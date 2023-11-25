@@ -72,7 +72,7 @@ This module has been tested against the below versions of AutomateNOW!
 ### 1.0.0
 - Initial release (feedback requested)
 <br/><br/>
-## Notes 📝
+## Caution 🚸
 
 Use the -NotSecure parameter when connecting to an instance that doesn't use https 😒
 <br/><br/>
