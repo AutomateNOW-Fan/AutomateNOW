@@ -10,6 +10,10 @@ Created by AutomateNOW-Fan
 ```
 ⚠ Not affiliated with InfiniteDATA
 ```
+## Installation 🏗
+
+Install from the PowerShell Gallery 👉 `Install-Module -Name AutomateNOW -Scope CurrentUser`
+<br/><br/>
 ## Usage 🤔
 Use `Connect-AutomateNOW` to establish your session (access token)
 <br/><br/>
@@ -29,7 +33,7 @@ This module has been tested against the below versions of AutomateNOW!
 
 - 3.3.1.73
 <br/><br/>
-## Change Log 👀
+## Change Log 📝
 
 ### 1.0.7
 - Added new functions: `Get-AutomateNOWTask`, `Show-AutomateNOWTaskType`, `Start-AutomateNOWTask`
@@ -67,11 +71,6 @@ This module has been tested against the below versions of AutomateNOW!
 
 ### 1.0.0
 - Initial release (feedback requested)
-<br/><br/>
-## Installation 👍
-
-
-Install from the PowerShell Gallery 👉 **Install-Module -Name AutomateNOW -Scope CurrentUser**
 <br/><br/>
 ## Notes 📝
 
