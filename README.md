@@ -20,7 +20,7 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 ## Features 🤓
 
 - Completely browserless operation
-- Compatible with both Windows PowerShell 5.1 & PowerShell Core 7+
+- Compatible with both Windows PowerShell & PowerShell Core
 - Outputs can be PSCustomObject or (deserialized) JSON
 - Supports both http & https protocols
 - Each function will respond to -? with help information
@@ -39,11 +39,11 @@ This module has been tested against the below versions of AutomateNOW!
 - Added new functions: `Get-AutomateNOWTask`, `Show-AutomateNOWTaskType`, `Start-AutomateNOWTask`
 - Added support for transparent colors in `New-AutomateNOWTag`
 - Added a requirement to use `Disconnect-AutomateNOWTag` before connecting to a different instance
-- Added the ability to include additional headers via -Headers with `Invoke-AutomateNOWAPI`
+- Added the _-Headers_ parameter to `Invoke-AutomateNOWAPI` for including additional headers (experimental)
 - Incorporated `ConvertTo-QueryString` (see MSIdentityTools on the PowerShell Gallery)
 - Fixed an issue with the token expiration date sometimes showing +1 hour ahead
 - Fixed an issue with HTTP error hints not being shown
-- Fixed an issue with the domain not being set in the header variable whenever the domain was specified with the -Domain parameter of `Confirm-AutomateNOWSession`
+- Fixed an issue with the domain not being set in the header variable whenever the domain was specified with the _-Domain_ parameter of `Confirm-AutomateNOWSession`
 
 ### 1.0.6
 - Added new functions: `Get-AutomateNOWWorkflow`, `Get-AutomateNOWFolder`, `New-AutomateNOWFolder`
@@ -61,7 +61,7 @@ This module has been tested against the below versions of AutomateNOW!
 ### 1.0.3
 - Added new functions: `Import-AutomateNOWIcon`, `New-AutomateNOWTag`, `Remove-AutomateNOWTag` & `Update-AutomateNOWToken`
 - Added the ability to refresh the token (See `Update-AutomateNOWToken`)
-- Fixed an issue where the -SkipCertificateCheck parameter was included in PowerShell 7 even when it was not needed
+- Fixed an issue where the _-SkipCertificateCheck_ parameter was included in PowerShell 7 even when it was not needed
 
 ### 1.0.2
 - Cosmetic fixes for PowerShell Gallery (again!)
@@ -74,7 +74,7 @@ This module has been tested against the below versions of AutomateNOW!
 <br/><br/>
 ## Caution 🚸
 
-Use the -NotSecure parameter when connecting to an instance that doesn't use https 😒
+Use the _-NotSecure_ parameter when connecting to an instance that doesn't use https 😒
 <br/><br/>
 ## Functions 🛠
 
