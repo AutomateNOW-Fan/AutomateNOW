@@ -38,7 +38,7 @@ This module has been tested against the below versions of AutomateNOW!
 ### 1.0.7
 - Added new functions: `Get-AutomateNOWTask`, `Show-AutomateNOWTaskType`, `Start-AutomateNOWTask`
 - Added support for transparent colors in `New-AutomateNOWTag`
-- Added a requirement to use `Disconnect-AutomateNOWTag` before connecting to a different instance
+- Added a requirement to use `Disconnect-AutomateNOW` before connecting to a different instance
 - Added the _-Headers_ parameter to `Invoke-AutomateNOWAPI` for including additional headers (experimental)
 - Incorporated `ConvertTo-QueryString` (see MSIdentityTools on the PowerShell Gallery)
 - Fixed an issue with the token expiration date sometimes showing +1 hour ahead
