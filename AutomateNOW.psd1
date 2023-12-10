@@ -1,5 +1,5 @@
 ﻿<#	
-Developed against AutomateNOW! version 3.2.1.69
+Developed against AutomateNOW! version 3.2.1.77
 #>
 @{	
 	# Author of this module
@@ -9,10 +9,10 @@ Developed against AutomateNOW! version 3.2.1.69
 	RootModule = 'AutomateNOW.psm1'
 	
 	# Version number of this module.
-	ModuleVersion = '1.0.7'
+	ModuleVersion = '1.0.8'
 	
 	# ID used to uniquely identify this module
-	GUID = '374214ab-a9cb-6aa1-6531-1d73e6a25a0b'
+	GUID = '3a4214ab-a9cb-6aa1-2331-1d73e6a25b0b'
 	
 	# Copyright statement for this module
 	Copyright = 'not affiliated with InfiniteDATA'
@@ -60,7 +60,7 @@ Developed against AutomateNOW! version 3.2.1.69
 	NestedModules = @()
 	
 	# Functions to export from this module
-	FunctionsToExport = @('Confirm-AutomateNOWSession', 'Connect-AutomateNOW', 'Disconnect-AutomateNOW', 'Get-AutomateNOWDomain', 'Get-AutomateNOWFolder', 'Get-AutomateNOWNode', 'Get-AutomateNOWTag', 'Get-AutomateNOWTask', 'Get-AutomateNOWTriggerLog', 'Get-AutomateNOWUser', 'Get-AutomateNOWWorkflow', 'Import-AutomateNOWIcon', 'Invoke-AutomateNOWAPI', 'New-AutomateNOWFolder', 'New-AutomateNOWTag', 'Remove-AutomateNOWTag', 'Set-AutomateNOWPassword', 'Show-AutomateNOWDomain', 'Show-AutomateNOWTaskType', 'Start-AutomateNOWTask', 'Switch-AutomateNOWDomain', 'Update-AutomateNOWToken') #For performance, list functions explicitly
+	FunctionsToExport = @('Confirm-AutomateNOWSession', 'Connect-AutomateNOW', 'Disconnect-AutomateNOW', 'Get-AutomateNOWAdhocReport', 'Get-AutomateNOWAuditLog', 'Get-AutomateNOWCalendar', 'Get-AutomateNOWDomain', 'Get-AutomateNOWFolder', 'Get-AutomateNOWNode', 'Get-AutomateNOWOverview', 'Get-AutomateNOWTag', 'Get-AutomateNOWTask', 'Get-AutomateNOWTriggerLog', 'Get-AutomateNOWUser', 'Get-AutomateNOWWorkflow', 'Import-AutomateNOWIcon', 'Invoke-AutomateNOWAPI', 'New-AutomateNOWFolder', 'New-AutomateNOWTag', 'Read-AutomateNOWTimeZone', 'Remove-AutomateNOWTag', 'Set-AutomateNOWPassword', 'Show-AutomateNOWDomain', 'Show-AutomateNOWTaskType', 'Start-AutomateNOWTask', 'Switch-AutomateNOWDomain', 'Update-AutomateNOWToken') #For performance, list functions explicitly
 	CompatiblePSEditions = @('Desktop', 'Core')
 	
 	# Cmdlets to export from this module

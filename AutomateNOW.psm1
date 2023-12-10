@@ -1,4 +1,193 @@
-﻿#Region - Utilities
+﻿$InformationPreference = 'Continue'
+
+#Region Classes
+Class ANOWAuditLogEntry {
+    [Parameter(Mandatory = $true)]
+    [string]$actionTimestamp
+    [ValidateSet('UPDATE', 'INSERT', 'DELETE')]
+    [Parameter(Mandatory = $true)]
+    [string]$actionType
+    [Parameter(Mandatory = $true)]
+    [int64]$id
+    [Parameter(Mandatory = $true)]
+    [string]$objectId
+    [Parameter(Mandatory = $true)]
+    [string]$tableName
+    [Parameter(Mandatory = $false)]
+    [string]$userIp
+    [Parameter(Mandatory = $false)]
+    [string]$createdBy
+    [Parameter(Mandatory = $false)]
+    [string]$Domain
+}
+
+Class ANOWAuditLogEntry_Update : ANOWAuditLogEntry {
+    [ValidateSet('UPDATE')]
+    [Parameter(Mandatory = $true)]
+    [string]$actionType
+    [Parameter(Mandatory = $true)]
+    [PSCustomObject]$newValues
+    [Parameter(Mandatory = $true)]
+    [string]$newValuesText
+    [Parameter(Mandatory = $true)]
+    [PSCustomObject]$oldValues
+    [Parameter(Mandatory = $true)]
+    [string]$oldValuesText
+    ANOWAuditLogEntry_Update() { $this.Init(@{}) }
+    ANOWAuditLogEntry_Update([hashtable]$Properties) { $this.Init($Properties) }
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+    [string] ToString() {
+        [string]$ConvertedAuditLogEntry = $this | ConvertTo-Json -Compress
+        Return $ConvertedAuditLogEntry
+    }
+    [PSCustomObject[]] CompareOldNewValues() {
+        [PSCustomObject]$ReferenceObject = $this.oldValues
+        [PSCustomObject]$DifferenceObject = $this.newValues
+        [PSCustomObject[]]$ComparisonObjects = Compare-ObjectProperty -ReferenceObject $ReferenceObject -DifferenceObject $DifferenceObject | ForEach-Object { [PSCustomObject]@{PropertyName=$_.PropertyName; PreviousValue=$_.RefValue; NewValue=$_.DiffValue } }
+        If ($ComparisonObjects.Count -gt 0) {
+            Return $ComparisonObjects
+        }
+        Else {
+            Throw "Compare-Object somehow failed to compare the old values against the new values in log entry [$($this.id)]"
+        }
+    }
+}
+
+Class ANOWAuditLogEntry_Delete : ANOWAuditLogEntry {
+    [ValidateSet('DELETE')]
+    [Parameter(Mandatory = $true)]
+    [string]$actionType
+    [Parameter(Mandatory = $true)]
+    [PSCustomObject]$oldValues
+    [Parameter(Mandatory = $true)]
+    [string]$oldValuesText
+
+    # Default constructor
+    ANOWAuditLogEntry_Update() { $this.Init(@{}) }
+    # Convenience constructor from hashtable
+    ANOWAuditLogEntry_Update([hashtable]$Properties) { $this.Init($Properties) }
+    # Shared initializer method
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+}
+
+Class ANOWAuditLogEntry_Insert : ANOWAuditLogEntry {
+    [ValidateSet('INSERT')]
+    [Parameter(Mandatory = $true)]
+    [string]$actionType
+    [Parameter(Mandatory = $true)]
+    [PSCustomObject]$newValues
+    [Parameter(Mandatory = $true)]
+    [string]$newValuesText
+
+    # Default constructor
+    ANOWAuditLogEntry_Update() { $this.Init(@{}) }
+    # Convenience constructor from hashtable
+    ANOWAuditLogEntry_Update([hashtable]$Properties) { $this.Init($Properties) }
+    # Shared initializer method
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }        
+}
+
+Class AutomateNOWTimeZone {
+    [string]$displayName
+    [string]$id
+    [int32]$rawOffset
+    [int32]$dstsavings
+
+    AutomateNOWTimeZone() { $this.Init(@{}) }
+    
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+}
+
+#EndRegion
+
+#Region - Utilities
+function Compare-ObjectProperty {
+    <#
+    .SYNOPSIS
+        Compares two objects property by property.
+    .DESCRIPTION
+        Compares two objects property by property. A simple Compare-Object only compares those properties with the same name in the two objects.
+    .PARAMETER ReferenceObject
+        The first object to compare
+    .PARAMETER DifferenceObject
+        The second object to compare
+    .EXAMPLE
+        $a = New-Object psobject -Prop ([ordered] @{ One = 1; Two = 2})
+        $b = New-Object psobject -Prop ([ordered] @{ One = 1; Two = 2; Three = 3})
+     
+        Compare-Object $a $b
+     
+        # would return $null because it only compares the properties that have common names but
+     
+        Compare-ObjectProperty $a $b
+     
+        # would return below because it compares the two objects property by property
+     
+        PropertyName RefValue DiffValue
+        ------------ -------- ---------
+        Three 3
+    .OUTPUTS
+        [psobject]
+    .LINK
+        https://github.com/riedyw/PoshFunctions
+    #>
+    
+        #region Parameters
+        [CmdletBinding(ConfirmImpact = 'None')]
+        [outputtype('psobject')]
+        Param(
+            [Parameter(Mandatory, HelpMessage = 'First object to compare', Position = 0)]
+            [PSObject] $ReferenceObject,
+    
+            [Parameter(Mandatory, HelpMessage = 'Second object to compare', Position = 1)]
+            [PSObject] $DifferenceObject
+        )
+        #endregion Parameters
+    
+        begin {
+            Write-Verbose -Message "Starting [$($MyInvocation.Mycommand)]"
+        }
+    
+        process {
+            $objprops = $ReferenceObject | Get-Member -MemberType Property, NoteProperty | ForEach-Object Name
+            $objprops += $DifferenceObject | Get-Member -MemberType Property, NoteProperty | ForEach-Object Name
+            $objprops = $objprops | Sort-Object | Select-Object -Unique
+            $diffs = @()
+            foreach ($objprop in $objprops) {
+                $diff = Compare-Object -ReferenceObject $ReferenceObject -DifferenceObject $DifferenceObject -Property $objprop
+                if ($diff) {
+                    $diffprops = @{
+                        PropertyName = $objprop
+                        RefValue     = ($diff | Where-Object { $_.SideIndicator -eq '<=' } | ForEach-Object $($objprop))
+                        DiffValue    = ($diff | Where-Object { $_.SideIndicator -eq '=>' } | ForEach-Object $($objprop))
+                    }
+                    $diffs += New-Object -TypeName PSObject -Property $diffprops
+                }
+            }
+            if ($diffs) { return ($diffs | Select-Object -Property PropertyName, RefValue, DiffValue) }
+        }
+    
+        end {
+            Write-Verbose -Message "Ending [$($MyInvocation.Mycommand)]"
+        }
+}
+
 Function ConvertTo-QueryString {
     <#
     Credit for this function: https://www.powershellgallery.com/packages/MSIdentityTools
@@ -47,6 +236,216 @@ Function ConvertTo-QueryString {
 
 #endregion
 
+#Region - AdHoc Reports
+
+Function Get-AutomateNOWAdhocReport {
+    <#
+    .SYNOPSIS
+    Gets the Adhoc Report objects from an instance of AutomateNOW!
+    
+    .DESCRIPTION    
+    The `Get-AutomateNOWAdhocReport` cmdlet gets the Adhoc Report objects from an instance of AutomateNOW!
+    
+    .PARAMETER startRow
+    An optional int32 representing what row to start the download from. This is intended for multi-page transfers.
+
+    .PARAMETER endRow
+    An optional int32 representing how many rows of data to receive. The default is 2000. This is ideal for testing when you only want a few items.
+
+    .PARAMETER sortBy
+    Optional string parameter which defines the sorting order (default is by 'id'). Valid choices are: 'createdBy', 'dateCreated', 'description', 'domain', 'folder', 'id', 'lastUpdated', 'lastUpdatedBy', 'reportType', 'simpleId', 'tags'
+
+    .PARAMETER Descending
+    Optional switch parameter which changes the sort order from the default ascending to descending
+    
+    .INPUTS
+    None. You cannot pipe objects to Get-AutomateNOWAdhocReport.
+    
+    .OUTPUTS
+    An array of PSCustomObjects
+    
+    .EXAMPLE
+    Get-AutomateNOWAdhocReport
+    
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [OutputType([PSCustomObject])]
+    [Cmdletbinding()]
+    Param(
+        [Parameter(Mandatory = $False)]
+        [int32]$startRow = 0,
+        [Parameter(Mandatory = $False)]
+        [int32]$endRow = 2000,
+        [ValidateSet('createdBy', 'dateCreated', 'description', 'domain', 'folder', 'id', 'lastUpdated', 'lastUpdatedBy', 'reportType', 'simpleId', 'tags', IgnoreCase = $false)]
+        [Parameter(Mandatory = $False)]
+        [string]$sortBy = 'id',
+        [Parameter(Mandatory = $False)]
+        [switch]$Descending
+    )
+    If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+        Write-Warning -Message "Somehow there is not a valid token confirmed."
+        Break
+    }
+    [string]$command = '/adhocReport/read'
+    $BodyObject = New-Object -TypeName System.Collections.Specialized.OrderedDictionary
+    $BodyObject.Add('_operationType', 'fetch')
+    $BodyObject.Add('_startRow', $startRow)
+    $BodyObject.Add('_endRow', $endRow)
+    If ($Descending -eq $true) {
+        [string]$sortBy = ('-' + $sortBy)
+    }
+    $BodyObject.Add('_sortBy', $sortBy)
+    $BodyObject.Add('_textMatchStyle', 'exact')
+    $BodyObject.Add('_componentId', 'AdhocReportList')
+    $BodyObject.Add('_dataSource', 'AdhocReportDataSource')
+    $BodyObject.Add('isc_metaDataPrefix', '_')
+    $BodyObject.Add('isc_dataFormat', 'json')
+    [string]$Body = ConvertTo-QueryString -InputObjects $BodyObject    
+    [string]$Instance = $anow_session.Instance
+    [hashtable]$parameters = @{}
+    $parameters.Add('Command', $command)
+    $parameters.Add('Method', 'GET')
+    $parameters.Add('Body', $Body)
+    $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+    $parameters.Add('Instance', $Instance)
+    If ($anow_session.NotSecure -eq $true) {
+        $parameters.Add('NotSecure', $true)
+    }    
+    $Error.Clear()
+    Try {
+        [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+    }
+    Catch {
+        [string]$Message = $_.Exception.Message
+        Write-Warning -Message "Invoke-AutomateNOWAPI failed due to execute [$command] due to [$Message]."
+        Break
+    }
+    [array]$AdhocReports = $results.response.data
+    [int32]$AdhocReports_count = $AdhocReports.Count
+    If ($AdhocReports_count -eq 0) {
+        Write-Warning -Message "Somehow there are 0 Adhoc reports..."
+        Break
+    }
+    Return $AdhocReports
+}
+
+#EndRegion
+
+#Region - AuditLog
+
+Function Get-AutomateNOWAuditLog {
+    <#
+    .SYNOPSIS
+    Gets the Audit log from an instance of AutomateNOW!
+    
+    .DESCRIPTION    
+    The `Get-AutomateNOWAuditLog` cmdlet gets the Audit log from an instance of AutomateNOW!
+
+    .PARAMETER startRow
+    An optional int32 representing what row to start the download from. This is intended for multi-page transfers.
+
+    .PARAMETER endRow
+    An optional int32 representing how many rows of data to receive. The default is 2000. This is ideal for testing when you only want a few items.
+
+    .PARAMETER Ascending
+    Optional switch parameter which changes the sort order (of the actionTimestamp property) from the default descending to ascending
+
+    .INPUTS
+    None. You cannot pipe objects to Get-AutomateNOWAuditLog.
+    
+    .OUTPUTS
+    An array of PSCustomObjects
+    
+    .EXAMPLE
+    Get-AutomateNOWAuditLog
+    
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [OutputType([PSCustomObject])]
+    [Cmdletbinding()]
+    Param(
+        [Parameter(Mandatory = $False)]
+        [int32]$startRow = 0,
+        [Parameter(Mandatory = $False)]
+        [int32]$endRow = 200,
+        [Parameter(Mandatory = $False)]
+        [switch]$Ascending
+    )
+    If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+        Write-Warning -Message "Somehow there is not a valid token confirmed."
+        Break
+    }    
+    If ($endRow -lt $startRow) {
+        Write-Warning -Message "The end row must be higher then the start row"
+        Break
+    }
+    $BodyObject = New-Object -TypeName System.Collections.Specialized.OrderedDictionary
+    $BodyObject.Add('_operationType', 'fetch')
+    $BodyObject.Add('_startRow', $startRow)
+    $BodyObject.Add('_endRow', $endRow)
+    If ($Ascending -ne $true) {
+        $BodyObject.Add('_sortBy', '-actionTimestamp')
+    }
+    Else {
+        $BodyObject.Add('_sortBy', 'actionTimestamp')
+    }
+    $BodyObject.Add('_textMatchStyle', 'substring')
+    $BodyObject.Add('_componentId', 'AuditLogEventList')
+    $BodyObject.Add('_dataSource', 'AuditLogDataSource')
+    $BodyObject.Add('isc_metaDataPrefix', '_')
+    $BodyObject.Add('isc_dataFormat', 'json')
+    [string]$Body = ConvertTo-QueryString -InputObjects $BodyObject
+    [string]$command = '/auditLog/read' + '?' + $Body # Note these parameters must be passed on the URL directly
+    [string]$Instance = $anow_session.Instance
+    [hashtable]$parameters = @{}
+    $parameters.Add('Command', $command)
+    $parameters.Add('Method', 'GET')
+    If ($Verbose -eq $true) {
+        $parameters.Add('Verbose', $True)
+    }
+    $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+    $parameters.Add('Instance', $Instance)
+    If ($anow_session.NotSecure -eq $true) {
+        $parameters.Add('NotSecure', $true)
+    }    
+    $Error.Clear()
+    Try {
+        [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+    }
+    Catch {
+        [string]$Message = $_.Exception.Message
+        Write-Warning -Message "Invoke-AutomateNOWAPI failed due to execute [$command] due to [$Message]."
+        Break
+    }
+    $Error.Clear()
+    Try {
+        [array]$AuditLogs = ForEach($entry in $results.response.data)  { 
+            Switch ($entry.actionType) {
+                "UPDATE" { [ANOWAuditLogEntry_Update]$entry; Break }
+                "INSERT" { [ANOWAuditLogEntry_Insert]$entry; Break }
+                "DELETE" { [ANOWAuditLogEntry_Delete]$entry }
+            }
+        }
+    }
+    Catch {
+        [string]$Message = $_.Exception.Message
+        Write-Warning -Message "ForEach-Object failed due to parse the AuditLog entry due to [$Message]."
+        Break
+    }
+    [int32]$AuditLogs_count = $AuditLogs.Count
+    If ($AuditLogs_count -eq 0) {
+        Write-Warning -Message "Somehow there are 0 AuditLog entries. This can't be correct."
+        Break
+    }
+    Return $AuditLogs
+}
+
+#EndRegion
+
 #Region - Authentication
 
 Function Confirm-AutomateNOWSession {
@@ -63,8 +462,11 @@ Switch parameter to silence the extraneous output that this outputs by default
 .PARAMETER IgnoreEmptyDomain
 Switch parameter to ignore the lack of configured domain in the session header. This was intended for development purposes and is likely to be removed in the future.
 
+.PARAMETER DoNotRefresh
+Switch parameter to ignore MaximumTokenRefreshAge
+
 .PARAMETER MaximumTokenRefreshAge
-int32 parameter to specify the minimum age (in seconds) of the refresh token before updating it occurs automatically.
+int32 parameter to specify the minimum age (in seconds) of the refresh token before updating it occurs automatically. Default is 3300 (meaning that the token will not be refreshed if it is less than 300 seconds old)
 
 .INPUTS
 None. You cannot pipe objects to Confirm-AutomateNOWSession (yet).
@@ -92,13 +494,21 @@ You must use Connect-AutomateNOW to establish the token before you can confirm i
         [int32]$MaximumTokenRefreshAge = 3300
     )
     If ($anow_header.values.count -eq 0) {
-        Write-Warning -Message "Please use Connect-AutomateNOW to establish your access token."
+        Write-Warning -Message "Please use Connect-AutomateNOW to establish your access token or provide your token through the -AccessToken parameter of Connect-AutomateNOW."
         Break
     }
     ElseIf ($anow_header.Authorization -notmatch '^Bearer [a-zA-Z-_/=:,."0-9]{1,}$') {
         [string]$malformed_token = $anow_header.values
         Write-Warning -Message "Somehow the access token is not in the expected format. Please contact the author with this apparently malformed token: [$malformed_token]"
         Break
+    }
+    ElseIf ($anow_header.domain.Length -eq 0 -and $IgnoreEmptyDomain -ne $true) {
+        Write-Warning -Message 'Please use Switch-AutomateNOWDomain to switch your domain. Use Get-AutomateNOWDomains or include the -Domain parameter with Connect-AutomateNOW'
+        Break
+    }
+    ElseIf ($anow_session.RefreshToken -eq 'Not set') {
+        Write-Warning -Message 'This connection is without a refresh token! Please use -RefreshToken with Connect-AutomateNOW to include one.'
+        Return $true
     }
     ElseIf ($anow_session.ExpirationDate -isnot [datetime]) {
         Write-Warning -Message 'Somehow there is no expiration date available. Please use Connect-AutomateNOW to establish your session properties.'
@@ -113,26 +523,44 @@ You must use Connect-AutomateNOW to establish the token before you can confirm i
         Write-Warning -Message 'Somehow the Invoke-AutomateNOWAPI function is not available in this session. Did you install -and- import the module?'
         Break
     }
-    [datetime]$current_date = Get-Date
-    [datetime]$ExpirationDate = $anow_session.ExpirationDate
-    [string]$ExpirationDateDisplay = Get-Date -Date $ExpirationDate -Format 'yyyy-MM-dd HH:mm:ss'
-    [timespan]$TimeRemaining = ($ExpirationDate - $current_date)
-    [int32]$SecondsRemaining = $TimeRemaining.TotalSeconds
-    If ($SecondsRemaining -lt 0) {
-        Write-Warning -Message "This token expired [$SecondsRemaining] seconds ago at [$ExpirationDateDisplay]. Kindly refresh your token by using Connect-AutomateNOW."
-        Break
-    }
-    ElseIf ($SecondsRemaining -lt $MaximumTokenRefreshAge -and $DoNotRefesh -ne $true) {
-        [int32]$minutes_elapsed = ($TimeRemaining.TotalMinutes)
-        Write-Verbose -Message "This token will expire in [$minutes_elapsed] minutes. Refreshing your token automatically. Use -DoNotRefresh with Connect-AutomateNOW to stop this behavior."
-        Update-AutomateNOWToken
+    If ($anow_session.ExpirationDate -gt (Get-Date -Date '1970-01-01 00:00:00')) {
+        [datetime]$current_date = Get-Date
+        [datetime]$ExpirationDate = $anow_session.ExpirationDate
+        [string]$ExpirationDateDisplay = Get-Date -Date $ExpirationDate -Format 'yyyy-MM-dd HH:mm:ss'
+        [timespan]$TimeRemaining = ($ExpirationDate - $current_date)
+        [int32]$SecondsRemaining = $TimeRemaining.TotalSeconds
+        If ($SecondsRemaining -lt 0) {
+            If ($SecondsRemaining -lt -86400) {
+                [int32]$DaysRemaining = ($SecondsRemaining / -86400)
+                Write-Warning -Message "This token expired [$DaysRemaining] days ago at [$ExpirationDateDisplay]. You can request a new token using Connect-AutomateNOW."
+                Break    
+            }
+            ElseIf ($SecondsRemaining -lt -3600) {
+                [int32]$HoursRemaining = ($SecondsRemaining / -3600)
+                Write-Warning -Message "This token expired [$HoursRemaining] hours ago at [$ExpirationDateDisplay]. You can request a new token using Connect-AutomateNOW."
+                Break    
+            }
+            ElseIf ($SecondsRemaining -lt -60) {
+                [int32]$MinutesRemaining = ($SecondsRemaining / -60)
+                Write-Warning -Message "This token expired [$MinutesRemaining] minutes ago at [$ExpirationDateDisplay]. You can request a new token using Connect-AutomateNOW."
+                Break    
+            }
+            Else {
+                Write-Warning -Message "This token expired [$SecondsRemaining] seconds ago at [$ExpirationDateDisplay]. You can request a new token using Connect-AutomateNOW."
+                Break    
+            }
+        }
+        ElseIf (($SecondsRemaining -lt $MaximumTokenRefreshAge) -and ($DoNotRefresh -ne $true)) {
+            [int32]$minutes_elapsed = ($TimeRemaining.TotalMinutes)
+            Write-Verbose -Message "This token will expire in [$minutes_elapsed] minutes. Refreshing your token automatically. Use -DoNotRefresh with Connect-AutomateNOW to stop this behavior."
+            Update-AutomateNOWToken
+        }
+        Else {
+            Write-Verbose -Message "Debug: This token still has [$SecondsRemaining] seconds remaining"
+        }
     }
     Else {
-        Write-Verbose -Message "Debug: This token still has [$SecondsRemaining] seconds remaining"
-    }
-    If ($anow_header.domain.Length -eq 0 -and $IgnoreEmptyDomain -ne $true) {
-        Write-Warning -Message 'You somehow do have not have a domain selected. You can try re-connecting again with Connect-AutomateNOW and the -Domain parameter or use Switch-AutomateNOWDomain please.'
-        Break
+        Write-Warning -Message "This token has an unknown expiration date because you used -AccessToken without including -RefreshToken :|"
     }
     Return $true
 }
@@ -145,17 +573,29 @@ Connects to the API of an AutomateNOW! instance
 .DESCRIPTION
 The `Connect-AutomateNow` function authenticates to the API of an AutomateNOW! instance. It then sets the access token globally.
 
-.PARAMETER User
-Specifies the user connecting to the API
-
-.PARAMETER Pass
-Specifies the password of the user connecting to the API
-
 .PARAMETER Instance
 Specifies the name of the AutomateNOW! instance. For example: s2.infinitedata.com
 
+.PARAMETER User
+Specifies the user connecting to the API only if you want to enter it on the command line manually. If you do not specify this, you will be prompted for it.
+
+.PARAMETER Pass
+Specifies the password for connecting to the API only if you want to enter it on the command line manually. If you do not specify this, you will be prompted for it.
+
+.PARAMETER AccessToken
+Specifies an access token manually. This is normally copy/pasted from your web browser. THIS IS OPTIONAL!
+
+.PARAMETER RefreshToken
+Specifies the refresh token manually. This is normally copy/pasted from your web browser. THIS IS OPTIONAL! You can use -AccessToken without this but it is better to include the refresh token as well for a fully functioning session without warnings.
+
+.PARAMETER ExpirationDate
+Int64 representing the current date in UNIX time milliseconds. THIS IS OPTIONAL! You can only use this in conjunction with -AccessToken. Hint: If the Unix timestamp is 13 digits in length, it has milliseconds. If it is 10 digits in length, it does not.
+
+.PARAMETER ReadJSONFromClipboard
+Switch parameter that read the Access Token, Refresh Token and Expiration Date from your clipboard. Normally, you would copy this from the response to your authentication request in your web browser. This is STRICTLY for your convenience. See notes below.
+
 .PARAMETER Domain
-Optional string to set the AutomateNOW domain manually
+Optional string to set the AutomateNOW domain manually. If you do not specify, then you will (likely) need to use Switch-AutomateNOWDomain
 
 .PARAMETER NotSecure
 Switch parameter to accomodate instances that use the http protocol (typically on port 8080)
@@ -163,8 +603,11 @@ Switch parameter to accomodate instances that use the http protocol (typically o
 .PARAMETER Quiet
 Switch parameter to silence the extraneous output that this outputs by default
 
+.PARAMETER SkipPreviousSessionCheck
+Switch parameter to override the requirement to disconnect from a previous session before starting a new session on a different instance
+
 .PARAMETER Key
-Optional 16-byte array for when InfiniteDATA has changed their encryption key
+Optional 16-byte array for when InfiniteDATA has changed their encryption key. Let's hope we don't need to use this :-)
 
 .INPUTS
 None. You cannot pipe objects to Connect-AutomateNOW (yet).
@@ -173,10 +616,33 @@ None. You cannot pipe objects to Connect-AutomateNOW (yet).
 There is no direct output. Rather, a global variable $anow_header with the bearer access token is set in the current powershell session.
 
 .EXAMPLE
-Connect-AutomateNOW -User 'user.10' -Pass 'MyCoolPassword!' -Instance 's2.infinitedata.com'
+Example 1 (You will be prompted for credential, just like the UI) *RECOMMENDED*
+Connect-AutomateNOW -Instance 's2.infinitedata.com'
+
+Example 2 (You will logon to the AutomateNOW UI and copy the authentication JSON payload into your clipboard)
+Connect-AutomateNOW -Instance 's2.infinitedata.com' -ReadJSONFromClipboard
+
+Example 3 (You will provide the access token, refresh token and expiration date typically sourced from your web browser after logging on that way)
+Connect-AutomateNOW -Instance 's2.infinitedata.com' -AccessToken 'ey...' -RefreshToken 'ey...' -ExpirationDate 1700000000000
+
+Example 4 (You will provide only the access token without an accompanying refresh or expiration date)
+Connect-AutomateNOW -Instance 's2.infinitedata.com' -AccessToken 'ey...'
+
+Example 5 (Shows how to connect to an insecure instance and also how to skip the check if a previous session already exists)
+Connect-AutomateNOW -Instance 'blah-blah.azure.com' -NotSecure -Domain 'Test' -SkipPreviousSessionCheck
+
+Example 6 (Shows how to enter an alternate encryption key array)
+Connect-AutomateNOW -Instance 's2.infinitedata.com' -Key [byte[]]@(7, 22, 15, 11, 1, 24, 8, 13, 16, 10, 5, 17, 12, 19, 27, 9)
+
+Example 7 (You will supply the user and password on the commandline. This is not secure because your password will be logged in your command line history. This is only here for convenience in a training instance!) *NOT RECOMMENDED*
+Connect-AutomateNOW -Instance 's2.infinitedata.com' -User 'user.10' -Pass '********' -Domain 'Test' -Quiet
 
 .NOTES
-More features will be added in the future if this turns out to be useful
+1. The -User and -Pass parameters are NOT NEEDED. They do work but they are not recommended because your credential would be in the command line history. These 2 parameters were intended for convenience on InfiniteDATA training instances with generic logons. Simply do not include them to be prompted for the user/password. You may also skip the entering of passwords entirely by utilizing the -AccessToken and related parameters.
+2. The -AccessToken does not require the -RefreshToken and -ExpirationDate values to function but you will not be able to refresh your token and you will not know when it expires.
+3. Only use the -ReadJSONFromClipboard parameter if you are fully understanding and comfortable with this script reading a JSON payload from your clipboard.
+4. This module will take care of refreshing the token automatically based on the -MaximumTokenRefreshAge parameter of Confirm-AutomateNOWSession (defaults to 3300 seconds meaning that the refresh happens if your token is older than 300 seconds but not eXpired yet)
+5. Always use Disconnect-AutomateNOW after you have concluded your session
 
 #>
     [OutputType([string])]
@@ -184,26 +650,49 @@ More features will be added in the future if this turns out to be useful
     Param(
         [Parameter(Mandatory = $true, ParameterSetName = 'Default')]
         [Parameter(Mandatory = $true, ParameterSetName = 'DirectCredential')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'AccessToken')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'Clipboard')]
         [string]$Instance,
         [Parameter(Mandatory = $true, ParameterSetName = 'DirectCredential')]
         [string]$User,
         [Parameter(Mandatory = $true, ParameterSetName = 'DirectCredential')]
         [string]$Pass,
+        [ValidateScript({ $_ -match '^ey[a-zA-Z0-9_.-]{4,}$' })]
+        [Parameter(Mandatory = $true, ParameterSetName = 'AccessToken')]
+        [string]$AccessToken,
+        [ValidateScript({ $_ -match '^ey[a-zA-Z0-9_.-]{4,}$' })]
+        [Parameter(Mandatory = $false, ParameterSetName = 'AccessToken')]
+        [string]$RefreshToken,
+        [Parameter(Mandatory = $false, ParameterSetName = 'AccessToken')]
+        [int64]$ExpirationDate = 0,
+        [Parameter(Mandatory = $true, ParameterSetName = 'Clipboard')]
+        [switch]$ReadJSONFromClipboard,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [Parameter(Mandatory = $false, ParameterSetName = 'DirectCredential')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'AccessToken')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Clipboard')]
         [string]$Domain,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [Parameter(Mandatory = $false, ParameterSetName = 'DirectCredential')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'AccessToken')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Clipboard')]
         [switch]$NotSecure,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [Parameter(Mandatory = $false, ParameterSetName = 'DirectCredential')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'AccessToken')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Clipboard')]
         [switch]$Quiet,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [Parameter(Mandatory = $false, ParameterSetName = 'DirectCredential')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'AccessToken')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Clipboard')]
         [switch]$SkipPreviousSessionCheck,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [Parameter(Mandatory = $false, ParameterSetName = 'DirectCredential')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'AccessToken')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Clipboard')]
         [byte[]]$Key = @(7, 22, 15, 11, 1, 24, 8, 13, 16, 10, 5, 17, 12, 19, 27, 9)
+        
     )
     Function New-ANowAuthenticationPayload {
         [OutputType([string])]
@@ -372,8 +861,8 @@ More features will be added in the future if this turns out to be useful
     }
     If (($null -ne $anow_session.ExpirationDate) -and ($Instance -ne $anow_session.Instance) -and ($SkipPreviousSessionCheck -ne $true)) {
         [datetime]$current_date = Get-Date
-        [datetime]$ExpirationDate = $anow_session.ExpirationDate
-        [timespan]$TimeRemaining = ($ExpirationDate - $current_date)
+        [datetime]$expiration_date = $anow_session.ExpirationDate
+        [timespan]$TimeRemaining = ($expiration_date - $current_date)
         [int32]$SecondsRemaining = $TimeRemaining.TotalSeconds
         If ($SecondsRemaining -gt 60) {
             [string]$AlreadyConnectedInstance = ($anow_session.Instance)
@@ -392,67 +881,126 @@ More features will be added in the future if this turns out to be useful
             Break
         }
     }
-    If ($User.Length -eq 0) {
+    If ($ReadJSONFromClipboard -eq $true) {
         $Error.Clear()
         Try {
-            [string]$User = Read-Host -Prompt 'Please enter ldap username (e.g. jsmith1)'
+            If ($null -eq (Get-Clipboard)) {
+                Write-Warning "The clipboard cannot be read. Please use a different parameter set or fill up your clipboard with the authentication JSON payload."
+                Break
+            }
+            Else {
+                [string]$Clipboard = Get-Clipboard
+                If ($Clipboard -notmatch '[0-9a-zA-Z \n{}":,_.-]{1,}(?:"expires_in")[0-9a-zA-Z \n{}":,_.-]{1,}') {
+                    Write-Verbose -Message "The contents of the clipboard are: $Clipboard"
+                    Write-Warning "The contents of the clipboard do not appear to be a valid JSON authentication payload"
+                    Break
+                }
+            }
         }
         Catch {
             [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Read-Host failed to receive the current username due to [$Message]."
+            Write-Warning -Message "Get-Clipboard failed to read the clipboard due to [$Message]."
             Break
         }
-    }
-    If ($Pass.Length -eq 0) {
-        
-        If ($ps_version_major -gt 5) {
+        $Error.Clear()
+        Try {
+            [PSCustomObject]$AuthenticationObject = $Clipboard | ConvertFrom-Json
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "ConvertFrom-Json failed to convert the contents of the clipboard due to [$Message]."
+            Break
+        }
+        If ($AuthenticationObject.token_type -ne 'Bearer') {
+            Write-Warning -Message "Somehow the authentication object that was extracted from the clipboard does not include the Token Type. This is fatal."
+            Break
+        }
+        ElseIf ($AuthenticationObject.expires_in -isnot [int32]) {
+            Write-Warning -Message "Somehow the authentication object that was extracted from the clipboard does not have a valid expires_in property. This is fatal."
+            Break
+        }
+        ElseIf ($AuthenticationObject.expirationDate -isnot [int64]) {
+            Write-Warning -Message "Somehow the authentication object that was extracted from the clipboard does not have a valid expirationDate property. This is fatal."
+            Break
+        }
+        [string]$AccessToken = $AuthenticationObject.access_token
+        [string]$RefreshToken = $AuthenticationObject.refresh_token
+        [int64]$ExpirationDate = $AuthenticationObject.expirationDate
+    }    
+    If ($AccessToken.Length -eq 0) {
+        If ($User.Length -eq 0 ) {
             $Error.Clear()
             Try {
-                [string]$Pass = Read-Host -Prompt 'Please enter the password (e.g. ********)' -MaskInput
+                [string]$User = Read-Host -Prompt 'Please enter ldap username (e.g. jsmith1)'
             }
             Catch {
                 [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Read-Host failed to receive the current password on PowerShell Core due to [$Message]."
+                Write-Warning -Message "Read-Host failed to receive the current username due to [$Message]."
                 Break
             }
+        }
+        If ($Pass.Length -eq 0 ) {        
+            If ($ps_version_major -gt 5) {
+                $Error.Clear()
+                Try {
+                    [string]$Pass = Read-Host -Prompt 'Please enter the password (e.g. ********)' -MaskInput
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Read-Host failed to receive the current password on PowerShell Core due to [$Message]."
+                    Break
+                }
+            }
+            Else {
+                $Error.Clear()
+                Try {
+                    [securestring]$SecurePass = Read-Host -Prompt 'Please enter the password (e.g. ********)' -AsSecureString
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Read-Host failed to receive the current password on Windows PowerShell due to [$Message]."
+                    Break
+                }
+                $Error.Clear()
+                Try {
+                    [string]$Pass = [System.Net.NetworkCredential]::new("", $SecurePass).Password
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "The 'new' constructor of the System.Net.NetworkCredential class failed to convert a secure string to plain text due to [$Message]."
+                    Break
+                }
+                $Error.Clear()
+                Try {
+                    [PSCustomObject]$token_properties = New-ANOWAuthenticationProperties -User $User -Pass $Pass
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning "New-ANOWAuthenticationProperties failed due to [$Message]."
+                    Break
+                }
+                If ( $token_properties.expirationDate -isnot [int64]) {
+                    Write-Warning -Message "How is it that the expiration date value is not a 64-bit integer? Something must be wrong. Are we in a time machine?"
+                    Break
+                }
+                [string]$access_token = $token_properties.access_token
+                [string]$refresh_token = $token_properties.refresh_token
+            }
+        }
+    }
+    Else {
+        [string]$access_token = $AccessToken
+        If ($RefreshToken.Length -gt 0) {
+            [string]$refresh_token = $RefreshToken
         }
         Else {
-            $Error.Clear()
-            Try {
-                [securestring]$SecurePass = Read-Host -Prompt 'Please enter the password (e.g. ********)' -AsSecureString
-            }
-            Catch {
-                [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Read-Host failed to receive the current password on Windows PowerShell due to [$Message]."
-                Break
-            }
-            $Error.Clear()
-            Try {
-                [string]$Pass = [System.Net.NetworkCredential]::new("", $SecurePass).Password
-            }
-            Catch {
-                [string]$Message = $_.Exception.Message
-                Write-Warning -Message "The 'new' constructor of the System.Net.NetworkCredential class failed to convert a secure string to plain text due to [$Message]."
-                Break
-            }
+            [string]$refresh_token = 'Not set'
         }
     }
-    $Error.Clear()
-    Try {
-        [PSCustomObject]$token_properties = New-ANOWAuthenticationProperties -User $User -Pass $Pass
+    [hashtable]$authorization_header = @{'Authorization' = "Bearer $access_token"; 'domain' = ''; }
+    If ($Domain.Length -gt 0) {
+        $authorization_header['domain'] = $Domain
     }
-    Catch {
-        [string]$Message = $_.Exception.Message
-        Write-Warning "New-ANOWAuthenticationProperties failed due to [$Message]."
-        Break
-    }
-    If ( $token_properties.expirationDate -isnot [int64]) {
-        Write-Warning -Message "How is it that the expiration date value is not a 64-bit integer? Something must be wrong. Are we in a time machine?"
-        Break
-    }
-    [string]$access_token = $token_properties.access_token
-    [string]$refresh_token = $token_properties.refresh_token
-    [hashtable]$authorization_header = @{'Authorization' = "Bearer $access_token"; 'domain' = '' }
     $Error.Clear()
     Try {
         New-Variable -Name 'anow_header' -Scope Global -Value $authorization_header
@@ -473,16 +1021,42 @@ More features will be added in the future if this turns out to be useful
         Break
     }
     [System.TimeSpan]$utc_offset = $timezone.BaseUtcOffset
-    $Error.Clear()
-    Try {
-        [datetime]$expiration_date_utc = (Get-Date -Date '1970-01-01').AddMilliseconds($token_properties.expirationDate)
+    If ($refresh_token -ne 'Not set' -and $ExpirationDate -eq 0) {
+        $Error.Clear()
+        Try {
+            [datetime]$expiration_date_utc = (Get-Date -Date '1970-01-01').AddMilliseconds($token_properties.expirationDate)
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning "Get-Date failed due to process the expiration date from the `$token_properties variable due to [$Message]"
+            Break
+        }
+        [datetime]$expiration_date = ($expiration_date_utc + $utc_offset) # We're adding 2 values here: the current time in UTC and the current machine's UTC offset
     }
-    Catch {
-        [string]$Message = $_.Exception.Message
-        Write-Warning "Get-Date failed due to process the authentication properties due to [$Message]"
-        Break
+    Else {
+        If ($ExpirationDate -gt 0) {
+            $Error.Clear()
+            Try {
+                [datetime]$expiration_date_utc = (Get-Date -Date '1970-01-01').AddMilliseconds($ExpirationDate)
+            }
+            Catch {
+                Write-Warning "Get-Date failed due to process the expiration date from the `$ExpirationDate variable due to [$Message]"
+                Break
+            }
+            [datetime]$Current_Date_UTC = (Get-Date).ToUniversalTime()
+            [timespan]$Remaining_Time = ($Current_Date_UTC - $expiration_date_utc)
+            If ($Remaining_Time.TotalSeconds -le 1) {
+                [datetime]$expiration_date = ($expiration_date_utc + $utc_offset) # We're adding 2 values here: the current time in UTC and the current machine's UTC offset
+            }
+            Else {
+                Write-Warning -Message "Your token has expired. Please obtain a new one."
+                Break
+            }            
+        }
+        Else {
+            [datetime]$expiration_date = Get-Date -Date '1970-01-01'
+        }        
     }
-    [datetime]$expiration_date = ($expiration_date_utc + $utc_offset) # We're adding 2 values here: the current time in UTC and the current machine's UTC offset
     [hashtable]$anow_session = @{}
     $anow_session.Add('User', $User)
     $anow_session.Add('Instance', $Instance)
@@ -508,14 +1082,23 @@ More features will be added in the future if this turns out to be useful
         Write-Warning "Somehow the user info object is malformed."
         Break
     }
+    [string]$userName = $userInfo.id
+    If ($userName.Length -eq 0) {
+        Write-Warning -Message "Somehow the username property is not present from the user object. This is fatal."
+        Break
+    }
+    $anow_session['User'] = $userName
     [array]$domains = $userInfo.domains -split ','
     [int32]$domain_count = $domains.Count
     Write-Verbose -Message "Detected $domain_count domains"
-    If ($domain_count -eq 0) {
+    If ($domain_count -gt 0) {
+        $anow_session.Add('domains', $domains)
+    }
+    Else {
         Write-Warning "Somehow the count of domains is zero."
         Break
     }
-    ElseIf ($domain_count -eq 1) {
+    If ($domain_count -eq 1) {
         If ($Domain.Length -eq 0) {
             [string]$Domain = $domains
             If ($null -ne $anow_header.Domain) {
@@ -527,12 +1110,8 @@ More features will be added in the future if this turns out to be useful
             If ($null -ne $anow_session.domain) {
                 $anow_session.Remove('domain')
             }
-            If ($null -ne $anow_session.domains) {
-                $anow_session.Remove('domains')
-            }
             $anow_header.Add('domain', $Domain)
             $anow_session.Add('current_domain', $Domain)
-            $anow_session.Add('domains', @($Domain))
             Write-Verbose -Message "Automatically choosing the [$Domain] domain as it is the only one available."
         }
         ElseIf ($userInfo.domains -ne $Domain) {
@@ -540,19 +1119,19 @@ More features will be added in the future if this turns out to be useful
             Break
         }
     }    
-    Elseif ($domain_count -gt 1 -and $Domain.Length -gt 0) {
+    Else {
         If ($domains -contains $Domain) {
-            $anow_header['domain'] = $Domain
+            If ($Domain.Length -gt 0) {
+                $anow_header['domain'] = $Domain
+            }
+            Else {
+                Write-Warning -Message "The domain you chose with -Domain is not available on [$instance]. Are you sure you entered the domain correctly?"
+                Break
+            }
         }
         Else {
-            Write-Warning -Message "The domain you chose with -Domain is not available on [$instance]. Are you sure you entered the domain correctly?"
-            Break
+            Write-Verbose -Message "Proceeding without a domain selected"
         }
-    }
-    Else {
-        [string]$domains_display = $domains -join ', '
-        $anow_session.Add('domains', $domains)
-        Write-Information -MessageData "Please use Switch-AutomateNOWDomain to choose from one of these $domain_count domains [$domains_display]"
     }
     $Error.Clear()
     Try {
@@ -565,7 +1144,12 @@ More features will be added in the future if this turns out to be useful
     }
     Write-Verbose -Message 'Global variable $anow_session has been set. Use this for other session properties.'
     If ($Quiet -ne $true) {
-        Return [PSCustomObject]@{ instance = $instance; token_expires = $expiration_date; domain = $Domain; }
+        [PSCustomObject]$anow_session_display = [PSCustomObject]@{ instance = $instance; token_expires = $expiration_date; user = $userName; domain = $Domain; access_token = ($access_token.SubString(0, 5) + '...' + $access_token.SubString(($access_token.Length - 5), 5)) }
+        Format-Table -InputObject $anow_session_display -AutoSize -Wrap
+    }
+    If ($Domain.Length -eq 0) {
+        [string]$domains_display = $domains -join ', '
+        Write-Warning -Message "You did not include the domain. Please use Switch-AutomateNOWDomain to select one of the available domains: $domains_display"
     }
 }
 
@@ -593,7 +1177,7 @@ You should do this whenever you are finished with your session. This prevents yo
     Param(
     
     )
-    If ((Confirm-AutomateNOWSession -Quiet -IgnoreEmptyDomain) -ne $true) {
+    If ((Confirm-AutomateNOWSession -IgnoreEmptyDomain -Quiet) -ne $true) {
         Write-Warning -Message "Somehow there is not a valid token confirmed."
         Break
     }
@@ -795,6 +1379,9 @@ Function Update-AutomateNOWToken {
         Write-Warning -Message "Somehow there is no refresh token."
         Break
     }
+    ElseIf ( $anow_session.RefreshToken -eq 'Not set' ) {
+        Write-Warning -Message "It is not possible to refresh the token if you used -AccessToken without also including -RefreshToken"
+    }
     [string]$command = '/oauth/access_token'
     [string]$ContentType = 'application/x-www-form-urlencoded; charset=UTF-8'
     [string]$RefreshToken = $anow_session.RefreshToken
@@ -907,13 +1494,13 @@ Function Invoke-AutomateNOWAPI {
         [ValidateSet('GET', 'POST')]
         [string]$Method,
         [Parameter(Mandatory = $false)]
+        [hashtable]$Headers,
+        [Parameter(Mandatory = $false)]
         [switch]$NotSecure = $false,
         [Parameter(Mandatory = $false)]
         [string]$Body,
         [Parameter(Mandatory = $false)]
         [string]$ContentType = 'application/json',
-        [Parameter(Mandatory = $false)]
-        [hashtable]$Headers,
         [Parameter(Mandatory = $false)]
         [string]$Instance,
         [Parameter(Mandatory = $false)]
@@ -966,22 +1553,31 @@ Function Invoke-AutomateNOWAPI {
     $parameters.Add('Uri', $api_url)
     If ($Headers -is [hashtable]) {
         $Headers.Add('domain', $anow_header.domain)
-        $Headers.Add('Authorization', $anow_header.authorization)
+        $Headers.Add('Authorization', $anow_header.Authorization)
     }
     Else {
         $parameters.Add('Headers', $anow_header)
+        <#
+        If($anow_header.domain.Length -gt 0)
+        {
+            $Headers.Add('domain', $anow_header.domain)
+        }
+        #>
     }
     $parameters.Add('Method', $Method)
     $parameters.Add('ContentType', $ContentType)
     If ($Body.Length -gt 0) {
+        Write-Verbose -Message "Sending body: $Body"
         If ($Method -eq 'GET') {
-            Write-Warning -Message "Cannot send a content-body with this verb-type. Please use POST instead :-)."
-            Break
+            [string]$api_url = $api_url + '?' + $Body
         }
-        $parameters.Add('Body', $Body)
-    }
+        Else {
+            $parameters.Add('Body', $Body)
+        }
+    }        
     [string]$parameters_display = $parameters | ConvertTo-Json
-    Write-Verbose -Message "Sending the following parameters to $Instance -> $parameters_display."
+    Write-Verbose -Message "Sending the following parameters to $api_url -> $parameters_display."
+    #$ProgressPreference = 'SilentlyContinue'
     $Error.Clear()
     Try {
         [Microsoft.PowerShell.Commands.BasicHtmlWebResponseObject]$results = Invoke-WebRequest @parameters
@@ -1024,6 +1620,7 @@ Function Invoke-AutomateNOWAPI {
         Write-Warning -Message $ReturnCodeWarning
         Break
     }
+    $ProgressPreference = 'Continue'
     [string]$content = $Results.Content
     If ($content -notmatch '^{.{1,}}$') {
         Write-Warning -Message "The returned results were somehow not a JSON object."
@@ -1042,6 +1639,111 @@ Function Invoke-AutomateNOWAPI {
         Break
     }
     Return $content_object
+}
+
+#EndRegion
+
+#Region - Calendars
+
+Function Get-AutomateNOWCalendar {
+    <#
+    .SYNOPSIS
+    Gets the calendar objects from an instance of AutomateNOW!
+    
+    .DESCRIPTION    
+    The `Get-AutomateNOWCalendar` cmdlet gets the calendar objects from an instance of AutomateNOW!
+    
+    .PARAMETER startRow
+    An optional int32 representing what row to start the download from. This is intended for multi-page transfers.
+
+    .PARAMETER endRow
+    An optional int32 representing how many rows of data to receive. The default is 2000. This is ideal for testing when you only want a few items.
+
+    .PARAMETER sortBy
+    Optional string parameter which defines the sorting order (default is by 'id'). Valid choices are: 'createdBy', 'dateCreated', 'id', 'lastUpdated', 'lastUpdatedBy', 'nextCloseDate', 'nextOpenDate', 'simpleId'
+
+    .PARAMETER Descending
+    Optional switch parameter which changes the sort order from the default ascending to descending
+    
+    .INPUTS
+    None. You cannot pipe objects to Get-AutomateNOWCalendar.
+    
+    .OUTPUTS
+    An array of PSCustomObjects
+    
+    .EXAMPLE
+    Get-AutomateNOWCalendar
+    
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    There are no parameters yet for this function.
+    #>
+    [OutputType([PSCustomObject])]
+    [Cmdletbinding()]
+    Param(
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $False, ParameterSetName = 'SortBy')]
+        [int32]$startRow = 0,
+        [Parameter(Mandatory = $False)]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $False, ParameterSetName = 'SortBy')]
+        [int32]$endRow = 2000,
+        [ValidateSet('createdBy', 'dateCreated', 'id', 'lastUpdated', 'lastUpdatedBy', 'nextCloseDate', 'nextOpenDate', 'simpleId', IgnoreCase = $false)]
+        [Parameter(Mandatory = $True, ParameterSetName = 'SortBy')]
+        [string]$sortBy = 'id',
+        [Parameter(Mandatory = $False, ParameterSetName = 'SortBy')]
+        [switch]$Descending
+    )
+    If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+        Write-Warning -Message "Somehow there is not a valid token confirmed."
+        Break
+    }
+    
+    [string]$command = '/resource/read'
+    $BodyObject = New-Object -TypeName System.Collections.Specialized.OrderedDictionary
+    $BodyObject.Add('_constructor', 'AdvancedCriteria')
+    $BodyObject.Add('operator', 'and')
+    $BodyObject.Add('_textMatchStyle', 'substring')
+    $BodyObject.Add('_componentId', 'ResourceList')
+    $BodyObject.Add('_dataSource', 'ResourceDataSource')
+    $BodyObject.Add('isc_metaDataPrefix', '_')
+    $BodyObject.Add('isc_dataFormat', 'json')
+    $BodyObject.Add('_operationType', 'fetch')
+    $BodyObject.Add('_startRow', $startRow)
+    $BodyObject.Add('_endRow', $endRow)
+    $BodyObject.Add('criteria', '{"fieldName":"resourceType","operator":"equals","value":"CALENDAR"}')
+    If ($Descending -eq $true) {
+        [string]$sortBy = ('-' + $sortBy)
+    }
+    $BodyObject.Add('_sortBy', $sortBy)
+    [string]$Body = ConvertTo-QueryString -InputObjects $BodyObject    
+    [string]$Instance = $anow_session.Instance
+    [hashtable]$parameters = @{}
+    $parameters.Add('Command', $command)
+    $parameters.Add('Method', 'POST')
+    $parameters.Add('Body', $Body)
+    $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+    $parameters.Add('Instance', $Instance)
+    If ($anow_session.NotSecure -eq $true) {
+        $parameters.Add('NotSecure', $true)
+    }    
+    $Error.Clear()
+    Try {
+        [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+    }
+    Catch {
+        [string]$Message = $_.Exception.Message
+        Write-Warning -Message "Invoke-AutomateNOWAPI failed due to execute [$command] due to [$Message]."
+        Break
+    }
+    [array]$Calendars = $results.response.data
+    [int32]$Calendars_count = $Calendars.Count
+    If ($Calendars_count -eq 0) {
+        Write-Warning -Message "Somehow there are 0 calendars. Is there something else wrong? Was this instance recently built?"
+        Break
+    }
+    Return $Calendars
 }
 
 #EndRegion
@@ -1074,7 +1776,7 @@ Function Get-AutomateNOWDomain {
     [Cmdletbinding()]
     Param(
     )
-    If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+    If ((Confirm-AutomateNOWSession -IgnoreEmptyDomain -Quiet) -ne $true) {
         Write-Warning -Message "Somehow there is not a valid token confirmed."
         Break
     }
@@ -1172,7 +1874,7 @@ You must use Connect-AutomateNOW to establish the token by way of global variabl
     Param(
         [string]$Domain
     )
-    If ((Confirm-AutomateNOWSession -Quiet -IgnoreEmptyDomain) -ne $true) {
+    If ((Confirm-AutomateNOWSession -IgnoreEmptyDomain -Quiet) -ne $true) {
         Write-Warning -Message "Somehow there is not a valid token confirmed."
         Break
     }
@@ -1239,7 +1941,7 @@ Function Get-AutomateNOWFolder {
     [Cmdletbinding()]
     Param(
     )
-    If ((Confirm-AutomateNOWSession -Quiet -IgnoreEmptyDomain ) -ne $true) {
+    If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
         Write-Warning -Message "Somehow there is not a valid token confirmed."
         Break
     }
@@ -1297,6 +1999,12 @@ Function New-AutomateNOWFolder {
     .PARAMETER Description
     The description of the folder (may contain unicode characters). For example: 'My folder description'
 
+    .PARAMETER Repository
+    This parameter appears to be an error from the vendor, hence it is disabled here but included for reference.
+
+    .PARAMETER Quiet
+    Switch parameter that suppresses the output (which is the newly created folder object)
+    
     .INPUTS
     None. You cannot pipe objects to New-AutomateNOWFolder.
     
@@ -1322,7 +2030,7 @@ Function New-AutomateNOWFolder {
         [Parameter(Mandatory = $false)]
         [switch]$Quiet
     )
-    If ((Confirm-AutomateNOWSession -Quiet -IgnoreEmptyDomain ) -ne $true) {
+    If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
         Write-Warning -Message "Somehow there is not a valid token confirmed."
         Break
     }
@@ -1412,6 +2120,8 @@ Function Import-AutomateNOWIcon {
     .NOTES
     You DO NOT need to authenticate to the instance to execute this function.
 
+    This function is very much a work in progress. The output .csv does not open cleanly in Excel. To workaround this, open the file in Excel as a Text file as this will force the delimiter wizard. Choose tab as the delimiter and enable that the data has a header row and it will import cleanly into Excel.
+
     #>
     [CmdletBinding()]
     Param(
@@ -1424,7 +2134,7 @@ Function Import-AutomateNOWIcon {
         [CmdletBinding()]
         Param(
             [Parameter(Mandatory = $true)]
-            [ValidateSet('FatCow', 'Fugue', 'FontAwesome')]
+            [ValidateSet('FatCow', 'Fugue', 'FontAwesome', IgnoreCase = $false)]
             [string]$Library,
             [Parameter(Mandatory = $true)]
             [array]$assets_content,
@@ -1499,10 +2209,11 @@ Function Import-AutomateNOWIcon {
     }
     [string]$url_homepage = ('https://' + $Instance + '/automatenow/') # Note the backslash at the end. This is required!
     Write-Verbose -Message "The instance url is set to [$url_homepage]"
-    If ($PSVersionTable.PSVersion.Major -gt 5) {
+    [int32]$ps_version_major = $PSVersionTable.PSVersion.Major
+    If ($ps_version_major -gt 5) {
         [Microsoft.PowerShell.Commands.BasicHtmlWebResponseObject]$request_homepage = Invoke-WebRequest -uri $url_homepage
     }
-    ElseIf ($PSVersionTable.PSVersion.Major -eq 5) {
+    ElseIf ($ps_version_major -eq 5) {
         [Microsoft.PowerShell.Commands.HtmlWebResponseObject]$request_homepage = Invoke-WebRequest -uri $url_homepage
     }
     Else {
@@ -1518,10 +2229,10 @@ Function Import-AutomateNOWIcon {
     Write-Verbose -Message "The homepage content from [$Instance] has [$homepage_content_line_count] lines"
     [string]$asset_url = ($url_homepage + ($homepage_content -match 'assets/application/automateNow-[0-9a-z]{32}.js' -replace '"></script>' -replace '<script type="text/javascript" src="/automatenow/' | Select-Object -First 1))
     Write-Verbose -Message "Fetching assets from [$asset_url]"    
-    If ($PSVersionTable.PSVersion.Major -gt 5) {
+    If ($ps_version_major -gt 5) {
         [Microsoft.PowerShell.Commands.BasicHtmlWebResponseObject]$request_assets = Invoke-WebRequest -Uri $asset_url
     }
-    ElseIf ($PSVersionTable.PSVersion.Major -eq 5) {
+    ElseIf ($ps_version_major -eq 5) {
         [Microsoft.PowerShell.Commands.HtmlWebResponseObject]$request_assets = Invoke-WebRequest -Uri $asset_url
     }
     Else {
@@ -1606,10 +2317,20 @@ Function Import-AutomateNOWIcon {
         [array]$FormattedData = $ConvertedData | ForEach-Object { $_ -replace '"' }
         [string]$current_time = Get-Date -Format 'yyyyMMddHHmmssfff'
         [string]$ExportFileName = 'Export-AutomateNOW-Icons-' + $current_time + '.csv'
-        [string]$ExportFilePath = ($PSScriptRoot + '\' + $ExportFileName)
+        [string]$ExportFilePath = ((Get-Location | Select-Object -ExpandProperty Path) + '\' + $ExportFileName)
+        [hashtable]$parameters = @{}
+        $parameters.Add('FilePath', $ExportFilePath)
+        [int32]$ps_version_major = $PSVersionTable.PSVersion.Major
+        If ($ps_version_major -gt 5) {
+            $parameters.Add('Encoding', 'utf8BOM')
+        }
+        Else {
+            $parameters.Add('Encoding', 'UTF8')
+
+        }
         $Error.Clear()
         Try {
-            $FormattedData | Out-File -FilePath $ExportFilePath -Encoding utf8BOM # Note: Use utf8 encoding to guarantee that this file opens correctly in Excel
+            $FormattedData | Out-File @parameters
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -1684,6 +2405,107 @@ Function Get-AutomateNOWNode {
 
 #Endregion
 
+#Region - Overview
+
+Function Get-AutomateNOWOverview {
+    <#
+    .SYNOPSIS
+    Gets the ?? objects from an instance of AutomateNOW!
+    
+    .DESCRIPTION    
+    The `Get-AutomateNOWOverview` cmdlet gets the ?? objects from an instance of AutomateNOW!
+    
+    .PARAMETER startRow
+    An optional int32 representing what row to start the download from. This is intended for multi-page transfers.
+
+    .PARAMETER endRow
+    An optional int32 representing how many rows of data to receive. The default is 2000. This is ideal for testing when you only want a few items.
+
+    .PARAMETER sortBy
+    Optional string parameter which defines the sorting order (default is by 'id'). Valid choices are: 'createdBy', 'dateCreated', 'id', 'lastUpdated', 'lastUpdatedBy', 'nextCloseDate', 'nextOpenDate', 'simpleId'
+
+    .PARAMETER Descending
+    Optional switch parameter which changes the sort order from the default ascending to descending
+    
+    .INPUTS
+    None. You cannot pipe objects to Get-AutomateNOWOverview.
+    
+    .OUTPUTS
+    An array of PSCustomObjects
+    
+    .EXAMPLE
+    Get-AutomateNOWOverview
+    
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+    #>
+    [OutputType([PSCustomObject])]
+    [Cmdletbinding()]
+    Param(
+        [Parameter(Mandatory = $False)]
+        [int32]$startRow = 0,
+        [Parameter(Mandatory = $False)]
+        [int32]$endRow = 2000,
+        [ValidateSet('agent', 'approvalPending', 'createdBy', 'critical', 'dateCreated', 'highRisk', 'id', 'lazyload', 'name', 'node', 'processingStatus', 'startTime', 'taskType', 'weight', IgnoreCase = $false)]
+        [Parameter(Mandatory = $False)]
+        [string]$sortBy = 'dateCreated',
+        [Parameter(Mandatory = $False, ParameterSetName = 'SortBy')]
+        [switch]$Descending
+    )
+    If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+        Write-Warning -Message "Somehow there is not a valid token confirmed."
+        Break
+    }
+    [string]$command = '/processing/read'
+    $BodyObject = New-Object -TypeName System.Collections.Specialized.OrderedDictionary
+    $BodyObject.Add('_constructor', 'AdvancedCriteria')
+    $BodyObject.Add('operator', 'and')
+    $BodyObject.Add('_operationType', 'fetch')
+    $BodyObject.Add('_operationId', 'ProcessingDataSource_fetch')
+    $BodyObject.Add('_textMatchStyle', 'exact')
+    $BodyObject.Add('_componentId', 'ProcessingTreeGrid')
+    $BodyObject.Add('_dataSource', 'ProcessingDataSource')
+    $BodyObject.Add('isc_metaDataPrefix', '_')
+    $BodyObject.Add('isc_dataFormat', 'json')
+    $BodyObject.Add('_startRow', $startRow)
+    $BodyObject.Add('_endRow', $endRow)
+    $BodyObject.Add('criteria1', '{"_constructor":"AdvancedCriteria","operator":"and","criteria":[{"fieldName":"archived","operator":"equals","value":false},{"fieldName":"isProcessing","operator":"equals","value":true},{"fieldName":"isRoot","operator":"equals","value":true}]}')
+    $BodyObject.Add('criteria2', '{"fieldName":"parent","value":null,"operator":"equals"}')
+    If ($Descending -eq $true) {
+        [string]$sortBy = ('-' + $sortBy)
+    }
+    $BodyObject.Add('_sortBy', $sortBy)
+    [string]$Body = ConvertTo-QueryString -InputObjects $BodyObject    
+    [string]$Instance = $anow_session.Instance
+    [hashtable]$parameters = @{}
+    $parameters.Add('Command', $command)
+    $parameters.Add('Method', 'POST')
+    $parameters.Add('Body', $Body)
+    $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+    $parameters.Add('Instance', $Instance)
+    If ($anow_session.NotSecure -eq $true) {
+        $parameters.Add('NotSecure', $true)
+    }    
+    $Error.Clear()
+    Try {
+        [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+    }
+    Catch {
+        [string]$Message = $_.Exception.Message
+        Write-Warning -Message "Invoke-AutomateNOWAPI failed due to execute [$command] due to [$Message]."
+        Break
+    }
+    [array]$Items = $results.response.data
+    [int32]$Items_count = $Items.Count
+    If ($Items_count -eq 0) {
+        Write-Warning -Message "Somehow there are 0 items in the Processing Overview. Is there something else wrong? Was this instance recently built?"
+        Break
+    }
+    Return $Items
+}
+
+#EndRegion
+
 #Region - Tags
 Function New-AutomateNOWTag {
     <#
@@ -1708,7 +2530,7 @@ Function New-AutomateNOWTag {
     .PARAMETER iconSet
     The name of the icon library (if you choose to use one). Possible choices are: FatCow, Fugue, FontAwesome
 
-    .PARAMETER iconName
+    .PARAMETER iconCode
     The name of the icon which matches the chosen library.
 
     .PARAMETER textColor
@@ -1751,7 +2573,7 @@ Function New-AutomateNOWTag {
         Write-Warning -Message "If you specify an icon library then you must also specify an icon"
         Break
     }
-    If ((Confirm-AutomateNOWSession -IgnoreEmptyDomain -Quiet) -ne $true) {
+    If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
         Write-Warning -Message "Somehow there is no global session token"
         Break
     }
@@ -1759,18 +2581,25 @@ Function New-AutomateNOWTag {
         'FatCow' { 'FAT_COW'; Break }
         'Fegue' { 'FEGUE'; Break }
         'FontAwesome' { 'FONT_AWESOME'; Break }
-        'Default' { 'FAT_COW' }
+        'Default' { '' }
     }
     [string]$command = '/tag/create'
-    [string]$description = [System.Net.WebUtility]::UrlEncode($description)
-    [string]$ContentType = 'application/x-www-form-urlencoded; charset=UTF-8'
+    
+    $BodyObject = New-Object -TypeName System.Collections.Specialized.OrderedDictionary
     If ($textColor -ne 'transparent') {
-        $textColor = ('%23' + $textColor)
+        $textColor = ('#' + $textColor)
     }
     If ($backgroundColor -ne 'transparent') {
-        $backgroundColor = ('%23' + $backgroundColor)
+        $backgroundColor = ('#' + $backgroundColor)
     }
-    [string]$Body = ('textColor=' + $textColor + '&backgroundColor=' + $backgroundColor + '&id=' + $id + '&description=' + $description + '&iconSet=' + $iconSet + '&iconCode=' + $iconCode)
+    $BodyObject.Add('textColor', $textColor)
+    $BodyObject.Add('backgroundColor', $backgroundColor)
+    $BodyObject.Add('id', $id)
+    $BodyObject.Add('description', $description)
+    $BodyObject.Add('iconSet', $iconSet)
+    $BodyObject.Add('iconCode', $iconCode)
+    [string]$Body = ConvertTo-QueryString -InputObjects $BodyObject
+    [string]$ContentType = 'application/x-www-form-urlencoded; charset=UTF-8'
     [hashtable]$parameters = @{}
     $parameters.Add('Method', 'POST')
     $parameters.Add('ContentType', $ContentType)
@@ -1959,231 +2788,6 @@ Function Remove-AutomateNOWTag {
 
 #EndRegion
 
-#Region - TriggerLog
-Function Get-AutomateNOWTriggerLog {
-    <#
-    .SYNOPSIS
-    Gets the trigger logs from the domain of an AutomateNOW! instance
-    
-    .DESCRIPTION    
-    The `Get-AutomateNOWTriggerLog` retrieves all of the trigger logs from the domain of an AutomateNOW! instance
-    
-    .INPUTS
-    None. You cannot pipe objects to Get-AutomateNOWTriggerLog.
-    
-    .OUTPUTS
-    An array of PSCustomObjects
-    
-    .EXAMPLE
-    Get-AutomateNOWTriggerLog
-    
-    .NOTES
-    You must use Connect-AutomateNOW to establish the token by way of global variable.
-    There are no parameters yet for this function.
-    #>
-    [OutputType([array])]
-    [Cmdletbinding()]
-    Param(
-    )
-    If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
-        Write-Warning -Message "Somehow there is not a valid token confirmed."
-        Break
-    }
-    [string]$command = '/executeProcessingTriggerLog'
-    [hashtable]$parameters = @{}
-    $parameters.Add('Command', $command)
-    $parameters.Add('Method', 'GET')
-    If ($anow_session.NotSecure -eq $true) {
-        $parameters.Add('NotSecure', $true)
-    }    
-    $Error.Clear()
-    Try {
-        [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
-    }
-    Catch {
-        [string]$Message = $_.Exception.Message
-        Write-Warning -Message "Invoke-AutomateNOWAPI failed due to execute [$command] due to [$Message]."
-        Break
-    }
-    [PSCustomObject[]]$nodes = $results.response.data
-    [int32]$nodes_count = $nodes.Count
-    If ($nodes_count -eq 0) {
-        Write-Warning -Message "Somehow there are no trigger logs available. Is this a newly installed instance which has not been configured yet?"
-        Break
-    }
-    Return $nodes
-}
-#Endregion
-
-#Region - Users
-Function Get-AutomateNOWUser {
-    <#
-    .SYNOPSIS
-    Gets the details of the currently authenticated user
-    
-    .DESCRIPTION    
-    The `Get-AutomateNOWUser` cmdlet invokes the /secUser/getUserInfo endpoint to retrieve information about the currently authenticated user (meaning you)
-    
-    .INPUTS
-    None. You cannot pipe objects to Get-AutomateNOWUser.
-    
-    .OUTPUTS
-    A PSCustomObject
-    
-    .EXAMPLE
-    Get-AutomateNOWUser
-    
-    .NOTES
-    You must use Connect-AutomateNOW to establish the token by way of global variable.
-
-    There are no parameters yet for this function.
-    #>
-    [OutputType([PSCustomObject])]
-    [Cmdletbinding()]
-    Param(
-    )
-    If ((Confirm-AutomateNOWSession -Quiet -IgnoreEmptyDomain ) -ne $true) {
-        Write-Warning -Message "Somehow there is not a valid token confirmed."
-        Break
-    }
-    [string]$command = '/secUser/getUserInfo'
-    [string]$Instance = $anow_session.Instance
-    [hashtable]$parameters = @{}
-    $parameters.Add('Command', $command)
-    $parameters.Add('Method', 'GET')
-    $parameters.Add('Instance', $Instance)
-    If ($anow_session.NotSecure -eq $true) {
-        $parameters.Add('NotSecure', $true)
-    }    
-    $Error.Clear()
-    Try {
-        [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
-    }
-    Catch {
-        [string]$Message = $_.Exception.Message
-        Write-Warning -Message "Invoke-AutomateNOWAPI failed due to execute [$command] due to [$Message]."
-        Break
-    }
-    Return $results
-}
-
-#Endregion
-
-#Region - Workflows
-
-Function Get-AutomateNOWWorkflow {
-    <#
-    .SYNOPSIS
-    Gets the workflow objects from an instance of AutomateNOW!
-    
-    .DESCRIPTION    
-    The `Get-AutomateNOWWorkflow` cmdlet gets the workflow objects from an instance of AutomateNOW!
-    
-    .INPUTS
-    None. You cannot pipe objects to Get-AutomateNOWWorkflow.
-    
-    .OUTPUTS
-    An array of PSCustomObjects
-    
-    .EXAMPLE
-    Get-AutomateNOWWorkflow
-    
-    .NOTES
-    You must use Connect-AutomateNOW to establish the token by way of global variable.
-
-    There are no parameters yet for this function.
-    #>
-    [OutputType([PSCustomObject])]
-    [Cmdletbinding()]
-    Param(
-    )
-    If ((Confirm-AutomateNOWSession -Quiet -IgnoreEmptyDomain ) -ne $true) {
-        Write-Warning -Message "Somehow there is not a valid token confirmed."
-        Break
-    }
-    [string]$command = '/processingTemplate/read'
-    [string]$Body = '_constructor=AdvancedCriteria&operator=and&criteria=%7B%22fieldName%22%3A%22workflowType%22%2C%22operator%22%3A%22equals%22%2C%22value%22%3A%22STANDARD%22%7D'
-    [string]$Instance = $anow_session.Instance
-    [hashtable]$parameters = @{}
-    $parameters.Add('Command', $command)
-    $parameters.Add('Method', 'POST')
-    $parameters.Add('Body', $Body)
-    $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
-    $parameters.Add('Instance', $Instance)
-    $parameters.Add('JustGiveMeJSON', $True)
-    If ($anow_session.NotSecure -eq $true) {
-        $parameters.Add('NotSecure', $true)
-    }    
-    $Error.Clear()
-    Try {
-        [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
-    }
-    Catch {
-        [string]$Message = $_.Exception.Message
-        Write-Warning -Message "Invoke-AutomateNOWAPI failed due to execute [$command] due to [$Message]."
-        Break
-    }
-    [int32]$ps_version_major = $PSVersionTable.PSVersion.Major
-    If ($ps_version_major -eq 5) {
-        $Error.Clear()
-        Try {
-            Add-Type -AssemblyName System.Web.Extensions
-        }
-        Catch {
-            [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Add-Type failed to add type [System.Web.Extensions] due to [$Message]"
-            Break
-        }
-        $Error.Clear()
-        Try {
-            [Web.Script.Serialization.JavaScriptSerializer]$JavaScriptSerializer = [Web.Script.Serialization.JavaScriptSerializer]::new()
-        }
-        Catch {
-            [string]$Message = $_.Exception.Message
-            Write-Warning -Message "The new() method of Web.Script.Serialization.JavaScriptSerializer failed due to [$Message]"
-            Break
-        }
-        $Error.Clear()
-        Try {
-            [hashtable]$Workflow_hashtable = $JavaScriptSerializer.Deserialize($results, [hashtable])
-        }
-        Catch {
-            [string]$Message = $_.Exception.Message
-            Write-Warning -Message "The Deserialize() method of Web.Script.Serialization.JavaScriptSerializer failed due to [$Message]"
-            Break
-        }
-    }
-    Else {
-        $Error.Clear()
-        Try {
-            [hashtable]$Workflow_hashtable = $results | ConvertFrom-Json -AsHashTable
-        }
-        Catch {
-            [string]$Message = $_.Exception.Message
-            Write-Warning -Message "ConvertFrom-JSON failed to create a hashtable due to  [$Message]"
-            Break
-        }        
-    }
-    If ($Workflow_hashtable.response.status -isnot [int32]) {
-        Write-Warning -Message "The response to Get-AutomateNOWWorkflow did not include a response code. Please look into this."
-        Break
-    }
-    ElseIf ($Workflow_hashtable.response.status -ne 0) {
-        [int32]$response_status_code = $Workflow_hashtable.response.status
-        Write-Warning -Message "Received a response code of [$response_status_code] instead of 0. Please look into this."
-        Break
-    }
-    [array]$WorkFlow_array = $Workflow_hashtable.response.data
-    [int32]$WorkFlow_array_count = $WorkFlow_array.Count
-    If ($WorkFlow_array_count -eq 0) {
-        Write-Warning -Message "Somehow there were no workflows returned from Get-AutomateNOWWorkflow. Please look into this."
-        Break
-    }
-    Return $WorkFlow_array
-}
-
-#endregion
-
 #Region - Tasks
 
 Function Show-AutomateNOWTaskType {
@@ -2195,7 +2799,7 @@ Function Show-AutomateNOWTaskType {
     The `Show-AutomateNOWTaskType` cmdlet gets the tasks from an instance of AutomateNOW!
     
     .INPUTS
-    None. You cannot pipe objects to Get-AutomateNOWTask.
+    None. You cannot pipe objects to Show-AutomateNOWTaskType.
     
     .OUTPUTS
     An array of PSCustomObjects
@@ -2224,23 +2828,29 @@ Function Get-AutomateNOWTask {
     .PARAMETER Type
     A string representing the type of task (of which there are 218). For example, 'SH' for shell scripts. Valid choices are: 'SH','AE_SHELL_SCRIPT','PYTHON','PERL','RUBY','GROOVY','POWERSHELL','JAVA','SCALA','SH_MONITOR','PYTHON_MONITOR','PERL_MONITOR','RUBY_MONITOR','GROOVY_MONITOR','POWERSHELL_MONITOR','FILE_TRANSFER','XFTP_COMMAND','DATASOURCE_UPLOAD_FILE','DATASOURCE_DOWNLOAD_FILE','DATASOURCE_DELETE_FILE','FILE_SENSOR','RDBMS_STORED_PROCEDURE','RDBMS_SQL_STATEMENT','RDBMS_SQL','SQL_SENSOR','REDIS_SET','REDIS_GET','REDIS_DELETE','REDIS_CLI','MONGO_DB_INSERT','IBM_MQ_SEND','IBM_MQ_SENSOR','RABBIT_MQ_SEND','RABBIT_MQ_SENSOR','KAFKA_SEND','KAFKA_SENSOR','JMS_SEND','JMS_SENSOR','AMQP_SEND','MQTT_SEND','XMPP_SEND','STOMP_SEND','Z_OS_DYNAMIC_JCL','Z_OS_STORED_JCL','Z_OS_COMMAND','Z_OS_JES_JOB_SENSOR','AS400_BATCH_JOB','AS400_PROGRAM_CALL','RAINCODE_DYNAMIC_JCL','RAINCODE_STORED_JCL','OPENTEXT_DYNAMIC_JCL','OPENTEXT_STORED_JCL','HDFS_UPLOAD_FILE','HDFS_APPEND_FILE','HDFS_DOWNLOAD_FILE','HDFS_DELETE_FILE','HDFS_CREATE_DIRECTORY','HDFS_DELETE_DIRECTORY','HDFS_RENAME','SPARK_JAVA','SPARK_SCALA','SPARK_PYTHON','SPARK_R','SPARK_SQL','FLINK_RUN_JOB','FLINK_JAR_UPLOAD','FLINK_JAR_DELETE','HTTP_REQUEST','REST_WEB_SERVICE_CALL','SOAP_WEB_SERVICE_CALL','HTTP_MONITOR','EMAIL_SEND','EMAIL_CONFIRMATION','EMAIL_INPUT','EMAIL_SENSOR','AWS_GLUE_WORKFLOW','AWS_GLUE_TRIGGER','AWS_GLUE_CRAWLER','AWS_GLUE_JOB','AWS_EMR_WORKFLOW','AWS_EMR_ADD_STEPS','AWS_EMR_CANCEL_STEPS','AWS_EMR_TERMINATE_JOB_FLOW','AWS_EMR_CONTAINER_MONITOR','AWS_EMR_JOB_FLOW_MONITOR','AWS_EMR_STEP_MONITOR','AWS_EMR_NOTEBOOK_MONITOR','AWS_EMR_PUT','AWS_EMR_GET','AWS_EMR_START_NOTEBOOK_EXECUTION','AWS_EMR_STOP_NOTEBOOK_EXECUTION','AWS_EMR_API_COMMAND','AWS_SAGE_MAKER_ADD_MODEL','AWS_SAGE_MAKER_DELETE_MODEL','AWS_SAGE_MAKER_PROCESSING','AWS_SAGE_MAKER_TRAINING','AWS_SAGE_MAKER_TRANSFORM','AWS_SAGE_MAKER_API_COMMAND','AWS_LAMBDA_INVOKE','AWS_LAMBDA_CREATE_FUNCTION','AWS_LAMBDA_DELETE_FUNCTION','AWS_EC2_START_INSTANCE','AWS_EC2_STOP_INSTANCE','AWS_EC2_TERMINATE_INSTANCE','AWS_EC2_DELETE_VOLUME','AWS_S3_DELETE_OBJECT','AWS_S3_COPY_OBJECT','AWS_S3_MOVE_OBJECT','AWS_S3_RENAME_OBJECT','AWS_BATCH_JOB','AWS_START_STEP_FUNCTION_STATE_MACHINE','AZURE_DATA_FACTORY_TRIGGER','AZURE_DATA_FACTORY_PIPELINE','AZURE_DATA_LAKE_JOB','AZURE_DATABRICKS_JOB','AZURE_DATABRICKS_TERMINATE_CLUSTER','AZURE_DATABRICKS_START_CLUSTER','AZURE_DATABRICKS_CLUSTER_MONITOR','AZURE_DATABRICKS_LIST_CLUSTERS','AZURE_DATABRICKS_DELETE_CLUSTER','INFORMATICA_CLOUD_TASKFLOW','INFORMATICA_WORKFLOW','INFORMATICA_WS_WORKFLOW','IBM_DATASTAGE','MS_SSIS','ODI_SESSION','ODI_LOAD_PLAN','SAS_4GL','SAS_DI','SAS_JOB','SAS_VIYA_JOB','TALEND_JOB','DBT_JOB','SAP_R3_JOB','SAP_R3_VARIANT_CREATE','SAP_R3_VARIANT_COPY','SAP_R3_VARIANT_UPDATE','SAP_R3_VARIANT_DELETE','SAP_R3_COPY_EXISTING_JOB','SAP_R3_START_SCHEDULED_JOB','SAP_R3_JOB_INTERCEPTOR','SAP_MODIFY_INTERCEPTION_CRITERIA','SAP_R3_INTERCEPTED_JOB_SENSOR','SAP_R3_JOB_MONITOR','SAP_R3_RAISE_EVENT','SAP_R3_EVENT_SENSOR','SAP_BW_PROCESS_CHAIN','SAP_ARCHIVE','SAP_FUNCTION_MODULE_CALL','SAP_READ_TABLE','SAP_CM_PROFILE_ACTIVATE','SAP_CM_PROFILE_DEACTIVATE','SAP_EXPORT_CALENDAR','SAP_EXPORT_JOB','SAP_4H_JOB','SAP_4H_VARIANT_CREATE','SAP_4H_VARIANT_COPY','SAP_4H_VARIANT_UPDATE','SAP_4H_VARIANT_DELETE','SAP_4H_COPY_EXISTING_JOB','SAP_4H_START_SCHEDULED_JOB','SAP_4H_JOB_INTERCEPTOR','SAP_4H_MODIFY_INTERCEPTION_CRITERIA','SAP_4H_INTERCEPTED_JOB_SENSOR','SAP_4H_JOB_MONITOR','SAP_4H_RAISE_EVENT','SAP_4H_EVENT_SENSOR','SAP_4H_BW_PROCESS_CHAIN','SAP_4H_ARCHIVE','SAP_4H_FUNCTION_MODULE_CALL','SAP_4H_READ_TABLE','SAP_4H_CM_PROFILE_ACTIVATE','SAP_4H_CM_PROFILE_DEACTIVATE','SAP_4H_EXPORT_CALENDAR','SAP_4H_EXPORT_JOB','SAP_ODATA_API_CALL','SAP_IBP_JOB','ORACLE_EBS_PROGRAM','ORACLE_EBS_REQUEST_SET','ORACLE_EBS_EXECUTE_PROGRAM','ORACLE_EBS_EXECUTE_REQUEST_SET','PEOPLESOFT_APPLICATION_ENGINE_TASK','PEOPLESOFT_CRW_ONLINE_TASK','PEOPLESOFT_CRYSTAL_REPORTS_TASK','PEOPLESOFT_CUBE_BUILDER_TASK','PEOPLESOFT_NVISION_TASK','PEOPLESOFT_SQR_PROCESS_TASK','PEOPLESOFT_SQR_REPORT_TASK','PEOPLESOFT_WINWORD_TASK','PEOPLESOFT_JOB_TASK','JIRA_ISSUE_SENSOR','JIRA_ADD_ISSUE','SERVICE_NOW_CREATE_INCIDENT','SERVICE_NOW_RESOLVE_INCIDENT','SERVICE_NOW_CLOSE_INCIDENT','SERVICE_NOW_UPDATE_INCIDENT','SERVICE_NOW_INCIDENT_STATUS_SENSOR','BMC_REMEDY_INCIDENT','AUTOMATE_NOW_TRIGGER_EVENT','APACHE_AIRFLOW_RUN_DAG','ANSIBLE_PLAYBOOK','ANSIBLE_PLAYBOOK_PATH','CTRLM_ADD_CONDITION','CTRLM_DELETE_CONDITION','CTRLM_ORDER_JOB','CTRLM_CREATE_JOB','CTRLM_RESOURCE_TABLE_ADD','CTRLM_RESOURCE_TABLE_UPDATE','CTRLM_RESOURCE_TABLE_DELETE','UI_PATH','BLUE_PRISM','ROBOT_FRAMEWORK_START_ROBOT','MICROSOFT_POWER_BI_DATASET_REFRESH','MICROSOFT_POWER_BI_DATAFLOW_REFRESH','TELEGRAM_MESSAGE','WHATSAPP_MESSAGE','SYSTEM_MONITOR','SYSTEM_PROCESS_MONITOR'
 
-    .PARAMETER Rows
-    An optional int32 representing how many rows of data to receive. The default is 2000. This is ideal for testing when you only want a few items.
-
     .PARAMETER Templates
     Important optional switch parameter to select Task Templates or Task Monitoring. If you are looking for tasks to EXECUTE then use this parameter to list available Task Templates. By default, this function shows the Tasks under the Monitors tab of the UI not the Design tab!
+
+    .PARAMETER OnlyRunning
+    An optional switch parameter that filters the tasks to only those that are actively running
 
     .PARAMETER Formatted
     An optional switch parameter that returns select columns. Intended for display purposes!
     
-    .PARAMETER OnlyRunning
-    An optional switch parameter that filters the tasks to only those that are actively running
+    .PARAMETER startRow
+    An optional int32 representing what row to start the download from. This is intended for multi-page transfers.
+
+    .PARAMETER endRow
+    An optional int32 representing how many rows of data to receive. The default is 2000. This is ideal for testing when you only want a few items.
 
     .PARAMETER sortBy
     Optional string parameter which defines the sorting order (default is by 'id'). Valid choices are: 'id', 'startTime', 'agent', 'createdBy', 'dateCreated', 'duration', 'endTime', 'firstStartTime', 'lastUpdated', 'name', 'node', 'pid', 'processingLaunchType', 'processingStatus', 'template', 'weight'
 
+    .PARAMETER sortTemplatesBy
+    Optional string parameter not implemented yet which will allow to sort the output when Templates are chosen
+
     .PARAMETER Descending
-    Optional switch parameter which changes the sort order from the default ascending to descending
+    Optional switch parameter which changes the sort order from the default ascending to descending (applies to both -sortBy and -sortTemplatesBy)
     
     .INPUTS
     None. You cannot pipe objects to Get-AutomateNOWTask.
@@ -2254,12 +2864,12 @@ Function Get-AutomateNOWTask {
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
 
-    There are no parameters yet for this function (yet)
+    The Type, sortBy and SortTemplatesBy parameter values are CASE-SENSITIVE!
     #>
     [OutputType([PSCustomObject])]
     [Cmdletbinding(DefaultParameterSetName = 'Default')]
     Param(
-        [ValidateSet('SH', 'AE_SHELL_SCRIPT', 'PYTHON', 'PERL', 'RUBY', 'GROOVY', 'POWERSHELL', 'JAVA', 'SCALA', 'SH_MONITOR', 'PYTHON_MONITOR', 'PERL_MONITOR', 'RUBY_MONITOR', 'GROOVY_MONITOR', 'POWERSHELL_MONITOR', 'FILE_TRANSFER', 'XFTP_COMMAND', 'DATASOURCE_UPLOAD_FILE', 'DATASOURCE_DOWNLOAD_FILE', 'DATASOURCE_DELETE_FILE', 'FILE_SENSOR', 'RDBMS_STORED_PROCEDURE', 'RDBMS_SQL_STATEMENT', 'RDBMS_SQL', 'SQL_SENSOR', 'REDIS_SET', 'REDIS_GET', 'REDIS_DELETE', 'REDIS_CLI', 'MONGO_DB_INSERT', 'IBM_MQ_SEND', 'IBM_MQ_SENSOR', 'RABBIT_MQ_SEND', 'RABBIT_MQ_SENSOR', 'KAFKA_SEND', 'KAFKA_SENSOR', 'JMS_SEND', 'JMS_SENSOR', 'AMQP_SEND', 'MQTT_SEND', 'XMPP_SEND', 'STOMP_SEND', 'Z_OS_DYNAMIC_JCL', 'Z_OS_STORED_JCL', 'Z_OS_COMMAND', 'Z_OS_JES_JOB_SENSOR', 'AS400_BATCH_JOB', 'AS400_PROGRAM_CALL', 'RAINCODE_DYNAMIC_JCL', 'RAINCODE_STORED_JCL', 'OPENTEXT_DYNAMIC_JCL', 'OPENTEXT_STORED_JCL', 'HDFS_UPLOAD_FILE', 'HDFS_APPEND_FILE', 'HDFS_DOWNLOAD_FILE', 'HDFS_DELETE_FILE', 'HDFS_CREATE_DIRECTORY', 'HDFS_DELETE_DIRECTORY', 'HDFS_RENAME', 'SPARK_JAVA', 'SPARK_SCALA', 'SPARK_PYTHON', 'SPARK_R', 'SPARK_SQL', 'FLINK_RUN_JOB', 'FLINK_JAR_UPLOAD', 'FLINK_JAR_DELETE', 'HTTP_REQUEST', 'REST_WEB_SERVICE_CALL', 'SOAP_WEB_SERVICE_CALL', 'HTTP_MONITOR', 'EMAIL_SEND', 'EMAIL_CONFIRMATION', 'EMAIL_INPUT', 'EMAIL_SENSOR', 'AWS_GLUE_WORKFLOW', 'AWS_GLUE_TRIGGER', 'AWS_GLUE_CRAWLER', 'AWS_GLUE_JOB', 'AWS_EMR_WORKFLOW', 'AWS_EMR_ADD_STEPS', 'AWS_EMR_CANCEL_STEPS', 'AWS_EMR_TERMINATE_JOB_FLOW', 'AWS_EMR_CONTAINER_MONITOR', 'AWS_EMR_JOB_FLOW_MONITOR', 'AWS_EMR_STEP_MONITOR', 'AWS_EMR_NOTEBOOK_MONITOR', 'AWS_EMR_PUT', 'AWS_EMR_GET', 'AWS_EMR_START_NOTEBOOK_EXECUTION', 'AWS_EMR_STOP_NOTEBOOK_EXECUTION', 'AWS_EMR_API_COMMAND', 'AWS_SAGE_MAKER_ADD_MODEL', 'AWS_SAGE_MAKER_DELETE_MODEL', 'AWS_SAGE_MAKER_PROCESSING', 'AWS_SAGE_MAKER_TRAINING', 'AWS_SAGE_MAKER_TRANSFORM', 'AWS_SAGE_MAKER_API_COMMAND', 'AWS_LAMBDA_INVOKE', 'AWS_LAMBDA_CREATE_FUNCTION', 'AWS_LAMBDA_DELETE_FUNCTION', 'AWS_EC2_START_INSTANCE', 'AWS_EC2_STOP_INSTANCE', 'AWS_EC2_TERMINATE_INSTANCE', 'AWS_EC2_DELETE_VOLUME', 'AWS_S3_DELETE_OBJECT', 'AWS_S3_COPY_OBJECT', 'AWS_S3_MOVE_OBJECT', 'AWS_S3_RENAME_OBJECT', 'AWS_BATCH_JOB', 'AWS_START_STEP_FUNCTION_STATE_MACHINE', 'AZURE_DATA_FACTORY_TRIGGER', 'AZURE_DATA_FACTORY_PIPELINE', 'AZURE_DATA_LAKE_JOB', 'AZURE_DATABRICKS_JOB', 'AZURE_DATABRICKS_TERMINATE_CLUSTER', 'AZURE_DATABRICKS_START_CLUSTER', 'AZURE_DATABRICKS_CLUSTER_MONITOR', 'AZURE_DATABRICKS_LIST_CLUSTERS', 'AZURE_DATABRICKS_DELETE_CLUSTER', 'INFORMATICA_CLOUD_TASKFLOW', 'INFORMATICA_WORKFLOW', 'INFORMATICA_WS_WORKFLOW', 'IBM_DATASTAGE', 'MS_SSIS', 'ODI_SESSION', 'ODI_LOAD_PLAN', 'SAS_4GL', 'SAS_DI', 'SAS_JOB', 'SAS_VIYA_JOB', 'TALEND_JOB', 'DBT_JOB', 'SAP_R3_JOB', 'SAP_R3_VARIANT_CREATE', 'SAP_R3_VARIANT_COPY', 'SAP_R3_VARIANT_UPDATE', 'SAP_R3_VARIANT_DELETE', 'SAP_R3_COPY_EXISTING_JOB', 'SAP_R3_START_SCHEDULED_JOB', 'SAP_R3_JOB_INTERCEPTOR', 'SAP_MODIFY_INTERCEPTION_CRITERIA', 'SAP_R3_INTERCEPTED_JOB_SENSOR', 'SAP_R3_JOB_MONITOR', 'SAP_R3_RAISE_EVENT', 'SAP_R3_EVENT_SENSOR', 'SAP_BW_PROCESS_CHAIN', 'SAP_ARCHIVE', 'SAP_FUNCTION_MODULE_CALL', 'SAP_READ_TABLE', 'SAP_CM_PROFILE_ACTIVATE', 'SAP_CM_PROFILE_DEACTIVATE', 'SAP_EXPORT_CALENDAR', 'SAP_EXPORT_JOB', 'SAP_4H_JOB', 'SAP_4H_VARIANT_CREATE', 'SAP_4H_VARIANT_COPY', 'SAP_4H_VARIANT_UPDATE', 'SAP_4H_VARIANT_DELETE', 'SAP_4H_COPY_EXISTING_JOB', 'SAP_4H_START_SCHEDULED_JOB', 'SAP_4H_JOB_INTERCEPTOR', 'SAP_4H_MODIFY_INTERCEPTION_CRITERIA', 'SAP_4H_INTERCEPTED_JOB_SENSOR', 'SAP_4H_JOB_MONITOR', 'SAP_4H_RAISE_EVENT', 'SAP_4H_EVENT_SENSOR', 'SAP_4H_BW_PROCESS_CHAIN', 'SAP_4H_ARCHIVE', 'SAP_4H_FUNCTION_MODULE_CALL', 'SAP_4H_READ_TABLE', 'SAP_4H_CM_PROFILE_ACTIVATE', 'SAP_4H_CM_PROFILE_DEACTIVATE', 'SAP_4H_EXPORT_CALENDAR', 'SAP_4H_EXPORT_JOB', 'SAP_ODATA_API_CALL', 'SAP_IBP_JOB', 'ORACLE_EBS_PROGRAM', 'ORACLE_EBS_REQUEST_SET', 'ORACLE_EBS_EXECUTE_PROGRAM', 'ORACLE_EBS_EXECUTE_REQUEST_SET', 'PEOPLESOFT_APPLICATION_ENGINE_TASK', 'PEOPLESOFT_CRW_ONLINE_TASK', 'PEOPLESOFT_CRYSTAL_REPORTS_TASK', 'PEOPLESOFT_CUBE_BUILDER_TASK', 'PEOPLESOFT_NVISION_TASK', 'PEOPLESOFT_SQR_PROCESS_TASK', 'PEOPLESOFT_SQR_REPORT_TASK', 'PEOPLESOFT_WINWORD_TASK', 'PEOPLESOFT_JOB_TASK', 'JIRA_ISSUE_SENSOR', 'JIRA_ADD_ISSUE', 'SERVICE_NOW_CREATE_INCIDENT', 'SERVICE_NOW_RESOLVE_INCIDENT', 'SERVICE_NOW_CLOSE_INCIDENT', 'SERVICE_NOW_UPDATE_INCIDENT', 'SERVICE_NOW_INCIDENT_STATUS_SENSOR', 'BMC_REMEDY_INCIDENT', 'AUTOMATE_NOW_TRIGGER_EVENT', 'APACHE_AIRFLOW_RUN_DAG', 'ANSIBLE_PLAYBOOK', 'ANSIBLE_PLAYBOOK_PATH', 'CTRLM_ADD_CONDITION', 'CTRLM_DELETE_CONDITION', 'CTRLM_ORDER_JOB', 'CTRLM_CREATE_JOB', 'CTRLM_RESOURCE_TABLE_ADD', 'CTRLM_RESOURCE_TABLE_UPDATE', 'CTRLM_RESOURCE_TABLE_DELETE', 'UI_PATH', 'BLUE_PRISM', 'ROBOT_FRAMEWORK_START_ROBOT', 'MICROSOFT_POWER_BI_DATASET_REFRESH', 'MICROSOFT_POWER_BI_DATAFLOW_REFRESH', 'TELEGRAM_MESSAGE', 'WHATSAPP_MESSAGE', 'SYSTEM_MONITOR', 'SYSTEM_PROCESS_MONITOR')]
+        [ValidateSet('SH', 'AE_SHELL_SCRIPT', 'PYTHON', 'PERL', 'RUBY', 'GROOVY', 'POWERSHELL', 'JAVA', 'SCALA', 'SH_MONITOR', 'PYTHON_MONITOR', 'PERL_MONITOR', 'RUBY_MONITOR', 'GROOVY_MONITOR', 'POWERSHELL_MONITOR', 'FILE_TRANSFER', 'XFTP_COMMAND', 'DATASOURCE_UPLOAD_FILE', 'DATASOURCE_DOWNLOAD_FILE', 'DATASOURCE_DELETE_FILE', 'FILE_SENSOR', 'RDBMS_STORED_PROCEDURE', 'RDBMS_SQL_STATEMENT', 'RDBMS_SQL', 'SQL_SENSOR', 'REDIS_SET', 'REDIS_GET', 'REDIS_DELETE', 'REDIS_CLI', 'MONGO_DB_INSERT', 'IBM_MQ_SEND', 'IBM_MQ_SENSOR', 'RABBIT_MQ_SEND', 'RABBIT_MQ_SENSOR', 'KAFKA_SEND', 'KAFKA_SENSOR', 'JMS_SEND', 'JMS_SENSOR', 'AMQP_SEND', 'MQTT_SEND', 'XMPP_SEND', 'STOMP_SEND', 'Z_OS_DYNAMIC_JCL', 'Z_OS_STORED_JCL', 'Z_OS_COMMAND', 'Z_OS_JES_JOB_SENSOR', 'AS400_BATCH_JOB', 'AS400_PROGRAM_CALL', 'RAINCODE_DYNAMIC_JCL', 'RAINCODE_STORED_JCL', 'OPENTEXT_DYNAMIC_JCL', 'OPENTEXT_STORED_JCL', 'HDFS_UPLOAD_FILE', 'HDFS_APPEND_FILE', 'HDFS_DOWNLOAD_FILE', 'HDFS_DELETE_FILE', 'HDFS_CREATE_DIRECTORY', 'HDFS_DELETE_DIRECTORY', 'HDFS_RENAME', 'SPARK_JAVA', 'SPARK_SCALA', 'SPARK_PYTHON', 'SPARK_R', 'SPARK_SQL', 'FLINK_RUN_JOB', 'FLINK_JAR_UPLOAD', 'FLINK_JAR_DELETE', 'HTTP_REQUEST', 'REST_WEB_SERVICE_CALL', 'SOAP_WEB_SERVICE_CALL', 'HTTP_MONITOR', 'EMAIL_SEND', 'EMAIL_CONFIRMATION', 'EMAIL_INPUT', 'EMAIL_SENSOR', 'AWS_GLUE_WORKFLOW', 'AWS_GLUE_TRIGGER', 'AWS_GLUE_CRAWLER', 'AWS_GLUE_JOB', 'AWS_EMR_WORKFLOW', 'AWS_EMR_ADD_STEPS', 'AWS_EMR_CANCEL_STEPS', 'AWS_EMR_TERMINATE_JOB_FLOW', 'AWS_EMR_CONTAINER_MONITOR', 'AWS_EMR_JOB_FLOW_MONITOR', 'AWS_EMR_STEP_MONITOR', 'AWS_EMR_NOTEBOOK_MONITOR', 'AWS_EMR_PUT', 'AWS_EMR_GET', 'AWS_EMR_START_NOTEBOOK_EXECUTION', 'AWS_EMR_STOP_NOTEBOOK_EXECUTION', 'AWS_EMR_API_COMMAND', 'AWS_SAGE_MAKER_ADD_MODEL', 'AWS_SAGE_MAKER_DELETE_MODEL', 'AWS_SAGE_MAKER_PROCESSING', 'AWS_SAGE_MAKER_TRAINING', 'AWS_SAGE_MAKER_TRANSFORM', 'AWS_SAGE_MAKER_API_COMMAND', 'AWS_LAMBDA_INVOKE', 'AWS_LAMBDA_CREATE_FUNCTION', 'AWS_LAMBDA_DELETE_FUNCTION', 'AWS_EC2_START_INSTANCE', 'AWS_EC2_STOP_INSTANCE', 'AWS_EC2_TERMINATE_INSTANCE', 'AWS_EC2_DELETE_VOLUME', 'AWS_S3_DELETE_OBJECT', 'AWS_S3_COPY_OBJECT', 'AWS_S3_MOVE_OBJECT', 'AWS_S3_RENAME_OBJECT', 'AWS_BATCH_JOB', 'AWS_START_STEP_FUNCTION_STATE_MACHINE', 'AZURE_DATA_FACTORY_TRIGGER', 'AZURE_DATA_FACTORY_PIPELINE', 'AZURE_DATA_LAKE_JOB', 'AZURE_DATABRICKS_JOB', 'AZURE_DATABRICKS_TERMINATE_CLUSTER', 'AZURE_DATABRICKS_START_CLUSTER', 'AZURE_DATABRICKS_CLUSTER_MONITOR', 'AZURE_DATABRICKS_LIST_CLUSTERS', 'AZURE_DATABRICKS_DELETE_CLUSTER', 'INFORMATICA_CLOUD_TASKFLOW', 'INFORMATICA_WORKFLOW', 'INFORMATICA_WS_WORKFLOW', 'IBM_DATASTAGE', 'MS_SSIS', 'ODI_SESSION', 'ODI_LOAD_PLAN', 'SAS_4GL', 'SAS_DI', 'SAS_JOB', 'SAS_VIYA_JOB', 'TALEND_JOB', 'DBT_JOB', 'SAP_R3_JOB', 'SAP_R3_VARIANT_CREATE', 'SAP_R3_VARIANT_COPY', 'SAP_R3_VARIANT_UPDATE', 'SAP_R3_VARIANT_DELETE', 'SAP_R3_COPY_EXISTING_JOB', 'SAP_R3_START_SCHEDULED_JOB', 'SAP_R3_JOB_INTERCEPTOR', 'SAP_MODIFY_INTERCEPTION_CRITERIA', 'SAP_R3_INTERCEPTED_JOB_SENSOR', 'SAP_R3_JOB_MONITOR', 'SAP_R3_RAISE_EVENT', 'SAP_R3_EVENT_SENSOR', 'SAP_BW_PROCESS_CHAIN', 'SAP_ARCHIVE', 'SAP_FUNCTION_MODULE_CALL', 'SAP_READ_TABLE', 'SAP_CM_PROFILE_ACTIVATE', 'SAP_CM_PROFILE_DEACTIVATE', 'SAP_EXPORT_CALENDAR', 'SAP_EXPORT_JOB', 'SAP_4H_JOB', 'SAP_4H_VARIANT_CREATE', 'SAP_4H_VARIANT_COPY', 'SAP_4H_VARIANT_UPDATE', 'SAP_4H_VARIANT_DELETE', 'SAP_4H_COPY_EXISTING_JOB', 'SAP_4H_START_SCHEDULED_JOB', 'SAP_4H_JOB_INTERCEPTOR', 'SAP_4H_MODIFY_INTERCEPTION_CRITERIA', 'SAP_4H_INTERCEPTED_JOB_SENSOR', 'SAP_4H_JOB_MONITOR', 'SAP_4H_RAISE_EVENT', 'SAP_4H_EVENT_SENSOR', 'SAP_4H_BW_PROCESS_CHAIN', 'SAP_4H_ARCHIVE', 'SAP_4H_FUNCTION_MODULE_CALL', 'SAP_4H_READ_TABLE', 'SAP_4H_CM_PROFILE_ACTIVATE', 'SAP_4H_CM_PROFILE_DEACTIVATE', 'SAP_4H_EXPORT_CALENDAR', 'SAP_4H_EXPORT_JOB', 'SAP_ODATA_API_CALL', 'SAP_IBP_JOB', 'ORACLE_EBS_PROGRAM', 'ORACLE_EBS_REQUEST_SET', 'ORACLE_EBS_EXECUTE_PROGRAM', 'ORACLE_EBS_EXECUTE_REQUEST_SET', 'PEOPLESOFT_APPLICATION_ENGINE_TASK', 'PEOPLESOFT_CRW_ONLINE_TASK', 'PEOPLESOFT_CRYSTAL_REPORTS_TASK', 'PEOPLESOFT_CUBE_BUILDER_TASK', 'PEOPLESOFT_NVISION_TASK', 'PEOPLESOFT_SQR_PROCESS_TASK', 'PEOPLESOFT_SQR_REPORT_TASK', 'PEOPLESOFT_WINWORD_TASK', 'PEOPLESOFT_JOB_TASK', 'JIRA_ISSUE_SENSOR', 'JIRA_ADD_ISSUE', 'SERVICE_NOW_CREATE_INCIDENT', 'SERVICE_NOW_RESOLVE_INCIDENT', 'SERVICE_NOW_CLOSE_INCIDENT', 'SERVICE_NOW_UPDATE_INCIDENT', 'SERVICE_NOW_INCIDENT_STATUS_SENSOR', 'BMC_REMEDY_INCIDENT', 'AUTOMATE_NOW_TRIGGER_EVENT', 'APACHE_AIRFLOW_RUN_DAG', 'ANSIBLE_PLAYBOOK', 'ANSIBLE_PLAYBOOK_PATH', 'CTRLM_ADD_CONDITION', 'CTRLM_DELETE_CONDITION', 'CTRLM_ORDER_JOB', 'CTRLM_CREATE_JOB', 'CTRLM_RESOURCE_TABLE_ADD', 'CTRLM_RESOURCE_TABLE_UPDATE', 'CTRLM_RESOURCE_TABLE_DELETE', 'UI_PATH', 'BLUE_PRISM', 'ROBOT_FRAMEWORK_START_ROBOT', 'MICROSOFT_POWER_BI_DATASET_REFRESH', 'MICROSOFT_POWER_BI_DATAFLOW_REFRESH', 'TELEGRAM_MESSAGE', 'WHATSAPP_MESSAGE', 'SYSTEM_MONITOR', 'SYSTEM_PROCESS_MONITOR', IgnoreCase = $false)]
         [Parameter(Mandatory = $True, ParameterSetName = 'Default')]
         [Parameter(Mandatory = $True, ParameterSetName = 'Templates')]
         [string]$Type,
@@ -2275,17 +2885,17 @@ Function Get-AutomateNOWTask {
         [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
         [Parameter(Mandatory = $False, ParameterSetName = 'Templates')]
         [int32]$endRow = 2000,        
-        [ValidateSet('id', 'startTime', 'agent', 'createdBy', 'dateCreated', 'duration', 'endTime', 'firstStartTime', 'lastUpdated', 'name', 'node', 'pid', 'processingLaunchType', 'processingStatus', 'template', 'weight')]
+        [ValidateSet('id', 'startTime', 'agent', 'createdBy', 'dateCreated', 'duration', 'endTime', 'firstStartTime', 'lastUpdated', 'name', 'node', 'pid', 'processingLaunchType', 'processingStatus', 'template', 'weight', IgnoreCase = $false)]
         [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
         [string]$sortBy = 'id',
-        [ValidateSet('createdBy', 'dateCreated', 'id', 'lastUpdated', 'priority', 'simpleId', 'tags', 'weight')]
+        [ValidateSet('createdBy', 'dateCreated', 'id', 'lastUpdated', 'priority', 'simpleId', 'tags', 'weight', IgnoreCase = $false)]
         [Parameter(Mandatory = $False, ParameterSetName = 'Templates')]
         [string]$sortTemplatesBy = 'id',
         [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
         [Parameter(Mandatory = $False, ParameterSetName = 'Templates')]
         [switch]$Descending
     )
-    If ((Confirm-AutomateNOWSession -Quiet -IgnoreEmptyDomain ) -ne $true) {
+    If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
         Write-Warning -Message "Somehow there is not a valid token confirmed."
         Break
     }
@@ -2302,8 +2912,7 @@ Function Get-AutomateNOWTask {
         $BodyObject.Add('criteria', '{"fieldName":"taskType","operator":"equals","value":"' + $Type + '"}')
         $BodyObject.Add('_componentId', 'ProcessingTemplateList')
         $BodyObject.Add('_dataSource', 'ProcessingTemplateDataSource')
-        If($Descending -eq $true)
-        {
+        If ($Descending -eq $true) {
             [string]$sortTemplatesBy = ('-' + $sortTemplatesBy)
         }
         $BodyObject.Add('_sortBy', $sortTemplatesBy)
@@ -2315,8 +2924,7 @@ Function Get-AutomateNOWTask {
         $BodyObject.Add('criteria3', '{"fieldName":"itemType","operator":"equals","value":"' + $Type + '"}')
         $BodyObject.Add('_componentId', 'ProcessingList')
         $BodyObject.Add('_dataSource', 'ProcessingDataSource')
-        If($Descending -eq $true)
-        {
+        If ($Descending -eq $true) {
             [string]$sortBy = ('-' + $sortBy)
         }
         $BodyObject.Add('_sortBy', ($sortBy))
@@ -2330,7 +2938,6 @@ Function Get-AutomateNOWTask {
     $parameters.Add('Body', $Body)
     $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
     $parameters.Add('Instance', $Instance)
-    $parameters.Add('JustGiveMeJSON', $True)
     If ($anow_session.NotSecure -eq $true) {
         $parameters.Add('NotSecure', $true)
     }    
@@ -2343,16 +2950,7 @@ Function Get-AutomateNOWTask {
         Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
         Break
     }
-    $Error.Clear()
-    Try {
-        [PSCustomObject]$response = $results | ConvertFrom-Json
-    }
-    Catch {
-        [string]$Message = $_.Exception.Message
-        Write-Warning -Message "ConvertFrom-JSON failed due to [$Message]"
-        Break
-    }
-    [array]$Tasks = $response.response.data
+    [array]$Tasks = $results.response.data
     [int32]$Tasks_count = $Tasks.Count
     If ($Tasks_count -eq 0) {
         Write-Warning -Message "Somehow there are 0 tasks. Is there something else wrong? Was this instance recently built?"
@@ -2440,7 +3038,7 @@ Function Start-AutomateNOWTask {
     [OutputType([PSCustomObject])]
     [Cmdletbinding()]
     Param(
-        [ValidateSet('SH', 'AE_SHELL_SCRIPT', 'PYTHON', 'PERL', 'RUBY', 'GROOVY', 'POWERSHELL', 'JAVA', 'SCALA', 'SH_MONITOR', 'PYTHON_MONITOR', 'PERL_MONITOR', 'RUBY_MONITOR', 'GROOVY_MONITOR', 'POWERSHELL_MONITOR', 'FILE_TRANSFER', 'XFTP_COMMAND', 'DATASOURCE_UPLOAD_FILE', 'DATASOURCE_DOWNLOAD_FILE', 'DATASOURCE_DELETE_FILE', 'FILE_SENSOR', 'RDBMS_STORED_PROCEDURE', 'RDBMS_SQL_STATEMENT', 'RDBMS_SQL', 'SQL_SENSOR', 'REDIS_SET', 'REDIS_GET', 'REDIS_DELETE', 'REDIS_CLI', 'MONGO_DB_INSERT', 'IBM_MQ_SEND', 'IBM_MQ_SENSOR', 'RABBIT_MQ_SEND', 'RABBIT_MQ_SENSOR', 'KAFKA_SEND', 'KAFKA_SENSOR', 'JMS_SEND', 'JMS_SENSOR', 'AMQP_SEND', 'MQTT_SEND', 'XMPP_SEND', 'STOMP_SEND', 'Z_OS_DYNAMIC_JCL', 'Z_OS_STORED_JCL', 'Z_OS_COMMAND', 'Z_OS_JES_JOB_SENSOR', 'AS400_BATCH_JOB', 'AS400_PROGRAM_CALL', 'RAINCODE_DYNAMIC_JCL', 'RAINCODE_STORED_JCL', 'OPENTEXT_DYNAMIC_JCL', 'OPENTEXT_STORED_JCL', 'HDFS_UPLOAD_FILE', 'HDFS_APPEND_FILE', 'HDFS_DOWNLOAD_FILE', 'HDFS_DELETE_FILE', 'HDFS_CREATE_DIRECTORY', 'HDFS_DELETE_DIRECTORY', 'HDFS_RENAME', 'SPARK_JAVA', 'SPARK_SCALA', 'SPARK_PYTHON', 'SPARK_R', 'SPARK_SQL', 'FLINK_RUN_JOB', 'FLINK_JAR_UPLOAD', 'FLINK_JAR_DELETE', 'HTTP_REQUEST', 'REST_WEB_SERVICE_CALL', 'SOAP_WEB_SERVICE_CALL', 'HTTP_MONITOR', 'EMAIL_SEND', 'EMAIL_CONFIRMATION', 'EMAIL_INPUT', 'EMAIL_SENSOR', 'AWS_GLUE_WORKFLOW', 'AWS_GLUE_TRIGGER', 'AWS_GLUE_CRAWLER', 'AWS_GLUE_JOB', 'AWS_EMR_WORKFLOW', 'AWS_EMR_ADD_STEPS', 'AWS_EMR_CANCEL_STEPS', 'AWS_EMR_TERMINATE_JOB_FLOW', 'AWS_EMR_CONTAINER_MONITOR', 'AWS_EMR_JOB_FLOW_MONITOR', 'AWS_EMR_STEP_MONITOR', 'AWS_EMR_NOTEBOOK_MONITOR', 'AWS_EMR_PUT', 'AWS_EMR_GET', 'AWS_EMR_START_NOTEBOOK_EXECUTION', 'AWS_EMR_STOP_NOTEBOOK_EXECUTION', 'AWS_EMR_API_COMMAND', 'AWS_SAGE_MAKER_ADD_MODEL', 'AWS_SAGE_MAKER_DELETE_MODEL', 'AWS_SAGE_MAKER_PROCESSING', 'AWS_SAGE_MAKER_TRAINING', 'AWS_SAGE_MAKER_TRANSFORM', 'AWS_SAGE_MAKER_API_COMMAND', 'AWS_LAMBDA_INVOKE', 'AWS_LAMBDA_CREATE_FUNCTION', 'AWS_LAMBDA_DELETE_FUNCTION', 'AWS_EC2_START_INSTANCE', 'AWS_EC2_STOP_INSTANCE', 'AWS_EC2_TERMINATE_INSTANCE', 'AWS_EC2_DELETE_VOLUME', 'AWS_S3_DELETE_OBJECT', 'AWS_S3_COPY_OBJECT', 'AWS_S3_MOVE_OBJECT', 'AWS_S3_RENAME_OBJECT', 'AWS_BATCH_JOB', 'AWS_START_STEP_FUNCTION_STATE_MACHINE', 'AZURE_DATA_FACTORY_TRIGGER', 'AZURE_DATA_FACTORY_PIPELINE', 'AZURE_DATA_LAKE_JOB', 'AZURE_DATABRICKS_JOB', 'AZURE_DATABRICKS_TERMINATE_CLUSTER', 'AZURE_DATABRICKS_START_CLUSTER', 'AZURE_DATABRICKS_CLUSTER_MONITOR', 'AZURE_DATABRICKS_LIST_CLUSTERS', 'AZURE_DATABRICKS_DELETE_CLUSTER', 'INFORMATICA_CLOUD_TASKFLOW', 'INFORMATICA_WORKFLOW', 'INFORMATICA_WS_WORKFLOW', 'IBM_DATASTAGE', 'MS_SSIS', 'ODI_SESSION', 'ODI_LOAD_PLAN', 'SAS_4GL', 'SAS_DI', 'SAS_JOB', 'SAS_VIYA_JOB', 'TALEND_JOB', 'DBT_JOB', 'SAP_R3_JOB', 'SAP_R3_VARIANT_CREATE', 'SAP_R3_VARIANT_COPY', 'SAP_R3_VARIANT_UPDATE', 'SAP_R3_VARIANT_DELETE', 'SAP_R3_COPY_EXISTING_JOB', 'SAP_R3_START_SCHEDULED_JOB', 'SAP_R3_JOB_INTERCEPTOR', 'SAP_MODIFY_INTERCEPTION_CRITERIA', 'SAP_R3_INTERCEPTED_JOB_SENSOR', 'SAP_R3_JOB_MONITOR', 'SAP_R3_RAISE_EVENT', 'SAP_R3_EVENT_SENSOR', 'SAP_BW_PROCESS_CHAIN', 'SAP_ARCHIVE', 'SAP_FUNCTION_MODULE_CALL', 'SAP_READ_TABLE', 'SAP_CM_PROFILE_ACTIVATE', 'SAP_CM_PROFILE_DEACTIVATE', 'SAP_EXPORT_CALENDAR', 'SAP_EXPORT_JOB', 'SAP_4H_JOB', 'SAP_4H_VARIANT_CREATE', 'SAP_4H_VARIANT_COPY', 'SAP_4H_VARIANT_UPDATE', 'SAP_4H_VARIANT_DELETE', 'SAP_4H_COPY_EXISTING_JOB', 'SAP_4H_START_SCHEDULED_JOB', 'SAP_4H_JOB_INTERCEPTOR', 'SAP_4H_MODIFY_INTERCEPTION_CRITERIA', 'SAP_4H_INTERCEPTED_JOB_SENSOR', 'SAP_4H_JOB_MONITOR', 'SAP_4H_RAISE_EVENT', 'SAP_4H_EVENT_SENSOR', 'SAP_4H_BW_PROCESS_CHAIN', 'SAP_4H_ARCHIVE', 'SAP_4H_FUNCTION_MODULE_CALL', 'SAP_4H_READ_TABLE', 'SAP_4H_CM_PROFILE_ACTIVATE', 'SAP_4H_CM_PROFILE_DEACTIVATE', 'SAP_4H_EXPORT_CALENDAR', 'SAP_4H_EXPORT_JOB', 'SAP_ODATA_API_CALL', 'SAP_IBP_JOB', 'ORACLE_EBS_PROGRAM', 'ORACLE_EBS_REQUEST_SET', 'ORACLE_EBS_EXECUTE_PROGRAM', 'ORACLE_EBS_EXECUTE_REQUEST_SET', 'PEOPLESOFT_APPLICATION_ENGINE_TASK', 'PEOPLESOFT_CRW_ONLINE_TASK', 'PEOPLESOFT_CRYSTAL_REPORTS_TASK', 'PEOPLESOFT_CUBE_BUILDER_TASK', 'PEOPLESOFT_NVISION_TASK', 'PEOPLESOFT_SQR_PROCESS_TASK', 'PEOPLESOFT_SQR_REPORT_TASK', 'PEOPLESOFT_WINWORD_TASK', 'PEOPLESOFT_JOB_TASK', 'JIRA_ISSUE_SENSOR', 'JIRA_ADD_ISSUE', 'SERVICE_NOW_CREATE_INCIDENT', 'SERVICE_NOW_RESOLVE_INCIDENT', 'SERVICE_NOW_CLOSE_INCIDENT', 'SERVICE_NOW_UPDATE_INCIDENT', 'SERVICE_NOW_INCIDENT_STATUS_SENSOR', 'BMC_REMEDY_INCIDENT', 'AUTOMATE_NOW_TRIGGER_EVENT', 'APACHE_AIRFLOW_RUN_DAG', 'ANSIBLE_PLAYBOOK', 'ANSIBLE_PLAYBOOK_PATH', 'CTRLM_ADD_CONDITION', 'CTRLM_DELETE_CONDITION', 'CTRLM_ORDER_JOB', 'CTRLM_CREATE_JOB', 'CTRLM_RESOURCE_TABLE_ADD', 'CTRLM_RESOURCE_TABLE_UPDATE', 'CTRLM_RESOURCE_TABLE_DELETE', 'UI_PATH', 'BLUE_PRISM', 'ROBOT_FRAMEWORK_START_ROBOT', 'MICROSOFT_POWER_BI_DATASET_REFRESH', 'MICROSOFT_POWER_BI_DATAFLOW_REFRESH', 'TELEGRAM_MESSAGE', 'WHATSAPP_MESSAGE', 'SYSTEM_MONITOR', 'SYSTEM_PROCESS_MONITOR')]
+        [ValidateSet('SH', 'AE_SHELL_SCRIPT', 'PYTHON', 'PERL', 'RUBY', 'GROOVY', 'POWERSHELL', 'JAVA', 'SCALA', 'SH_MONITOR', 'PYTHON_MONITOR', 'PERL_MONITOR', 'RUBY_MONITOR', 'GROOVY_MONITOR', 'POWERSHELL_MONITOR', 'FILE_TRANSFER', 'XFTP_COMMAND', 'DATASOURCE_UPLOAD_FILE', 'DATASOURCE_DOWNLOAD_FILE', 'DATASOURCE_DELETE_FILE', 'FILE_SENSOR', 'RDBMS_STORED_PROCEDURE', 'RDBMS_SQL_STATEMENT', 'RDBMS_SQL', 'SQL_SENSOR', 'REDIS_SET', 'REDIS_GET', 'REDIS_DELETE', 'REDIS_CLI', 'MONGO_DB_INSERT', 'IBM_MQ_SEND', 'IBM_MQ_SENSOR', 'RABBIT_MQ_SEND', 'RABBIT_MQ_SENSOR', 'KAFKA_SEND', 'KAFKA_SENSOR', 'JMS_SEND', 'JMS_SENSOR', 'AMQP_SEND', 'MQTT_SEND', 'XMPP_SEND', 'STOMP_SEND', 'Z_OS_DYNAMIC_JCL', 'Z_OS_STORED_JCL', 'Z_OS_COMMAND', 'Z_OS_JES_JOB_SENSOR', 'AS400_BATCH_JOB', 'AS400_PROGRAM_CALL', 'RAINCODE_DYNAMIC_JCL', 'RAINCODE_STORED_JCL', 'OPENTEXT_DYNAMIC_JCL', 'OPENTEXT_STORED_JCL', 'HDFS_UPLOAD_FILE', 'HDFS_APPEND_FILE', 'HDFS_DOWNLOAD_FILE', 'HDFS_DELETE_FILE', 'HDFS_CREATE_DIRECTORY', 'HDFS_DELETE_DIRECTORY', 'HDFS_RENAME', 'SPARK_JAVA', 'SPARK_SCALA', 'SPARK_PYTHON', 'SPARK_R', 'SPARK_SQL', 'FLINK_RUN_JOB', 'FLINK_JAR_UPLOAD', 'FLINK_JAR_DELETE', 'HTTP_REQUEST', 'REST_WEB_SERVICE_CALL', 'SOAP_WEB_SERVICE_CALL', 'HTTP_MONITOR', 'EMAIL_SEND', 'EMAIL_CONFIRMATION', 'EMAIL_INPUT', 'EMAIL_SENSOR', 'AWS_GLUE_WORKFLOW', 'AWS_GLUE_TRIGGER', 'AWS_GLUE_CRAWLER', 'AWS_GLUE_JOB', 'AWS_EMR_WORKFLOW', 'AWS_EMR_ADD_STEPS', 'AWS_EMR_CANCEL_STEPS', 'AWS_EMR_TERMINATE_JOB_FLOW', 'AWS_EMR_CONTAINER_MONITOR', 'AWS_EMR_JOB_FLOW_MONITOR', 'AWS_EMR_STEP_MONITOR', 'AWS_EMR_NOTEBOOK_MONITOR', 'AWS_EMR_PUT', 'AWS_EMR_GET', 'AWS_EMR_START_NOTEBOOK_EXECUTION', 'AWS_EMR_STOP_NOTEBOOK_EXECUTION', 'AWS_EMR_API_COMMAND', 'AWS_SAGE_MAKER_ADD_MODEL', 'AWS_SAGE_MAKER_DELETE_MODEL', 'AWS_SAGE_MAKER_PROCESSING', 'AWS_SAGE_MAKER_TRAINING', 'AWS_SAGE_MAKER_TRANSFORM', 'AWS_SAGE_MAKER_API_COMMAND', 'AWS_LAMBDA_INVOKE', 'AWS_LAMBDA_CREATE_FUNCTION', 'AWS_LAMBDA_DELETE_FUNCTION', 'AWS_EC2_START_INSTANCE', 'AWS_EC2_STOP_INSTANCE', 'AWS_EC2_TERMINATE_INSTANCE', 'AWS_EC2_DELETE_VOLUME', 'AWS_S3_DELETE_OBJECT', 'AWS_S3_COPY_OBJECT', 'AWS_S3_MOVE_OBJECT', 'AWS_S3_RENAME_OBJECT', 'AWS_BATCH_JOB', 'AWS_START_STEP_FUNCTION_STATE_MACHINE', 'AZURE_DATA_FACTORY_TRIGGER', 'AZURE_DATA_FACTORY_PIPELINE', 'AZURE_DATA_LAKE_JOB', 'AZURE_DATABRICKS_JOB', 'AZURE_DATABRICKS_TERMINATE_CLUSTER', 'AZURE_DATABRICKS_START_CLUSTER', 'AZURE_DATABRICKS_CLUSTER_MONITOR', 'AZURE_DATABRICKS_LIST_CLUSTERS', 'AZURE_DATABRICKS_DELETE_CLUSTER', 'INFORMATICA_CLOUD_TASKFLOW', 'INFORMATICA_WORKFLOW', 'INFORMATICA_WS_WORKFLOW', 'IBM_DATASTAGE', 'MS_SSIS', 'ODI_SESSION', 'ODI_LOAD_PLAN', 'SAS_4GL', 'SAS_DI', 'SAS_JOB', 'SAS_VIYA_JOB', 'TALEND_JOB', 'DBT_JOB', 'SAP_R3_JOB', 'SAP_R3_VARIANT_CREATE', 'SAP_R3_VARIANT_COPY', 'SAP_R3_VARIANT_UPDATE', 'SAP_R3_VARIANT_DELETE', 'SAP_R3_COPY_EXISTING_JOB', 'SAP_R3_START_SCHEDULED_JOB', 'SAP_R3_JOB_INTERCEPTOR', 'SAP_MODIFY_INTERCEPTION_CRITERIA', 'SAP_R3_INTERCEPTED_JOB_SENSOR', 'SAP_R3_JOB_MONITOR', 'SAP_R3_RAISE_EVENT', 'SAP_R3_EVENT_SENSOR', 'SAP_BW_PROCESS_CHAIN', 'SAP_ARCHIVE', 'SAP_FUNCTION_MODULE_CALL', 'SAP_READ_TABLE', 'SAP_CM_PROFILE_ACTIVATE', 'SAP_CM_PROFILE_DEACTIVATE', 'SAP_EXPORT_CALENDAR', 'SAP_EXPORT_JOB', 'SAP_4H_JOB', 'SAP_4H_VARIANT_CREATE', 'SAP_4H_VARIANT_COPY', 'SAP_4H_VARIANT_UPDATE', 'SAP_4H_VARIANT_DELETE', 'SAP_4H_COPY_EXISTING_JOB', 'SAP_4H_START_SCHEDULED_JOB', 'SAP_4H_JOB_INTERCEPTOR', 'SAP_4H_MODIFY_INTERCEPTION_CRITERIA', 'SAP_4H_INTERCEPTED_JOB_SENSOR', 'SAP_4H_JOB_MONITOR', 'SAP_4H_RAISE_EVENT', 'SAP_4H_EVENT_SENSOR', 'SAP_4H_BW_PROCESS_CHAIN', 'SAP_4H_ARCHIVE', 'SAP_4H_FUNCTION_MODULE_CALL', 'SAP_4H_READ_TABLE', 'SAP_4H_CM_PROFILE_ACTIVATE', 'SAP_4H_CM_PROFILE_DEACTIVATE', 'SAP_4H_EXPORT_CALENDAR', 'SAP_4H_EXPORT_JOB', 'SAP_ODATA_API_CALL', 'SAP_IBP_JOB', 'ORACLE_EBS_PROGRAM', 'ORACLE_EBS_REQUEST_SET', 'ORACLE_EBS_EXECUTE_PROGRAM', 'ORACLE_EBS_EXECUTE_REQUEST_SET', 'PEOPLESOFT_APPLICATION_ENGINE_TASK', 'PEOPLESOFT_CRW_ONLINE_TASK', 'PEOPLESOFT_CRYSTAL_REPORTS_TASK', 'PEOPLESOFT_CUBE_BUILDER_TASK', 'PEOPLESOFT_NVISION_TASK', 'PEOPLESOFT_SQR_PROCESS_TASK', 'PEOPLESOFT_SQR_REPORT_TASK', 'PEOPLESOFT_WINWORD_TASK', 'PEOPLESOFT_JOB_TASK', 'JIRA_ISSUE_SENSOR', 'JIRA_ADD_ISSUE', 'SERVICE_NOW_CREATE_INCIDENT', 'SERVICE_NOW_RESOLVE_INCIDENT', 'SERVICE_NOW_CLOSE_INCIDENT', 'SERVICE_NOW_UPDATE_INCIDENT', 'SERVICE_NOW_INCIDENT_STATUS_SENSOR', 'BMC_REMEDY_INCIDENT', 'AUTOMATE_NOW_TRIGGER_EVENT', 'APACHE_AIRFLOW_RUN_DAG', 'ANSIBLE_PLAYBOOK', 'ANSIBLE_PLAYBOOK_PATH', 'CTRLM_ADD_CONDITION', 'CTRLM_DELETE_CONDITION', 'CTRLM_ORDER_JOB', 'CTRLM_CREATE_JOB', 'CTRLM_RESOURCE_TABLE_ADD', 'CTRLM_RESOURCE_TABLE_UPDATE', 'CTRLM_RESOURCE_TABLE_DELETE', 'UI_PATH', 'BLUE_PRISM', 'ROBOT_FRAMEWORK_START_ROBOT', 'MICROSOFT_POWER_BI_DATASET_REFRESH', 'MICROSOFT_POWER_BI_DATAFLOW_REFRESH', 'TELEGRAM_MESSAGE', 'WHATSAPP_MESSAGE', 'SYSTEM_MONITOR', 'SYSTEM_PROCESS_MONITOR', IgnoreCase = $false)]
         [Parameter(Mandatory = $True)]
         [string]$Type,
         [Parameter(Mandatory = $True)]
@@ -2461,7 +3059,7 @@ Function Start-AutomateNOWTask {
         [Parameter(Mandatory = $False)]
         [switch]$ForceLoad
     )
-    If ((Confirm-AutomateNOWSession -Quiet -IgnoreEmptyDomain ) -ne $true) {
+    If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
         Write-Warning -Message "Somehow there is not a valid token confirmed."
         Break
     }
@@ -2530,7 +3128,6 @@ Function Start-AutomateNOWTask {
     $parameters.Add('Body', $Body)
     $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
     $parameters.Add('Instance', $Instance)
-    $parameters.Add('JustGiveMeJSON', $True)
     If ($anow_session.NotSecure -eq $true) {
         $parameters.Add('NotSecure', $true)
     }
@@ -2543,18 +3140,258 @@ Function Start-AutomateNOWTask {
         Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
         Break
     }
-    $Error.Clear()
-    Try {
-        [PSCustomObject]$response = $results | ConvertFrom-Json
-    }
-    Catch {
-        [string]$Message = $_.Exception.Message
-        Write-Warning -Message "ConvertFrom-JSON failed due to [$Message]"
-        Break
-    }
-    Return $response
+    Return $results
 }
 
 #EndRegion
 
-$InformationPreference = 'Continue'
+#Region - TimeZones
+Function Read-AutomateNOWTimeZone {
+    <#
+    .SYNOPSIS
+    Reads the available time zones from the assets of an instance of AutomateNOW!
+    
+    .DESCRIPTION    
+    The `Read-AutomateNOWTimeZone` reads the available time zones from the assets of an instance of AutomateNOW!
+    
+    .INPUTS
+    None. You cannot pipe objects to Read-AutomateNOWTimeZone.
+    
+    .OUTPUTS
+    An array of PSCustomObjects
+    
+    .EXAMPLE
+    Read-AutomateNOWTimeZone
+    
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [OutputType([AutomateNOWTimezone[]])]
+    [Cmdletbinding()]
+    Param(
+    )
+    If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+        Write-Warning -Message "Somehow there is not a valid token confirmed."
+        Break
+    }
+    [string]$command = '/home/readTimeZones'
+    $BodyObject = New-Object -TypeName System.Collections.Specialized.OrderedDictionary
+    $BodyObject.Add('_operationType', 'fetch')
+    $BodyObject.Add('_textMatchStyle', 'exact')
+    $BodyObject.Add('_componentId', 'cacheAllData')
+    $BodyObject.Add('_dataSource', 'TimeZoneDataSource')
+    $BodyObject.Add('_operationId', 'TimeZoneDataSource_fetch')
+    $BodyObject.Add('isc_metaDataPrefix', '_')
+    $BodyObject.Add('isc_dataFormat', 'json')
+    [string]$Body = ConvertTo-QueryString -InputObjects $BodyObject    
+    [string]$Instance = $anow_session.Instance
+    [hashtable]$parameters = @{}
+    $parameters.Add('Command', $command)
+    $parameters.Add('Method', 'GET')
+    $parameters.Add('Body', $Body)
+    $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+    $parameters.Add('Instance', $Instance)
+    If ($anow_session.NotSecure -eq $true) {
+        $parameters.Add('NotSecure', $true)
+    }    
+    $Error.Clear()
+    Try {
+        [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+    }
+    Catch {
+        [string]$Message = $_.Exception.Message
+        Write-Warning -Message "Invoke-AutomateNOWAPI failed due to execute [$command] due to [$Message]."
+        Break
+    }
+    [AutomateNOWTimezone[]]$TimeZones = $results.response.data
+    [int32]$TimeZones_count = $TimeZones.Count
+    If ($TimeZones_count -eq 0) {
+        Write-Warning -Message "Somehow there are 0 time zones..."
+        Break
+    }
+    Return $TimeZones
+}
+
+#EndRegion
+
+#Region - TriggerLog
+Function Get-AutomateNOWTriggerLog {
+    <#
+    .SYNOPSIS
+    Gets the trigger logs from the domain of an AutomateNOW! instance
+    
+    .DESCRIPTION    
+    The `Get-AutomateNOWTriggerLog` retrieves all of the trigger logs from the domain of an AutomateNOW! instance
+    
+    .INPUTS
+    None. You cannot pipe objects to Get-AutomateNOWTriggerLog.
+    
+    .OUTPUTS
+    An array of PSCustomObjects
+    
+    .EXAMPLE
+    Get-AutomateNOWTriggerLog
+    
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+    There are no parameters yet for this function.
+    #>
+    [OutputType([array])]
+    [Cmdletbinding()]
+    Param(
+    )
+    If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+        Write-Warning -Message "Somehow there is not a valid token confirmed."
+        Break
+    }
+    [string]$command = '/executeProcessingTriggerLog'
+    [hashtable]$parameters = @{}
+    $parameters.Add('Command', $command)
+    $parameters.Add('Method', 'GET')
+    If ($anow_session.NotSecure -eq $true) {
+        $parameters.Add('NotSecure', $true)
+    }    
+    $Error.Clear()
+    Try {
+        [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+    }
+    Catch {
+        [string]$Message = $_.Exception.Message
+        Write-Warning -Message "Invoke-AutomateNOWAPI failed due to execute [$command] due to [$Message]."
+        Break
+    }
+    [PSCustomObject[]]$nodes = $results.response.data
+    [int32]$nodes_count = $nodes.Count
+    If ($nodes_count -eq 0) {
+        Write-Warning -Message "Somehow there are no trigger logs available. Is this a newly installed instance which has not been configured yet?"
+        Break
+    }
+    Return $nodes
+}
+#Endregion
+
+#Region - Users
+Function Get-AutomateNOWUser {
+    <#
+    .SYNOPSIS
+    Gets the details of the currently authenticated user
+    
+    .DESCRIPTION    
+    The `Get-AutomateNOWUser` cmdlet invokes the /secUser/getUserInfo endpoint to retrieve information about the currently authenticated user (meaning you)
+    
+    .INPUTS
+    None. You cannot pipe objects to Get-AutomateNOWUser.
+    
+    .OUTPUTS
+    A PSCustomObject
+    
+    .EXAMPLE
+    Get-AutomateNOWUser
+    
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    There are no parameters yet for this function.
+
+    Get-AutomateNOWUser DOES NOT refresh the token automatically!
+    #>
+    [OutputType([PSCustomObject])]
+    [Cmdletbinding()]
+    Param(
+    )
+    If ((Confirm-AutomateNOWSession -IgnoreEmptyDomain -Quiet -DoNotRefresh) -ne $true) {
+        Write-Warning -Message "Somehow there is not a valid token confirmed."
+        Break
+    }
+    [string]$command = '/secUser/getUserInfo'
+    [string]$Instance = $anow_session.Instance
+    [hashtable]$parameters = @{}
+    $parameters.Add('Command', $command)
+    $parameters.Add('Method', 'GET')
+    $parameters.Add('Instance', $Instance)
+    If ($anow_session.NotSecure -eq $true) {
+        $parameters.Add('NotSecure', $true)
+    }    
+    $Error.Clear()
+    Try {
+        [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+    }
+    Catch {
+        [string]$Message = $_.Exception.Message
+        Write-Warning -Message "Invoke-AutomateNOWAPI failed due to execute [$command] due to [$Message]."
+        Break
+    }
+    Return $results
+}
+
+#Endregion
+
+#Region - Workflows
+
+Function Get-AutomateNOWWorkflow {
+    <#
+    .SYNOPSIS
+    Gets the workflow objects from an instance of AutomateNOW!
+    
+    .DESCRIPTION    
+    The `Get-AutomateNOWWorkflow` cmdlet gets the workflow objects from an instance of AutomateNOW!
+    
+    .INPUTS
+    None. You cannot pipe objects to Get-AutomateNOWWorkflow.
+    
+    .OUTPUTS
+    An array of PSCustomObjects
+    
+    .EXAMPLE
+    Get-AutomateNOWWorkflow
+    
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    There are no parameters yet for this function.
+    #>
+    [OutputType([PSCustomObject])]
+    [Cmdletbinding()]
+    Param(
+    )
+    If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+        Write-Warning -Message "Somehow there is not a valid token confirmed."
+        Break
+    }
+    [string]$command = '/processingTemplate/read'
+    $BodyObject = New-Object -TypeName System.Collections.Specialized.OrderedDictionary
+    $BodyObject.Add('_constructor', 'AdvancedCriteria')
+    $BodyObject.Add('operator', 'and')
+    $BodyObject.Add('criteria', '{"fieldName":"workflowType","operator":"equals","value":"STANDARD"}')
+    $Body = ConvertTo-QueryString -InputObjects $BodyObject    
+    [string]$Instance = $anow_session.Instance
+    [hashtable]$parameters = @{}
+    $parameters.Add('Command', $command)
+    $parameters.Add('Method', 'POST')
+    $parameters.Add('Body', $Body)
+    $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+    $parameters.Add('Instance', $Instance)
+    If ($anow_session.NotSecure -eq $true) {
+        $parameters.Add('NotSecure', $true)
+    }    
+    $Error.Clear()
+    Try {
+        [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+    }
+    Catch {
+        [string]$Message = $_.Exception.Message
+        Write-Warning -Message "Invoke-AutomateNOWAPI failed due to execute [$command] due to [$Message]."
+        Break
+    }
+    [array]$WorkFlows = $Results.response.data
+    [int32]$WorkFlows_count = $WorkFlows.Count
+    If ($WorkFlows_count -eq 0) {
+        Write-Warning -Message "Somehow there are 0 workflows..."
+        Break
+    }
+    Return $WorkFlows
+}
+
+#endregion
+
