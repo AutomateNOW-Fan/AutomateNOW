@@ -21,9 +21,9 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 
 - Completely browserless operation
 - Compatible with both Windows PowerShell & PowerShell Core
-- Outputs can be PSCustomObject or (deserialized) JSON
+- Output can be either: PSCustomObject array or a JSON string
 - Supports both http & https protocols
-- Each function will respond to -? with help information
+- Each function includes built-in help (use -?)
 - The session token may be continually updated via `Update-AutomateNOWToken`
 - Manually substitute the encryption key bytes (if needed 🤞)
 <br/><br/>
@@ -38,13 +38,14 @@ This module has been tested against the below versions of AutomateNOW!
 ### 1.0.8
 - Added new functions: `Get-AutomateNOWAdhocReport`, `Get-AutomateNOWAuditLog`, `Get-AutomateNOWCalendar`, `Get-AutomateNOWOverview`, `Get-AutomateNOWTimeZone`
 - Replaced hard-coded query strings with properly defined URL parameter hashtables with the help of `ConvertTo-QueryString`
-- Fixed an issue with Import-AutomateNOWIcon exporting the .csv to the wrong location
+- Fixed an issue with `Import-AutomateNOWIcon` exporting the .csv to the wrong location
 - Added support for entering your own session token directly into `Connect-AutomateNOW` (optionally include refresh token + expiration date for best results)
+- Added support for reading the authentication JSON payload from the clipboard
 - Incorporated `Compare-ObjectProperty` (see PoshFunctions on the PowerShell Gallery)
 - Initiated the beginnings of class objects for AutomateNOW objects
-- Added base class ANOWAuditLogEntry with sub classes (UPDATE, DELETE and INSERT)
-- Added base class ANOWTimeZone
-- Added method CompareOldNewValues() to derived class ANOWAuditLogEntry_Update (note: only applies UPDATE entries)
+- Added base class _ANOWAuditLogEntry_ with sub classes (UPDATE, DELETE and INSERT)
+- Added base class _ANOWTimeZone_
+- Added method **CompareOldNewValues()** to derived class _ANOWAuditLogEntry_Update_ (note: only applies to UPDATE audit log entries)
 - Added myriad tiny fixes
 
 ### 1.0.7
