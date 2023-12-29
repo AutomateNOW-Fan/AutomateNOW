@@ -108,7 +108,6 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 - add export capability for workflow diagram data to PNG
 
-<br/><br/>
 ## Functions 🛠
 
 `Confirm-AutomateNOWSession`
