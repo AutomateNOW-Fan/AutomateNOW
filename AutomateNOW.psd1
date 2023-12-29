@@ -9,10 +9,10 @@ Developed against AutomateNOW! version 3.2.1.77
 	RootModule = 'AutomateNOW.psm1'
 	
 	# Version number of this module.
-	ModuleVersion = '1.0.8'
+	ModuleVersion = '1.0.9'
 	
 	# ID used to uniquely identify this module
-	GUID = '3a4214ab-a9cb-6aa1-2331-1d73e6a25b0b'
+	GUID = '4a4214ab-a9cd-6aa1-2331-1d73e6a25b0a'
 	
 	# Copyright statement for this module
 	Copyright = 'not affiliated with InfiniteDATA'
@@ -60,7 +60,8 @@ Developed against AutomateNOW! version 3.2.1.77
 	NestedModules = @()
 	
 	# Functions to export from this module
-	FunctionsToExport = @('Confirm-AutomateNOWSession', 'Connect-AutomateNOW', 'Disconnect-AutomateNOW', 'Get-AutomateNOWAdhocReport', 'Get-AutomateNOWAuditLog', 'Get-AutomateNOWCalendar', 'Get-AutomateNOWDomain', 'Get-AutomateNOWFolder', 'Get-AutomateNOWNode', 'Get-AutomateNOWOverview', 'Get-AutomateNOWTag', 'Get-AutomateNOWTask', 'Get-AutomateNOWTriggerLog', 'Get-AutomateNOWUser', 'Get-AutomateNOWWorkflow', 'Import-AutomateNOWIcon', 'Invoke-AutomateNOWAPI', 'New-AutomateNOWFolder', 'New-AutomateNOWTag', 'Read-AutomateNOWTimeZone', 'Remove-AutomateNOWTag', 'Set-AutomateNOWPassword', 'Show-AutomateNOWDomain', 'Show-AutomateNOWTaskType', 'Start-AutomateNOWTask', 'Switch-AutomateNOWDomain', 'Update-AutomateNOWToken') #For performance, list functions explicitly
+	FunctionsToExport = @('Confirm-AutomateNOWSession', 'Connect-AutomateNOW', 'Disconnect-AutomateNOW', 'Export-AutomateNOWDomain', 'Export-AutomateNOWFolder', 'Export-AutomateNOWIcon', 'Export-AutomateNOWNode', 'Export-AutomateNOWTag', 'Export-AutomateNOWTask', 'Export-AutomateNOWTimeZone', 'Export-AutomateNOWUser', 'Export-AutomateNOWWorkflow', 'Get-AutomateNOWDomain', 'Get-AutomateNOWFolder', 'Get-AutomateNOWNode', 'Get-AutomateNOWTag', 'Get-AutomateNOWTask', 'Get-AutomateNOWTimeZone', 'Get-AutomateNOWUser', 'Get-AutomateNOWWorkflow', 'Import-AutomateNOWIcon', 'Import-AutomateNOWLocalIcon', 'Import-AutomateNOWTimeZone', 'Invoke-AutomateNOWAPI', 'New-AutomateNOWFolder', 'New-AutomateNOWNode', 'New-AutomateNOWTag', 'New-AutomateNOWTask', 'New-AutomateNOWWorkflow', 'Read-AutomateNOWIcon', 'Remove-AutomateNOWFolder', 'Remove-AutomateNOWNode', 'Remove-AutomateNOWTag', 'Remove-AutomateNOWTask', 'Remove-AutomateNOWWorkflow', 'Set-AutomateNOWPassword', 'Switch-AutomateNOWDomain', 'Update-AutomateNOWToken', 'Write-AutomateNOWIconData' ) #For performance, list functions explicitly
+
 	CompatiblePSEditions = @('Desktop', 'Core')
 	
 	# Cmdlets to export from this module
