@@ -1,5 +1,5 @@
 ﻿<#	
-Developed against AutomateNOW! version 3.2.1.77
+Developed against AutomateNOW! version 3.3.1.75
 #>
 @{	
 	# Author of this module
@@ -9,10 +9,10 @@ Developed against AutomateNOW! version 3.2.1.77
 	RootModule = 'AutomateNOW.psm1'
 	
 	# Version number of this module.
-	ModuleVersion = '1.0.9'
+	ModuleVersion = '1.0.10'
 	
 	# ID used to uniquely identify this module
-	GUID = '4a4214ab-a9cd-6aa1-2331-1d73e6a25b0a'
+	GUID = '4a4214db-a9cd-7aa1-2331-1d73e6a25b0f'
 	
 	# Copyright statement for this module
 	Copyright = 'not affiliated with InfiniteDATA'
@@ -60,7 +60,7 @@ Developed against AutomateNOW! version 3.2.1.77
 	NestedModules = @()
 	
 	# Functions to export from this module
-	FunctionsToExport = @('Confirm-AutomateNOWSession', 'Connect-AutomateNOW', 'Disconnect-AutomateNOW', 'Export-AutomateNOWDomain', 'Export-AutomateNOWFolder', 'Export-AutomateNOWIcon', 'Export-AutomateNOWNode', 'Export-AutomateNOWTag', 'Export-AutomateNOWTask', 'Export-AutomateNOWTimeZone', 'Export-AutomateNOWUser', 'Export-AutomateNOWWorkflow', 'Get-AutomateNOWDomain', 'Get-AutomateNOWFolder', 'Get-AutomateNOWNode', 'Get-AutomateNOWTag', 'Get-AutomateNOWTask', 'Get-AutomateNOWTimeZone', 'Get-AutomateNOWUser', 'Get-AutomateNOWWorkflow', 'Import-AutomateNOWIcon', 'Import-AutomateNOWLocalIcon', 'Import-AutomateNOWTimeZone', 'Invoke-AutomateNOWAPI', 'New-AutomateNOWFolder', 'New-AutomateNOWNode', 'New-AutomateNOWTag', 'New-AutomateNOWTask', 'New-AutomateNOWWorkflow', 'Read-AutomateNOWIcon', 'Remove-AutomateNOWFolder', 'Remove-AutomateNOWNode', 'Remove-AutomateNOWTag', 'Remove-AutomateNOWTask', 'Remove-AutomateNOWWorkflow', 'Set-AutomateNOWPassword', 'Switch-AutomateNOWDomain', 'Update-AutomateNOWToken', 'Write-AutomateNOWIconData' ) #For performance, list functions explicitly
+	FunctionsToExport = @('Add-AutomateNOWDataSourceItem', 'Confirm-AutomateNOWSession', 'Connect-AutomateNOW', 'Copy-AutomateNOWWorkflowTemplate', 'Disconnect-AutomateNOW', 'Export-AutomateNOWDataSource', 'Export-AutomateNOWDataSourceItem', 'Export-AutomateNOWDomain', 'Export-AutomateNOWFolder', 'Export-AutomateNOWIcon', 'Export-AutomateNOWNode', 'Export-AutomateNOWTag', 'Export-AutomateNOWTaskTemplate', 'Export-AutomateNOWTimeZone', 'Export-AutomateNOWUser', 'Export-AutomateNOWWorkflowTemplate', 'Export-AutomateNOWWorkspace', 'Get-AutomateNOWDataSource', 'Get-AutomateNOWDataSourceItem', 'Get-AutomateNOWDomain', 'Get-AutomateNOWFolder', 'Get-AutomateNOWNode', 'Get-AutomateNOWTag', 'Get-AutomateNOWTaskTemplate', 'Get-AutomateNOWTimeZone', 'Get-AutomateNOWUser', 'Get-AutomateNOWWorkflowTemplate', 'Get-AutomateNOWWorkspace', 'Import-AutomateNOWIcon', 'Import-AutomateNOWLocalIcon', 'Import-AutomateNOWTimeZone', 'Invoke-AutomateNOWAPI', 'New-AutomateNOWDataSource', 'New-AutomateNOWDataSourceItem', 'New-AutomateNOWFolder', 'New-AutomateNOWNode', 'New-AutomateNOWTag', 'New-AutomateNOWTaskTemplate', 'New-AutomateNOWWorkflowTemplate', 'New-AutomateNOWWorkspace', 'New-WebkitBoundaryString', 'Read-AutomateNOWIcon', 'Remove-AutomateNOWDataSource', 'Remove-AutomateNOWFolder', 'Remove-AutomateNOWNode', 'Remove-AutomateNOWTag', 'Remove-AutomateNOWTask', 'Remove-AutomateNOWWorkflowTemplate', 'Remove-AutomateNOWWorkspace', 'Rename-AutomateNOWWorkflowTemplate', 'Set-AutomateNOWPassword', 'Set-AutomateNOWFolder', 'Set-AutomateNOWTag', 'Switch-AutomateNOWDomain', 'Update-AutomateNOWToken', 'Write-AutomateNOWIconData' ) #For performance, list functions explicitly
 
 	CompatiblePSEditions = @('Desktop', 'Core')
 	
@@ -95,7 +95,7 @@ Developed against AutomateNOW! version 3.2.1.77
 			# LicenseUri = ''
 			
 			# A URL to the main website for this project.
-			ProjectUri = 'https://github.com/AutomateNOW-Fan'
+			ProjectUri = 'https://github.com/AutomateNOW-Fan/AutomateNOW'
 			
 			# A URL to an icon representing this module.
 			IconUri = 'https://i.imgur.com/vqgEhoh.png'

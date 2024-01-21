@@ -1,9 +1,23 @@
+
 #Region Enums
 
 #Region - Enum [Icons]
 
 Enum ANOWiconSet {
     FAT_COW; FUGUE; FONT_AWESOME;
+}
+
+Enum ANOWiconSetIconsOnly {
+    # Notes: Some features (e.g. Workspace) only support the two real icon sets
+    FAT_COW; FUGUE;
+}
+
+#endregion
+
+#Region - Enum [DataSource]
+
+Enum ANOWDataSource_dataSourceType {
+    LOCAL_DICTIONARY; LOCAL_KEY_VALUE_STORE; LOCAL_FILE_STORE; LOCAL_TEXT_FILE_STORE; # Note: There are three additional types (REST; SQL; LOCAL;) which are not selectable in the UI.
 }
 
 #endregion
@@ -32,73 +46,73 @@ Enum ANOWserverNode_resourceType {
 
 #endregion
 
-#Region - Enum [Tasks]
+#Region - Enum [TaskTemplates]
 
-Enum ANOWTask_sensorType {
+Enum ANOWTaskTemplate_sensorType {
     FILE_SENSOR; SQL_SENSOR; EMAIL_SENSOR; JMS_SENSOR; AMQP_SENSOR; RABBIT_MQ_SENSOR; KAFKA_SENSOR; JIRA_ISSUE_SENSOR; MQTT_SENSOR; IBM_MQ_SENSOR; HTTP_SENSOR; SNMP_SENSOR; Z_OS_JES_JOB_SENSOR; SAP_R3_INTERCEPTED_JOB_SENSOR; SAP_R3_EVENT_SENSOR; SAP_IBP_PROCESS_SENSOR; SAP_4H_EVENT_SENSOR; SAP_4H_INTERCEPTED_JOB_SENSOR; SAP_4H_IBP_PROCESS_SENSOR; SERVICE_NOW_INCIDENT_STATUS_SENSOR;
 }
 
-Enum ANOWTask_endpointType {
+Enum ANOWTaskTemplate_endpointType {
     USER; FTP; MAINFRAME_FTP; FTPS; MAINFRAME_FTPS; SFTP; S3; HDFS; AZURE_BLOB; AZURE_FILE; GOOGLE_COULD_STORAGE_BUCKET; PGP; HTTP; REST_WEB_SERVICE; SOAP_WEB_SERVICE; EMAIL; EMAIL_EWS; AWS; AZURE; GOOGLE_CLOUD; GOOGLE_DATA_FLOW; AZURE_DATABRICKS; INFORMATICA_CLOUD; AWS_COMMON; IBM_MQ; RABBIT_MQ; SQS; ACTIVE_MQ; QPID; IBM_SIBUS; HORNETQ; SOLACE; JORAM_MQ; QMQ; ZERO_MQ; KAFKA; PULSAR; AMAZON_KINESIS; GOOGLE_CLOUD_PUB_SUB; MICROSOFT_AZURE_EVENT_HUB; AMQP; XMPP; STOMP; REDIS; HADOOP; HIVE; IMPALA; SQOOP; YARN; SPARK; FLUME; FLINK; STORM; OOZIE; AMBARI; ELASTIC_SEARCH; CASSANDRA; SAP_HANA; MONGO_DB; COUCH_DB; COUCH_BASE; DYNAMO_DB; ARANGO_DB; NEO4J; ORIENT_DB; TITAN; SSH; WINRM; HIVE_QL; GOOGLE_BIG_QUERY; DASHDB; DB2; MYSQL; NETEZZA; AZURE_SQL_DATABASE; AZURE_SQL_DATA_WAREHOUSE; ORACLE; POSTGRESQL; SQL_SERVER; SQL_SERVER_JTDS; TERADATA; SINGLESTORE; VERTICA; SNOWFLAKE; PRESTO_DB; SYBASE; INFORMIX; H2; AS400; Z_OS; RAINCODE; OPENTEXT; CTRL_M; INFORMATICA; INFORMATICA_WS; SAS; SAS_VIYA; IBM_DATASTAGE; ODI; MS_SSIS; AB_INITIO; SAP_BODI; SKYVIA; TALEND; DBT; SAP; SAP_S4_HANA; SAP_S4_HANA_CLOUD; SAP_IBP; JD_EDWARDS; ORACLE_EBS; PEOPLESOFT; MICROSOFT_DYNAMICS; JIRA; SERVICE_NOW; ORACLE_SERVICE_CENTER; BMC_REMEDY; CA_SERVICE_MANAGEMENT; IBM_CONTROL_DESK; HP_OPEN_VIEW_SERVICE_MANAGER; SAP_SOLUTION_MANAGER; FACEBOOK; INSTAGRAM; TWITTER; YOUTUBE; LINKED_IN; TUMBLR; TIKTOK; REDDIT; TELEGRAM; WHATSAPP; MICROSOFT_POWER_BI; BLUE_PRISM; UI_PATH; AUTOMATION_ANYWHERE; WORK_FUSION; PEGA; ROBOT_FRAMEWORK; AUTOMATE_NOW; APACHE_AIRFLOW; ANSIBLE;
 }
 
-Enum ANOWTask_processingType {
+Enum ANOWTaskTemplate_processingType {
     TASK; WORKFLOW; SERVICE; TRIGGER;
 }
 
-Enum ANOWTask_serviceManagerAggregationMode {
+Enum ANOWTaskTemplate_serviceManagerAggregationMode {
     AND; OR; XOR; NAND; NOR; XNOR; SUM; MIN; MAX; AVG; MEDIAN;
 }
 
-Enum ANOWTask_integrationType {
+Enum ANOWTaskTemplate_integrationType {
     TEMPLATE; INTERFACE; CUSTOM;
 }
 
-Enum ANOWTask_highRiskStatisticPeriod {
+Enum ANOWTaskTemplate_highRiskStatisticPeriod {
     WEEK; MONTH; QUARTER; YEAR; ALL;
 }
 
-Enum ANOWTask_triggerType {
+Enum ANOWTaskTemplate_triggerType {
     SCHEDULE; EVENT; SELF_SERVICE; USER; PROCESSING; SERVER_NODE;
 }
 
-Enum ANOWTask_serviceType {
+Enum ANOWTaskTemplate_serviceType {
     SERVICE_MANAGER; SENSOR; MONITOR;
 }
 
-Enum ANOWTask_serviceManagerType {
+Enum ANOWTaskTemplate_serviceManagerType {
     BUSINESS_VIEW; SLA_SERVICE_MANAGER; STATE_SERVICE_MANAGER; NUMERIC_SERVICE_MANAGER;
 }
 
-Enum ANOWTask_monitorType {
+Enum ANOWTaskTemplate_monitorType {
     SYSTEM_MONITOR; SYSTEM_PROCESS_MONITOR; PROCESSING_MONITOR; PROCESSING_DEADLINE_MONITOR; PROCESSING_BASELINE_DEVIATION_MONITOR; SERVER_NODE_MONITOR; PING_MONITOR; HTTP_MONITOR; SH_MONITOR; PYTHON_MONITOR; PERL_MONITOR; POWERSHELL_MONITOR; TCL_MONITOR; RUBY_MONITOR; GROOVY_MONITOR; SAP_R3_JOB_MONITOR; SAP_IBP_JOB_MONITOR; SAP_IBP_PROCESS_MONITOR; SAP_IBP_PROCESS_FILTER_MONITOR; SAP_R3_INTERCEPTED_JOB_MONITOR; SAP_4H_JOB_MONITOR; SAP_4H_IBP_JOB_MONITOR; SAP_4H_IBP_PROCESS_MONITOR; SAP_4H_IBP_PROCESS_FILTER_MONITOR; SAP_4H_INTERCEPTED_JOB_MONITOR; AWS_EMR_CONTAINER_MONITOR; AWS_EMR_JOB_FLOW_MONITOR; AWS_EMR_STEP_MONITOR; AWS_EMR_NOTEBOOK_MONITOR; AZURE_DATABRICKS_CLUSTER_MONITOR;
 }
 
-Enum ANOWTask_workflowType {
+Enum ANOWTaskTemplate_workflowType {
     STANDARD; BROADCAST; FOR_EACH; TIME_SERIES; SWITCH; CYCLE; INFORMATICA;
 }
 
-Enum ANOWTask_highRiskStatisticMethod {
+Enum ANOWTaskTemplate_highRiskStatisticMethod {
     STATIC_VALUE; COUNT; PERCENT;
 }
 
-Enum ANOWTask_outputFormat {
+Enum ANOWTaskTemplate_outputFormat {
     TEXT; JSON; XML; GREP; AUTO;
 }
 
-Enum ANOWTask_statisticPeriod {
+Enum ANOWTaskTemplate_statisticPeriod {
     WEEK; MONTH; QUARTER; YEAR; ALL;
 }
 
-Enum ANOWTask_serverNodeType {
+Enum ANOWTaskTemplate_serverNodeType {
     AZURE; AWS; GOOGLE_CLOUD; GOOGLE_DATA_FLOW; AZURE_DATABRICKS; INFORMATICA_CLOUD; UNIX; LINUX; WINDOWS; SOLARIS; HPUX; AIX; OPENVMS; MACOS; AS400; Z_OS; RAINCODE; CTRL_M; OPENTEXT; INFORMATICA; INFORMATICA_WS; SAS; SAS_VIYA; IBM_DATASTAGE; ODI; MS_SSIS; AB_INITIO; SAP_BODI; SKYVIA; TALEND; DBT; SAP; SAP_S4_HANA; SAP_S4_HANA_CLOUD; SAP_IBP; JD_EDWARDS; ORACLE_EBS; PEOPLESOFT; MICROSOFT_DYNAMICS; HIVE_QL; GOOGLE_BIG_QUERY; AZURE_SQL_DATA_WAREHOUSE; AZURE_SQL_DATABASE; DASHDB; DB2; MYSQL; NETEZZA; ORACLE; POSTGRESQL; SQL_SERVER; TERADATA; SINGLESTORE; SNOWFLAKE; VERTICA; PRESTO_DB; SYBASE; INFORMIX; H2; FILE_MANAGER; SNMP; HTTP; EMAIL; SOAP_WEB_SERVICE; REST_WEB_SERVICE; INTERNAL; IBM_MQ; RABBIT_MQ; SQS; ACTIVE_MQ; QPID; IBM_SIBUS; HORNETQ; SOLACE; JORAM_MQ; QMQ; ZERO_MQ; KAFKA; PULSAR; AMAZON_KINESIS; GOOGLE_CLOUD_PUB_SUB; MICROSOFT_AZURE_EVENT_HUB; AMQP; XMPP; STOMP; HDFS; REDIS; HADOOP; HIVE; IMPALA; SQOOP; YARN; SPARK; FLUME; FLINK; STORM; OOZIE; AMBARI; ELASTIC_SEARCH; CASSANDRA; SAP_HANA; MONGO_DB; COUCH_DB; COUCH_BASE; DYNAMO_DB; ARANGO_DB; NEO4J; ORIENT_DB; TITAN; ANDROID; IOS; WINDOWS_MOBILE; MICROSOFT_POWER_BI; BLUE_PRISM; UI_PATH; AUTOMATION_ANYWHERE; WORK_FUSION; PEGA; ROBOT_FRAMEWORK; CONTROL_M; STONEBRANCH; CA_WLA; AUTOMIC_WLA; IBM_WLA; TIDAL; FACEBOOK; INSTAGRAM; TWITTER; YOUTUBE; LINKED_IN; TUMBLR; TIKTOK; REDDIT; TELEGRAM; WHATSAPP; JIRA; SERVICE_NOW; ORACLE_SERVICE_CENTER; BMC_REMEDY; CA_SERVICE_MANAGEMENT; IBM_CONTROL_DESK; HP_OPEN_VIEW_SERVICE_MANAGER; SAP_SOLUTION_MANAGER; AUTOMATE_NOW; APACHE_AIRFLOW; ANSIBLE;
 }
 
-Enum ANOWTask_statisticMethod {
+Enum ANOWTaskTemplate_statisticMethod {
     MOST_FREQUENT_VALUE; WEIGHTED_AVERAGE; AVERAGE; MEDIAN; FIRST_QUARTILE; SECOND_QUARTILE; THIRD_QUARTILE; FOURTH_QUARTILE; STATIC_VALUE; MIN; MAX; COUNT;
 }
 
-Enum ANOWTask_taskType {
+Enum ANOWTaskTemplate_taskType {
     PROCESSING_OBSERVER; TRIGGER_ITEM; SH; PYTHON; PERL; POWERSHELL; TCL; RUBY; GROOVY; SCALA; KOTLIN; C; CPP; JAVA; JAVASCRIPT; TYPESCRIPT; RUST; GO; SWIFT; VBSCRIPT; AS400_COMMAND_CALL; AS400_PROGRAM_CALL; AS400_BATCH_JOB; Z_OS_DYNAMIC_JCL; Z_OS_STORED_JCL; Z_OS_COMMAND; AWS_GLUE_WORKFLOW; AWS_GLUE_JOB; AWS_GLUE_CRAWLER; AWS_GLUE_TRIGGER; AWS_EMR_WORKFLOW; AWS_EMR_PUT; AWS_EMR_GET; AWS_EMR_START_NOTEBOOK_EXECUTION; AWS_EMR_STOP_NOTEBOOK_EXECUTION; AWS_EMR_API_COMMAND; AWS_EMR_ADD_STEPS; AWS_EMR_CANCEL_STEPS; AWS_EMR_TERMINATE_JOB_FLOW; AWS_SAGE_MAKER_API_COMMAND; AWS_SAGE_MAKER_ADD_MODEL; AWS_SAGE_MAKER_DELETE_MODEL; AWS_SAGE_MAKER_PROCESSING; AWS_SAGE_MAKER_TRAINING; AWS_SAGE_MAKER_TRANSFORM; AWS_SAGE_MAKER_TUNING; AWS_EC2_START_INSTANCE; AWS_EC2_STOP_INSTANCE; AWS_EC2_TERMINATE_INSTANCE; AWS_EC2_DELETE_VOLUME; AWS_LAMBDA_INVOKE; AWS_LAMBDA_CREATE_FUNCTION; AWS_LAMBDA_DELETE_FUNCTION; AWS_BATCH_JOB; AWS_START_STEP_FUNCTION_STATE_MACHINE; AWS_S3_DELETE_OBJECT; AWS_S3_COPY_OBJECT; AWS_S3_MOVE_OBJECT; AWS_S3_RENAME_OBJECT; AZURE_DATA_LAKE_JOB; AZURE_DATA_FACTORY_TRIGGER; AZURE_DATA_FACTORY_PIPELINE; AZURE_DATABRICKS_JOB; AZURE_DATABRICKS_TERMINATE_CLUSTER; AZURE_DATABRICKS_START_CLUSTER; AZURE_DATABRICKS_LIST_CLUSTERS; AZURE_DATABRICKS_DELETE_CLUSTER; AZURE_BATCH_JOB; AZURE_RUN_LOGIC_APP; GOOGLE_DATA_FLOW_JOB; INFORMATICA_CLOUD_TASKFLOW; HTTP_REQUEST; REST_WEB_SERVICE_CALL; SOAP_WEB_SERVICE_CALL; EMAIL_SEND; EMAIL_CONFIRMATION; EMAIL_INPUT; IBM_MQ_SEND; JMS_SEND; AMQP_SEND; RABBIT_MQ_SEND; KAFKA_SEND; MQTT_SEND; XMPP_SEND; STOMP_SEND; IBM_DATASTAGE; INFORMATICA_WORKFLOW; INFORMATICA_WS_WORKFLOW; INFORMATICA_START; INFORMATICA_EMAIL; INFORMATICA_ASSIGNMENT; INFORMATICA_TIMER; INFORMATICA_CONTROL; INFORMATICA_COMMAND; INFORMATICA_SESSION; INFORMATICA_EVENT_RAISE; INFORMATICA_EVENT_WAIT; SAP_R3_JOB; SAP_R3_VARIANT_CREATE; SAP_R3_VARIANT_COPY; SAP_R3_VARIANT_UPDATE; SAP_R3_VARIANT_DELETE; SAP_R3_RAISE_EVENT; SAP_R3_MONITOR_EXISTING_JOB; SAP_R3_RELEASE_EXISTING_JOB; SAP_R3_COPY_EXISTING_JOB; SAP_R3_START_SCHEDULED_JOB; SAP_R3_JOB_INTERCEPTOR; SAP_BW_PROCESS_CHAIN; SAP_ARCHIVE; SAP_CM_PROFILE_ACTIVATE; SAP_CM_PROFILE_DEACTIVATE; SAP_EXPORT_CALENDAR; SAP_FUNCTION_MODULE_CALL; SAP_READ_TABLE; SAP_EXPORT_JOB; SAP_MODIFY_INTERCEPTION_CRITERIA; SAP_GET_APPLICATION_LOG; SAP_SWITCH_OPERATION_MODE; SAP_4H_JOB; SAP_4H_VARIANT_CREATE; SAP_4H_VARIANT_COPY; SAP_4H_VARIANT_UPDATE; SAP_4H_VARIANT_DELETE; SAP_4H_RAISE_EVENT; SAP_4H_MONITOR_EXISTING_JOB; SAP_4H_RELEASE_EXISTING_JOB; SAP_4H_COPY_EXISTING_JOB; SAP_4H_START_SCHEDULED_JOB; SAP_4H_JOB_INTERCEPTOR; SAP_4H_BW_PROCESS_CHAIN; SAP_4H_ARCHIVE; SAP_4H_CM_PROFILE_ACTIVATE; SAP_4H_CM_PROFILE_DEACTIVATE; SAP_4H_EXPORT_CALENDAR; SAP_4H_FUNCTION_MODULE_CALL; SAP_4H_READ_TABLE; SAP_4H_EXPORT_JOB; SAP_4H_MODIFY_INTERCEPTION_CRITERIA; SAP_4H_GET_APPLICATION_LOG; SAP_4H_SWITCH_OPERATION_MODE; SAP_ODATA_API_CALL; SAP_IBP_JOB; SAP_IBP_CREATE_PROCESS; SAP_IBP_DELETE_PROCESS; SAP_IBP_SET_PROCESS_STEP_STATUS; ORACLE_EBS_PROGRAM; ORACLE_EBS_REQUEST_SET; ORACLE_EBS_EXECUTE_PROGRAM; ORACLE_EBS_EXECUTE_REQUEST_SET; PEOPLESOFT_APPLICATION_ENGINE_TASK; PEOPLESOFT_COBOL_SQL_TASK; PEOPLESOFT_CRW_ONLINE_TASK; PEOPLESOFT_CRYSTAL_REPORTS_TASK; PEOPLESOFT_CUBE_BUILDER_TASK; PEOPLESOFT_NVISION_TASK; PEOPLESOFT_SQR_PROCESS_TASK; PEOPLESOFT_SQR_REPORT_TASK; PEOPLESOFT_WINWORD_TASK; PEOPLESOFT_JOB_TASK; FILE_TRANSFER; XFTP_COMMAND; FILE_CHECK; FILE_WATCHER; DATASOURCE_UPLOAD_FILE; DATASOURCE_DOWNLOAD_FILE; DATASOURCE_DELETE_FILE; RDBMS_STORED_PROCEDURE; RDBMS_SQL_STATEMENT; RDBMS_SQL; MONGO_DB_INSERT; COUCH_DB_INSERT; CASSANDRA_CQL_SCRIPT; COUCH_BASE_INSERT; DYNAMO_DB_INSERT; ARANGO_DB_INSERT; NEO4J_INSERT; TITAN_INSERT; PROCESSING_ACTION_SKIP_ON; PROCESSING_ACTION_SKIP_OFF; NOTIFY_GROUP; NOTIFY_CHANNEL; NOTIFY_EMAIL; SET_PROCESSING_STATUS; SET_SERVER_NODE; SET_SEMAPHORE_STATE; SET_SEMAPHORE_TIMESTAMP_STATE; SET_TIME_WINDOW_STATE; SET_VARIABLE_VALUE; SET_VARIABLE_TIMESTAMP_VALUE; SET_STOCK_TOTAL_PERMITS; SET_BARRIER_TOTAL_PERMITS; SET_CONTEXT_VARIABLE_VALUE; SET_CONTEXT_VARIABLE_VALUES; SET_RESOURCES; SET_PHYSICAL_RESOURCE; SET_METRIC; PUSH_TO_QUEUE; POP_FROM_QUEUE; CLEAR_QUEUE; TRIGGER_EVENT; CHECK_SEMAPHORE_STATE; CHECK_TIME_WINDOW_STATE; CHECK_PROCESSING_STATE; CHECK_STOCK_TOTAL_PERMITS; CHECK_STOCK_AVAILABLE_PERMITS; CHECK_BARRIER_TOTAL_PERMITS; CHECK_BARRIER_AVAILABLE_PERMITS; CHECK_LOCK_STATE; CHECK_VARIABLE_VALUE; CHECK_PHYSICAL_RESOURCE; CHECK_METRIC; CHECK_CALENDAR; CHECK_QUEUE; RESOURCE_ADD_TAG; RESOURCE_REMOVE_TAG; RESOURCE_SET_FOLDER; PROCESSING_REGISTER_STATE; PROCESSING_UNREGISTER_STATE; PROCESSING_CLEAR_STATE_REGISTRY; RESTART; RETRY; FORCE_COMPLETED; FORCE_FAILED; FORCE_READY; HOLD; RESUME; ABORT; KILL; SKIP_ON; SKIP_OFF; SET_PRIORITY; ADD_TAG; REMOVE_TAG; SET_FOLDER; PROCESSING_RUN_NOW; SET_STATUS_CODE; SERVER_NODE_ABORT_ALL; SERVER_NODE_KILL_ALL; SERVER_NODE_HOLD; SERVER_NODE_SET_CONNECTION; SERVER_NODE_RESUME; SERVER_NODE_SKIP_ON; SERVER_NODE_SKIP_OFF; SERVER_NODE_STOP; SERVER_NODE_ADD_TAG; SERVER_NODE_REMOVE_TAG; SERVER_NODE_SET_FOLDER; SERVER_NODE_SET_PARAMETERS; SERVER_NODE_SET_TOTAL_WEIGHT_CAPACITY; PROCESSING_TEMPLATE_HOLD; PROCESSING_TEMPLATE_RESUME; PROCESSING_TEMPLATE_SKIP_ON; PROCESSING_TEMPLATE_SKIP_OFF; ARCHIVE; ARCHIVE_INTERVAL; ARCHIVE_CLEANUP; RECALCULATE_STATISTICS; DESIGN_BACKUP; DESIGN_IMPORT; CHECK_TIME; WAIT; USER_CONFIRM; USER_INPUT; ADHOC_REPORT_SEND; AE_SCRIPT; MS_SSIS; RAINCODE_DYNAMIC_JCL; RAINCODE_STORED_JCL; OPENTEXT_DYNAMIC_JCL; OPENTEXT_STORED_JCL; SAS_DI; SAS_4GL; SAS_JOB; SAS_VIYA_JOB; ODI_SESSION; ODI_LOAD_PLAN; DBT_JOB; TALEND_JOB; REDIS_CLI; REDIS_SET; REDIS_GET; REDIS_DELETE; FLINK_JAR_UPLOAD; FLINK_JAR_DELETE; FLINK_RUN_JOB; HDFS_UPLOAD_FILE; HDFS_APPEND_FILE; HDFS_DOWNLOAD_FILE; HDFS_DELETE_FILE; HDFS_CREATE_DIRECTORY; HDFS_DELETE_DIRECTORY; HDFS_RENAME; SPARK_RUN_JOB; SPARK_JAVA; SPARK_SCALA; SPARK_R; SPARK_PYTHON; SPARK_SQL; MICROSOFT_POWER_BI_DATASET_REFRESH; MICROSOFT_POWER_BI_DATAFLOW_REFRESH; BLUE_PRISM_STOP_ROBOT; BLUE_PRISM_START_ROBOT; BLUE_PRISM_UNDEPLOY_ROBOT; BLUE_PRISM_DEPLOY_ROBOT; BLUE_PRISM; UI_PATH_STOP_ROBOT; UI_PATH_START_ROBOT; UI_PATH_UNDEPLOY_ROBOT; UI_PATH_DEPLOY_ROBOT; UI_PATH; AUTOMATION_ANYWHERE; AUTOMATION_ANYWHERE_STOP_ROBOT; AUTOMATION_ANYWHERE_START_ROBOT; AUTOMATION_ANYWHERE_UNDEPLOY_ROBOT; AUTOMATION_ANYWHERE_DEPLOY_ROBOT; WORK_FUSION_STOP_ROBOT; WORK_FUSION_START_ROBOT; WORK_FUSION_UNDEPLOY_ROBOT; WORK_FUSION_DEPLOY_ROBOT; PEGA_STOP_ROBOT; PEGA_START_ROBOT; PEGA_UNDEPLOY_ROBOT; PEGA_DEPLOY_ROBOT; ROBOT_FRAMEWORK_STOP_ROBOT; ROBOT_FRAMEWORK_START_ROBOT; ROBOT_FRAMEWORK_UNDEPLOY_ROBOT; ROBOT_FRAMEWORK_DEPLOY_ROBOT; CONTROL_M_RUN_JOB; STONEBRANCH_RUN_JOB; CA_WLA_RUN_JOB; AUTOMIC_WLA_RUN_JOB; IBM_WLA_RUN_JOB; TERMA_RUN_JOB; TIDAL_RUN_JOB; AUTOMATE_NOW_RUN_JOB; FACEBOOK_POST; INSTAGRAM_POST; TWITTER_POST; YOUTUBE_POST; LINKED_IN_POST; TUMBLR_POST; TIKTOK_POST; REDDIT_POST; TELEGRAM_MESSAGE; WHATSAPP_MESSAGE; JIRA_ADD_ISSUE; SERVICE_NOW_CREATE_INCIDENT; SERVICE_NOW_UPDATE_INCIDENT; SERVICE_NOW_RESOLVE_INCIDENT; SERVICE_NOW_CLOSE_INCIDENT; SERVICE_NOW_INCIDENT_STATUS_SENSOR; ORACLE_SERVICE_CENTER_CASE; IBM_CONTROL_DESK_INCIDENT; BMC_REMEDY_INCIDENT; CA_SERVICE_MANAGEMENT_INCIDENT; SAP_SOLUTION_MANAGER_TICKET; HP_OPEN_VIEW_SERVICE_MANAGER_INCIDENT; AUTOMATE_NOW_TRIGGER_EVENT; APACHE_AIRFLOW_RUN_DAG; ANSIBLE_PLAYBOOK_PATH; ANSIBLE_PLAYBOOK; CTRLM_DELETE_CONDITION; CTRLM_ADD_CONDITION; CTRLM_ORDER_JOB; CTRLM_CREATE_JOB; CTRLM_RESOURCE_TABLE_ADD; CTRLM_RESOURCE_TABLE_UPDATE; CTRLM_RESOURCE_TABLE_DELETE; AE_SHELL_SCRIPT;
 }
 
@@ -188,16 +202,147 @@ Enum ANOWWorkflow_taskType {
 
 #endregion
 
+#Region - Enum [Workspace]
 
+Enum ANOWWorkspace_workspaceSetFolderType {
+    SET_WORKSPACE_FOLDER; SET_SPECIFIC_FOLDER; CREATE_SUB_FOLDER_PER_WORKFLOW;
+}
+
+Enum ANOWWorkspace_workspaceSetTagType {
+    SET_WORKSPACE_TAGS; SET_SPECIFIC_TAGS;
+}
+
+#endregion
 
 #EndRegion
 
-#Region - Classes
+#Region - Base Classes
+
+#region Class - [ANOW Base Object]
+
+Class ANOW {
+    [int64]$checksum = 0
+    [string]$codeRepository
+    [string]$createdBy
+    [datetime]$dateCreated
+    [string]$description
+    [string]$domain
+    [string]$id
+    [datetime]$lastUpdated
+    [string]$lastUpdatedBy
+    [boolean]$modifiedByUser
+    [boolean]$outOfSync
+    [string]$simpleId
+    [string]$userIp
+
+    [boolean] ValidateBaseObject() {
+        If ($this.simpleId -notmatch '^[0-9a-zA-z_.-]{1,512}$') {
+            If ($this.simpleId.Length -le 512) {
+                [string]$validation_error_message = 'Check #1a failed: The simpleId may only consist of the following: numbers, letters (both cases), underscore, hyphen (dash) and period (dot).'
+            }
+            Else {
+                [string]$validation_error_message = 'Check #1b failed: The length of the simpleId may not exceed 512 characters except for folders, ___ and tags where it is limited to 128.'
+            }
+            Write-Warning -Message $validation_error_message
+            Return $false
+        }
+        ElseIf ($this.description.length -gt 255) {
+            [string]$validation_error_message = "Check #2a failed: The length of the description may not exceed 255 characters."
+            Write-Warning -Message $validation_error_message
+            Return $false
+        }
+        Else {
+            Return $true
+        }
+    }
+
+    # The primary goal of this method is to return back the same json string that the ANOW application produces when it converts an object into JSON
+    # The secondary goal of this method is to stringify the object in preparation for encoding to URL format faithfully
+    [string] ToString([string[]]$optional_properties) {        
+        [hashtable]$this2 = @{}
+        $current_members = $this | Get-Member | Where-Object { $_.MemberType -eq 'Property' }
+        ForEach ($current_member in $current_members) {
+            [string]$current_member_name = $current_member.Name
+            $current_member_value = $this.$current_member_name # this variable cannot be hard typed
+            # This omits pre-defined optional properties for this specific class when they are empty
+            If (-not ($current_member_value.Length -eq 0 -and $current_member_name -in ($optional_properties))) {
+                If ($current_member.definition -match '^datetime [a-zA-Z]{1,} {.{1,}}$' ) {
+                    # This ensures that datetimes are always formatted into ISO 8601 format. Powershell is not consistent on recognizing strings that can be safely casted into dates.
+                    [string]$current_member_value = Get-Date -Date $current_member_value -Format 'yyyy-MM-ddTHH:mm:ss.fff'
+                    $this2.Add($current_member_name, $current_member_value)
+                }
+                ElseIf ($current_member.definition -match '^bool [a-zA-Z]{1,} {.{1,}}$' ) {
+                    # This ensures that booleans are converted the same way that the application expects
+                    If ($current_member_value -eq $false) {
+                        $this2.Add($current_member_name, $false)
+                    }
+                    Else {
+                        $this2.Add($current_member_name, $true)
+                    }
+                }
+                ElseIf ($current_member_value -is [System.Enum]) {
+                    # This ensures that enums are resolved into their string value instead of the numerical index
+                    [string]$current_member_value = $current_member_value.ToString()
+                    $this2.Add($current_member_name, $current_member_value)
+                }
+                ElseIf ($current_member.definition -match '^[A-Za-z]{1,}\[] [a-zA-Z]{1,} {.{1,}}$' -and $current_member_value.Count -eq 1) {
+                    # This ensures that arrays which only contain a single item are not converted into strings
+                    $this2.Add($current_member_name, @(, $current_member_value))
+                }
+                ElseIf ($current_member_value.Length -eq 0) {
+                    # This ensures that null values remain null instead of being converted to a string
+                    $this2.Add($current_member_name, $null)
+                }
+                Else {
+                    $this2.Add($current_member_name, $current_member_value)
+                }
+            }
+        }
+        [string]$stringified_object = $this2 | ConvertTo-JSON -Compress -Depth 10        
+        Return $stringified_object
+    }
+    # The primary goal of this method is to URL encode an ANOW object for conversion into the _oldValues string. The _oldValues is typically (but not always) included by the ANOW application whenever modifying an object. The behavior of this method should match the ANOW application as closely as possible. Rigorous and frequent testing will always be needed to ensure that valid payloads are sent when modifying existing objects in the ANOW application.
+    [string] ToURL([string[]]$optional_properties) {
+        [string]$stringified_object = $this.ToString([string[]]$optional_properties)
+        [string]$escaped_object = [System.Uri]::EscapeDataString($stringified_object)
+        Return $escaped_object
+    }
+}
+
+#endregion
+
+#region Class - [ANOWDataSourceItem]
+
+Class ANOWDataSourceItem {
+    [ANOWDataSource]$masterDataSource
+    [string]$id
+    # Default constructor
+    ANOWDataSourceItem() {
+        $this.Init(@{}) 
+    }
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = ''
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
+    }
+}
+
+#endregion
 
 #region Class - [ANOWDomain]
 
 Class ANOWDomain {
     [string]$id
+    [string]$userIp
+    [datetime]$dateCreated
+    [datetime]$lastUpdated
+    [string]$createdBy
+    [string]$lastUpdatedBy
     [Nullable[ANOWIconSet]]$iconSet
     [string]$processingTemplatePrefixList
     [boolean]$overwriteApplicationVersionControlSettings
@@ -208,8 +353,6 @@ Class ANOWDomain {
     [string]$instanceToolbarBackgroundColor
     [boolean]$versionControlCheckoutEnabled
     [boolean]$operatorActionConfirmationRequired
-    [datetime]$lastUpdated
-    [datetime]$dateCreated
     [byte[]]$logoFile
     [boolean]$operatorActionReasonEnabled
     [string]$logoFileFormat
@@ -217,7 +360,6 @@ Class ANOWDomain {
     [boolean]$processingTemplatePrefixEnabled
     [string]$adhocReportEndpoint
     [boolean]$operatorActionCommentEnabled
-    [string]$lastUpdatedBy
     [string]$backgroundColor
     [boolean]$operatorActionReasonRequired
     [Nullable[int64]]$processingRegistryDayLimit
@@ -228,285 +370,20 @@ Class ANOWDomain {
     [boolean]$versionControlEnabled
     [string]$defaultTimeZone
     [boolean]$operatorActionCommentRequired
-    [string]$createdBy
-    [string]$userIp
     [string]$iconCode
     [string]$operatorActionReasonChoiceList
     [boolean]$versionControlCommentRequired
     # Default constructor
-    ANOWTag() { $this.Init(@{}) }
+    ANOWDomain() { $this.Init(@{}) }
     [void] Init([hashtable]$Properties) {
         foreach ($Property in $Properties.Keys) {
             $this.$Property = $Properties.$Property
         }
     }
-    [string] ToString() {
-        [string]$StringifiedObject = $this | ConvertTo-Json -Compress
-        Return $StringifiedObject
-    }
-}
-
-#endregion
-
-#region Class - [ANOWFolder]
-
-Class ANOWFolder {
-    [string]$id
-    [string]$parent
-    [string]$lastUpdatedBy
-    [string]$description
-    [string]$folderPath
-    [datetime]$lastUpdated
-    [datetime]$dateCreated
-    [string]$createdBy
-    [string]$domain
-    [Nullable[boolean]]$modifiedByUser
-    [int64]$checksum
-    [string]$userIp
-    [string]$codeRepository
-    [boolean]$outOfSync
-    [string]$simpleId
-
-    # Default constructor
-    ANOWFolder() { $this.Init(@{}) }
-    
-    [void] Init([hashtable]$Properties) {
-        foreach ($Property in $Properties.Keys) {
-            $this.$Property = $Properties.$Property
-        }
-    }
-    [string] ToString() {
-        [string]$StringifiedObject = $this | ConvertTo-Json -Compress
-        Return $StringifiedObject
-    }
-    
-}
-
-#endregion
-
-#region Class - [ANOWNode]
-
-Class ANOWNode {
-    [int64]$connectedNodes
-    [boolean]$onAnyHold
-    [string]$parentLoadBalancer
-    [datetime]$lastUpdated
-    [datetime]$lastActivityDate
-    [boolean]$modifiedByUser
-    [string]$id
-    [string]$simpleId
-    [PSCustomObject]$info
-    [Nullable[datetime]]$agentStartTime
-    [string]$lastUpdatedBy
-    [boolean]$isParent
-    [boolean]$onHold
-    [string]$resource
-    [ANOWserverNode_type]$serverNodeType
-    [boolean]$onGlobalHold
-    [string[]]$tags
-    [string]$lastLoadBalanceNode
-    [Nullable[float]]$manualBaselineDeviationMultiplier
-    [string]$folder
-    [PSCustomObject]$customFieldValues
-    [string]$lastInfoDate
-    [string]$domain
-    [int64]$sortOrder
-    [ANOWserverNode_status]$status
-    [float]$baselineDeviationMultiplier
-    [PSCustomObject]$configuration
-    [string]$description
-    [string]$agentIp
-    [Nullable[ANOWserverNode_loadBalancerStrategy]]$loadBalancerStrategy
-    [int64]$totalNodes
-    [datetime]$dateCreated
-    [int64]$availableWeightCapacity
-    [boolean]$loadBalancer
-    [int64]$checksum
-    [string]$codeRepository
-    [int64]$connectionTimeout
-    [PSCustomObject]$relatedResources
-    [boolean]$holdOnAgentIpChanged
-    [int64]$occupiedWeightCapacity
-    [boolean]$passBy
-    [PSCustomObject]$serverNodeState
-    [int64]$totalWeightCapacity
-    [string]$createdBy
-    [string]$agentVersion
-    [string]$userIp
-    [Nullable[ANOWserverNode_semaphoreState]]$semaphoreState
-    [boolean]$outOfSync
-    [Nullable[ANOWserverNode_resourceType]]$resourceType
-
-    # Default constructor
-    ANOWNode() { $this.Init(@{}) }
-    
-    [void] Init([hashtable]$Properties) {
-        foreach ($Property in $Properties.Keys) {
-            $this.$Property = $Properties.$Property
-        }
-    }
-    [string] ToString() {
-        [string]$StringifiedObject = $this | ConvertTo-Json -Compress
-        Return $StringifiedObject
-    }
-}
-
-#endregion
-
-#region Class - [ANOWTag]
-
-Class ANOWTag {
-    [string]$id
-    [string]$description
-    [string]$textColor = '#FFFFFF'
-    [string]$backgroundColor = '#FF0000'    
-    [Nullable[ANOWiconSet]]$iconSet
-    [string]$iconCode
-    [string]$domain    
-    [string]$simpleId
-    [string]$lastUpdatedBy
-    [datetime]$dateCreated
-    [boolean]$showIconOnly = $False
-    [long]$checksum = 0
-    [datetime]$lastUpdated
-    [boolean]$modifiedByUser = $False
-    [string]$userIp
-    [boolean]$outOfSync = $False
-    [string]$createdBy
-    [string]$codeRepository
-
-    # Default constructor
-    ANOWTag() { $this.Init(@{}) }
-    
-    [void] Init([hashtable]$Properties) {
-        foreach ($Property in $Properties.Keys) {
-            $this.$Property = $Properties.$Property
-        }
-    }
-    [string] ToString() {
-        [string]$StringifiedObject = $this | ConvertTo-Json -Compress
-        Return $StringifiedObject
-    }
-
-    # Method to show the available IconSets
-    [Array] GetIconSetNames() {
-        [array]$IconSets = [ANOWIconSet].GetEnumValues()
-        return $IconSets
-    }
-    
-    # Method to show the icon names
-    [Array] GetIconsFromSet($IconSetName) {
-        $Icons = Switch ($IconSetName) {
-            'FAT_COW' { $global:icon_sets['FAT_COW']; Break }
-            'FONT_AWESOME' { $global:icon_sets['FONT_AWESOME']; Break }
-            'FUGUE' { $global:icon_sets['FUGUE']; Break }
-        }
-        If ($Icons.Count -gt 0) {
-            Return $Icons
-        }
-        Throw "Somehow there are no icons available for $IconSetName. Did you import the icons with Import-AutomateNOWIcon?"
-    }
-}
-
-#endregion
-
-#region Class - [ANOWTask]
-
-Class ANOWTask {
-    [string]$reason
-    [datetime]$lastUpdated
-    [PSCustomObject]$ignoreCondition
-    [Nullable[int64]]$highRiskThreshold
-    [Nullable[ANOWTask_sensorType]]$sensorType
-    [int64]$statisticalDuration
-    [boolean]$modifiedByUser
-    [string]$preScript
-    [string]$postScript
-    [string]$id
-    [boolean]$highRisk
-    [array]$serviceStatusMapping
-    [Nullable[ANOWTask_endpointType]]$endpointType
-    [string]$costCenter
-    [PSCustomObject]$layoutSettings
-    [Nullable[int64]]$expectedDuration
-    [string]$priority
-    [string[]]$tags
-    [string]$node
-    [string]$folder
-    [datetime]$checkoutDate
-    [PSCustomObject]$customFieldValues
-    [string]$resultMapping
-    [string]$domain
-    [string]$integration
-    [PSCustomObject]$forceCompletedCondition
-    [boolean]$checkedOut
-    [ANOWTask_processingType]$processingType
-    [boolean]$lazyLoad
-    [int64]$preloadCounter
-    [Nullable[ANOWTask_serviceManagerAggregationMode]]$serviceManagerAggregationMode
-    [string]$endpoint
-    [Nullable[ANOWTask_integrationType]]$integrationType
-    [boolean]$turnOffDurationEstimation
-    [Nullable[ANOWTask_highRiskStatisticPeriod]]$highRiskStatisticPeriod
-    [string]$codeRepository
-    [string]$calendar
-    [boolean]$keepResourcesOnFailure
-    [boolean]$autoArchive
-    [string]$processingCommandText
-    [string]$userIp
-    [Nullable[ANOWTask_triggerType]]$triggerType
-    [boolean]$outOfSync
-    [Nullable[ANOWTask_serviceType]]$serviceType
-    [string]$workspace
-    [Nullable[ANOWTask_serviceManagerType]]$serviceManagerType
-    [int64]$estimatedDuration
-    [Nullable[ANOWTask_monitorType]]$monitorType
-    [int64]$durationSum
-    [Nullable[ANOWTask_workflowType]]$workflowType
-    [PSCustomObject]$layoutPreset
-    [Nullable[ANOWTask_highRiskStatisticMethod]]$highRiskStatisticMethod
-    [Nullable[ANOWTask_outputFormat]]$outputFormat
-    [Nullable[ANOWTask_statisticPeriod]]$statisticPeriod
-    [string]$simpleId
-    [string]$lastUpdatedBy
-    [boolean]$onHold
-    [boolean]$passResourceDependenciesToChildren
-    [ANOWTask_serverNodeType]$serverNodeType
-    [string]$weight
-    [boolean]$useScripts
-    [PSCustomObject]$inputFormValues
-    [boolean]$sequentialProcessing
-    [PSCustomObject]$forceFailedCondition
-    [string]$checkoutBy
-    [Nullable[ANOWTask_statisticMethod]]$statisticMethod
-    [string]$ownerRole
-    [boolean]$eagerScriptExecution
-    [string]$description
-    [string]$title
-    [boolean]$modifiedVersion
-    [boolean]$passActionsToChildren
-    [ANOWTask_taskType]$taskType
-    [datetime]$dateCreated
-    [int64]$checksum
-    [string]$approvalConfiguration
-    [PSCustomObject]$processingCommand
-    [string]$owner
-    [boolean]$passBy
-    [Nullable[datetime]]$nextTriggerDate
-    [string]$abortCommand
-    [string]$createdBy
-    [string]$comment
-    # Default constructor
-    ANOWTag() { $this.Init(@{}) }
-    
-    [void] Init([hashtable]$Properties) {
-        foreach ($Property in $Properties.Keys) {
-            $this.$Property = $Properties.$Property
-        }
-    }
-    [string] ToString() {
-        [string]$StringifiedObject = $this | ConvertTo-Json -Compress
-        Return $StringifiedObject
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = ''
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
     }
 }
 
@@ -544,6 +421,7 @@ Class ANOWTimeZone {
 
 #region Class - [ANOWUser]
 Class ANOWUser {
+    [string]$id
     [string]$lastName
     [datetime]$lastAccessTokenCreated
     [boolean]$passwordEncoded
@@ -553,21 +431,17 @@ Class ANOWUser {
     [boolean]$admin
     [datetime]$lastAccountExpired
     [array]$secRoles
-    [datetime]$lastUpdated
     [string]$password
     [string]$firstLastName
-    [datetime]$dateCreated
     [datetime]$passwordValidUntil
     [Nullable[ANOWUser_skinThemeType]]$skinThemeType
     [Nullable[ANOWUser_skinDensityType]]$skinDensityType
     [int32]$incorrectLogons
     [boolean]$ldapAdmin
-    [string]$id
     [string]$department
     [string]$email
     [boolean]$accountLocked
     [datetime]$accountValidUntil
-    [string]$lastUpdatedBy
     [string]$clientId
     [int32]$passwordValidDays
     [datetime]$lastAccessTokenExpire
@@ -578,10 +452,8 @@ Class ANOWUser {
     [string]$defaultTimeZone
     [datetime]$lastAccountLocked
     [string]$phone
-    [string]$createdBy
     [string]$name
     [boolean]$accountExpired
-    [string]$userIp
     [string]$location
     [datetime]$lastPasswordChange
     [boolean]$passwordExpired
@@ -591,6 +463,214 @@ Class ANOWUser {
     [PSCustomObject]$domainRoles
     [array]$securityRoles
     # Default constructor
+    ANOWUser() { $this.Init(@{}) }
+    
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = ''
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
+    }
+
+}
+
+#endregion
+
+
+#EndRegion
+
+#Region - Sub Classes
+
+#region Class - [ANOWFolder]
+
+Class ANOWFolder : ANOW {
+    [string]$parent
+    [string]$folderPath
+
+    # Default constructor
+    ANOWFolder() { $this.Init(@{}) }
+    
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = 'description', 'folderPath'
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
+    }
+}
+
+#endregion
+
+#region Class - [ANOWDataSource]
+
+
+Class ANOWDataSource : ANOW {
+    [Nullable[ANOWiconSet]]$iconSet
+    [string]$fetchCommand
+    [string]$endpoint
+    [string]$folder
+    [string]$name
+    [string]$iconCode
+    [string[]]$tags
+    [ANOWDataSource_dataSourceType]$dataSourceType
+    [string]$validity #= FREE - THESE ARE UNDEFINED
+	[string]$errorHandling #= INIT- THESE ARE UNDEFINED
+    [string]$dataType #= STRING- THESE ARE UNDEFINED
+}
+
+#validity=FREE
+#errorHandling=INIT
+#dataType=STRING
+
+
+#endregion
+
+#region Class - [ANOWDataSourceItem]
+
+Class ANOWLocalDictionaryRecord : ANOWDataSourceItem {
+    # all of the properties are properly documented
+
+    [datetime]$lastUpdated
+    [datetime]$dateCreated
+    [string]$lastUpdatedBy
+    [string]$createdBy
+    [string]$domain
+    [string]$userIp
+    [string]$value
+    
+    [string]$displayValue
+}
+
+Class ANOWLocalKeyValueStoreRecord : ANOWDataSourceItem {
+    # all of the properties are properly documented
+    
+    [datetime]$lastUpdated
+    [datetime]$dateCreated
+    [string]$lastUpdatedBy
+    [string]$createdBy
+    [string]$domain
+    [string]$userIp
+    [string]$value
+    
+    [string]$key
+}
+
+Class ANOWLocalFileStoreRecord : ANOWDataSourceItem {
+    <#
+    
+    these properties are in the schema but not actually present
+    
+    [string]$domain
+    [byte[]]$content
+    
+    #>
+    [string]$domain
+    [datetime]$lastUpdated
+    [datetime]$dateCreated
+    [string]$lastUpdatedBy
+    [string]$createdBy
+
+    [string]$mimeType
+    [string]$key
+    [int64]$size
+    [string]$fileName
+    [string]$userIp
+
+}
+
+Class ANOWLocalTextFileStoreRecord : ANOWDataSourceItem {
+    
+    #these 6 properties are in the schema but not always presented by the console
+    [datetime]$lastUpdated
+    [datetime]$dateCreated
+    [string]$lastUpdatedBy
+    [string]$createdBy
+    [string]$domain
+    [string]$userIp
+    #
+    [string]$fileName
+    [string]$mimeType
+    [string]$content
+    [int64]$size
+    [string]$key
+}
+
+#endregion
+
+#region Class - [ANOWNode]
+
+Class ANOWNode : ANOW {
+    [int64]$connectedNodes
+    [boolean]$onAnyHold
+    [string]$parentLoadBalancer
+    [datetime]$lastActivityDate
+    [PSCustomObject]$info
+    [Nullable[datetime]]$agentStartTime
+    [boolean]$isParent
+    [boolean]$onHold
+    [string]$resource
+    [ANOWserverNode_type]$serverNodeType
+    [boolean]$onGlobalHold
+    [string[]]$tags
+    [string]$lastLoadBalanceNode
+    [Nullable[float]]$manualBaselineDeviationMultiplier
+    [string]$folder
+    [PSCustomObject]$customFieldValues
+    [string]$lastInfoDate
+    [int64]$sortOrder
+    [ANOWserverNode_status]$status
+    [float]$baselineDeviationMultiplier
+    [PSCustomObject]$configuration
+    [string]$agentIp
+    [Nullable[ANOWserverNode_loadBalancerStrategy]]$loadBalancerStrategy
+    [int64]$totalNodes
+    [int64]$availableWeightCapacity
+    [boolean]$loadBalancer
+    [int64]$connectionTimeout
+    [PSCustomObject]$relatedResources
+    [boolean]$holdOnAgentIpChanged
+    [int64]$occupiedWeightCapacity
+    [boolean]$passBy
+    [PSCustomObject]$serverNodeState
+    [int64]$totalWeightCapacity
+    [string]$agentVersion
+    [Nullable[ANOWserverNode_semaphoreState]]$semaphoreState
+    [Nullable[ANOWserverNode_resourceType]]$resourceType
+
+    # Default constructor
+    ANOWNode() { $this.Init(@{}) }
+    
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = 'configuration', 'folder', 'lastUpdatedBy', 'parentLoadBalancer', 'sortOrder', 'tags'
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
+    }
+}
+
+#endregion
+
+#region Class - [ANOWTag]
+
+Class ANOWTag : ANOW {
+    [string]$textColor = '#FFFFFF'
+    [string]$backgroundColor = '#FF0000'    
+    [Nullable[ANOWiconSet]]$iconSet
+    [string]$iconCode
+    [boolean]$showIconOnly = $False
+
+    # Default constructor
     ANOWTag() { $this.Init(@{}) }
     
     [void] Init([hashtable]$Properties) {
@@ -598,17 +678,108 @@ Class ANOWUser {
             $this.$Property = $Properties.$Property
         }
     }
-    [string] ToString() {
-        [string]$StringifiedObject = $this | ConvertTo-Json -Compress
-        Return $StringifiedObject
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = 'code_repository', 'description', 'iconCode', 'iconSet'
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
     }
 }
 
 #endregion
 
-#region Class - [ANOWWorkflow]
-Class ANOWWorkflow {
-    [string]$id
+#region Class - [ANOWTaskTemplate]
+
+Class ANOWTaskTemplate : ANOW {
+    [string]$reason
+    [PSCustomObject]$ignoreCondition
+    [Nullable[int64]]$highRiskThreshold
+    [Nullable[ANOWTaskTemplate_sensorType]]$sensorType
+    [int64]$statisticalDuration
+    [string]$preScript
+    [string]$postScript
+    [boolean]$highRisk
+    [array]$serviceStatusMapping
+    [Nullable[ANOWTaskTemplate_endpointType]]$endpointType
+    [string]$costCenter
+    [PSCustomObject]$layoutSettings
+    [Nullable[int64]]$expectedDuration
+    [string]$priority
+    [string[]]$tags
+    [string]$node
+    [string]$folder
+    [datetime]$checkoutDate
+    [PSCustomObject]$customFieldValues
+    [string]$resultMapping
+    [string]$integration
+    [PSCustomObject]$forceCompletedCondition
+    [boolean]$checkedOut
+    [ANOWTaskTemplate_processingType]$processingType
+    [boolean]$lazyLoad
+    [int64]$preloadCounter
+    [Nullable[ANOWTaskTemplate_serviceManagerAggregationMode]]$serviceManagerAggregationMode
+    [string]$endpoint
+    [Nullable[ANOWTaskTemplate_integrationType]]$integrationType
+    [boolean]$turnOffDurationEstimation
+    [Nullable[ANOWTaskTemplate_highRiskStatisticPeriod]]$highRiskStatisticPeriod
+    [string]$calendar
+    [boolean]$keepResourcesOnFailure
+    [boolean]$autoArchive
+    [string]$processingCommandText
+    [Nullable[ANOWTaskTemplate_triggerType]]$triggerType
+    [Nullable[ANOWTaskTemplate_serviceType]]$serviceType
+    [string]$workspace
+    [Nullable[ANOWTaskTemplate_serviceManagerType]]$serviceManagerType
+    [int64]$estimatedDuration
+    [Nullable[ANOWTaskTemplate_monitorType]]$monitorType
+    [int64]$durationSum
+    [Nullable[ANOWTaskTemplate_workflowType]]$workflowType
+    [PSCustomObject]$layoutPreset
+    [Nullable[ANOWTaskTemplate_highRiskStatisticMethod]]$highRiskStatisticMethod
+    [Nullable[ANOWTaskTemplate_outputFormat]]$outputFormat
+    [Nullable[ANOWTaskTemplate_statisticPeriod]]$statisticPeriod
+    [boolean]$onHold
+    [boolean]$passResourceDependenciesToChildren
+    [ANOWTaskTemplate_serverNodeType]$serverNodeType
+    [string]$weight
+    [boolean]$useScripts
+    [PSCustomObject]$inputFormValues
+    [boolean]$sequentialProcessing
+    [PSCustomObject]$forceFailedCondition
+    [string]$checkoutBy
+    [Nullable[ANOWTaskTemplate_statisticMethod]]$statisticMethod
+    [string]$ownerRole
+    [boolean]$eagerScriptExecution
+    [string]$title
+    [boolean]$modifiedVersion
+    [boolean]$passActionsToChildren
+    [ANOWTaskTemplate_taskType]$taskType
+    [string]$approvalConfiguration
+    [PSCustomObject]$processingCommand
+    [string]$owner
+    [boolean]$passBy
+    [Nullable[datetime]]$nextTriggerDate
+    [string]$abortCommand
+    [string]$comment
+    # Default constructor
+    ANOWTask() { $this.Init(@{}) }
+    
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = 'checkoutBy', 'checkoutDate', 'codeRepository', 'description', 'endpoint', 'endpointType', 'folder', 'forceCompletedCondition', 'highRiskStatisticMethod', 'highRiskStatisticPeriod', 'lastUpdatedBy', 'monitorType', 'node', 'owner', 'postScript', 'preScript', 'processingCommand', 'processingCommandText', 'resultMapping', 'sensorType', 'serviceType', 'statisticMethod', 'statisticPeriod', 'tags', 'taskType', 'title', 'workspace'
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
+    }
+
+}
+
+#endregion
+
+#region Class - [ANOWWorkflowTemplate]
+Class ANOWWorkflowTemplate : ANOW {
     [string]$abortCommand
     [string]$approvalConfiguration
     [boolean]$autoArchive
@@ -616,15 +787,9 @@ Class ANOWWorkflow {
     [boolean]$checkedOut
     [string]$checkoutBy
     [Nullable[datetime]]$checkoutDate
-    [int64]$checksum
-    [string]$codeRepository
     [string]$comment
     [string]$costCenter
-    [string]$createdBy
     [PSCustomObject]$customFieldValues
-    [datetime]$dateCreated
-    [string]$description
-    [string]$domain
     [int64]$durationSum
     [boolean]$eagerScriptExecution
     [string]$endpoint
@@ -643,18 +808,14 @@ Class ANOWWorkflow {
     [string]$integration
     [string]$integrationType
     [boolean]$keepResourcesOnFailure
-    [datetime]$lastUpdated
-    [string]$lastUpdatedBy
     [PSCustomObject]$layoutPreset
     [PSCustomObject]$layoutSettings
     [boolean]$lazyLoad
-    [boolean]$modifiedByUser
     [boolean]$modifiedVersion
     [Nullable[ANOWWorkflow_monitorType]]$monitorType
     [Nullable[datetime]]$nextTriggerDate
     [string]$node
     [boolean]$onHold
-    [boolean]$outOfSync
     [Nullable[ANOWWorkflow_outputFormat]]$outputFormat
     [string]$owner
     [string]$ownerRole
@@ -677,7 +838,6 @@ Class ANOWWorkflow {
     [Nullable[ANOWWorkflow_serviceManagerType]]$serviceManagerType
     [array]$serviceStatusMapping
     [Nullable[ANOWWorkflow_serviceType]]$serviceType
-    [string]$simpleId
     [int64]$statisticalDuration
     [Nullable[ANOWWorkflow_statisticMethod]]$statisticMethod
     [Nullable[ANOWWorkflow_statisticPeriod]]$statisticPeriod
@@ -686,27 +846,62 @@ Class ANOWWorkflow {
     [string]$title
     [Nullable[ANOWWorkflow_triggerType]]$triggerType
     [boolean]$turnOffDurationEstimation
-    [string]$userIp
     [boolean]$useScripts
     [string]$weight
     [ANOWWorkflow_workflowType]$workflowType
     [string]$workspace
     # Default constructor
-    ANOWWorkflow() { $this.Init(@{}) }
+    ANOWWorkflowTemplate() { $this.Init(@{}) }
     
     [void] Init([hashtable]$Properties) {
         foreach ($Property in $Properties.Keys) {
             $this.$Property = $Properties.$Property
         }
     }
-    [string] ToString() {
-        [string]$StringifiedObject = $this | ConvertTo-Json -Compress
-        Return $StringifiedObject
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = 'checkoutBy', 'checkoutDate', 'codeRepository', 'description', 'folder', 'highRiskStatisticMethod', 'highRiskStatisticPeriod', 'lastUpdatedBy', 'layoutPreset', 'processingCommand', 'processingCommandText', 'statisticMethod', 'statisticPeriod', 'tags'
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
+    }
+}
+
+#endregion
+
+#region Class - [ANOWWorkspace]
+
+Class ANOWWorkspace : ANOW {
+    [Nullable[ANOWiconSetIconsOnly]]$iconSet
+    [string]$prefix
+    [boolean]$setTags
+    [string]$setWorkspaceFolder
+    [Nullable[ANOWWorkspace_workspaceSetFolderType]]$workspaceSetFolderType
+    [boolean]$setFolder
+    [Nullable[ANOWWorkspace_workspaceSetTagType]]$workspaceSetTagType
+    [boolean]$addPrefix
+    [array]$setWorkspaceTags
+    [string[]]$tags
+    [string]$folder
+    [string]$iconCode
+    [string]$fugueIcon
+    [string]$fatCowIcon
+    # Default constructor
+    ANOWWorkspace() { $this.Init(@{}) }
+    
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = 'prefix', 'setWorkspaceFolder', 'setWorkspaceTags', 'workspaceSetFolderType', 'workspaceSetTagType'
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
     }
 }
 
 #endregion
 
 #EndRegion
+
 
 

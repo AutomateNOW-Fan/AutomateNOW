@@ -25,6 +25,7 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 - Supports both http & https protocols
 - Session token refreshing is handled automatically
 - Pipeline capability
+- Batch upload text & binary files to a Data Source
 - All function sets include an Export function
 - All functions include help by way of the -? parameter
 - Alternate encryption key bytes can be supplied (let's hope it is never needed 🤞)
@@ -33,12 +34,21 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 
 This module has been tested against the below versions of AutomateNOW!
 
-- 3.3.1.73 & 3.3.1.74HF1
+- 3.3.1.75
 <br/><br/>
 ## Change Log 📝
 
+## 1.0.10
+- Added new functions: `Add-AutomateNOWDataSourceItem`, `Copy-AutomateNOWWorkflowTemplate`, `Export-AutomateNOWDataSource`, `Export-AutomateNOWDataSourceItem`, `Export-AutomateNOWWorkspace`, `Find-AutomateNOWObjectReferral`, `Get-AutomateNOWDataSource`, `Get-AutomateNOWDataSourceItem`, `Get-AutomateNOWWorkspace`, `New-AutomateNOWDataSource`, `New-AutomateNOWWorkspace`, `Remove-AutomateNOWDataSource`, `Remove-AutomateNOWDataSourceItem`, `Remove-AutomateNOWWorkspace`, `Resume-AutomateNOWTask`, `Set-AutomateNOWFolder`, `Set-AutomateNOWTag`, `Set-AutomateNOWWorkspace`, `Show-AutomateNOWTaskType`
+- Organized the classes into "base" and "sub" classes in line with best practices (changes to classes and enums will no longer be listed in this change log)
+- Added method CreateOldValues() to ANOW base class. It is imperative that this method will always precisely match what the console expects.
+- Removed a check that is no longer needed from the Remove-* functions
+- Fixed an issue with the default constructor on some classes
+- Renamed the *Task and *Workflow functions to TaskTemplate* and WorkflowTemplate* since that's what they actually were
+- Added automation detection of ASCII vs. UTF-8 text files (feature not available in the vendor console)
+
 ### 1.0.9
-- Added new functions: `Export-AutomateNOWDomain`, `Export-AutomateNOWIcon`, `Export-AutomateNOWNode`, `Export-AutomateNOWTag`, `Export-AutomateNOWTimeZone`, `Export-AutomateNOWUser`, `Get-AutomateNOWTimeZone`, `Import-AutomateNOWLocalIcon`, `Import-AutomateNOWTimeZone`, `New-AutomateNOWNode`, `Read-AutomateNOWIcon`, `Remove-AutomateNOWNode`, `Write-AutomateNOWIconData`
+- Added new functions: `Export-AutomateNOWDomain`, `Export-AutomateNOWIcon`, `Export-AutomateNOWNode`, `Export-AutomateNOWTag`, `Export-AutomateNOWTask`, `Export-AutomateNOWTimeZone`, `Export-AutomateNOWUser`, `Export-AutomateNOWWorkflow`, `Get-AutomateNOWTimeZone`, `Import-AutomateNOWLocalIcon`, `Import-AutomateNOWTimeZone`, `New-AutomateNOWNode`, `Read-AutomateNOWIcon`, `Remove-AutomateNOWNode`, `Write-AutomateNOWIconData`
 - Removed all instances of the -All parameter from the Get-* functions. Instead, the Get-* functions will now return all items by default when no parameters are supplied.
 - Consolidated the two session variables into one
 - Added pipeline capability to (virtually) all functions 🥳
@@ -103,19 +113,31 @@ This module has been tested against the below versions of AutomateNOW!
 ## Caution 🚸
 
 Use the _-NotSecure_ parameter when connecting to an instance that doesn't use https 😒
-<br/><br/>
 ## Wish List 🌠
 
 - add export capability for workflow diagram data to PNG
+- add a class for the referrals output which includes a custom member for the parent object
+- simulate the binary file detect type (mime type) that the console javascript appears to do when uploading a binary file
 
-<br/><br/>
 ## Functions 🛠
+
+`Add-AutomateNOWDataSourceItem`
+
+`Compare-ObjectProperty`
 
 `Confirm-AutomateNOWSession`
 
 `Connect-AutomateNOW`
 
+`ConvertTo-QueryString`
+
+`Copy-AutomateNOWWorkflowTemplate`
+
 `Disconnect-AutomateNOW`
+
+`Export-AutomateNOWDataSource`
+
+`Export-AutomateNOWDataSourceItem`
 
 `Export-AutomateNOWDomain`
 
@@ -133,23 +155,33 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Export-AutomateNOWUser`
 
-`Export-AutomateNOWWorkflow`
+`Export-AutomateNOWWorkflowTemplate`
+
+`Export-AutomateNOWWorkspace`
+
+`Find-AutomateNOWObjectReferral`
+
+`Get-AutomateNOWDataSource`
+
+`Get-AutomateNOWDataSourceItem`
 
 `Get-AutomateNOWDomain`
+
+`Get-AutomateNOWFolder`
 
 `Get-AutomateNOWNode`
 
 `Get-AutomateNOWTag`
 
-`Get-AutomateNOWTask`
+`Get-AutomateNOWTaskTemplate`
 
 `Get-AutomateNOWTimeZone`
 
 `Get-AutomateNOWUser`
 
-`Get-AutomateNOWWorkflow`
+`Get-AutomateNOWWorkflowTemplate`
 
-`Get-AutomateNOWfolder`
+`Get-AutomateNOWWorkspace`
 
 `Import-AutomateNOWIcon`
 
@@ -159,6 +191,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Invoke-AutomateNOWAPI`
 
+`New-AutomateNOWDataSource`
+
 `New-AutomateNOWFolder`
 
 `New-AutomateNOWNode`
@@ -167,9 +201,17 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `New-AutomateNOWTask`
 
-`New-AutomateNOWWorkflow`
+`New-AutomateNOWWorkflowTemplate`
+
+`New-AutomateNOWWorkspace`
+
+`New-WebkitBoundaryString`
 
 `Read-AutomateNOWIcon`
+
+`Remove-AutomateNOWDataSource`
+
+`Remove-AutomateNOWDataSourceItem`
 
 `Remove-AutomateNOWFolder`
 
@@ -179,14 +221,26 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Remove-AutomateNOWTask`
 
-`Remove-AutomateNOWWorkflow`
+`Remove-AutomateNOWWorkflowTemplate`
+
+`Remove-AutomateNOWWorkspace`
+
+`Rename-AutomateNOWWorkflowTemplate`
+
+`Resume-AutomateNOWTask`
+
+`Set-AutomateNOWFolder`
 
 `Set-AutomateNOWPassword`
+
+`Set-AutomateNOWTag`
+
+`Set-AutomateNOWWorkspace`
+
+`Show-AutomateNOWTaskType`
 
 `Switch-AutomateNOWDomain`
 
 `Update-AutomateNOWToken`
 
 `Write-AutomateNOWIconData`
-
-
