@@ -7445,9 +7445,9 @@ Function New-AutomateNOWWorkspace {
 
     The name (id) of the Workspace must be unique (per domain). It may consist only of letters, numbers, underscore, dot or hypen.
 
-    #>
+    Adding the icon set is missing
 
-    # work stop - you need to add the icon code too but that parameter should only be available with the iconset too. lookat the new-automatenowtag
+    #>
 
     [OutputType([ANOWWorkspace])]
     [Cmdletbinding(DefaultParameterSetName = 'Default')]
