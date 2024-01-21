@@ -20,14 +20,13 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 ## Features 🤓
 
 - Completely browserless operation
-- Compatible with both Windows PowerShell & PowerShell Core
-- Class objects and enums defined (see Classes.ps1)
-- Supports both http & https protocols
-- Session token refreshing is handled automatically
-- Pipeline capability
-- Batch upload text & binary files to a Data Source
-- All function sets include an Export function
-- All functions include help by way of the -? parameter
+- Both http & https protocols supported
+- PowerShell Core & Windows PowerShell compatible
+- Classes and enums are defined (see Classes.ps1)
+- Pipeline capability to streamline your workloads
+- Session tokens are refreshed automatically during usage
+- Batch upload your text or binary files to a Data Source
+- All functions include examples & usage notes by way of Get-Help
 - Alternate encryption key bytes can be supplied (let's hope it is never needed 🤞)
 <br/><br/>
 ## Efficacy 🧪
@@ -41,11 +40,11 @@ This module has been tested against the below versions of AutomateNOW!
 ## 1.0.10
 - Added new functions: `Add-AutomateNOWDataSourceItem`, `Copy-AutomateNOWWorkflowTemplate`, `Export-AutomateNOWDataSource`, `Export-AutomateNOWDataSourceItem`, `Export-AutomateNOWWorkspace`, `Find-AutomateNOWObjectReferral`, `Get-AutomateNOWDataSource`, `Get-AutomateNOWDataSourceItem`, `Get-AutomateNOWWorkspace`, `New-AutomateNOWDataSource`, `New-AutomateNOWWorkspace`, `Remove-AutomateNOWDataSource`, `Remove-AutomateNOWDataSourceItem`, `Remove-AutomateNOWWorkspace`, `Resume-AutomateNOWTask`, `Set-AutomateNOWFolder`, `Set-AutomateNOWTag`, `Set-AutomateNOWWorkspace`, `Show-AutomateNOWTaskType`
 - Organized the classes into "base" and "sub" classes in line with best practices (changes to classes and enums will no longer be listed in this change log)
-- Added method CreateOldValues() to ANOW base class. It is imperative that this method will always precisely match what the console expects.
+- Added method CreateOldValues() to ANOW base class. It is imperative that this method will always precisely match what the console expects. This method is intended for use with the Set-* functions.
 - Removed a check that is no longer needed from the Remove-* functions
 - Fixed an issue with the default constructor on some classes
-- Renamed the *Task and *Workflow functions to TaskTemplate* and WorkflowTemplate* since that's what they actually were
-- Added automation detection of ASCII vs. UTF-8 text files (feature not available in the vendor console)
+- Renamed the *Task* and *Workflow* functions to *TaskTemplate* and *WorkflowTemplate* since that's what they actually were
+- Added automation mime type detection (ASCII vs. UTF-8) when uploading text files to a Data Source (the console does not do this)
 
 ### 1.0.9
 - Added new functions: `Export-AutomateNOWDomain`, `Export-AutomateNOWIcon`, `Export-AutomateNOWNode`, `Export-AutomateNOWTag`, `Export-AutomateNOWTask`, `Export-AutomateNOWTimeZone`, `Export-AutomateNOWUser`, `Export-AutomateNOWWorkflow`, `Get-AutomateNOWTimeZone`, `Import-AutomateNOWLocalIcon`, `Import-AutomateNOWTimeZone`, `New-AutomateNOWNode`, `Read-AutomateNOWIcon`, `Remove-AutomateNOWNode`, `Write-AutomateNOWIconData`
