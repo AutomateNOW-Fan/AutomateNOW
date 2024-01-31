@@ -48,7 +48,7 @@ This module has been tested against the below versions of AutomateNOW!
 - Enforced that the endRow must be greater than the startRow
 - Fixed an issue with `Get-AutomateNOWTag` when the same tag name occurs across multiple domains
 - Enforced that the server node type supplied to `New-AutomateNOWTaskTemplate` must match the task type
-- Completed renaming the *Task* functions to *TaskTemplate*. All Task/Workflow tasks have been aligned and optimized.
+- Completed renaming the *Task* functions to *TaskTemplate*. All Task/Workflow functions have been aligned and optimized.
 
 ## 1.0.10
 - Added new functions: `Add-AutomateNOWDataSourceItem`, `Copy-AutomateNOWWorkflowTemplate`, `Export-AutomateNOWDataSource`, `Export-AutomateNOWDataSourceItem`, `Export-AutomateNOWWorkspace`, `Find-AutomateNOWObjectReferral`, `Get-AutomateNOWDataSource`, `Get-AutomateNOWDataSourceItem`, `Get-AutomateNOWWorkspace`, `New-AutomateNOWDataSource`, `New-AutomateNOWWorkspace`, `Remove-AutomateNOWDataSource`, `Remove-AutomateNOWDataSourceItem`, `Remove-AutomateNOWWorkspace`, `Resume-AutomateNOWTask`, `Set-AutomateNOWFolder`, `Set-AutomateNOWTag`, `Set-AutomateNOWWorkspace`, `Show-AutomateNOWTaskType`
