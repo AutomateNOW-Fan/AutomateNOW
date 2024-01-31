@@ -1,5 +1,5 @@
 ﻿<#	
-Developed against AutomateNOW! version 3.3.1.75
+Developed against AutomateNOW! version 3.3.1.75HF1
 #>
 @{	
 	# Author of this module
@@ -9,10 +9,10 @@ Developed against AutomateNOW! version 3.3.1.75
 	RootModule = 'AutomateNOW.psm1'
 	
 	# Version number of this module.
-	ModuleVersion = '1.0.10'
+	ModuleVersion = '1.0.11'
 	
 	# ID used to uniquely identify this module
-	GUID = '4a4214db-a9cd-7aa1-2331-1d73e6a25b0f'
+	GUID = '1a4214db-b9ce-7aa1-2331-2d73e4a25b1a'
 	
 	# Copyright statement for this module
 	Copyright = 'not affiliated with InfiniteDATA'
@@ -60,7 +60,7 @@ Developed against AutomateNOW! version 3.3.1.75
 	NestedModules = @()
 	
 	# Functions to export from this module
-	FunctionsToExport = @('Add-AutomateNOWDataSourceItem', 'Confirm-AutomateNOWSession', 'Connect-AutomateNOW', 'Copy-AutomateNOWWorkflowTemplate', 'Disconnect-AutomateNOW', 'Export-AutomateNOWDataSource', 'Export-AutomateNOWDataSourceItem', 'Export-AutomateNOWDomain', 'Export-AutomateNOWFolder', 'Export-AutomateNOWIcon', 'Export-AutomateNOWNode', 'Export-AutomateNOWTag', 'Export-AutomateNOWTaskTemplate', 'Export-AutomateNOWTimeZone', 'Export-AutomateNOWUser', 'Export-AutomateNOWWorkflowTemplate', 'Export-AutomateNOWWorkspace', 'Get-AutomateNOWDataSource', 'Get-AutomateNOWDataSourceItem', 'Get-AutomateNOWDomain', 'Get-AutomateNOWFolder', 'Get-AutomateNOWNode', 'Get-AutomateNOWTag', 'Get-AutomateNOWTaskTemplate', 'Get-AutomateNOWTimeZone', 'Get-AutomateNOWUser', 'Get-AutomateNOWWorkflowTemplate', 'Get-AutomateNOWWorkspace', 'Import-AutomateNOWIcon', 'Import-AutomateNOWLocalIcon', 'Import-AutomateNOWTimeZone', 'Invoke-AutomateNOWAPI', 'New-AutomateNOWDataSource', 'New-AutomateNOWDataSourceItem', 'New-AutomateNOWFolder', 'New-AutomateNOWNode', 'New-AutomateNOWTag', 'New-AutomateNOWTaskTemplate', 'New-AutomateNOWWorkflowTemplate', 'New-AutomateNOWWorkspace', 'New-WebkitBoundaryString', 'Read-AutomateNOWIcon', 'Remove-AutomateNOWDataSource', 'Remove-AutomateNOWFolder', 'Remove-AutomateNOWNode', 'Remove-AutomateNOWTag', 'Remove-AutomateNOWTask', 'Remove-AutomateNOWWorkflowTemplate', 'Remove-AutomateNOWWorkspace', 'Rename-AutomateNOWWorkflowTemplate', 'Set-AutomateNOWPassword', 'Set-AutomateNOWFolder', 'Set-AutomateNOWTag', 'Switch-AutomateNOWDomain', 'Update-AutomateNOWToken', 'Write-AutomateNOWIconData' ) #For performance, list functions explicitly
+	FunctionsToExport = @('Add-AutomateNOWDataSourceItem', 'Compare-ObjectProperty', 'Confirm-AutomateNOWSession', 'Confirm-AutomateNOWTaskTemplate', 'Confirm-AutomateNOWWorkflowTemplate', 'Connect-AutomateNOW', 'ConvertTo-QueryString', 'Copy-AutomateNOWTaskTemplate', 'Copy-AutomateNOWWorkflowTemplate', 'Disconnect-AutomateNOW', 'Export-AutomateNOWCodeRepository', 'Export-AutomateNOWDataSource', 'Export-AutomateNOWDataSourceItem', 'Export-AutomateNOWDomain', 'Export-AutomateNOWFolder', 'Export-AutomateNOWIcon', 'Export-AutomateNOWNode', 'Export-AutomateNOWTag', 'Export-AutomateNOWTask', 'Export-AutomateNOWTaskTemplate', 'Export-AutomateNOWTimeZone', 'Export-AutomateNOWUser', 'Export-AutomateNOWWorkflow', 'Export-AutomateNOWWorkflowTemplate', 'Export-AutomateNOWWorkspace', 'Find-AutomateNOWObjectReferral', 'Get-AutomateNOWCodeRepository', 'Get-AutomateNOWDataSource', 'Get-AutomateNOWDataSourceItem', 'Get-AutomateNOWDomain', 'Get-AutomateNOWFolder', 'Get-AutomateNOWNode', 'Get-AutomateNOWTag', 'Get-AutomateNOWTask', 'Get-AutomateNOWTaskTemplate', 'Get-AutomateNOWTimeZone', 'Get-AutomateNOWUser', 'Get-AutomateNOWWorkflow', 'Get-AutomateNOWWorkflowTemplate', 'Get-AutomateNOWWorkspace', 'Import-AutomateNOWIcon', 'Import-AutomateNOWLocalIcon', 'Import-AutomateNOWTimeZone', 'Invoke-AutomateNOWAPI', 'New-AutomateNOWAuthenticationEncryptedString', 'New-AutomateNOWDataSource', 'New-AutomateNOWDefaultProcessingTitle', 'New-AutomateNOWFolder', 'New-AutomateNOWNode', 'New-AutomateNOWTag', 'New-AutomateNOWTaskTemplate', 'New-AutomateNOWWorkflowTemplate', 'New-AutomateNOWWorkspace', 'New-WebkitBoundaryString', 'Read-AutomateNOWIcon', 'Remove-AutomateNOWDataSource', 'Remove-AutomateNOWDataSourceItem', 'Remove-AutomateNOWFolder', 'Remove-AutomateNOWNode', 'Remove-AutomateNOWTag', 'Remove-AutomateNOWTaskTemplate', 'Remove-AutomateNOWWorkflowTemplate', 'Remove-AutomateNOWWorkspace', 'Rename-AutomateNOWTaskTemplate', 'Rename-AutomateNOWWorkflowTemplate', 'Resolve-AutomateNOWTaskType2ServerNodeType', 'Resume-AutomateNOWTaskTemplate', 'Resume-AutomateNOWWorkflowTemplate', 'Set-AutomateNOWFolder', 'Set-AutomateNOWPassword', 'Set-AutomateNOWTag', 'Set-AutomateNOWUser', 'Set-AutomateNOWWorkspace', 'Show-AutomateNOWTaskTemplateType', 'Skip-AutomateNOWTaskTemplate', 'Skip-AutomateNOWWorkflowTemplate', 'Start-AutomateNOWNode', 'Start-AutomateNOWTaskTemplate', 'Start-AutomateNOWWorkflowTemplate', 'Stop-AutomateNOWNode', 'Suspend-AutomateNOWTaskTemplate', 'Suspend-AutomateNOWWorkflowTemplate', 'Switch-AutomateNOWDomain', 'Update-AutomateNOWToken', 'Write-AutomateNOWIconData') #For performance, list functions explicitly
 
 	CompatiblePSEditions = @('Desktop', 'Core')
 	

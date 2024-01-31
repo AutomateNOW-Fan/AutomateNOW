@@ -5,7 +5,7 @@
 ![image](usage-example.png)
 
 ```
-Created by AutomateNOW-Fan
+Created by Mike Simpson (DHL IT Services)
 ```
 ```
 ⚠ Not affiliated with InfiniteDATA
@@ -24,18 +24,31 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 - PowerShell Core & Windows PowerShell compatible
 - Classes and enums are defined (see Classes.ps1)
 - Pipeline capability to streamline your workloads
-- Session tokens are refreshed automatically during usage
-- Batch upload your text or binary files to a Data Source
-- All functions include examples & usage notes by way of Get-Help
+- Session tokens will be automatically refreshed during usage
+- All functions can return help with Get-Help or the -? parameter
+- PSScriptAnalyzer compliant / Approved verbs only
 - Alternate encryption key bytes can be supplied (let's hope it is never needed 🤞)
 <br/><br/>
 ## Efficacy 🧪
 
 This module has been tested against the below versions of AutomateNOW!
 
-- 3.3.1.75
+- 3.3.1.75HF1
 <br/><br/>
 ## Change Log 📝
+
+## 1.0.11
+- Added new functions: `Confirm-AutomateNOWTaskTemplate`, `Confirm-AutomateNOWWorkflowTemplate`, `Copy-AutomateNOWTaskTemplate`, `Export-AutomateNOWCodeRepository`, `Get-AutomateNOWCodeRepository`, `Rename-AutomateNOWTaskTemplate`, `Resolve-AutomateNOWTaskType2ServerNodeType`,`Resume-AutomateNOWTaskTemplate`, `Resume-AutomateNOWWorkflowTemplate`, `Skip-AutomateNOWTaskTemplate`, `Skip-AutomateNOWWorkflowTemplate`, `Start-AutomateNOWNode`, `Start-AutomateNOWTaskTemplate`, `Start-AutomateNOWWorkflowTemplate`, `Stop-AutomateNOWNode`, `Suspend-AutomateNOWTaskTemplate`, `Suspend-AutomateNOWWorkflowTemplate`
+- Improved the global session variable to use class objects (e.g. [ANOWTimeZone], [ANOWUser])
+- Enhanced the `Get-AutomatenowUser` function to fetch the full user details. If you don't know the username (e.g. using an access token) then use the -LoggedOnUser parameter.
+- Decorated the [ANOWUser] object with [ANOWDomainRole] and [ANOWSecurityRole] class objects
+- Fixed an issue where error messages returned from the API were not always reflected back
+- Enforced on most functions that tags, folders, code repositories and workspaces must actually exist before trying to add them to an object
+- Lowered the default endRow from 2000 to 100
+- Enforced that the endRow must be greater than the startRow
+- Fixed an issue with `Get-AutomateNOWTag` when the same tag name occurs across multiple domains
+- Enforced that the server node type supplied to `New-AutomateNOWTaskTemplate` must match the task type
+- Completed renaming the *Task* functions to *TaskTemplate*. All Task/Workflow tasks have been aligned and optimized.
 
 ## 1.0.10
 - Added new functions: `Add-AutomateNOWDataSourceItem`, `Copy-AutomateNOWWorkflowTemplate`, `Export-AutomateNOWDataSource`, `Export-AutomateNOWDataSourceItem`, `Export-AutomateNOWWorkspace`, `Find-AutomateNOWObjectReferral`, `Get-AutomateNOWDataSource`, `Get-AutomateNOWDataSourceItem`, `Get-AutomateNOWWorkspace`, `New-AutomateNOWDataSource`, `New-AutomateNOWWorkspace`, `Remove-AutomateNOWDataSource`, `Remove-AutomateNOWDataSourceItem`, `Remove-AutomateNOWWorkspace`, `Resume-AutomateNOWTask`, `Set-AutomateNOWFolder`, `Set-AutomateNOWTag`, `Set-AutomateNOWWorkspace`, `Show-AutomateNOWTaskType`
@@ -114,9 +127,11 @@ This module has been tested against the below versions of AutomateNOW!
 Use the _-NotSecure_ parameter when connecting to an instance that doesn't use https 😒
 ## Wish List 🌠
 
-- add export capability for workflow diagram data to PNG
-- add a class for the referrals output which includes a custom member for the parent object
-- simulate the binary file detect type (mime type) that the console javascript appears to do when uploading a binary file
+- Export diagrams to PNG
+- Simulate mime type of binary files (relates to Add-AutomateNOWDataSourceItem)
+- Complete all of sorting options for all of the Get functions
+- Enforce the server node type selection when creating a new tasktemplate/workflowtemplate
+- Refactor and optimize redundant code
 
 ## Functions 🛠
 
@@ -126,13 +141,21 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Confirm-AutomateNOWSession`
 
+`Confirm-AutomateNOWTaskTemplate`
+
+`Confirm-AutomateNOWWorkflowTemplate`
+
 `Connect-AutomateNOW`
 
 `ConvertTo-QueryString`
 
+`Copy-AutomateNOWTaskTemplate`
+
 `Copy-AutomateNOWWorkflowTemplate`
 
 `Disconnect-AutomateNOW`
+
+`Export-AutomateNOWCodeRepository`
 
 `Export-AutomateNOWDataSource`
 
@@ -150,15 +173,21 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Export-AutomateNOWTask`
 
+`Export-AutomateNOWTaskTemplate`
+
 `Export-AutomateNOWTimeZone`
 
 `Export-AutomateNOWUser`
+
+`Export-AutomateNOWWorkflow`
 
 `Export-AutomateNOWWorkflowTemplate`
 
 `Export-AutomateNOWWorkspace`
 
 `Find-AutomateNOWObjectReferral`
+
+`Get-AutomateNOWCodeRepository`
 
 `Get-AutomateNOWDataSource`
 
@@ -172,11 +201,15 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Get-AutomateNOWTag`
 
+`Get-AutomateNOWTask`
+
 `Get-AutomateNOWTaskTemplate`
 
 `Get-AutomateNOWTimeZone`
 
 `Get-AutomateNOWUser`
+
+`Get-AutomateNOWWorkflow`
 
 `Get-AutomateNOWWorkflowTemplate`
 
@@ -190,7 +223,11 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Invoke-AutomateNOWAPI`
 
+`New-AutomateNOWAuthenticationEncryptedString`
+
 `New-AutomateNOWDataSource`
+
+`New-AutomateNOWDefaultProcessingTitle`
 
 `New-AutomateNOWFolder`
 
@@ -198,7 +235,7 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `New-AutomateNOWTag`
 
-`New-AutomateNOWTask`
+`New-AutomateNOWTaskTemplate`
 
 `New-AutomateNOWWorkflowTemplate`
 
@@ -218,15 +255,21 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Remove-AutomateNOWTag`
 
-`Remove-AutomateNOWTask`
+`Remove-AutomateNOWTaskTemplate`
 
 `Remove-AutomateNOWWorkflowTemplate`
 
 `Remove-AutomateNOWWorkspace`
 
+`Rename-AutomateNOWTaskTemplate`
+
 `Rename-AutomateNOWWorkflowTemplate`
 
-`Resume-AutomateNOWTask`
+`Resolve-AutomateNOWTaskType2ServerNodeType`
+
+`Resume-AutomateNOWTaskTemplate`
+
+`Resume-AutomateNOWWorkflowTemplate`
 
 `Set-AutomateNOWFolder`
 
@@ -236,7 +279,23 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Set-AutomateNOWWorkspace`
 
-`Show-AutomateNOWTaskType`
+`Show-AutomateNOWTaskTemplateType`
+
+`Skip-AutomateNOWTaskTemplate`
+
+`Skip-AutomateNOWWorkflowTemplate`
+
+`Start-AutomateNOWNode`
+
+`Start-AutomateNOWTaskTemplate`
+
+`Start-AutomateNOWWorkflowTemplate`
+
+`Stop-AutomateNOWNode`
+
+`Suspend-AutomateNOWTaskTemplate`
+
+`Suspend-AutomateNOWWorkflowTemplate`
 
 `Switch-AutomateNOWDomain`
 
