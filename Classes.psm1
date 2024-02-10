@@ -1,4 +1,3 @@
-
 #Region Enums
 
 #Region - Enum [Icons]
@@ -501,6 +500,27 @@ Class ANOW {
 
 #endregion
 
+#region Class [Base ANOWAuditLog]
+Class ANOWAuditLog {
+    [string]$actionTimestamp
+    [ValidateSet('UPDATE', 'INSERT', 'DELETE')]
+    [string]$actionType
+    [int64]$id
+    [string]$objectId
+    [string]$tableName
+    [string]$userIp
+    [string]$createdBy
+    [string]$Domain
+    [PSCustomObject]$newValues
+    [PSCustomObject]$oldValues
+    [string]$newValuesText
+    [string]$oldValuesText
+    [PSCustomObject]$changedValues # this is a custom member
+    [string]$changedValuesText # this is a custom member
+}
+
+#endregion
+
 #region Class - [CodeRepository]
 
 Class ANOWCodeRepository {
@@ -532,6 +552,7 @@ Class ANOWCodeRepository {
         }
     }
 }
+
 #endregion
 
 #region Class - [DataSourceItem]
@@ -772,6 +793,8 @@ Class ANOWDomainRole {
     }
 }
 
+#endregion
+
 #region Class - [ANOWTimeZone]
 
 Class ANOWTimeZone {
@@ -804,53 +827,23 @@ Class ANOWTimeZone {
 
 #region Class - [ANOWUserInfo]
 Class ANOWUserInfo {
+    [string]$id
+    [boolean]$admin
+    [boolean]$superuser
+    [PSCustomObject]$domainRoles
     [boolean]$accountExpired
     [datetime]$accountValidUntil
-    [boolean]$admin
-    [ANOWTimeZone]$defaultTimeZone
-    [PSCustomObject]$domainRoles
-    [string]$domains
-    [string]$id
-    [string]$languageCode
-    [datetime]$lastPasswordChange
     [boolean]$passwordExpired
-    [int32]$passwordValidDays
+    [datetime]$lastPasswordChange
+    [int64]$passwordValidDays
     [datetime]$passwordValidUntil
-    [ANOWSecurityRole[]]$secRoles
-    [array]$securityRoles
+    [string]$languageCode
+    [ANOWTimeZone]$defaultTimeZone
     [ANOWUser_skinDensityType]$skinDensityType
     [ANOWUser_skinThemeType]$skinThemeType
-    [boolean]$superuser
-    
-    <#
-    [boolean]$accountLocked
-    [boolean]$active
-    [boolean]$agent
-    [boolean]$ldapAdmin
-    [boolean]$passwordEncoded
-    [datetime]$dateCreated
-    [datetime]$lastAccessTokenCreated
-    [datetime]$lastAccessTokenExpire
-    [datetime]$lastAccountExpired
-    [datetime]$lastAccountLocked
-    [datetime]$lastUpdated
-    [int32]$incorrectLogons
-    [int64]$numberOfSessions
-    [string[]]$secRolesList
-    [string]$clientId
-    [string]$department
-    [string]$email
-    [string]$firstLastName
-    [string]$firstName
-    [string]$lastName
-    [string]$ldapGroupName
-    [string]$location
-    [string]$name
-    [string]$password
-    [string]$phone
-    [string]$secRole
-    [string]$username
-    #>
+    [string[]]$domains
+    [array]$securityRoles
+    [ANOWSecurityRole[]]$secRoles
     # Default constructor
     ANOWUserInfo() { $this.Init(@{}) }
     
@@ -931,52 +924,47 @@ Class ANOWUserInfo {
     }
 }
 
-#region Class - [ANOWUserInfo]
+#endregion
+
+#region Class - [ANOWUser]
+
 Class ANOWUser {
-    [ANOWSecurityRole[]]$secRoles
-    [ANOWTimeZone]$defaultTimeZone
-    [array]$securityRoles
-    [boolean]$accountExpired
-    [boolean]$accountLocked
-    [boolean]$active
-    [boolean]$admin
-    [boolean]$agent
-    [boolean]$ldapAdmin
-    [boolean]$passwordEncoded
-    [boolean]$passwordExpired
-    [boolean]$superuser
-    [datetime]$accountValidUntil
-    [datetime]$dateCreated
-    [datetime]$lastAccessTokenCreated
-    [datetime]$lastAccessTokenExpire
-    [datetime]$lastAccountExpired
-    [datetime]$lastAccountLocked
-    [datetime]$lastPasswordChange
-    [datetime]$lastUpdated
-    [datetime]$passwordValidUntil
-    [int32]$incorrectLogons
-    [int32]$passwordValidDays
-    [int64]$numberOfSessions
-    [ANOWUser_skinDensityType]$skinDensityType
-    [ANOWUser_skinThemeType]$skinThemeType
-    [PSCustomObject]$domainRoles
-    [string[]]$secRolesList
-    [string]$clientId
-    [string]$department
-    [string]$domains
-    [string]$email
-    [string]$firstLastName
-    [string]$firstName
     [string]$id
-    [string]$languageCode
-    [string]$lastName
-    [string]$ldapGroupName
+    [string]$lastUpdatedBy
+    [boolean]$passwordEncoded
+    [datetime]$dateCreated
+    [string]$firstName
     [string]$location
-    [string]$name
-    [string]$password
-    [string]$phone
+    [boolean]$active
+    [boolean]$accountExpired
+    [ANOWUser_skinThemeType]$skinThemeType
+    [datetime]$lastAccessTokenCreated
+    [datetime]$lastPasswordChange
+    [boolean]$admin
     [string]$secRole
+    [boolean]$ldapAdmin
+    [ANOWUser_skinDensityType]$skinDensityType
+    [string]$lastName
+    [int64]$passwordValidDays
+    [string]$phone
+    [int64]$incorrectLogons
+    [boolean]$passwordExpired
+    [datetime]$lastUpdated
+    [boolean]$agent
+    [string]$department
+    [datetime]$lastAccessTokenExpire
     [string]$username
+    [boolean]$accountLocked
+    [datetime]$accountValidUntil
+    [string]$email
+    [string[]]$domains
+    [string]$firstLastName
+    [string]$name
+    [datetime]$passwordValidUntil
+    [ANOWSecurityRole[]]$secRoles
+    [string[]]$secRolesList
+    [ANOWTimeZone]$defaultTimeZone
+    [datetime]$lastAccountExpired
     # Default constructor
     ANOWUser() { $this.Init(@{}) }
     
@@ -995,31 +983,22 @@ Class ANOWUser {
     [string] ToString([string[]]$optional_properties) {        
         #[hashtable]$this2 = @{}
         [System.Collections.Specialized.OrderedDictionary]$this2 = [System.Collections.Specialized.OrderedDictionary]@{}
-        $current_members = $this | Get-Member | Where-Object { $_.MemberType -eq 'Property' }
+        #$current_members = $this | Get-Member | Where-Object { $_.MemberType -eq 'Property' }
+        $current_members = @('id', 'lastUpdatedBy', 'passwordEncoded', 'dateCreated', 'firstName', 'location', 'active', 'accountExpired', 'skinThemeType', 'lastAccessTokenCreated', 'lastPasswordChange', 'admin', 'secRole', 'ldapAdmin', 'skinDensityType', 'lastName', 'passwordValidDays', 'phone', 'incorrectLogons', 'passwordExpired', 'lastUpdated', 'agent', 'department', 'lastAccessTokenExpire', 'username', 'accountLocked', 'accountValidUntil', 'email', 'domains', 'firstLastName', 'name', 'passwordValidUntil', 'secRoles', 'secRolesList', 'createdBy', 'lastAccountExpired', 'languageCode')
         ForEach ($current_member in $current_members) {
-            [string]$current_member_name = $current_member.Name
+            [string]$current_member_name = $current_member
             If ($current_member_value.Length -gt 0 -or $current_member_value.count -gt 0) {
                 Remove-Variable current_member_value -Force
             }
-            If (($this.$current_member_name.count -gt 0)) {
-                If ($this.$current_member_name[0] -is [ANOWSecurityRole]) {
-                    [ANOWSecurityRole[]]$current_member_value = $this.$current_member_name
-                }
-                Else {
-                    $current_member_value = $this.$current_member_name # this variable cannot be hard typed
-                }
-            }
-            Else {
-                $current_member_value = $this.$current_member_name # this variable cannot be hard typed
-            }
+            $current_member_value = $this.$current_member_name
             # This omits pre-defined optional properties for this specific class when they are empty
             If (-not ($current_member_value.Length -eq 0 -and $current_member_name -in ($optional_properties))) {
-                If ($current_member.definition -match '^datetime [a-zA-Z]{1,} {.{1,}}$' ) {
+                If ($current_member -in @('accountValidUntil', 'dateCreated', 'lastAccessTokenCreated', 'lastAccessTokenExpire', 'lastPasswordChange', 'lastUpdated', 'passwordValidUntil') ) {
                     # This ensures that datetimes are always formatted into ISO 8601 format. Powershell is not consistent on recognizing strings that can be safely casted into dates.
                     [string]$current_member_value = Get-Date -Date $current_member_value -Format 'yyyy-MM-ddTHH:mm:ss.fff'
                     $this2.Add($current_member_name, $current_member_value)
                 }
-                ElseIf ($current_member.definition -match '^bool [a-zA-Z]{1,} {.{1,}}$' ) {
+                ElseIf ($current_member -in @('accountExpired', 'accountLocked', 'active', 'admin', 'agent', 'ldapAdmin', 'passwordEncoded', 'passwordExpired') ) {
                     # This ensures that booleans are converted the same way that the application expects
                     If ($current_member_value -eq $false) {
                         $this2.Add($current_member_name, $false)
@@ -1028,14 +1007,22 @@ Class ANOWUser {
                         $this2.Add($current_member_name, $true)
                     }
                 }
+                ElseIf ($current_member_name -eq 'secRoles') {
+                    If ($current_member_value.count -gt 0) {
+                        [ANOWSecurityRole[]]$current_member_value = $this.secRoles
+                    }
+                    $this2.Add($current_member_name, @())
+                }
+                ElseIf ($current_member_name -eq 'secRolesList') {
+                    If ($current_member_value.count -gt 0) {
+                        [string[]]$current_member_value = $this.secRolesList
+                    }
+                    $this2.Add($current_member_name, "")
+                }
                 ElseIf ($current_member_value -is [System.Enum]) {
                     # This ensures that enums are resolved into their string value instead of the numerical index
                     [string]$current_member_value = $current_member_value.ToString()
                     $this2.Add($current_member_name, $current_member_value)
-                }
-                ElseIf ($current_member.definition -match '^[A-Za-z]{1,}\[] [a-zA-Z]{1,} {.{1,}}$' -and $current_member_value.Count -eq 1) {
-                    # This ensures that arrays which only contain a single item are not converted into strings
-                    $this2.Add($current_member_name, @(, $current_member_value))
                 }
                 ElseIf ($current_member_value.Length -eq 0) {
                     # This ensures that null values remain null instead of being converted to a string
@@ -1058,9 +1045,6 @@ Class ANOWUser {
 }
 
 #endregion
-
-
-#EndRegion
 
 #region Class - [SecurityRole]
 
@@ -1123,7 +1107,6 @@ Class ANOWFolder : ANOW {
 
 #region Class - [ANOWDataSource]
 
-
 Class ANOWDataSource : ANOW {
     [Nullable[ANOWiconSet]]$iconSet
     [string]$fetchCommand
@@ -1137,11 +1120,6 @@ Class ANOWDataSource : ANOW {
     [string]$errorHandling #= INIT- THESE ARE UNDEFINED
     [string]$dataType #= STRING- THESE ARE UNDEFINED
 }
-
-#validity=FREE
-#errorHandling=INIT
-#dataType=STRING
-
 
 #endregion
 
@@ -1157,7 +1135,6 @@ Class ANOWLocalDictionaryRecord : ANOWDataSourceItem {
     [string]$domain
     [string]$userIp
     [string]$value
-    
     [string]$displayValue
 }
 
@@ -1171,7 +1148,6 @@ Class ANOWLocalKeyValueStoreRecord : ANOWDataSourceItem {
     [string]$domain
     [string]$userIp
     [string]$value
-    
     [string]$key
 }
 
@@ -1207,7 +1183,7 @@ Class ANOWLocalTextFileStoreRecord : ANOWDataSourceItem {
     [string]$createdBy
     [string]$domain
     [string]$userIp
-    #
+
     [string]$fileName
     [string]$mimeType
     [string]$content
