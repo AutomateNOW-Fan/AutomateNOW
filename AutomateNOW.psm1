@@ -9308,7 +9308,14 @@ Function Get-AutomateNOWUser {
                 # Note: I'm not sure why routine this was needed
                 Try {
                     ForEach ($Property in ($FormattedUser | Get-Member -MemberType Property | Select-Object -ExpandProperty Name)) {
-                        $FormattedUser.$Property = $User.$Property
+                        If($null -eq $User.$Property){
+                            If($Property -in @('lastAccountExpired')){
+                                $FormattedUser.$Property = Get-Date -Date '1970-01-01'
+                            }
+                        }
+                        Else {
+                            $FormattedUser.$Property = $User.$Property
+                        }                        
                     }
                 }
                 Catch {
