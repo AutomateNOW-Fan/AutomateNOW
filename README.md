@@ -134,11 +134,10 @@ This module has been tested against the below versions of AutomateNOW!
 Use the _-NotSecure_ parameter when connecting to an instance that doesn't use https 😒
 ## Wish List 🌠
 
+- Enrich the sorting options for all Get functions
 - Export diagrams to PNG
-- Simulate mime type of binary files (relates to Add-AutomateNOWDataSourceItem)
-- Complete all of sorting options for all of the Get functions
-- Enforce the server node type selection when creating a new tasktemplate/workflowtemplate
-- Refactor and optimize redundant code
+- Detect the mime type of binary files (for Add-AutomateNOWDataSourceItem)
+- Refactor redundant code
 
 ## Functions 🛠
 
