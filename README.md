@@ -37,6 +37,9 @@ This module has been tested against the below versions of AutomateNOW!
 <br/><br/>
 ## Change Log 📝
 
+## 1.0.13
+- Fixed an issue with `Connect-AutomateNOW`
+
 ## 1.0.12
 - Added new functions: `Export-AutomateNOWAuditLog`, `Get-AutomateNOWAuditLog`, `Set-AutomateNOWUser`
 - Aligned `Get-AutomateNOWWorkspace` with the other Get-* functions

@@ -16,7 +16,7 @@ Function Compare-ObjectProperty {
     .EXAMPLE
         $a = New-Object psobject -Prop ([ordered] @{ One = 1; Two = 2})
         $b = New-Object psobject -Prop ([ordered] @{ One = 1; Two = 2; Three = 3})
-
+compa
         Compare-Object $a $b
 
         # would return $null because it only compares the properties that have common names but
@@ -753,7 +753,7 @@ Connect-AutomateNOW -Instance 's2.infinitedata.com' -User 'user.10' -Pass '*****
             [Parameter(Mandatory = $false)]
             [byte[]]$Key = @(7, 22, 15, 11, 1, 24, 8, 13, 16, 10, 5, 17, 12, 19, 27, 9)
         )
-        [string]$encrypted_string = New-ANOWAuthenticationEncryptedString -Pass $Pass -Key $Key
+        [string]$encrypted_string = New-AutomateNOWAuthenticationEncryptedString -Pass $Pass -Key $Key
         [hashtable]$payload = @{}
         $payload.Add('j_username', $User)
         $payload.Add('j_password', "ENCRYPTED::$encrypted_string")
@@ -1633,6 +1633,260 @@ Function Update-AutomateNOWToken {
 #EndRegion
 
 #Region - Object Functions
+
+#Region - AuditLogs
+Function Get-AutomateNOWAuditLog {
+    <#
+    .SYNOPSIS
+    Gets the Audit log from an instance of AutomateNOW!
+    
+    .DESCRIPTION    
+    The `Get-AutomateNOWAuditLog` cmdlet gets the Audit log from an instance of AutomateNOW!
+
+    .PARAMETER Type
+    An optional string to filter the results based on type. Valid choices are: UPDATE, INSERT and DELETE
+    
+    .PARAMETER startRow
+    An optional int32 representing what row to start the download from. This is intended for multi-page transfers.
+
+    .PARAMETER endRow
+    An optional int32 representing how many rows of data to receive. The default is 2000. This is ideal for testing when you only want a few items.
+
+    .PARAMETER Ascending
+    Optional switch parameter which changes the sort order (of the actionTimestamp property) from the default descending to ascending
+
+    .INPUTS
+    None. You cannot pipe objects to Get-AutomateNOWAuditLog.
+    
+    .OUTPUTS
+    An array of PSCustomObjects
+    
+    .EXAMPLE
+    Gets the most recent 100 audit log entries
+
+    Get-AutomateNOWAuditLog
+    
+    .EXAMPLE
+    Gets the most recent 1000 audit log entries
+
+    Get-AutomateNOWAuditLog -startRow 0 -endRow 1000
+
+    .EXAMPLE
+    Gets the most recent 1000 UPDATE audit log entries
+
+    Get-AutomateNOWAuditLog -startRow 0 -endRow 1000 -Type UPDATE
+
+    .EXAMPLE
+    Gets the oldest 1000 audit log entries
+
+    Get-AutomateNOWAuditLog -startRow 0 -endRow 1000 -Ascending
+
+    
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [OutputType([ANOWAuditLog[]])]
+    [Cmdletbinding()]
+    Param(
+        [ValidateSet('UPDATE', 'INSERT', 'DELETE')]
+        [Parameter(Mandatory = $False)]
+        [string]$Type,
+        [Parameter(Mandatory = $False)]
+        [int32]$startRow = 0,
+        [Parameter(Mandatory = $False)]
+        [int32]$endRow = 100,
+        [Parameter(Mandatory = $False)]
+        [switch]$Ascending
+    )
+    If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+        Write-Warning -Message "Somehow there is not a valid token confirmed."
+        Break
+    }    
+    If ($endRow -lt $startRow) {
+        Write-Warning -Message "The end row must be higher then the start row"
+        Break
+    }
+    [System.Collections.Specialized.OrderedDictionary]$BodyObject = [System.Collections.Specialized.OrderedDictionary]@{}
+    If ($Type.Length -gt 0) {
+        $BodyObject.Add('operator', 'and')
+        $BodyObject.Add('_constructor', 'AdvancedCriteria')
+        $BodyObject.Add('criteria', '{"fieldName":"actionType","operator":"equals","value":"' + $Type + '"}')
+    }    
+    $BodyObject.Add('_operationType', 'fetch')
+    $BodyObject.Add('_startRow', $startRow)
+    $BodyObject.Add('_endRow', $endRow)
+    If ($Ascending -ne $true) {
+        $BodyObject.Add('_sortBy', '-actionTimestamp')
+    }
+    Else {
+        $BodyObject.Add('_sortBy', 'actionTimestamp')
+    }
+    $BodyObject.Add('_textMatchStyle', 'substring')
+    $BodyObject.Add('_componentId', 'AuditLogEventList')
+    $BodyObject.Add('_dataSource', 'AuditLogDataSource')
+    $BodyObject.Add('isc_metaDataPrefix', '_')
+    $BodyObject.Add('isc_dataFormat', 'json')
+    [string]$Body = ConvertTo-QueryString -InputObject $BodyObject
+    [string]$command = ('/auditLog/read?' + $Body)
+    [string]$Instance = $anow_session.Instance
+    [hashtable]$parameters = @{}
+    $parameters.Add('Command', $command)
+    $parameters.Add('Method', 'GET')
+    If ($Verbose -eq $true) {
+        $parameters.Add('Verbose', $True)
+    }
+    $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+    $parameters.Add('Instance', $Instance)
+    If ($anow_session.NotSecure -eq $true) {
+        $parameters.Add('NotSecure', $true)
+    }    
+    $Error.Clear()
+    Try {
+        [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+    }
+    Catch {
+        [string]$Message = $_.Exception.Message
+        Write-Warning -Message "Invoke-AutomateNOWAPI failed due to execute [$command] due to [$Message]."
+        Break
+    }
+    If ($results.response.status -ne 0) {
+        If ($null -eq $results.response.status) {
+            Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
+            Break
+        }
+        Else {
+            [int32]$status_code = $results.response.status
+            [string]$results_response = $results.response
+            Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
+            Break
+        }
+    }
+    [int32]$AuditLogs_count = $results.response.data.Count
+    If ($AuditLogs_count -eq 0) {
+        Write-Warning -Message "Somehow there were 0 AuditLog entries returned. This can't be correct."
+        Break
+    }
+    $Error.Clear()
+    Try {
+        [ANOWAuditLog[]]$AuditLogs = ForEach ($entry in $results.response.data) {
+            Try {
+                $entry | Add-Member -MemberType NoteProperty -Name changedValuesText -TypeName String -Value ''
+                $entry | Add-Member -MemberType NoteProperty -Name changedValues -TypeName PSCustomObject -Value ''
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Add-Member failed to add the NoteProperty changedValues to an audit log UPDATE entry due to [$Message]."
+                Break
+            }            
+            If ($entry.actionType -eq 'UPDATE') {
+                $Error.Clear()
+                Try {
+                    [PSCustomObject]$ChangedValues = Compare-ObjectProperty -ReferenceObject $entry.oldValues -DifferenceObject $entry.newValues
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Compare-ObjectProperty failed to compare an audit log UPDATE entry due to [$Message]."
+                    Break
+                }
+                $Error.Clear()
+                Try {
+                    [PSCustomObject[]]$ObjectValues = $ChangedValues | ForEach-Object { [PSCustomObject]@{ name = $_.PropertyName; oldValue = $_.RefValue; newValue = $_.DiffValue; } }
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "ForEach-Object failed to format an audit log UPDATE entry due to [$Message]."
+                    Break
+                }
+                $Error.Clear()
+                Try {
+                    [string]$JSONValues = $ObjectValues | Sort-Object -Property name | ConvertTo-Json -Compress
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "ConvertTo-Json failed to convert an audit log UPDATE entry due to [$Message]."
+                    Break
+                }                
+                $entry.changedValues = $ObjectValues
+                $entry.changedValuesText = $JSONValues
+            }
+            $entry
+        }
+    }
+    Catch {
+        [string]$Message = $_.Exception.Message
+        Write-Warning -Message "Failed to parse the returned AuditLog entries under Get-AutomateNOWAuditLog due to [$Message]."
+        Break
+    }
+    Return $AuditLogs
+}
+
+Function Export-AutomateNOWAuditLog {
+    <#
+    .SYNOPSIS
+    Exports the AuditLog entries from an instance of AutomateNOW!
+
+    .DESCRIPTION
+    Exports the AuditLog entries from an instance of AutomateNOW! to a local .csv file
+
+    .PARAMETER Domain
+    Mandatory [ANOWAuditLog] object (Use Get-AutomateNOWAuditLog to retrieve them)
+
+    .INPUTS
+    ONLY [ANOWAuditLog] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    The [ANOWAuditLog] objects are exported to the local disk in CSV format
+
+    .EXAMPLE
+    Get-AutomateNOWAuditLog | Export-AutomateNOWAuditLog
+
+    .NOTES
+	You must present [ANOWAuditLog] objects to the pipeline to use this function.
+    #>
+
+    [Cmdletbinding(DefaultParameterSetName = 'Pipeline')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true, ParameterSetName = 'Pipeline')]
+        [ANOWAuditLog]$AuditLog
+    )
+    Begin {
+        [string]$current_time = Get-Date -Format 'yyyyMMddHHmmssfff'
+        [string]$ExportFileName = 'Export-AutomateNOW-AuditLogs-' + $current_time + '.csv'
+        [string]$ExportFilePath = ((Get-Location | Select-Object -ExpandProperty Path) + '\' + $ExportFileName)
+        [hashtable]$parameters = @{}
+        $parameters.Add('Path', $ExportFilePath)
+        $parameters.Add('Append', $true)
+        If ($PSVersionTable.PSVersion.Major -eq 5) {
+            $parameters.Add('NoTypeInformation', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [ANOWAuditLog]$AuditLog = $_
+        }
+        $Error.Clear()
+        Try {
+            $AuditLog | Export-CSV @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Export-CSV failed to export the [ANOWAuditLog] object on the pipeline due to [$Message]"
+            Break
+        }
+    }
+    End {
+        $Error.Clear()
+        If ((Test-Path -Path $ExportFilePath) -eq $true) {
+            [System.IO.FileInfo]$fileinfo = Get-Item -Path "$ExportFilePath"
+            [int32]$filelength = $fileinfo.Length
+            [string]$filelength_display = "{0:N0}" -f $filelength
+            Write-Information -MessageData "Created file $ExportFileName ($filelength_display bytes)"
+        }
+    }
+}
+
+#endregion
 
 #Region - CodeRepositories
 
@@ -2553,12 +2807,18 @@ Function Export-AutomateNOWDataSourceItem {
     The [ANOWDataSourceItem] objects are exported to the local disk in CSV format
     
     .EXAMPLE
+    Exports all of the local dictionary values from all local dictionary data sources
+
     Get-AutomateNOWDataSource -Type LOCAL_DICTIONARY | Get-AutomateNOWDataSourceItem | Export-AutomateNOWDataSourceItem -Type LOCAL_DICTIONARY
 
     .EXAMPLE
+    Exports all of the local dictionary values from a single local dictionary data source
+
     Get-AutomateNOWDataSource -Id 'DataSource01' | Get-AutomateNOWDataSourceItem | Export-AutomateNOWDataSourceItem -Type LOCAL_DICTIONARY
 
     .EXAMPLE
+    Exports the the first 5 local dictionary values from a series of local dictionary data sources
+
     @( 'DataSource01', 'DataSource02' ) | Get-AutomateNOWDataSource | Get-AutomateNOWDataSourceItem -startRow 0 -endRow 5 | Export-AutomateNOWDataSourceItem -Type LOCAL_DICTIONARY
 
     .NOTES
@@ -5424,7 +5684,7 @@ Function Set-AutomateNOWTag {
     ONLY [ANOWTag] objects are accepted (including from the pipeline)
 
     .OUTPUTS
-    The modified [ANOWTag] object will be returned
+    c
 
     .EXAMPLE
     Get-AutomateNOWTag -Id 'Tag01' | Set-AutomateNOWTag -Description 'New Description'
@@ -8714,7 +8974,7 @@ Function Export-AutomateNOWTimeZone {
     Get-AutomateNOWTimeZone | Where-Object {$_.name -match 'Greenwich' } | Export-AutomateNOWTimeZone
 
     .NOTES
-    You may present [ANOWTimezone] objects to the pipeline or specify the -Id manually.
+    
 
     #>
     
@@ -8909,14 +9169,25 @@ Function Get-AutomateNOWUser {
     .PARAMETER LoggedOnUser
     Switch parameter which skips entering the Id of the user. This is intended for use during the initial logon.
 
+    .PARAMETER startRow
+    Integer to indicate the row to start from. This is intended for when you need to paginate the results. Default is 0.
+
+    .PARAMETER endRow
+    Integer to indicate the row to stop on. This is intended for when you need to paginate the results. Default is 100.
+
     .INPUTS
     You may pipe strings representing the Id of the user.
 
     .OUTPUTS
-    A single [ANOWUser] object
+    1 or more [ANOWUser] objects or 1 [ANOWUserInfo] object
 
     .EXAMPLE
+    Gets a single user object
+
     Get-AutomateNOWUser -Id 'username'
+
+    .EXAMPLE
+    Gets the logged on userinfo object
 
     Get-AutomateNOWUser -LoggedOnUser
 
@@ -8924,15 +9195,23 @@ Function Get-AutomateNOWUser {
     You must use Connect-AutomateNOW to establish the token by way of global variable.
 
     Get-AutomateNOWUser DOES NOT refresh the token automatically. This is because it is used during the authentication process.
+
+    The startRow and endRow parameters may only be used when retrieving all users.
+
+    ONLY ADMINS CAN GET ALL USERS! You will get unauthorized error otherwise.
+
     #>
-    [OutputType([ANOWUser])]
-    [Cmdletbinding(DefaultParameterSetName = 'Default')]
+    [Cmdletbinding(DefaultParameterSetName = 'AllUsers')]
     Param(
         [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
-        [Parameter(Mandatory = $true, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'SpecificUser')]
         [string]$Id,
         [Parameter(Mandatory = $true, ParameterSetName = 'LoggedOnUser')]
-        [switch]$LoggedOnUser
+        [switch]$LoggedOnUser,
+        [Parameter(Mandatory = $false, ParameterSetName = 'AllUsers')]
+        [int32]$startRow = 0,
+        [Parameter(Mandatory = $false, ParameterSetName = 'AllUsers')]
+        [int32]$endRow = 100
     )
     Begin {
         If ((Confirm-AutomateNOWSession -IgnoreEmptyDomain -Quiet -DoNotRefresh) -ne $true) {
@@ -8949,6 +9228,10 @@ Function Get-AutomateNOWUser {
             [string]$command = '/secUser/read'
             $parameters.Add('Method', 'POST')
         }
+        If ($endRow -lt $startRow) {
+            Write-Warning -Message "The endRow must be greater then the startRow"
+            Break
+        }
         $parameters.Add('Command', $command)
         $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
         $parameters.Add('Instance', $Instance)
@@ -8962,10 +9245,19 @@ Function Get-AutomateNOWUser {
                 [string]$id = $_
             }
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
-            $BodyMetaData.Add('id', $id )
-            $BodyMetaData.Add('_operationType', 'fetch')
-            $BodyMetaData.Add('_operationId', 'read')
-            $BodyMetaData.Add('_textMatchStyle', 'exactCase')
+            If ($id.Length -gt 0) {
+                $BodyMetaData.Add('id', $id )
+                [string]$textMatchStyle = 'exactCase'
+                $BodyMetaData.Add('_operationId', 'read')
+            }
+            Else {
+                [string]$textMatchStyle = 'exact'
+                $BodyMetaData.Add('_componentId', 'SecUserList')
+                $BodyMetaData.Add('_startRow', $startRow)
+                $BodyMetaData.Add('_endRow', $endRow)
+            }            
+            $BodyMetaData.Add('_operationType', 'fetch')            
+            $BodyMetaData.Add('_textMatchStyle', $textMatchStyle)
             $BodyMetaData.Add('_dataSource', 'SecUserDataSource')
             $BodyMetaData.Add('isc_metaDataPrefix', '_')
             $BodyMetaData.Add('isc_dataFormat', 'json')
@@ -8991,48 +9283,54 @@ Function Get-AutomateNOWUser {
             [string]$full_response_display = $results.response | ConvertTo-Json -Compress
             Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
         }
-        If ($results.response.totalRows -eq 1) {
-            [PSCustomObject]$results_response_data = $results.response.data | Select-Object -First 1
-            If ($null -eq $results_response_data.defaultTimeZone) {
-                [ANOWTimeZone]$defaultTimeZone = $anow_session.server_timezone
-            }
-            Else {
-                [ANOWTimeZone]$defaultTimeZone = Get-AutomateNOWTimeZone -Id ($results_response_data.defaultTimeZone)
-            }
-            If ($Null -eq $results_response_data.defaultTimeZone) {
-                $results_response_data | Add-Member -MemberType NoteProperty -Name defaultTimeZone -Value $defaultTimeZone
-            }
-            Else {
-                $results_response_data.defaultTimeZone = $defaultTimeZone
-            }
-            [ANOWSecurityRole[]]$secRoles2 = ForEach ($secRole in $results_response_data.secRoles) {
-                [ANOWDomainRole[]]$domain_roles = $secRole.domainRoles
-                $secRole.domainRoles = $domain_roles
-                $secRole
-            }
-            $results_response_data.secRoles = $secRoles2
-            If ($LoggedOnUser -eq $true) {
+        If ($LoggedOnUser -ne $True) {
+            [ANOWUser[]]$Users = ForEach ($User in $results.response.data) {                
+                If ($null -eq $User.defaultTimeZone) {
+                    [ANOWTimeZone]$defaultTimeZone = $anow_session.server_timezone
+                }
+                Else {
+                    [ANOWTimeZone]$defaultTimeZone = Get-AutomateNOWTimeZone -Id ($User.defaultTimeZone)
+                }
+                If ($Null -eq $User.defaultTimeZone) {
+                    $User | Add-Member -MemberType NoteProperty -Name defaultTimeZone -Value $defaultTimeZone
+                }
+                Else {
+                    $User.defaultTimeZone = $defaultTimeZone
+                }
+                [ANOWSecurityRole[]]$secRoles2 = ForEach ($secRole in $User.secRoles) {
+                    [ANOWDomainRole[]]$domain_roles = $secRole.domainRoles
+                    $secRole.domainRoles = $domain_roles
+                    $secRole
+                }
+                $User.secRoles = $secRoles2
+                [ANOWUser]$FormattedUser = New-Object -TypeName ANOWUser
                 $Error.Clear()
+                # Note: I'm not sure why routine this was needed
                 Try {
-                    [ANOWUserInfo]$ANOWUser = $results_response_data
+                    ForEach ($Property in ($FormattedUser | Get-Member -MemberType Property | Select-Object -ExpandProperty Name)) {
+                        $FormattedUser.$Property = $User.$Property
+                    }
                 }
                 Catch {
                     [string]$Message = $_.Exception.Message
-                    Write-Warning -Message "Failed to convert the returned [ANOWUser] object from response data for [$id] due to [$Message]."
+                    Write-Warning -Message "Failed to convert the returned [ANOWUser] object from response data for [$User_id] under Get-AutomateNOWUser due to [$Message]."
                     Break
                 }
-    
+                If ($FormattedUser -is [ANOWUser]) {
+                    Write-Verbose -Message "User $User_id was successfully updated"
+                }
+                Else {
+                    Write-Warning -Message "Somehow the modified [ANOWUser] object under Get-AutomateNOWUser in invalid!"
+                    Break
+                }
+                $FormattedUser
+            }
+            If ($Users.Count -gt 0) {
+                Return $Users
             }
             Else {
-                $Error.Clear()
-                Try {
-                    [ANOWUser]$ANOWUser = $results_response_data
-                }
-                Catch {
-                    [string]$Message = $_.Exception.Message
-                    Write-Warning -Message "Failed to convert the returned [ANOWUser] object from response data for [$id] due to [$Message]."
-                    Break
-                }    
+                Write-Warning -Message "Somehow there were 0 users returned, this cannot be correct"
+                Break
             }
         }
         Else {
@@ -9048,13 +9346,20 @@ Function Get-AutomateNOWUser {
             $Error.Clear()
             If ($LoggedOnUser -eq $true) {
                 Try {
-                    [ANOWUserInfo]$ANOWUser = $results
+                    [ANOWUserInfo]$ANOWUserInfo = $results
                 }
                 Catch {
                     [string]$Message = $_.Exception.Message
-                    Write-Warning -Message "Failed to convert the returned [ANOWUser] object from direct data for [$id] due to [$Message]."
+                    Write-Warning -Message "Failed to convert the returned [ANOWUserInfo] object from direct data for [$id] due to [$Message]."
                     Break
                 }
+                If ($ANOWUserInfo.id.Length -gt 0) {
+                    Return $ANOWUserInfo
+                }
+                Else {
+                    Write-Warning -Message "Somehow the [ANOWUser] object appears to be empty"
+                    Break
+                }    
             }
             Else {
                 Try {
@@ -9065,14 +9370,14 @@ Function Get-AutomateNOWUser {
                     Write-Warning -Message "Failed to convert the returned [ANOWUser] object from direct data for [$id] due to [$Message]."
                     Break
                 }
+                If ($ANOWUser.id.Length -gt 0) {
+                    Return $ANOWUser
+                }
+                Else {
+                    Write-Warning -Message "Somehow the [ANOWUser] object appears to be empty"
+                    Break
+                }        
             }
-        }
-        If ($ANOWUser.id.Length -gt 0) {
-            Return $ANOWUser
-        }
-        Else {
-            Write-Warning -Message "Somehow the [ANOWUser] object appears to be empty"
-            Break
         }
     }
     End {
@@ -9142,6 +9447,277 @@ Function Export-AutomateNOWUser {
             [string]$filelength_display = "{0:N0}" -f $filelength
             Write-Information -MessageData "Created file $ExportFileName ($filelength_display bytes)"
         }
+    }
+}
+
+Function Set-AutomateNOWUser {
+    <#
+    .SYNOPSIS
+    Changes the settings of a User from an AutomateNOW! instance
+
+    .DESCRIPTION
+    Changes the settings of a User from an AutomateNOW! instance
+
+    .PARAMETER User
+    An [ANOWUser] object representing the User to be changed.
+
+    .PARAMETER skinThemeType
+    A string representing the theme. Valid choice are: LIGHT, GRAY, DARK, CONTRAST_ULTRA
+
+    .PARAMETER skinDensityType
+    A string representing the theme. Valid choice are: DENSE, COMPACT, STANDARD, EXPANDED, SPACIOUS
+
+    .PARAMETER admin
+    A boolean parameter representing administrative privileges. Use this with caution!
+
+    .PARAMETER ResetDefaultTimeZone
+    Switch parameter that will blank out the user accounts default timezone.
+
+    .PARAMETER Force
+    Force the change without confirmation. This is equivalent to -Confirm:$false
+
+    .PARAMETER Quiet
+    Switch parameter to silence the extraneous output that this outputs by default
+
+    .INPUTS
+    ONLY [ANOWUser] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    The updated [ANOWUser] object will be returned
+
+    .EXAMPLE
+    Get-AutomateNOWUser -Id 'user01' | Set-AutomateNOWUser -skinTheme 'DARK'
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    There's at least 2 missing properties: Admin, OAuth_clientid
+
+    This function does not support any roles. It is only to be used for the basic user properties.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
+        [ANOWUser]$User,
+        [AllowEmptyString()]
+        [ValidateLength(0, 255)]
+        [Parameter(Mandatory = $false)]
+        [string]$FirstName,
+        [AllowEmptyString()]
+        [ValidateLength(0, 255)]
+        [Parameter(Mandatory = $false)]
+        [string]$LastName,
+        [AllowEmptyString()]
+        [ValidateLength(0, 255)]
+        [Parameter(Mandatory = $false)]
+        [string]$Department,
+        [AllowEmptyString()]
+        [ValidateLength(0, 255)]
+        [Parameter(Mandatory = $false)]
+        [string]$Location,
+        [ValidateScript({ $_ -match '^[\w\.-]+@[a-zA-Z\d\.-]+\.[a-zA-Z]{2,}$' })]
+        [Parameter(Mandatory = $false, HelpMessage = 'Enter a valid email address')]
+        [string]$Email,
+        [AllowEmptyString()]
+        [ValidateScript({ $_ -match '^[\d]{0,255}$' })]
+        [Parameter(Mandatory = $false, HelpMessage = 'Enter numbers only')]
+        [string]$PhoneNumber,
+        [Parameter(Mandatory = $false)]
+        [datetime]$AccountValidUntil,
+        [Parameter(Mandatory = $false)]
+        [ANOWTimeZone]$DefaultTimeZone,
+        [Parameter(Mandatory = $false)]
+        [ANOWUser_skinThemeType]$skinThemeType,
+        [Parameter(Mandatory = $false)]
+        [ANOWUser_skinDensityType]$skinDensityType,
+        [Parameter(Mandatory = $false, HelpMessage = 'Set this to true to promote the user to full admin privileges')]
+        [boolean]$admin,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet,
+        [Parameter(Mandatory = $false)]
+        [switch]$ResetDefaultTimeZone
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [string]$command = '/secUser/update'
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($User.id)")) -eq $true) {
+            If ($_.id.Length -gt 0) {
+                [string]$User_id = $_.id
+            }
+            ElseIf ($User.id.Length -gt 0) {
+                [string]$User_id = $User.id
+            }
+            Else {
+                [string]$User_id = $Id
+            }
+            ## Begin warning ##
+            ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
+            $Error.Clear()
+            Try {
+                [ANOWUser]$User = Get-AutomateNOWUser -Id $User_id                
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Get-AutomateNOWUser failed to check if the User [$User_id] already existed under Set-AutomateNOWUser due to [$Message]."
+                Break
+            }
+            [boolean]$User_exists = ($User.Id.Length -gt 0)
+            If ($User_exists -eq $false) {
+                [string]$current_domain = $anow_session.header.domain
+                Write-Warning "There is not a User named [$User_id] in the [$current_domain]. Please check into this."
+                Break
+            }
+            ## End warning ##
+            [boolean]$account_has_changed = $false
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.'id' = $User.id            
+            
+            If ($FirstName.Length -gt 0) {
+                $BodyMetaData.'firstName' = $FirstName
+                $BodyMetaData.'firstLastName' = ($FirstName + ' ' + $User.LastName)
+                [boolean]$account_has_changed = $true
+            }
+            If ($LastName.Length -gt 0) {
+                $BodyMetaData.'lastName' = $LastName
+                $BodyMetaData.'firstLastName' = ($User.FirstName + ' ' + $LastName)
+                [boolean]$account_has_changed = $true
+            }
+            If ($FirstName.Length -gt 0 -and $LastName.Length -gt 0) {
+                $BodyMetaData.'firstLastName' = ($FirstName + ' ' + $LastName)
+            }
+            If ($Department.Length -gt 0) {
+                $BodyMetaData.'department' = $Department
+                [boolean]$account_has_changed = $true
+            }
+            If ($Location.Length -gt 0) {
+                $BodyMetaData.'location' = $Location
+                [boolean]$account_has_changed = $true
+            }
+            If ($Email.Length -gt 0) {
+                $BodyMetaData.'email' = $Email
+                [boolean]$account_has_changed = $true
+            }
+            If ($PhoneNumber.Length -gt 0) {
+                $BodyMetaData.'phone' = $PhoneNumber
+                [boolean]$account_has_changed = $true
+            }
+            If ($null -ne $AccountValidUntil) {
+                $BodyMetaData.'accountValidUntil' = Get-Date -Date $AccountValidUntil -Format 'yyyy-MM-ddTHH:mm:ss.fff'
+                [boolean]$account_has_changed = $true
+            }
+
+            If ($null -ne $DefaultTimeZone) {
+                $BodyMetaData.'defaultTimeZone' = ($DefaultTimeZone.Id)
+                [boolean]$account_has_changed = $true
+            }
+            If ($ResetDefaultTimeZone -eq $true) {
+                $BodyMetaData.'defaultTimeZone' = ''
+                [boolean]$account_has_changed = $true
+            }
+
+            If ($skinThemetype.Length -gt 0) {
+                $BodyMetaData.'skinThemeType' = $skinThemeType
+                [boolean]$account_has_changed = $true
+            }
+            If ($skinThemetype.Length -gt 0) {
+                $BodyMetaData.'skinDensityType' = $skinDensityType
+                [boolean]$account_has_changed = $true
+            }
+            If ($account_has_changed -eq $false) {
+                Write-Warning -Message "There must be at least 1 change to use Set-AutomateNOWUser"
+                Break
+            }
+            $BodyMetaData.'createdBy' = $User.createdBy
+            $BodyMetaData.'lastAccountExpired' = $User.lastAccountExpired
+            $BodyMetaData.'languageCode' = $User.languageCode
+            $BodyMetaData.'_operationType' = 'update'
+            $BodyMetaData.'_oldValues' = $User.CreateOldValues()
+            $BodyMetaData.'_textMatchStyle' = 'exact'
+            $BodyMetaData.'_componentId' = 'SecUserEditForm'
+            $BodyMetaData.'_dataSource' = 'SecUserDataSource'
+            $BodyMetaData.'isc_metaDataPrefix' = '_'
+            $BodyMetaData.'isc_dataFormat' = 'json'            
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            If ($null -eq $parameters.Body) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$User_id] due to [$Message]."
+                Break
+            }    
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            }
+            [PSCustomObject]$results_response_data = $results.response.data
+            If ($null -eq $results_response_data.defaultTimeZone) {
+                [ANOWTimeZone]$defaultTimeZone = $anow_session.server_timezone
+            }
+            Else {
+                [ANOWTimeZone]$defaultTimeZone = Get-AutomateNOWTimeZone -Id ($results_response_data.defaultTimeZone)
+                [PSCustomObject]$results_response_data = $results_response_data | Select-Object -ExcludeProperty defaultTimeZone
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results_response_data | Add-Member -MemberType NoteProperty -Name defaultTimeZone -Value $defaultTimeZone
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Add-Member failed to add the defaultTimeZone member under Set-AutomateNOWUser due to [$Message]."
+                Break
+            }
+            [ANOWUser]$ModifiedUser = New-Object -TypeName ANOWUser
+            $Error.Clear()
+            # Note: I'm not sure why routine this was needed
+            Try {
+                ForEach ($Property in ($ModifiedUser | Get-Member -MemberType Property | Select-Object -ExpandProperty Name)) {
+                    $ModifiedUser.$Property = $results_response_data.$Property
+                }
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Failed to convert the returned [ANOWUser] object from response data for [$User_id] under Set-AutomateNOWUser due to [$Message]."
+                Break
+            }
+            If ($ModifiedUser -is [ANOWUser]) {
+                Write-Verbose -Message "User $User_id was successfully updated"
+            }
+            Else {
+                Write-Warning -Message "Somehow the modified [ANOWUser] object in invalid!"
+                Break
+            }
+            
+            If ($Quiet -ne $true) {
+                Return $ModifiedUser
+            }
+        }
+    }
+    End {
+        
     }
 }
 

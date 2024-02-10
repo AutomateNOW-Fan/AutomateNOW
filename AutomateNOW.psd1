@@ -9,10 +9,10 @@ Developed against AutomateNOW! version 3.3.1.75HF1
 	RootModule = 'AutomateNOW.psm1'
 	
 	# Version number of this module.
-	ModuleVersion = '1.0.12'
+	ModuleVersion = '1.0.13'
 	
 	# ID used to uniquely identify this module
-	GUID = '1a4214db-b9ce-7aa1-2338-2d73e4a25b1f'
+	GUID = '1a1214db-b9ce-7aa1-2338-2d73e4a25b1f'
 	
 	# Copyright statement for this module
 	Copyright = 'not affiliated with InfiniteDATA'
