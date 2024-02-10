@@ -448,7 +448,8 @@ Class ANOW {
     # The primary goal of this method is to return back the same json string that the ANOW application produces when it converts an object into JSON
     # The secondary goal of this method is to stringify the object in preparation for encoding to URL format faithfully
     [string] ToString([string[]]$optional_properties) {        
-        [hashtable]$this2 = @{}
+        #[hashtable]$this2 = @{}
+        [System.Collections.Specialized.OrderedDictionary]$this2 = [System.Collections.Specialized.OrderedDictionary]@{}
         $current_members = $this | Get-Member | Where-Object { $_.MemberType -eq 'Property' }
         ForEach ($current_member in $current_members) {
             [string]$current_member_name = $current_member.Name
@@ -590,7 +591,7 @@ Class ANOWDomain {
     [boolean]$versionControlReasonEnabled
     [string]$textColor
     [boolean]$versionControlEnabled
-    [string]$defaultTimeZone
+    [ANOWTimeZone]$defaultTimeZone
     [boolean]$operatorActionCommentRequired
     [string]$iconCode
     [string]$operatorActionReasonChoiceList
@@ -801,53 +802,181 @@ Class ANOWTimeZone {
 
 #endregion
 
-#region Class - [ANOWUser]
-Class ANOWUser {
-    [string]$id
-    [string]$lastName
-    [datetime]$lastAccessTokenCreated
-    [boolean]$passwordEncoded
-    [boolean]$agent
-    [string[]]$secRolesList
-    [string]$secRole
-    [boolean]$admin
-    [datetime]$lastAccountExpired
-    [ANOWSecurityRole[]]$secRoles
-    [string]$password
-    [string]$firstLastName
-    [datetime]$passwordValidUntil
-    [Nullable[ANOWUser_skinThemeType]]$skinThemeType
-    [Nullable[ANOWUser_skinDensityType]]$skinDensityType
-    [int32]$incorrectLogons
-    [boolean]$ldapAdmin
-    [string]$department
-    [string]$email
-    [boolean]$accountLocked
-    [datetime]$accountValidUntil
-    [string]$clientId
-    [int32]$passwordValidDays
-    [datetime]$lastAccessTokenExpire
-    [boolean]$active
-    [string]$domains
-    [string]$languageCode
-    [string]$firstName
-    [ANOWTimeZone]$defaultTimeZone
-    [datetime]$lastAccountLocked
-    [string]$phone
-    [string]$name
+#region Class - [ANOWUserInfo]
+Class ANOWUserInfo {
     [boolean]$accountExpired
-    [string]$location
+    [datetime]$accountValidUntil
+    [boolean]$admin
+    [ANOWTimeZone]$defaultTimeZone
+    [PSCustomObject]$domainRoles
+    [string]$domains
+    [string]$id
+    [string]$languageCode
     [datetime]$lastPasswordChange
     [boolean]$passwordExpired
-    [string]$username
-    [int64]$numberOfSessions
-    [Nullable[boolean]]$superuser
-    [PSCustomObject]$domainRoles
+    [int32]$passwordValidDays
+    [datetime]$passwordValidUntil
+    [ANOWSecurityRole[]]$secRoles
     [array]$securityRoles
+    [ANOWUser_skinDensityType]$skinDensityType
+    [ANOWUser_skinThemeType]$skinThemeType
+    [boolean]$superuser
+    
+    <#
+    [boolean]$accountLocked
+    [boolean]$active
+    [boolean]$agent
+    [boolean]$ldapAdmin
+    [boolean]$passwordEncoded
     [datetime]$dateCreated
+    [datetime]$lastAccessTokenCreated
+    [datetime]$lastAccessTokenExpire
+    [datetime]$lastAccountExpired
+    [datetime]$lastAccountLocked
     [datetime]$lastUpdated
+    [int32]$incorrectLogons
+    [int64]$numberOfSessions
+    [string[]]$secRolesList
+    [string]$clientId
+    [string]$department
+    [string]$email
+    [string]$firstLastName
+    [string]$firstName
+    [string]$lastName
     [string]$ldapGroupName
+    [string]$location
+    [string]$name
+    [string]$password
+    [string]$phone
+    [string]$secRole
+    [string]$username
+    #>
+    # Default constructor
+    ANOWUserInfo() { $this.Init(@{}) }
+    
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = ''
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
+    }
+    # The primary goal of this method is to return back the same json string that the ANOW application produces when it converts an object into JSON
+    # The secondary goal of this method is to stringify the object in preparation for encoding to URL format faithfully
+    [string] ToString([string[]]$optional_properties) {        
+        #[hashtable]$this2 = @{}
+        [System.Collections.Specialized.OrderedDictionary]$this2 = [System.Collections.Specialized.OrderedDictionary]@{}
+        $current_members = $this | Get-Member | Where-Object { $_.MemberType -eq 'Property' }
+        ForEach ($current_member in $current_members) {
+            [string]$current_member_name = $current_member.Name
+            If ($current_member_value.Length -gt 0 -or $current_member_value.count -gt 0) {
+                Remove-Variable current_member_value -Force
+            }
+            If (($this.$current_member_name.count -gt 0)) {
+                If ($this.$current_member_name[0] -is [ANOWSecurityRole]) {
+                    [ANOWSecurityRole[]]$current_member_value = $this.$current_member_name
+                }
+                Else {
+                    $current_member_value = $this.$current_member_name # this variable cannot be hard typed
+                }
+            }
+            Else {
+                $current_member_value = $this.$current_member_name # this variable cannot be hard typed
+            }
+            # This omits pre-defined optional properties for this specific class when they are empty
+            If (-not ($current_member_value.Length -eq 0 -and $current_member_name -in ($optional_properties))) {
+                If ($current_member.definition -match '^datetime [a-zA-Z]{1,} {.{1,}}$' ) {
+                    # This ensures that datetimes are always formatted into ISO 8601 format. Powershell is not consistent on recognizing strings that can be safely casted into dates.
+                    [string]$current_member_value = Get-Date -Date $current_member_value -Format 'yyyy-MM-ddTHH:mm:ss.fff'
+                    $this2.Add($current_member_name, $current_member_value)
+                }
+                ElseIf ($current_member.definition -match '^bool [a-zA-Z]{1,} {.{1,}}$' ) {
+                    # This ensures that booleans are converted the same way that the application expects
+                    If ($current_member_value -eq $false) {
+                        $this2.Add($current_member_name, $false)
+                    }
+                    Else {
+                        $this2.Add($current_member_name, $true)
+                    }
+                }
+                ElseIf ($current_member_value -is [System.Enum]) {
+                    # This ensures that enums are resolved into their string value instead of the numerical index
+                    [string]$current_member_value = $current_member_value.ToString()
+                    $this2.Add($current_member_name, $current_member_value)
+                }
+                ElseIf ($current_member.definition -match '^[A-Za-z]{1,}\[] [a-zA-Z]{1,} {.{1,}}$' -and $current_member_value.Count -eq 1) {
+                    # This ensures that arrays which only contain a single item are not converted into strings
+                    $this2.Add($current_member_name, @(, $current_member_value))
+                }
+                ElseIf ($current_member_value.Length -eq 0) {
+                    # This ensures that null values remain null instead of being converted to a string
+                    $this2.Add($current_member_name, $null)
+                }
+                Else {
+                    $this2.Add($current_member_name, $current_member_value)
+                }
+            }
+        }
+        [string]$stringified_object = $this2 | ConvertTo-JSON -Compress -Depth 10        
+        Return $stringified_object
+    }
+    # The primary goal of this method is to URL encode an ANOW object for conversion into the _oldValues string. The _oldValues is typically (but not always) included by the ANOW application whenever modifying an object. The behavior of this method should match the ANOW application as closely as possible. Rigorous and frequent testing will always be needed to ensure that valid payloads are sent when modifying existing objects in the ANOW application.
+    [string] ToURL([string[]]$optional_properties) {
+        [string]$stringified_object = $this.ToString([string[]]$optional_properties)
+        [string]$escaped_object = [System.Uri]::EscapeDataString($stringified_object)
+        Return $escaped_object
+    }
+}
 
+#region Class - [ANOWUserInfo]
+Class ANOWUser {
+    [ANOWSecurityRole[]]$secRoles
+    [ANOWTimeZone]$defaultTimeZone
+    [array]$securityRoles
+    [boolean]$accountExpired
+    [boolean]$accountLocked
+    [boolean]$active
+    [boolean]$admin
+    [boolean]$agent
+    [boolean]$ldapAdmin
+    [boolean]$passwordEncoded
+    [boolean]$passwordExpired
+    [boolean]$superuser
+    [datetime]$accountValidUntil
+    [datetime]$dateCreated
+    [datetime]$lastAccessTokenCreated
+    [datetime]$lastAccessTokenExpire
+    [datetime]$lastAccountExpired
+    [datetime]$lastAccountLocked
+    [datetime]$lastPasswordChange
+    [datetime]$lastUpdated
+    [datetime]$passwordValidUntil
+    [int32]$incorrectLogons
+    [int32]$passwordValidDays
+    [int64]$numberOfSessions
+    [ANOWUser_skinDensityType]$skinDensityType
+    [ANOWUser_skinThemeType]$skinThemeType
+    [PSCustomObject]$domainRoles
+    [string[]]$secRolesList
+    [string]$clientId
+    [string]$department
+    [string]$domains
+    [string]$email
+    [string]$firstLastName
+    [string]$firstName
+    [string]$id
+    [string]$languageCode
+    [string]$lastName
+    [string]$ldapGroupName
+    [string]$location
+    [string]$name
+    [string]$password
+    [string]$phone
+    [string]$secRole
+    [string]$username
     # Default constructor
     ANOWUser() { $this.Init(@{}) }
     
@@ -864,7 +993,8 @@ Class ANOWUser {
     # The primary goal of this method is to return back the same json string that the ANOW application produces when it converts an object into JSON
     # The secondary goal of this method is to stringify the object in preparation for encoding to URL format faithfully
     [string] ToString([string[]]$optional_properties) {        
-        [hashtable]$this2 = @{}
+        #[hashtable]$this2 = @{}
+        [System.Collections.Specialized.OrderedDictionary]$this2 = [System.Collections.Specialized.OrderedDictionary]@{}
         $current_members = $this | Get-Member | Where-Object { $_.MemberType -eq 'Property' }
         ForEach ($current_member in $current_members) {
             [string]$current_member_name = $current_member.Name

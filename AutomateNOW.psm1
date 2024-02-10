@@ -1196,7 +1196,7 @@ Connect-AutomateNOW -Instance 's2.infinitedata.com' -User 'user.10' -Pass '*****
         If ($Id.length -eq 0) {
             $Error.Clear()
             Try {
-                [PSCustomObject]$userInfo = Get-AutomateNOWUser -LoggedOnUser
+                [ANOWUserInfo]$userInfo = Get-AutomateNOWUser -LoggedOnUser
             }
             Catch {
                 [string]$Message = $_.Exception.Message
@@ -1206,20 +1206,6 @@ Connect-AutomateNOW -Instance 's2.infinitedata.com' -User 'user.10' -Pass '*****
             [string]$Id = $userInfo.Id
         }
         $Error.Clear()
-        <#
-        Try {
-            [ANOWUser]$userInfo = Get-AutomateNOWUser -Id $Id
-        }
-        Catch {
-            [string]$Message = $_.Exception.Message
-            Write-Warning "Get-AutomateNOWUser failed to get the info for $Id (during connection) due to [$Message]."
-            Break
-        }
-        If ($userInfo.domains.length -eq 0) {
-            Write-Warning "Somehow the user info object is malformed."
-            Break
-        }
-        #>
         $anow_session['user_details'] = $userInfo
         [string]$userName = $userInfo.id
         If ($userName.Length -eq 0) {
@@ -3197,15 +3183,18 @@ Function Get-AutomateNOWDomain {
     An array of [ANOWDomain] class objects
     
     .EXAMPLE
+    Gets all of the domains
+
     Get-AutomateNOWDomain
 
     .EXAMPLE
+    Gets a single domain
+
     Get-AutomateNOWDomain -Id 'Training'
 
     .EXAMPLE
-    Get-AutomateNOWDomain -Id 'Training', 'Production'
-
-    .EXAMPLE
+    Gets a series of domains based on an array of strings presented to the pipeline
+    
     @('Training', 'Production', 'Test') | Get-AutomateNOWDomain
     
     .NOTES
@@ -3216,7 +3205,7 @@ Function Get-AutomateNOWDomain {
     [Cmdletbinding()]
     Param(
         [Parameter(Mandatory = $false, ValueFromPipeline = $true)]
-        [string[]]$Id
+        [string]$Id
     )
     Begin {
         If ((Confirm-AutomateNOWSession -IgnoreEmptyDomain -Quiet) -ne $true) {
@@ -3252,26 +3241,53 @@ Function Get-AutomateNOWDomain {
             }
         }
         $Error.Clear()
-        Try {
-            [ANOWDomain[]]$Domains = $results.response.data
-        }
-        Catch {
-            [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Unable to create the set of [ANOWDomain] objects due to [$Message]."
-            Break
+        If ($results.response.data.count -gt 0) {
+            [ANOWDomain[]]$Domains = ForEach ($domain in $results.response.data) {
+                [string]$domain_name = $domain.id
+                If ($domain_name.Length -eq 0) {
+                    Write-Warning -Message 'Somehow the domain information could not be read during Get-AutomateNOWDomain'
+                    Break
+                }
+                [string]$defaultTimeZoneId = $domain.defaultTimeZone
+                If ($defaultTimezoneId.Length -eq 0) {
+                    Write-Verbose -Message "There is not a default timezone set for this domain, therefore will use the server default"
+                    Try {
+                        $domain | Add-Member -MemberType NoteProperty -Name defaultTimezone -Value $anow_session.server_timezone
+                    }
+                    Catch {
+                        [string]$Message = $_.Exception.Message
+                        Write-Warning -Message "Add-Member failed to add the server timezone to the domain [$domain_name] due to [$Message]."
+                        Break
+                    }
+                }
+                Else {
+                    $Error.Clear()
+                    Try {
+                        [ANOWTimeZone]$defaultTimezone = Get-AutomateNOWTimeZone -Id $defaultTimeZoneId
+                    }
+                    Catch {
+                        [string]$Message = $_.Exception.Message
+                        Write-Warning -Message "Get-AutomateNOWTimeZone failed to get [$defaultTimeZoneId] under Get-AutomateNOWDomain due to [$Message]."
+                        Break
+                    }
+                    $domain.defaultTimeZone = $defaultTimezone
+                }
+                [ANOWDomain]$domain
+            }
         }
     }
     Process {
-        If (($_.Length -gt 0) -or ($Id.Count -gt 0)) {
+        If ($_.Length -gt 0 -or $Id.Length -gt 0) {
             If ($_.Length -gt 0) {
-                [string]$current_domain_name = $_
-                [ANOWDomain]$Domain = $results.response.data | Where-Object { $_.Id -eq $current_domain_name } | Select-Object -First 1
-                Return $Domain
+                [string]$domain_id = $_
             }
             Else {
-                [ANOWDomain[]]$Domains = ($Domains | Where-Object { $_.Id -in $Id })
-                Return $Domains
-            } 
+                [string]$domain_id = $Id
+            }
+            [ANOWDomain]$selected_domain = $Domains | Where-Object { $_.Id -eq $domain_id }
+            If ($selected_domain.Id.Length -gt 0) {
+                Return $selected_domain
+            }
         }
         Return $Domains
     }
@@ -3718,7 +3734,7 @@ Function New-AutomateNOWFolder {
     }
     Catch {
         [string]$Message = $_.Exception.Message
-        Write-Warning -Message "Get-AutomateNOWFolder failed to check if the Folder [$Id] already existed due to [$Message]."
+        Write-Warning -Message "Get-AutomateNOWFolder failed to check if the Folder [$Id] existed under New-AutomateNOWFolder due to [$Message]."
         Break
     }
     If ($Folder_exists -eq $true) {
@@ -3727,19 +3743,30 @@ Function New-AutomateNOWFolder {
         Break
     }
     ## End warning ##
-    $Error.Clear()
-    Try {
-        [ANOWFolder]$ANOWFolder = New-Object -TypeName ANOWFolder
+    [System.Collections.Specialized.OrderedDictionary]$ANOWFolder = [System.Collections.Specialized.OrderedDictionary]@{}
+    $ANOWFolder.Add('id', $Id)
+    If ($Description.Length -gt 0) {
+        $ANOWFolder.Add('description', $Description)
     }
-    Catch {
-        [string]$Message = $_.Exception.Message
-        Write-Warning -Message "New-Object failed to create the object of type [ANOWFolder] due to [$Message]."
-        Break
+    If ($CodeRepository.Length -gt 0) {
+        $Error.Clear()
+        Try {
+            [ANOWCodeRepository]$code_repository_object = Get-AutomateNOWCodeRepository -Id $CodeRepository
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWCodeRepository failed to confirm that the code repository [$CodeRepository] existed under New-AutomateNOWFolder due to [$Message]"
+            Break
+        }
+        If ($code_repository_object.simpleId.Length -eq 0) {
+            Throw "Get-AutomateNOWCodeRepository failed to locate the Code Repository [$CodeRepository] under New-AutomateNOWFolder. Please check again."
+            Break
+        }
+        [string]$code_repository_display = $code_repository_object | ConvertTo-Json -Compress
+        Write-Verbose -Message "Adding code repository $code_repository_display to [ANOWWorkflowTemplate] [$Id]"
+        $ANOWFolder.Add('codeRepository', $CodeRepository)
+        $include_properties += 'codeRepository'
     }
-
-    $ANOWFolder.'id' = $Id
-    $ANOWFolder.'description' = $Description
-    $ANOWFolder.'codeRepository' = $codeRepository
     [string]$BodyObject = ConvertTo-QueryString -InputObject $ANOWFolder -IncludeProperties id, description, codeRepository
     [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
     $BodyMetaData.'_operationType' = 'add'
@@ -4586,20 +4613,14 @@ Function New-AutomateNOWNode {
         Break
     }
     ## End warning ##
-    $Error.Clear()
-    Try {
-        [System.Collections.Specialized.OrderedDictionary]$ANOWNode = [System.Collections.Specialized.OrderedDictionary]@{}
+    [System.Collections.Specialized.OrderedDictionary]$ANOWNode = [System.Collections.Specialized.OrderedDictionary]@{}
+    $ANOWNode.Add('id', $Id)
+    $ANOWNode.Add('serverNodeType', $Type)
+    $ANOWNode.Add('loadBalancer', $False)
+    $ANOWNode.Add('totalWeightCapacity', $WeightCapacity)
+    If ($Description.Length -gt 0) {
+        $ANOWNode.Add('description', $Description)
     }
-    Catch {
-        [string]$Message = $_.Exception.Message
-        Write-Warning -Message "New-Object failed to create the object of type [ANOWNode] due to [$Message]."
-        Break
-    }
-    $ANOWNode.'id' = $Id
-    $ANOWNode.'serverNodeType' = $Type
-    $ANOWNode.'loadBalancer' = $False
-    $ANOWNode.'totalWeightCapacity' = $WeightCapacity
-    $ANOWNode.'description' = $Description
     If ($Tags.Count -gt 0) {
         [int32]$total_tags = $Tags.Count
         [int32]$current_tag = 1
@@ -5988,17 +6009,18 @@ Function Get-AutomateNOWTask {
     Get-AutomateNOWTask -taskType 'SH'
 
     .EXAMPLE
-    Get-AutomateNOWTask -Id 'task_01'
+    Gets a Task by its numerical Id
+
+    Get-AutomateNOWTask -Id 1738954
 
     .EXAMPLE
-    @( 'task_01', 'task_02' ) | Get-AutomateNOWTask
+    Gets a series of Tasks based on their numerical ID
+    @( 1738954, 1738955 ) | Get-AutomateNOWTask
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
 
     Run this function without parameters to retrieve all of the tasks (not recommended)
-
-    Please be aware that tasks are actually divided into 3 types which is not directly illustrated in the console. The three types are tasks, Monitors and Sensors. That is why there are three separate exclusive parameters for the task type.
 
     #>
     [OutputType([ANOWTask[]])]
@@ -6210,6 +6232,665 @@ Function Export-AutomateNOWTask {
             [string]$filelength_display = "{0:N0}" -f $filelength
             Write-Information -MessageData "Created file $ExportFileName ($filelength_display bytes)"
         }
+    }
+}
+
+Function Restart-AutomateNOWTask {
+    <#
+    .SYNOPSIS
+    Restarts a Task from an AutomateNOW! instance
+
+    .DESCRIPTION
+    Restarts a Task from an AutomateNOW! instance
+
+    .PARAMETER Task
+    An [ANOWTask] object representing the Task to be restarted
+
+    .PARAMETER Quiet
+    Switch parameter to omit the informational message if the Restart was successful
+
+    .PARAMETER Force
+    Force the restart without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    ONLY [ANOWTask] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    An informational message is written to the screen unless -Quiet is used
+
+    .EXAMPLE
+    Restarts a single Task
+
+    Get-AutomateNOWTask -Id 'Task_01' | Restart-AutomateNOWTask
+
+    .EXAMPLE
+    Quietly restarts multiple Tasks
+
+    @('Task1', 'Task2') | Get-AutomateNOWTask | Restart-AutomateNOWTask -Quiet
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
+        [ANOWTask]$Task,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [string]$command = '/processing/restart'
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Task.id)")) -eq $true) {
+            If ($_.id -gt 0) {
+                [int64]$Task_id = $_.id
+            
+            }
+            Else {
+                [int64]$Task_id = $Task.id
+            }
+            ## Begin warning ##
+            ## Do not tamper with this below code which makes sure that the object does not previously exist before attempting to create it. This is a critical check with the console handles for you.
+            $Error.Clear()
+            Try {
+                [ANOWTask]$current_task = Get-AutomateNOWTask -Id $Task_id
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Get-AutomateNOWTask failed to check if the Task [$Task_id] existed under Restart-AutomateNOWTask due to [$Message]."
+                Break
+            }
+            If ($current_task.id.length -eq 0) {
+                Write-Warning "The Task you specified does not seem to exist (Restart-AutomateNOWTask)"
+                Break
+            }
+            [string]$current_task_status = $current_task.processingStatus
+            If ($current_task_status -notin [ANOWTask_processingStatus].GetEnumNames()) {
+                Write-Warning -Message "Somehow the processing status of the task [$Task_id] cannot be read (Restart-AutomateNOWTask)"
+                Break
+            }
+            If ($current_task_status -notin @('COMPLETED', 'FAILED')) {            
+                Write-Warning -Message "[$Task_id] cannot be restarted as it currently in [$current_task_status] processing status"
+                Break
+            }
+            Else {
+                Write-Verbose -Message "[$Task_id] had a status of $current_task_status"
+            }
+            ## End warning ##
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.Add('restartType', 'RESTART_FROM_BEGINNING')
+            $BodyMetaData.Add('restartFailedOnly', 'false' ) # Note this value is currently not available in the console
+            $BodyMetaData.Add('id', $Task_id )
+            $BodyMetaData.Add('_operationType', 'custom')
+            $BodyMetaData.Add('_operationId', 'restart')
+            $BodyMetaData.Add('_textMatchStyle', 'exact')
+            $BodyMetaData.Add('_dataSource', 'ProcessingDataSource')
+            $BodyMetaData.Add('isc_metaDataPrefix', '_')
+            $BodyMetaData.Add('isc_dataFormat', 'json')
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            If ($null -eq $parameters.Body) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$Task_id] due to [$Message]."
+                Break
+            }    
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            }
+            If ($Quiet -ne $true) {
+                Write-Information -MessageData "Task $Task_id was successfully restarted"
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+Function Stop-AutomateNOWTask {
+    <#
+    .SYNOPSIS
+    Stops a Task on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Stops a Task on an AutomateNOW! instance with either a soft or hard stop
+
+    .PARAMETER Task
+    An [ANOWTask] object representing the Task to be stopped
+
+    .PARAMETER Kill
+    Switch parameter to indicate 'Hard kill' of the Task. You must include either this parameter or -Abort
+    
+    .PARAMETER Abort
+    Switch parameter to indicate 'Soft abort' of the Task. You must include either this parameter or -Kill
+    
+    .PARAMETER Quiet
+    Switch parameter to omit the informational message if the stop was successful
+
+    .PARAMETER Force
+    Force the stoppage without confirmation. This is equivalent to -Confirm:$false
+    
+    .INPUTS
+    ONLY [ANOWTask] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    An informational message is written to the screen unless -Quiet is used
+
+    .EXAMPLE
+    Stops a single Task
+
+    Get-AutomateNOWTask -Id 'Task_01' | Stop-AutomateNOWTask -Abort
+
+    .EXAMPLE
+    Quietly stops multiple Tasks
+
+    @('Task1', 'Task2') | Get-AutomateNOWTask | Stop-AutomateNOWTask -Kill -Quiet
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
+        [ANOWTask]$Task,
+        [Parameter(Mandatory = $true, ParameterSetName = 'Kill')]
+        [switch]$Kill,
+        [Parameter(Mandatory = $true, ParameterSetName = 'Abort')]
+        [switch]$Abort,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        If ($Kill -eq $true) {
+            [string]$operation_id = 'kill'
+        }
+        Else {
+            [string]$operation_id = 'abort'   
+        }
+        [string]$command = ('/processing/' + $operation_id)
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Task.id)")) -eq $true) {
+            If ($_.id -gt 0) {
+                [int64]$Task_id = $_.id
+            
+            }
+            Else {
+                [int64]$Task_id = $Task.id
+            }
+            ## Begin warning ##
+            ## Do not tamper with this below code which makes sure that the object does not previously exist before attempting to create it. This is a critical check with the console handles for you.
+            $Error.Clear()
+            Try {
+                [ANOWTask]$current_task = Get-AutomateNOWTask -Id $Task_id
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Get-AutomateNOWTask failed to check if the Task [$Task_id] existed under Restart-AutomateNOWTask due to [$Message]."
+                Break
+            }
+            If ($current_task.id.length -eq 0) {
+                Write-Warning "The Task you specified does not seem to exist (Stop-AutomateNOWTask)"
+                Break
+            }
+            [string]$current_task_status = $current_task.processingStatus
+            If ($current_task_status -notin [ANOWTask_processingStatus].GetEnumNames()) {
+                Write-Warning -Message "Somehow the processing status of the task [$Task_id] cannot be read (Stop-AutomateNOWTask)"
+                Break
+            }
+            If ($current_task_status -in @('COMPLETED', 'FAILED')) {            
+                Write-Warning -Message "[$Task_id] cannot be stopped as it currently in [$current_task_status] processing status"
+                Break
+            }
+            Else {
+                Write-Verbose -Message "[$Task_id] had a status of $current_task_status"
+            }
+            ## End warning ##
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.Add('id', $Task_id )
+            $BodyMetaData.Add('_operationType', 'custom')
+            $BodyMetaData.Add('_operationId', $operation_id)
+            $BodyMetaData.Add('_textMatchStyle', 'exact')
+            $BodyMetaData.Add('_dataSource', 'ProcessingDataSource')
+            $BodyMetaData.Add('isc_metaDataPrefix', '_')
+            $BodyMetaData.Add('isc_dataFormat', 'json')
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            If ($null -eq $parameters.Body) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$Task_id] due to [$Message]."
+                Break
+            }    
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            }
+            If ($Quiet -ne $true) {
+                Write-Information -MessageData "Task $Task_id was successfully stopped"
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+Function Resume-AutomateNOWTask {
+    <#
+    .SYNOPSIS
+    Resumes a Task that is on hold (suspended) on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Resumes a Task that is on hold (suspended) on an AutomateNOW! instance
+
+    .PARAMETER Task
+    An [ANOWTask] object representing the Task to be resumed
+
+    .PARAMETER Force
+    Force the change without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    ONLY [ANOWTask] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    A verbose information message will be sent indicating success
+
+    .EXAMPLE
+    Get-AutomateNOWTask -Id 'Task01' | Resume-AutomateNOWTask -Force
+
+    .EXAMPLE
+    Get-AutomateNOWTask -Id 'Task01', 'Task02' | Resume-AutomateNOWTask 
+
+    .EXAMPLE
+    @( 'Task1', 'Task2', 'Task3') | Resume-AutomateNOWTask 
+
+    .EXAMPLE
+    Get-AutomateNOWTask | ? { $_.serverTaskType -eq 'LINUX' } | Resume-AutomateNOWTask
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $True, ValueFromPipeline = $True)]
+        [ANOWTask]$Task,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [string]$command = '/processing/resume'
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Task.id)")) -eq $true) {
+            If ($_.id.Length -gt 0) {
+                [int64]$Task_id = $_.id
+            }
+            ElseIf ($Task.id.Length -gt 0) {
+                [int64]$Task_id = $Task.id
+            }
+            Else {
+                Write-Warning -Message "Unable to determine the Id of the Task."
+                Break
+            }
+            ## Begin warning ##
+            ## Do not tamper with this below code which makes sure that the object does not previously exist before attempting to create it. This is a critical check with the console handles for you.
+            $Error.Clear()
+            Try {
+                [ANOWTask]$current_task = Get-AutomateNOWTask -Id $Task_id
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Get-AutomateNOWTask failed to check if the Task [$Task_id] existed under Resume-AutomateNOWTask due to [$Message]."
+                Break
+            }
+            If ($current_task.id.length -eq 0) {
+                Write-Warning "The Task you specified does not seem to exist (Resume-AutomateNOWTask)"
+                Break
+            }
+            [boolean]$current_task_hold_status = $current_task.onHold
+            If ($current_task_hold_status -eq $false) {
+                Write-Warning -Message "[$Task_id] cannot be resumed as it is not currently suspended (on hold)"
+                Break
+            }
+            ## End warning ##
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.Add('id', $Task_id )
+            $BodyMetaData.Add('_operationType', 'update')
+            $BodyMetaData.Add('_operationId', 'resume')
+            $BodyMetaData.Add('_textMatchStyle', 'exact')
+            $BodyMetaData.Add('_dataSource', 'ProcessingDataSource')
+            $BodyMetaData.Add('isc_metaDataPrefix', '_')
+            $BodyMetaData.Add('isc_dataFormat', 'json')
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            $parameters.Add('Body', $Body)
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$Task_id] due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            }
+            Write-Verbose -Message "Task $Task_id successfully resumed"
+        }
+    }
+    End {
+
+    }
+}
+
+Function Suspend-AutomateNOWTask {
+    <#
+    .SYNOPSIS
+    Places a Task on hold (suspend) from execution on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Places a Task on hold (suspend) from execution on an AutomateNOW! instance
+
+    .PARAMETER Task
+    An [ANOWTask] object representing the Task to be suspended (placed on hold)
+
+    .PARAMETER Force
+    Force the change without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    ONLY [ANOWTask] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    A verbose information message will be sent indicating success
+
+    .EXAMPLE
+    Get-AutomateNOWTask -Id 'Task01' | Suspend-AutomateNOWTask -Force
+
+    .EXAMPLE
+    Get-AutomateNOWTask -Id 'Task01', 'Task02' | Suspend-AutomateNOWTask 
+    
+    .EXAMPLE
+    @( 'Task1', 'Task2', 'Task3') | Suspend-AutomateNOWTask 
+
+    .EXAMPLE
+    Get-AutomateNOWTask | ? { $_.serverTaskType -eq 'LINUX' } | Suspend-AutomateNOWTask 
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
+        [ANOWTask]$Task,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [string]$command = '/processing/hold'
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Task.id)")) -eq $true) {
+            If ($_.id.Length -gt 0) {
+                [string]$Task_id = $_.id
+            }
+            ElseIf ($Task.id.Length -gt 0) {
+                [string]$Task_id = $Task.id
+            }
+            Else {
+                [string]$Task_id = $Id
+            }
+            ## Begin warning ##
+            ## Do not tamper with this below code which makes sure that the object does not previously exist before attempting to create it. This is a critical check with the console handles for you.
+            $Error.Clear()
+            Try {
+                [ANOWTask]$current_task = Get-AutomateNOWTask -Id $Task_id
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Get-AutomateNOWTask failed to check if the Task [$Task_id] existed under Resume-AutomateNOWTask due to [$Message]."
+                Break
+            }
+            If ($current_task.id.length -eq 0) {
+                Write-Warning "The Task you specified does not seem to exist (Resume-AutomateNOWTask)"
+                Break
+            }
+            [boolean]$current_task_hold_status = $current_task.onHold
+            If ($current_task_hold_status -eq $true) {
+                Write-Warning -Message "[$Task_id] cannot be suspended (placed on hold) as it is already suspended (on hold)"
+                Break
+            }
+            ## End warning ##
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.Add('id', $Task_id )
+            $BodyMetaData.Add('_operationType', 'update')
+            $BodyMetaData.Add('_operationId', 'hold')
+            $BodyMetaData.Add('_textMatchStyle', 'exact')
+            $BodyMetaData.Add('_dataSource', 'ProcessingDataSource')
+            $BodyMetaData.Add('isc_metaDataPrefix', '_')
+            $BodyMetaData.Add('isc_dataFormat', 'json')
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            $parameters.Add('Body', $Body)
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$Task_id] due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            }
+            Write-Verbose -Message "Task $Task_id successfully suspended (placed on hold)"
+        }
+    }
+    End {
+
+    }
+}
+
+Function Skip-AutomateNOWTask {
+    <#
+    .SYNOPSIS
+    Sets or unsets the Skip flag on a Task on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Sets or unsets the Skip flag on a Task on an AutomateNOW! instance
+
+    .PARAMETER Task
+    An [ANOWTask] object representing the Task to be set to skipped or unskipped
+
+    .PARAMETER UnSkip
+    Removes the skip flag from an [ANOWTask] object. This is the opposite of the default behavior.
+
+    .PARAMETER Force
+    Force the change without confirmation. This is equivalent to -Confirm:$false
+
+    .PARAMETER Quiet
+    Switch parameter to silence the emitted [ANOWTask] object
+
+    .INPUTS
+    ONLY [ANOWTask] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    The skipped/unskipped [ANOWTask] object will be returned
+
+    .EXAMPLE
+    Sets a Task to Skip (bypass)
+
+    Get-AutomateNOWTask -Id 1234567 | Skip-AutomateNOWTask -Force
+
+    .EXAMPLE
+    Unsets the Skip (bypass) flag on a Task
+
+    12374894 | Get-AutomateNOWTask | Skip-AutomateNOWTask -UnSkip
+
+    .EXAMPLE
+    Sets an array of Task to Skip (bypass)
+
+    @( 'Task1', 'Task2', 'Task3') | Skip-AutomateNOWTask 
+
+    .EXAMPLE
+    Get-AutomateNOWTask | ? { $_.TaskType -eq 'FOR_EACH' } | Skip-AutomateNOWTask -UnSkip -Force -Quiet
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $false, ValueFromPipeline = $True)]
+        [ANOWTask]$Task,
+        [Parameter(Mandatory = $false)]
+        [switch]$UnSkip,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        If ($UnSkip -ne $True) {
+            [string]$skip_flag_status = 'On'
+            [string]$operation_id = 'passByOn'
+            [string]$ProcessDescription = 'Add the Skip flag'
+        }
+        Else {
+            [string]$skip_flag_status = 'Off'
+            [string]$operation_id = 'passByOff'
+            [string]$ProcessDescription = 'Remove the Skip flag'
+        }
+        [string]$command = ('/processing/' + $operation_id)
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [string]$Task_id = $_.id
+        }
+        ElseIf ($Task.id.Length -gt 0) {
+            [string]$Task_id = $Task.id
+        }
+        Else {
+            [string]$Task_id = $Id
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess($Task_id, $ProcessDescription)) -eq $true) {
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.Add('id', $Task_id )
+            $BodyMetaData.Add('_operationType', 'update')
+            $BodyMetaData.Add('_operationId', $operation_id)
+            $BodyMetaData.Add('_textMatchStyle', 'exact')
+            $BodyMetaData.Add('_dataSource', 'ProcessingDataSource')
+            $BodyMetaData.Add('isc_metaDataPrefix', '_')
+            $BodyMetaData.Add('isc_dataFormat', 'json')
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            $parameters.Add('Body', $Body)
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$Task_id] due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            }
+            Write-Verbose -Message "Successfully set the skip flag to [$skip_flag_status] on [$Task_id]"
+        }
+    }
+    End {
+
     }
 }
 
@@ -6672,7 +7353,7 @@ Function New-AutomateNOWTaskTemplate {
             Break
         }
         If ($workspace_object.simpleId.Length -eq 0) {
-            Throw "Get-AutomateNOWWorkspace failed to locate the Workspace [$Workspace] running under New-AutomateNOWWorkflowTemplate. Please check again."
+            Throw "Get-AutomateNOWWorkspace failed to locate the Workspace [$Workspace] running under New-AutomateNOWTaskTemplate. Please check again."
             Break
         }
         [string]$workspace_display = $workspace_object | ConvertTo-Json -Compress
@@ -6691,7 +7372,7 @@ Function New-AutomateNOWTaskTemplate {
             Break
         }
         If ($code_repository_object.simpleId.Length -eq 0) {
-            Throw "Get-AutomateNOWCodeRepository failed to locate the Code Repository [$CodeRepository] running under New-AutomateNOWWorkflowTemplate. Please check again."
+            Throw "Get-AutomateNOWCodeRepository failed to locate the Code Repository [$CodeRepository] running under New-AutomateNOWTaskTemplate. Please check again."
             Break
         }
         [string]$code_repository_display = $code_repository_object | ConvertTo-Json -Compress
@@ -7325,6 +8006,7 @@ Function Start-AutomateNOWTaskTemplate {
         $BodyMetaData.Add('priority', $priority )
         $BodyMetaData.Add('processingTimestamp', [string](Get-Date -Date ((Get-Date).ToUniversalTime()) -Format 'yyyy-MM-ddTHH:mm:ss.fff'))
         [string[]]$include_properties = 'id', 'runId', 'priority', 'processingTimestamp', 'hold', 'forceLoad', 'name'
+        
         If ($Tags.Count -gt 0) {
             ForEach ($tag_id in $Tags) {
                 $Error.Clear()
@@ -8317,25 +8999,43 @@ Function Get-AutomateNOWUser {
             Else {
                 [ANOWTimeZone]$defaultTimeZone = Get-AutomateNOWTimeZone -Id ($results_response_data.defaultTimeZone)
             }
-            $results_response_data.defaultTimeZone = $defaultTimeZone
+            If ($Null -eq $results_response_data.defaultTimeZone) {
+                $results_response_data | Add-Member -MemberType NoteProperty -Name defaultTimeZone -Value $defaultTimeZone
+            }
+            Else {
+                $results_response_data.defaultTimeZone = $defaultTimeZone
+            }
             [ANOWSecurityRole[]]$secRoles2 = ForEach ($secRole in $results_response_data.secRoles) {
                 [ANOWDomainRole[]]$domain_roles = $secRole.domainRoles
                 $secRole.domainRoles = $domain_roles
                 $secRole
             }
             $results_response_data.secRoles = $secRoles2
-            $Error.Clear()
-            Try {
-                [ANOWUser]$ANOWUser = $results_response_data
+            If ($LoggedOnUser -eq $true) {
+                $Error.Clear()
+                Try {
+                    [ANOWUserInfo]$ANOWUser = $results_response_data
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Failed to convert the returned [ANOWUser] object from response data for [$id] due to [$Message]."
+                    Break
+                }
+    
             }
-            Catch {
-                [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Failed to convert the returned [ANOWUser] object from response data for [$id] due to [$Message]."
-                Break
+            Else {
+                $Error.Clear()
+                Try {
+                    [ANOWUser]$ANOWUser = $results_response_data
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Failed to convert the returned [ANOWUser] object from response data for [$id] due to [$Message]."
+                    Break
+                }    
             }
         }
         Else {
-            $Error.Clear()
             [string]$id = $results.id
             If ($null -ne $results.defaultTimeZone) {
                 [ANOWTimeZone]$defaultTimeZone = Get-AutomateNOWTimeZone -Id ($results.defaultTimeZone)
@@ -8345,13 +9045,26 @@ Function Get-AutomateNOWUser {
             }
             $results.'defaultTimeZone' = $defaultTimeZone
             $results.'secRoles' = @()
-            Try {
-                [ANOWUser]$ANOWUser = $results
+            $Error.Clear()
+            If ($LoggedOnUser -eq $true) {
+                Try {
+                    [ANOWUserInfo]$ANOWUser = $results
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Failed to convert the returned [ANOWUser] object from direct data for [$id] due to [$Message]."
+                    Break
+                }
             }
-            Catch {
-                [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Failed to convert the returned [ANOWUser] object from direct data for [$id] due to [$Message]."
-                Break
+            Else {
+                Try {
+                    [ANOWUser]$ANOWUser = $results
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Failed to convert the returned [ANOWUser] object from direct data for [$id] due to [$Message]."
+                    Break
+                }
             }
         }
         If ($ANOWUser.id.Length -gt 0) {
@@ -8549,7 +9262,6 @@ Function Get-AutomateNOWWorkflow {
         }
         $Body.'_operationType' = 'fetch'
         $Body.'_textMatchStyle' = 'substring'
-        #$Body.'_componentId' = 'ProcessingItemList'
         $Body.'_componentId' = 'ProcessingList'
         $Body.'_dataSource' = 'ProcessingDataSource'
         $Body.'isc_metaDataPrefix' = '_'
@@ -8584,8 +9296,6 @@ Function Get-AutomateNOWWorkflow {
                 Break
             }
         }
-        #worklog - workflows are in fact, tasks
-        
         $Error.Clear()
         Try {
             [ANOWWorkflow[]]$workflows = $results.response.data
@@ -8685,6 +9395,665 @@ Function Export-AutomateNOWWorkflow {
             [string]$filelength_display = "{0:N0}" -f $filelength
             Write-Information -MessageData "Created file $ExportFileName ($filelength_display bytes)"
         }
+    }
+}
+
+Function Restart-AutomateNOWWorkflow {
+    <#
+    .SYNOPSIS
+    Restarts a Workflow from an AutomateNOW! instance
+
+    .DESCRIPTION
+    Restarts a Workflow from an AutomateNOW! instance
+
+    .PARAMETER Workflow
+    An [ANOWWorkflow] object representing the Workflow to be restarted
+
+    .PARAMETER Quiet
+    Switch parameter to omit the informational message if the Restart was successful
+
+    .PARAMETER Force
+    Force the restart without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    ONLY [ANOWWorkflow] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    An informational message is written to the screen unless -Quiet is used
+
+    .EXAMPLE
+    Restarts a single Workflow
+
+    Get-AutomateNOWWorkflow -Id 'Workflow_01' | Restart-AutomateNOWWorkflow
+
+    .EXAMPLE
+    Quietly restarts multiple Workflows
+
+    @('Workflow1', 'Workflow2') | Get-AutomateNOWWorkflow | Restart-AutomateNOWWorkflow -Quiet
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
+        [ANOWWorkflow]$Workflow,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [string]$command = '/processing/restart'
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Workflow.id)")) -eq $true) {
+            If ($_.id -gt 0) {
+                [int64]$Workflow_id = $_.id
+            
+            }
+            Else {
+                [int64]$Workflow_id = $Workflow.id
+            }
+            ## Begin warning ##
+            ## Do not tamper with this below code which makes sure that the object does not previously exist before attempting to create it. This is a critical check with the console handles for you.
+            $Error.Clear()
+            Try {
+                [ANOWWorkflow]$current_workflow = Get-AutomateNOWWorkflow -Id $Workflow_id
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Get-AutomateNOWWorkflow failed to check if the Workflow [$Workflow_id] existed under Restart-AutomateNOWWorkflow due to [$Message]."
+                Break
+            }
+            If ($current_workflow.id.length -eq 0) {
+                Write-Warning "The Workflow you specified does not seem to exist (Restart-AutomateNOWWorkflow)"
+                Break
+            }
+            [string]$current_workflow_status = $current_workflow.processingStatus
+            If ($current_workflow_status -notin [ANOWWorkflow_processingStatus].GetEnumNames()) {
+                Write-Warning -Message "Somehow the processing status of the Workflow [$Workflow_id] cannot be read (Restart-AutomateNOWWorkflow)"
+                Break
+            }
+            If ($current_workflow_status -notin @('COMPLETED', 'FAILED')) {            
+                Write-Warning -Message "[$Workflow_id] cannot be restarted as it currently in [$current_workflow_status] processing status"
+                Break
+            }
+            Else {
+                Write-Verbose -Message "[$Workflow_id] had a status of $current_workflow_status"
+            }
+            ## End warning ##
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.Add('restartType', 'RESTART_FROM_BEGINNING')
+            $BodyMetaData.Add('restartFailedOnly', 'false' ) # Note this value is currently not available in the console
+            $BodyMetaData.Add('id', $Workflow_id )
+            $BodyMetaData.Add('_operationType', 'custom')
+            $BodyMetaData.Add('_operationId', 'restart')
+            $BodyMetaData.Add('_textMatchStyle', 'exact')
+            $BodyMetaData.Add('_dataSource', 'ProcessingDataSource')
+            $BodyMetaData.Add('isc_metaDataPrefix', '_')
+            $BodyMetaData.Add('isc_dataFormat', 'json')
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            If ($null -eq $parameters.Body) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$Workflow_id] due to [$Message]."
+                Break
+            }    
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            }
+            If ($Quiet -ne $true) {
+                Write-Information -MessageData "Workflow $Workflow_id was successfully restarted"
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+Function Stop-AutomateNOWWorkflow {
+    <#
+    .SYNOPSIS
+    Stops a Workflow on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Stops a Workflow on an AutomateNOW! instance with either a soft or hard stop
+
+    .PARAMETER Workflow
+    An [ANOWWorkflow] object representing the Workflow to be stopped
+
+    .PARAMETER Kill
+    Switch parameter to indicate 'Hard kill' of the Workflow. You must include either this parameter or -Abort
+    
+    .PARAMETER Abort
+    Switch parameter to indicate 'Soft abort' of the Workflow. You must include either this parameter or -Kill
+    
+    .PARAMETER Quiet
+    Switch parameter to omit the informational message if the stop was successful
+
+    .PARAMETER Force
+    Force the stoppage without confirmation. This is equivalent to -Confirm:$false
+    
+    .INPUTS
+    ONLY [ANOWWorkflow] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    An informational message is written to the screen unless -Quiet is used
+
+    .EXAMPLE
+    Stops a single Workflow
+
+    Get-AutomateNOWWorkflow -Id 'Workflow_01' | Stop-AutomateNOWWorkflow -Abort
+
+    .EXAMPLE
+    Quietly stops multiple Workflows
+
+    @('Workflow1', 'Workflow2') | Get-AutomateNOWWorkflow | Stop-AutomateNOWWorkflow -Kill -Quiet
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
+        [ANOWWorkflow]$Workflow,
+        [Parameter(Mandatory = $true, ParameterSetName = 'Kill')]
+        [switch]$Kill,
+        [Parameter(Mandatory = $true, ParameterSetName = 'Abort')]
+        [switch]$Abort,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        If ($Kill -eq $true) {
+            [string]$operation_id = 'kill'
+        }
+        Else {
+            [string]$operation_id = 'abort'   
+        }
+        [string]$command = ('/processing/' + $operation_id)
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Workflow.id)")) -eq $true) {
+            If ($_.id -gt 0) {
+                [int64]$Workflow_id = $_.id
+            
+            }
+            Else {
+                [int64]$Workflow_id = $Workflow.id
+            }
+            ## Begin warning ##
+            ## Do not tamper with this below code which makes sure that the object does not previously exist before attempting to create it. This is a critical check with the console handles for you.
+            $Error.Clear()
+            Try {
+                [ANOWWorkflow]$current_workflow = Get-AutomateNOWWorkflow -Id $Workflow_id
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Get-AutomateNOWWorkflow failed to check if the Workflow [$Workflow_id] existed under Restart-AutomateNOWWorkflow due to [$Message]."
+                Break
+            }
+            If ($current_workflow.id.length -eq 0) {
+                Write-Warning "The Workflow you specified does not seem to exist (Stop-AutomateNOWWorkflow)"
+                Break
+            }
+            [string]$current_workflow_status = $current_workflow.processingStatus
+            If ($current_workflow_status -notin [ANOWWorkflow_processingStatus].GetEnumNames()) {
+                Write-Warning -Message "Somehow the processing status of the Workflow [$Workflow_id] cannot be read (Stop-AutomateNOWWorkflow)"
+                Break
+            }
+            If ($current_workflow_status -in @('COMPLETED', 'FAILED')) {            
+                Write-Warning -Message "[$Workflow_id] cannot be stopped as it currently in [$current_workflow_status] processing status"
+                Break
+            }
+            Else {
+                Write-Verbose -Message "[$Workflow_id] had a status of $current_workflow_status"
+            }
+            ## End warning ##
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.Add('id', $Workflow_id )
+            $BodyMetaData.Add('_operationType', 'custom')
+            $BodyMetaData.Add('_operationId', $operation_id)
+            $BodyMetaData.Add('_textMatchStyle', 'exact')
+            $BodyMetaData.Add('_dataSource', 'ProcessingDataSource')
+            $BodyMetaData.Add('isc_metaDataPrefix', '_')
+            $BodyMetaData.Add('isc_dataFormat', 'json')
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            If ($null -eq $parameters.Body) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$Workflow_id] due to [$Message]."
+                Break
+            }    
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            }
+            If ($Quiet -ne $true) {
+                Write-Information -MessageData "Workflow $Workflow_id was successfully stopped"
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+Function Resume-AutomateNOWWorkflow {
+    <#
+    .SYNOPSIS
+    Resumes a Workflow that is on hold (suspended) on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Resumes a Workflow that is on hold (suspended) on an AutomateNOW! instance
+
+    .PARAMETER Workflow
+    An [ANOWWorkflow] object representing the Workflow to be resumed
+
+    .PARAMETER Force
+    Force the change without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    ONLY [ANOWWorkflow] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    A verbose information message will be sent indicating success
+
+    .EXAMPLE
+    Get-AutomateNOWWorkflow -Id 'Workflow01' | Resume-AutomateNOWWorkflow -Force
+
+    .EXAMPLE
+    Get-AutomateNOWWorkflow -Id 'Workflow01', 'Workflow02' | Resume-AutomateNOWWorkflow 
+
+    .EXAMPLE
+    @( 'Workflow1', 'Workflow2', 'Workflow3') | Resume-AutomateNOWWorkflow 
+
+    .EXAMPLE
+    Get-AutomateNOWWorkflow | ? { $_.serverWorkflowType -eq 'LINUX' } | Resume-AutomateNOWWorkflow
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $True, ValueFromPipeline = $True)]
+        [ANOWWorkflow]$Workflow,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [string]$command = '/processing/resume'
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Workflow.id)")) -eq $true) {
+            If ($_.id.Length -gt 0) {
+                [int64]$Workflow_id = $_.id
+            }
+            ElseIf ($Workflow.id.Length -gt 0) {
+                [int64]$Workflow_id = $Workflow.id
+            }
+            Else {
+                Write-Warning -Message "Unable to determine the Id of the Workflow."
+                Break
+            }
+            ## Begin warning ##
+            ## Do not tamper with this below code which makes sure that the object does not previously exist before attempting to create it. This is a critical check with the console handles for you.
+            $Error.Clear()
+            Try {
+                [ANOWWorkflow]$current_workflow = Get-AutomateNOWWorkflow -Id $Workflow_id
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Get-AutomateNOWWorkflow failed to check if the Workflow [$Workflow_id] existed under Resume-AutomateNOWWorkflow due to [$Message]."
+                Break
+            }
+            If ($current_workflow.id.length -eq 0) {
+                Write-Warning "The Workflow you specified does not seem to exist (Resume-AutomateNOWWorkflow)"
+                Break
+            }
+            [boolean]$current_workflow_hold_status = $current_workflow.onHold
+            If ($current_workflow_hold_status -eq $false) {
+                Write-Warning -Message "[$Workflow_id] cannot be resumed as it is not currently suspended (on hold)"
+                Break
+            }
+            ## End warning ##
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.Add('id', $Workflow_id )
+            $BodyMetaData.Add('_operationType', 'update')
+            $BodyMetaData.Add('_operationId', 'resume')
+            $BodyMetaData.Add('_textMatchStyle', 'exact')
+            $BodyMetaData.Add('_dataSource', 'ProcessingDataSource')
+            $BodyMetaData.Add('isc_metaDataPrefix', '_')
+            $BodyMetaData.Add('isc_dataFormat', 'json')
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            $parameters.Add('Body', $Body)
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$Workflow_id] due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            }
+            Write-Verbose -Message "Workflow $Workflow_id successfully resumed"
+        }
+    }
+    End {
+
+    }
+}
+
+Function Suspend-AutomateNOWWorkflow {
+    <#
+    .SYNOPSIS
+    Places a Workflow on hold (suspend) from execution on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Places a Workflow on hold (suspend) from execution on an AutomateNOW! instance
+
+    .PARAMETER Workflow
+    An [ANOWWorkflow] object representing the Workflow to be suspended (placed on hold)
+
+    .PARAMETER Force
+    Force the change without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    ONLY [ANOWWorkflow] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    A verbose information message will be sent indicating success
+
+    .EXAMPLE
+    Get-AutomateNOWWorkflow -Id 'Workflow01' | Suspend-AutomateNOWWorkflow -Force
+
+    .EXAMPLE
+    Get-AutomateNOWWorkflow -Id 'Workflow01', 'Workflow02' | Suspend-AutomateNOWWorkflow 
+    
+    .EXAMPLE
+    @( 'Workflow1', 'Workflow2', 'Workflow3') | Suspend-AutomateNOWWorkflow 
+
+    .EXAMPLE
+    Get-AutomateNOWWorkflow | ? { $_.serverWorkflowType -eq 'LINUX' } | Suspend-AutomateNOWWorkflow 
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
+        [ANOWWorkflow]$Workflow,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [string]$command = '/processing/hold'
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Workflow.id)")) -eq $true) {
+            If ($_.id.Length -gt 0) {
+                [string]$Workflow_id = $_.id
+            }
+            ElseIf ($Workflow.id.Length -gt 0) {
+                [string]$Workflow_id = $Workflow.id
+            }
+            Else {
+                [string]$Workflow_id = $Id
+            }
+            ## Begin warning ##
+            ## Do not tamper with this below code which makes sure that the object does not previously exist before attempting to create it. This is a critical check with the console handles for you.
+            $Error.Clear()
+            Try {
+                [ANOWWorkflow]$current_workflow = Get-AutomateNOWWorkflow -Id $Workflow_id
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Get-AutomateNOWWorkflow failed to check if the Workflow [$Workflow_id] existed under Resume-AutomateNOWWorkflow due to [$Message]."
+                Break
+            }
+            If ($current_workflow.id.length -eq 0) {
+                Write-Warning "The Workflow you specified does not seem to exist (Resume-AutomateNOWWorkflow)"
+                Break
+            }
+            [boolean]$current_workflow_hold_status = $current_workflow.onHold
+            If ($current_workflow_hold_status -eq $true) {
+                Write-Warning -Message "[$Workflow_id] cannot be suspended (placed on hold) as it is already suspended (on hold)"
+                Break
+            }
+            ## End warning ##
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.Add('id', $Workflow_id )
+            $BodyMetaData.Add('_operationType', 'update')
+            $BodyMetaData.Add('_operationId', 'hold')
+            $BodyMetaData.Add('_textMatchStyle', 'exact')
+            $BodyMetaData.Add('_dataSource', 'ProcessingDataSource')
+            $BodyMetaData.Add('isc_metaDataPrefix', '_')
+            $BodyMetaData.Add('isc_dataFormat', 'json')
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            $parameters.Add('Body', $Body)
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$Workflow_id] due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            }
+            Write-Verbose -Message "Workflow $Workflow_id successfully suspended (placed on hold)"
+        }
+    }
+    End {
+
+    }
+}
+
+Function Skip-AutomateNOWWorkflow {
+    <#
+    .SYNOPSIS
+    Sets or unsets the Skip flag on a Workflow on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Sets or unsets the Skip flag on a Workflow on an AutomateNOW! instance
+
+    .PARAMETER Workflow
+    An [ANOWWorkflow] object representing the Workflow to be set to skipped or unskipped
+
+    .PARAMETER UnSkip
+    Removes the skip flag from an [ANOWWorkflow] object. This is the opposite of the default behavior.
+
+    .PARAMETER Force
+    Force the change without confirmation. This is equivalent to -Confirm:$false
+
+    .PARAMETER Quiet
+    Switch parameter to silence the emitted [ANOWWorkflow] object
+
+    .INPUTS
+    ONLY [ANOWWorkflow] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    The skipped/unskipped [ANOWWorkflow] object will be returned
+
+    .EXAMPLE
+    Sets a Workflow to Skip (bypass)
+
+    Get-AutomateNOWWorkflow -Id 'Workflow01' | Skip-AutomateNOWWorkflow -Force
+
+    .EXAMPLE
+    Unsets the Skip (bypass) flag on a Workflow
+
+    Get-AutomateNOWWorkflow | Skip-AutomateNOWWorkflow -UnSkip
+
+    .EXAMPLE
+    Sets an array of Workflows to Skip (bypass)
+
+    @( 1234567, 2345678, 34567890) | Skip-AutomateNOWWorkflow 
+
+    .EXAMPLE
+    Get-AutomateNOWWorkflow | ? { $_.workflowType -eq 'FOR_EACH' } | Skip-AutomateNOWWorkflow -UnSkip -Force -Quiet
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $false, ValueFromPipeline = $True)]
+        [ANOWWorkflow]$Workflow,
+        [Parameter(Mandatory = $false)]
+        [switch]$UnSkip,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        If ($UnSkip -ne $True) {
+            [string]$skip_flag_status = 'On'
+            [string]$operation_id = 'passByOn'
+            [string]$ProcessDescription = 'Add the Skip flag'
+        }
+        Else {
+            [string]$skip_flag_status = 'Off'
+            [string]$operation_id = 'passByOff'
+            [string]$ProcessDescription = 'Remove the Skip flag'
+        }
+        [string]$command = ('/processing/' + $operation_id)
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [string]$Workflow_id = $_.id
+        }
+        ElseIf ($Workflow.id.Length -gt 0) {
+            [string]$Workflow_id = $Workflow.id
+        }
+        Else {
+            [string]$Workflow_id = $Id
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess($Workflow_id, $ProcessDescription)) -eq $true) {
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.Add('id', $Workflow_id )
+            $BodyMetaData.Add('_operationType', 'update')
+            $BodyMetaData.Add('_operationId', $operation_id)
+            $BodyMetaData.Add('_textMatchStyle', 'exact')
+            $BodyMetaData.Add('_dataSource', 'ProcessingDataSource')
+            $BodyMetaData.Add('isc_metaDataPrefix', '_')
+            $BodyMetaData.Add('isc_dataFormat', 'json')
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            $parameters.Add('Body', $Body)
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$Workflow_id] due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            }
+            Write-Verbose -Message "Successfully set the skip flag to [$skip_flag_status] on [$Workflow_id]"
+        }
+    }
+    End {
+
     }
 }
 
@@ -9785,6 +11154,7 @@ Function Start-AutomateNOWWorkflowTemplate {
                 }
                 [string]$tag_display = $tag_object | ConvertTo-Json -Compress
                 Write-Verbose -Message "Adding tag $tag_display [$current_tag of $total_tags]"
+                #>
                 [string]$tag_name_sequence = ('tags' + $current_tag)
                 $ANOWWorkflowTemplate.Add($tag_name_sequence, $tag_id)
                 $include_properties += $tag_name_sequence
@@ -9978,16 +11348,16 @@ Function Resume-AutomateNOWWorkflowTemplate {
             }
             $Error.Clear()
             Try {
-                [ANOWWorkflowTemplate]$resumed_task_template = $results.response.data[0]
+                [ANOWWorkflowTemplate]$resumed_Workflow_template = $results.response.data[0]
             }
             Catch {
                 [string]$Message = $_.Exception.Message
                 Write-Warning -Message "Failed to create the [ANOWWorkflowTemplate] object after resuming [$WorkflowTemplate_id] due to [$Message]."
                 Break
             }
-            Write-Verbose -Message "Task $WorkflowTemplate_id successfully resumed"
+            Write-Verbose -Message "Workflow $WorkflowTemplate_id successfully resumed"
             If ($Quiet -ne $true) {
-                Return $resumed_task_template
+                Return $resumed_Workflow_template
             }
         }
     }
@@ -10020,16 +11390,16 @@ Function Suspend-AutomateNOWWorkflowTemplate {
     The suspended [ANOWWorkflowTemplate] object will be returned
 
     .EXAMPLE
-    Get-AutomateNOWWorkflowTemplate -Id 'Task01' | Suspend-AutomateNOWWorkflowTemplate -Force
+    Get-AutomateNOWWorkflowTemplate -Id 'Workflow01' | Suspend-AutomateNOWWorkflowTemplate -Force
 
     .EXAMPLE
-    Get-AutomateNOWWorkflowTemplate -Id 'Task01', 'Task02' | Suspend-AutomateNOWWorkflowTemplate 
+    Get-AutomateNOWWorkflowTemplate -Id 'Workflow01', 'Workflow02' | Suspend-AutomateNOWWorkflowTemplate 
 
     .EXAMPLE
-    @( 'Task1', 'Task2', 'Task3') | Suspend-AutomateNOWWorkflowTemplate 
+    @( 'Workflow1', 'Workflow2', 'Workflow3') | Suspend-AutomateNOWWorkflowTemplate 
 
     .EXAMPLE
-    Get-AutomateNOWWorkflowTemplate | ? { $_.serverTaskType -eq 'LINUX' } | Suspend-AutomateNOWWorkflowTemplate 
+    Get-AutomateNOWWorkflowTemplate | ? { $_.serverWorkflowType -eq 'LINUX' } | Suspend-AutomateNOWWorkflowTemplate 
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
@@ -10095,16 +11465,16 @@ Function Suspend-AutomateNOWWorkflowTemplate {
             }
             $Error.Clear()
             Try {
-                [ANOWWorkflowTemplate]$suspended_task_template = $results.response.data[0]
+                [ANOWWorkflowTemplate]$suspended_Workflow_template = $results.response.data[0]
             }
             Catch {
                 [string]$Message = $_.Exception.Message
                 Write-Warning -Message "Failed to create the [ANOWWorkflowTemplate] object after suspending [$WorkflowTemplate_id] due to [$Message]."
                 Break
             }
-            Write-Verbose -Message "Task $WorkflowTemplate_id successfully suspended (placed on hold)"
+            Write-Verbose -Message "Workflow $WorkflowTemplate_id successfully suspended (placed on hold)"
             If ($Quiet -ne $true) {
-                Return $suspended_task_template
+                Return $suspended_Workflow_template
             }
         }
     }
@@ -10142,7 +11512,7 @@ Function Skip-AutomateNOWWorkflowTemplate {
     .EXAMPLE
     Sets a Workflow Template to Skip (bypass)
 
-    Get-AutomateNOWWorkflowTemplate -Id 'Task01' | Skip-AutomateNOWWorkflowTemplate -Force
+    Get-AutomateNOWWorkflowTemplate -Id 'WorkflowTemplate01' | Skip-AutomateNOWWorkflowTemplate -Force
 
     .EXAMPLE
     Unsets the Skip (bypass) flag on a Workflow Template
@@ -10371,6 +11741,18 @@ Function Get-AutomateNOWWorkspace {
     .PARAMETER Id
     Optional string containing the simple id of the Workspace to fetch or you can pipeline a series of simple id strings. You may not enter an array here.
 
+    .PARAMETER sortBy
+    Optional string parameter to sort the results by. Valid choices are: id {To be continued...}
+
+    .PARAMETER Descending
+    Optional switch parameter to sort in descending order
+
+    .PARAMETER startRow
+    Optional integer to indicate the row to start from. This is intended for when you need to paginate the results. Default is 0.
+
+    .PARAMETER endRow
+    Optional integer to indicate the row to stop on. This is intended for when you need to paginate the results. Default is 2000.
+
     .INPUTS
     Accepts a string representing the simple id of the Workspace from the pipeline or individually (but not an array).
 
@@ -10378,12 +11760,18 @@ Function Get-AutomateNOWWorkspace {
     An array of one or more [ANOWWorkspace] class objects
 
     .EXAMPLE
+    Gets all Workspaces
+
     Get-AutomateNOWWorkspace
 
     .EXAMPLE
+    Gets a single Workspace
+
     Get-AutomateNOWWorkspace -Id 'Workspace1'
 
     .EXAMPLE
+    Gets a series of Workspaces from an array of strings sent across the pipeline
+
     @( 'Workspace1', 'Workspace2' ) | Get-AutomateNOWWorkspace
 
     .NOTES
@@ -10395,8 +11783,17 @@ Function Get-AutomateNOWWorkspace {
     [OutputType([ANOWWorkspace[]])]
     [Cmdletbinding()]
     Param(
+        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
         [Parameter(Mandatory = $False, ValueFromPipeline = $true)]
-        [string]$Id
+        [string]$Id,
+        [Parameter(Mandatory = $False)]
+        [int32]$startRow = 0,
+        [Parameter(Mandatory = $False)]
+        [int32]$endRow = 100,
+        [Parameter(Mandatory = $False)]
+        [string]$sortBy = 'id',
+        [Parameter(Mandatory = $False)]
+        [switch]$Descending
     )
     Begin {
         If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
@@ -10410,6 +11807,7 @@ Function Get-AutomateNOWWorkspace {
         }    
     }
     Process {
+        [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
         If ($_.Length -gt 0 -or $Id.Length -gt 0) {
             If ($_.Length -gt 0 ) {
                 [string]$Workspacename = $_
@@ -10417,17 +11815,31 @@ Function Get-AutomateNOWWorkspace {
             Else {
                 [string]$Workspacename = $Id
             }
-            [string]$command = ('/workspace/read?id=' + $Workspacename)
+            [string]$textMatchStyle = 'exact'
+            $Body.'id' = $Workspacename
         }
         Else {
-            [string]$command = '/workspace/read'
+            [string]$textMatchStyle = 'substring'
+            $Body.'_constructor' = 'AdvancedCriteria'
+            $Body.'operator' = 'and'
         }
-        If ($null -eq $parameters["Command"]) {
-            $parameters.Add('Command', $command)
+        $Body.'_operationType' = 'fetch'
+        $Body.'_startRow' = $startRow
+        $Body.'_endRow' = $endRow
+        $Body.'_textMatchStyle' = $textMatchStyle
+        $Body.'_componentId' = 'WorkspaceList'
+        $Body.'_dataSource' = 'workspace'
+        If ($Descending -eq $true) {
+            $Body.'_sortBy' = '-' + $sortBy
         }
         Else {
-            $parameters.Command = $command
+            $Body.'_sortBy' = $sortBy
         }
+        $Body.'isc_metaDataPrefix' = '_'
+        $Body.'isc_dataFormat' = 'json'
+        [string]$Body = ConvertTo-QueryString -InputObject $Body
+        [string]$command = ('/workspace/read?' + $Body)
+        $parameters.Add('command', $command)
         $Error.Clear()
         Try {
             [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
@@ -10451,7 +11863,7 @@ Function Get-AutomateNOWWorkspace {
         }
         $Error.Clear()
         Try {
-            [ANOWWorkspace[]]$Workspaces = $formatted_results
+            [ANOWWorkspace[]]$Workspaces = $results.response.data
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -10980,6 +12392,7 @@ Function Remove-AutomateNOWWorkspace {
 
     }
 }
+
 
 #endregion
 

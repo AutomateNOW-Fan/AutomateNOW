@@ -5,7 +5,7 @@
 ![image](usage-example.png)
 
 ```
-Created by Mike Simpson (DHL IT Services)
+Created by AutomateNOW-Fan
 ```
 ```
 ⚠ Not affiliated with InfiniteDATA
@@ -33,9 +33,16 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 
 This module has been tested against the below versions of AutomateNOW!
 
-- 3.3.1.75HF1
+- 3.3.1.75HF3
 <br/><br/>
 ## Change Log 📝
+
+## 1.0.12
+- Added new functions: `Export-AutomateNOWAuditLog`, `Get-AutomateNOWAuditLog`, `Set-AutomateNOWUser`
+- Aligned `Get-AutomateNOWWorkspace` with the other Get-* functions
+- Updated and fixed the help examples for many functions
+- `Get-AutomateNOWDomain` is now capable of retrieving a single domain
+- `Get-AutomateNOWUser` is now capable of retrieving all users (if permissions exist)
 
 ## 1.0.11
 - Added new functions: `Confirm-AutomateNOWTaskTemplate`, `Confirm-AutomateNOWWorkflowTemplate`, `Copy-AutomateNOWTaskTemplate`, `Export-AutomateNOWCodeRepository`, `Get-AutomateNOWCodeRepository`, `Rename-AutomateNOWTaskTemplate`, `Resolve-AutomateNOWTaskType2ServerNodeType`,`Resume-AutomateNOWTaskTemplate`, `Resume-AutomateNOWWorkflowTemplate`, `Skip-AutomateNOWTaskTemplate`, `Skip-AutomateNOWWorkflowTemplate`, `Start-AutomateNOWNode`, `Start-AutomateNOWTaskTemplate`, `Start-AutomateNOWWorkflowTemplate`, `Stop-AutomateNOWNode`, `Suspend-AutomateNOWTaskTemplate`, `Suspend-AutomateNOWWorkflowTemplate`
@@ -155,6 +162,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Disconnect-AutomateNOW`
 
+`Export-AutomateNOWAuditLog`
+
 `Export-AutomateNOWCodeRepository`
 
 `Export-AutomateNOWDataSource`
@@ -186,6 +195,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Export-AutomateNOWWorkspace`
 
 `Find-AutomateNOWObjectReferral`
+
+`Get-AutomateNOWAuditLog`
 
 `Get-AutomateNOWCodeRepository`
 
@@ -276,6 +287,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Set-AutomateNOWPassword`
 
 `Set-AutomateNOWTag`
+
+`Set-AutomateNOWUser`
 
 `Set-AutomateNOWWorkspace`
 
