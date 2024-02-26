@@ -1,3 +1,5 @@
+Add-Type -AssemblyName Microsoft.PowerShell.Commands.Utility
+
 #Region Enums
 
 #Region - Enum [Icons]
