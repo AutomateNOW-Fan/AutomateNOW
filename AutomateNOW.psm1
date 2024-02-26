@@ -16,7 +16,7 @@ Function Compare-ObjectProperty {
     .EXAMPLE
         $a = New-Object psobject -Prop ([ordered] @{ One = 1; Two = 2})
         $b = New-Object psobject -Prop ([ordered] @{ One = 1; Two = 2; Three = 3})
-compa
+
         Compare-Object $a $b
 
         # would return $null because it only compares the properties that have common names but
@@ -111,6 +111,9 @@ Function ConvertTo-QueryString {
                         [void]$QueryString.AppendFormat('{0}={1}', $ParameterName, [System.Net.WebUtility]::UrlEncode('false'))
                     }
                 }
+                ElseIf ($ParameterName -eq '_oldValues') {
+                    [void]$QueryString.AppendFormat('{0}={1}', $ParameterName, $Item.value)
+                }
                 Else {
                     [void]$QueryString.AppendFormat('{0}={1}', $ParameterName, [System.Net.WebUtility]::UrlEncode($Item.value))
                 }
@@ -164,7 +167,7 @@ Function ConvertTo-QueryString {
             continue
         }
         [string]$Result = $QueryString.ToString()
-        [string]$Result = $Result -replace '\+', '%20' -replace 'criteria[0-9]{1,}=', 'criteria=' -replace 'tags[0-9]{1,}=', 'tags='
+        [string]$Result = $Result -creplace '\+', '%20' -creplace 'criteria[0-9]{1,}=', 'criteria=' -creplace 'setWorkspaceTags[0-9]{1,}=', 'setWorkspaceTags=' -creplace 'tags[0-9]{1,}=', 'tags='        
         Write-Output $Result
     }
 }
@@ -1476,7 +1479,7 @@ Function Set-AutomateNOWPassword {
     }
     If ($results.response.status -eq 0) {
         Write-Information -MessageData "Password successfully changed for $User"
-        [string]$response_display = $results.response | ConvertTo-Json
+        [string]$response_display = $results.response | ConvertTo-Json -Compress
         Write-Verbose -Message $response_display
     }
     ElseIf ($null -eq $results.response.status) {
@@ -1484,7 +1487,7 @@ Function Set-AutomateNOWPassword {
         Break
     }
     Else {
-        [string]$response_display = $results.response | ConvertTo-Json
+        [string]$response_display = $results.response | ConvertTo-Json -Compress
         Write-Warning -Message "The attempt to change the password failed. Please see the returned data: $response_display"
         Break
     }
@@ -1763,8 +1766,12 @@ Function Get-AutomateNOWAuditLog {
         }
     }
     [int32]$AuditLogs_count = $results.response.data.Count
-    If ($AuditLogs_count -eq 0) {
+    If ($AuditLogs_count -eq 0 -and $startRow -eq 0) {
         Write-Warning -Message "Somehow there were 0 AuditLog entries returned. This can't be correct."
+        Break
+    }
+    ElseIf ($AuditLogs_count -eq 0 -and $startRow -gt 0) {
+        Write-Warning -Message "There are not any more rows of data past this point. Please try different -startRow value."
         Break
     }
     $Error.Clear()
@@ -1800,7 +1807,7 @@ Function Get-AutomateNOWAuditLog {
                 }
                 $Error.Clear()
                 Try {
-                    [string]$JSONValues = $ObjectValues | Sort-Object -Property name | ConvertTo-Json -Compress
+                    [string]$JSONValues = $ObjectValues | Sort-Object -Property name | ConvertTo-Json -Compress -Depth 10
                 }
                 Catch {
                     [string]$Message = $_.Exception.Message
@@ -1867,7 +1874,7 @@ Function Export-AutomateNOWAuditLog {
         }
         $Error.Clear()
         Try {
-            $AuditLog | Export-CSV @parameters
+            $AuditLog | Select-Object -ExcludeProperty oldValues, newValues, changedValues | Export-CSV @parameters
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -2563,6 +2570,156 @@ Function Remove-AutomateNOWDataSource {
     }
     End {
 
+    }
+}
+
+Function Set-AutomateNOWDataSource {
+    <#
+
+    .SYNOPSIS
+    Changes the settings of a DataSource on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Changes the settings of a DataSource on an AutomateNOW! instance
+
+    .PARAMETER DataSource
+    An [ANOWDataSource] object representing the DataSource to be changed.
+
+    .PARAMETER Description
+    Optional description of the DataSource (may not exceed 255 characters).
+
+    .PARAMETER Force
+    Force the change without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    ONLY [ANOWDataSource] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    The modified [ANOWDataSource] object will be returned
+
+    .EXAMPLE
+    Changes the settings of a DataSource
+
+    $datasource = Get-AutomateNOWDataSource -Id 'DataSource1'
+    Set-AutomateNOWDataSource -DataSource $datasource -DataType STRING -ErrorHandling INIT -Validity FREE
+    
+    .EXAMPLE
+    Quietly changes the settings of two DataSources by way of the pipeline
+
+    @((Get-AutomateNOWDataSource -Id 'DataSource1'), (Get-AutomateNOWDataSource -Id 'DataSource2')) | Set-AutomateNOWDataSource -DataType NUMBER -ErrorHandling INIT -Validity JOB -Description 'description!' -Force
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    This function is for modifying the settings of a DataSource. Use Add-AutomateNOWDataSourceItem if you want to add a DataSource Item to the DataSource.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
+        [ANOWDataSource]$DataSource,
+        [Parameter(Mandatory = $false)]
+        [ANOWDataSource_dataType]$DataType = 'STRING',
+        [Parameter(Mandatory = $false)]
+        [ANOWDataSource_errorHandling]$ErrorHandling = 'INIT',
+        [Parameter(Mandatory = $false)]
+        [ANOWDataSource_validity]$Validity = 'FREE',
+        [ValidateScript({ $_.Length -le 255 })]
+        [Parameter(Mandatory = $false)]
+        [string]$Description,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [string]$command = '/dataSource/update'
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Folder.id)")) -eq $true) {
+            If ($_.id.Length -gt 0) {
+                [string]$DataSource_id = $_.id
+            }
+            Else {
+                [string]$DataSource_id = $DataSource.id
+            }
+            ## Begin warning ##
+            ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
+            $Error.Clear()
+            Try {
+                [boolean]$DataSource_exists = ($null -eq (Get-AutomateNOWDataSource -Id $DataSource_id))
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Get-AutomateNOWDataSource failed to check if the DataSource [$DataSource_id] already existed due to [$Message]."
+                Break
+            }
+            If ($DataSource_exists -eq $true) {
+                [string]$current_domain = $anow_session.header.domain
+                Write-Warning "There is not a Result Mapping named [$DataSource_id] in the [$current_domain] domain. Please check into this."
+                Break
+            }
+            ## End warning ##
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.'id' = $DataSource_id
+            If ($Description.Length -gt 0) {
+                $BodyMetaData.'description' = $Description
+            }
+            ElseIf ($DataSource.description.length -gt 0) {
+                $BodyMetaData.'description' = $DataSource.description
+            }
+            If ($DataSource.codeRepository.Length -gt 0) {
+                $BodyMetaData.'codeRepository' = $DataSource.codeRepository
+            }
+            Else {
+                $BodyMetaData.'codeRepository' = $null
+            }
+            $BodyMetaData.'validity' = $Validity
+            $BodyMetaData.'errorHandling' = $ErrorHandling
+            $BodyMetaData.'dataType' = $DataType
+            $BodyMetaData.'_oldValues' = $DataSource.CreateOldValues()
+            $BodyMetaData.'_operationType' = 'update'
+            $BodyMetaData.'_textMatchStyle' = 'exact'
+            $BodyMetaData.'_componentId' = 'DataSourceValuesManager'
+            $BodyMetaData.'_dataSource' = 'DataSourceDataSource'
+            $BodyMetaData.'isc_metaDataPrefix' = '_'
+            $BodyMetaData.'isc_dataFormat' = 'json'
+            $BodyMetaData.description = $Description
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            If ($null -eq $parameters.Body) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$DataSource_id] due to [$Message]."
+                Break
+            }    
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            }
+            Write-Verbose -Message "Result Mapping [$DataSource_id] was successfully updated"
+        }
+    }
+    End {
+        
     }
 }
 
@@ -3833,7 +3990,7 @@ Function Set-AutomateNOWFolder {
             $BodyMetaData.'_componentId' = 'FolderEditForm'
             $BodyMetaData.'_dataSource' = 'FolderDataSource'
             $BodyMetaData.'isc_metaDataPrefix' = '_'
-            $BodyMetaData.'isc_dataFormat ' = 'json'
+            $BodyMetaData.'isc_dataFormat' = 'json'
             $BodyMetaData.description = $Description
             [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
             If ($null -eq $parameters.Body) {
@@ -4035,7 +4192,7 @@ Function New-AutomateNOWFolder {
     $BodyMetaData.'_componentId' = 'FolderCreateWindow_form'
     $BodyMetaData.'_dataSource' = 'FolderDataSource'
     $BodyMetaData.'isc_metaDataPrefix' = '_'
-    $BodyMetaData.'isc_dataFormat ' = 'json'
+    $BodyMetaData.'isc_dataFormat' = 'json'
     [string]$BodyMetaDataString = ConvertTo-QueryString -InputObject $BodyMetaData
     [string]$Body = ($BodyObject + '&' + $BodyMetaDataString)
     [string]$command = '/folder/create'
@@ -5538,6 +5695,965 @@ Function Find-AutomateNOWObjectReferral {
 
 #endregion
 
+#Region - Result Mappings
+
+Function Get-AutomateNOWResultMapping {
+    <#
+    .SYNOPSIS
+    Gets the Result Mapping objects from an AutomateNOW! instance
+
+    .DESCRIPTION
+    Gets the Result Mapping objects from an AutomateNOW! instance
+
+    .PARAMETER Id
+    Optional string containing the simple id of the Result Mapping to fetch or you can pipeline a series of simple id strings. You may not enter an array here.
+
+    .PARAMETER startRow
+    Optional integer to indicate the row to start from. This is intended for when you need to paginate the results. Default is 0.
+
+    .PARAMETER endRow
+    Optional integer to indicate the row to stop on. This is intended for when you need to paginate the results. Default is 100. The console default hard limit is 10,000.
+
+    .INPUTS
+    Accepts a string representing the simple id of the Result Mapping from the pipeline or individually (but not an array).
+
+    .OUTPUTS
+    An array of one or more [ANOWResultMapping] class objects
+
+    .EXAMPLE
+    Gets all Result Mapping objects (defaults 100 per page)
+
+    Get-AutomateNOWResultMapping
+
+    .EXAMPLE
+    Gets the first 500 Result Mapping objects in a single page
+
+    Get-AutomateNOWResultMapping -startRow 0 -endRow 500
+
+    .EXAMPLE
+    Gets a single Result Mapping by name
+
+    Get-AutomateNOWResultMapping -Id 'resultmapping_01'
+
+    .EXAMPLE
+    Gets a series of Result Mapping objects through the pipeline
+
+    @( 'resultmapping_01', 'resultmapping_02' ) | Get-AutomateNOWResultMapping
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    Run this function without parameters to retrieve all of the Result Mapping objects.
+
+    #>
+    [OutputType([ANOWResultMapping[]])]
+    [Cmdletbinding()]
+    Param(
+        [Parameter(Mandatory = $False, ValueFromPipeline = $true)]
+        [string]$Id,
+        [Parameter(Mandatory = $False)]
+        [int32]$startRow = 0,
+        [Parameter(Mandatory = $False)]
+        [int32]$endRow = 100
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        If ($endRow -le $startRow) {
+            Write-Warning -Message "The endRow must be greater than the startRow. Please try again."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'GET')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
+        If ($_.Length -gt 0 -or $Id.Length -gt 0) {            
+            If ($_.Length -gt 0 ) {
+                $Body.'id' = $_
+            }
+            Else {
+                $Body.'id' = $Id
+            }
+            $Body.'_operationId' = 'read'
+            [string]$textMatchStyle = 'exactCase'
+        }
+        Else {
+            $Body.'_startRow' = $startRow
+            $Body.'_endRow' = $endRow
+            $Body.'_textMatchStyle' = 'substring'
+            $Body.'_componentId' = 'ResultMappingList'
+        }
+        $Body.'_operationType' = 'fetch'
+        $Body.'_textMatchStyle' = $textMatchStyle
+        $Body.'_dataSource' = 'ResultMappingDataSource'
+        $Body.'isc_metaDataPrefix' = '_'
+        $Body.'isc_dataFormat' = 'json'
+        [string]$Body = ConvertTo-QueryString -InputObject $Body
+        [string]$command = ('/resultMapping/read?' + $Body)
+        If ($null -eq $parameters["Command"]) {
+            $parameters.Add('Command', $command)
+        }
+        Else {
+            $parameters.Command = $command
+        }
+        $Error.Clear()
+        Try {
+            [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
+            Break
+        }
+        If ($results.response.status -ne 0) {
+            If ($null -eq $results.response.status) {
+                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
+                Break
+            }
+            Else {
+                [int32]$status_code = $results.response.status
+                [string]$results_response = $results.response
+                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
+                Break
+            }
+        }
+        $Error.Clear()
+        [ANOWResultMapping[]]$ResultMappings = ForEach ($ResultMapping in $results.response.data) {
+            If ($null -ne $ResultMapping.definition) {
+                If ($ResultMapping.definition[0] -is [string]) {
+                    Try {
+                        $ResultMapping.definition = $ResultMapping.definition | ConvertFrom-Json -Depth 10
+                        [ANOWResultMapping]$ResultMapping
+                    }
+                    Catch {
+                        [string]$Message = $_.Exception.Message
+                        Write-Warning -Message "Failed to parse the response into a series of [ANOWResultMapping] under Get-AutomateNOWResultMapping objects due to [$Message]."
+                        Break
+                    }
+                }
+                Else {
+                    $Error.Clear()
+                    [ANOWResultMappingRule[]]$definitions = Try {
+                        ForEach ($definition in $resultmapping.definition) {
+                            [ANOWResultMappingRule]$definition
+                        }
+                    }
+                    Catch {
+                        [string]$Message = $_.Exception.Message
+                        Write-Warning -Message "Failed to parse the response into a [ANOWResultMapping] object under Get-AutomateNOWResultMappingRule due to [$Message]."
+                        Break
+                    }
+                    $ResultMapping.definition = $definitions
+                }
+            }
+            [ANOWResultMapping]$ResultMapping
+        }
+        If ($ResultMappings.Count -gt 0) {
+            Return $ResultMappings
+        }
+    }
+    End {
+
+    }
+}
+
+Function Export-AutomateNOWResultMapping {
+    <#
+    .SYNOPSIS
+    Exports the Result Mapping objects from an instance of AutomateNOW!
+
+    .DESCRIPTION
+    Exports the Result Mapping objects from an instance of AutomateNOW! to a local .csv file
+
+    .PARAMETER Domain
+    Mandatory [ANOWResultMapping] object (Use Get-AutomateNOWResultMapping to retrieve them)
+
+    .INPUTS
+    ONLY [ANOWResultMapping] objects from the pipeline are accepted
+
+    .OUTPUTS
+    The [ANOWResultMapping] objects are exported to the local disk in CSV format
+
+    .EXAMPLE
+    Exports all of the Result Mapping objects (up to 100 by default)
+
+    Get-AutomateNOWResultMapping | Export-AutomateNOWResultMapping
+
+    .EXAMPLE
+    Exports 1 Result Mapping by name
+
+    Get-AutomateNOWResultMapping -Id 'result_mapping01' | Export-AutomateNOWResultMapping
+
+    .EXAMPLE
+    Exports a series of Result Mapping objects by the pipeline
+
+    @( 'result_mapping01', 'result_mapping02' ) | Get-AutomateNOWResultMapping | Export-AutomateNOWResultMapping
+
+    .NOTES
+	You must present [ANOWResultMapping] objects to the pipeline to use this function.
+    #>
+    
+    [Cmdletbinding(DefaultParameterSetName = 'Pipeline')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true, ParameterSetName = 'Pipeline')]
+        [ANOWResultMapping]$ResultMapping
+    )
+    Begin {
+        [string]$current_time = Get-Date -Format 'yyyyMMddHHmmssfff'
+        [string]$ExportFileName = 'Export-AutomateNOW-ResultMappings-' + $current_time + '.csv'
+        [string]$ExportFilePath = ((Get-Location | Select-Object -ExpandProperty Path) + '\' + $ExportFileName)
+        [hashtable]$parameters = @{}
+        $parameters.Add('Path', $ExportFilePath)
+        $parameters.Add('Append', $true)
+        If ($PSVersionTable.PSVersion.Major -eq 5) {
+            $parameters.Add('NoTypeInformation', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [ANOWResultMapping]$ResultMapping = $_
+        }
+        $Error.Clear()
+        Try {
+            $ResultMapping | Export-CSV @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Export-CSV failed to export the [ANOWResultMapping] object on the pipeline due to [$Message]"
+            Break
+        }
+    }
+    End {
+        $Error.Clear()
+        If ((Test-Path -Path $ExportFilePath) -eq $true) {
+            [System.IO.FileInfo]$fileinfo = Get-Item -Path "$ExportFilePath"
+            [int32]$filelength = $fileinfo.Length
+            [string]$filelength_display = "{0:N0}" -f $filelength
+            Write-Information -MessageData "Created file $ExportFileName ($filelength_display bytes)"
+        }
+    }
+}
+
+Function New-AutomateNOWResultMapping {
+    <#
+    .SYNOPSIS
+    Creates a Result Mapping within an AutomateNOW! instance
+
+    .DESCRIPTION
+    Creates a Result Mapping within an AutomateNOW! instance and returns back the newly created [ANOWResultMapping] object
+
+    .PARAMETER Id
+    The intended name of the Result Mapping. For example: 'result_mapping1'. This value may not contain the domain in brackets.
+
+    .PARAMETER Description
+    Optional description of the Result Mapping (may not exceed 255 characters).
+
+    .PARAMETER Tags
+    Optional string array containing the id's of the tags to assign to the new Result Mapping. Do not pass [ANOWTag] objects here.
+
+    .PARAMETER Folder
+    Optional name of the folder to place the Result Mapping into.
+
+    .PARAMETER CodeRepository
+    Optional name of the code repository to place the Result Mapping into.
+
+    .INPUTS
+    None. You cannot pipe objects to New-AutomateNOWResultMapping.
+
+    .OUTPUTS
+    An [ANOWResultMapping] object representing the newly created Result Mapping
+
+    .EXAMPLE
+    New-AutomateNOWResultMapping
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    The name (id) of the Result Mapping must be unique (per domain). It may consist only of letters, numbers, underscore, dot or hypen.
+
+    #>
+    [OutputType([ANOWResultMapping])]
+    [Cmdletbinding()]
+    Param(
+        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [Parameter(Mandatory = $true)]
+        [string]$Id,
+        [Parameter(Mandatory = $false, HelpMessage = "Enter a descriptive string between 0 and 255 characters in length. UTF8 characters are accepted.")]
+        [ValidateScript({ $_.Length -le 255 })]
+        [string]$Description,
+        [Parameter(Mandatory = $false)]
+        [string[]]$Tags,
+        [Parameter(Mandatory = $false)]
+        [string]$Folder,
+        [Parameter(Mandatory = $false)]
+        [string]$CodeRepository
+    )
+    If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+        Write-Warning -Message "Somehow there is not a valid token confirmed."
+        Break
+    }
+    ## Begin warning ##
+    ## Do not tamper with this below code which makes sure that the object does not previously exist before attempting to create it. This is a critical check with the console handles for you.
+    $Error.Clear()
+    Try {
+        [boolean]$ResultMapping_exists = ($null -ne (Get-AutomateNOWResultMapping -Id $Id))
+    }
+    Catch {
+        [string]$Message = $_.Exception.Message
+        Write-Warning -Message "Get-AutomateNOWResultMapping failed to check if the Result Mapping [$Id] already existed due to [$Message]."
+        Break
+    }
+    If ($ResultMapping_exists -eq $true) {
+        [string]$current_domain = $anow_session.header.domain
+        Write-Warning "There is already a Result Mapping named [$Id] in [$current_domain]. Please check into this."
+        Break
+    }
+    ## End warning ##
+    [System.Collections.Specialized.OrderedDictionary]$ANOWResultMapping = [System.Collections.Specialized.OrderedDictionary]@{}
+    $ANOWResultMapping.Add('id', $Id)
+    If ($Description.Length -gt 0) {
+        $ANOWResultMapping.Add('description', $Description)
+    }
+    If ($Tags.Count -gt 0) {
+        [int32]$total_tags = $Tags.Count
+        [int32]$current_tag = 1
+        ForEach ($tag_id in $Tags) {
+            $Error.Clear()
+            Try {
+                [ANOWTag]$tag_object = Get-AutomateNOWTag -Id $tag_id
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Get-AutomateNOWTag had an error while retrieving the tag [$tag_id] running under New-AutomateNOWResultMapping due to [$message]"
+                Break
+            }
+            If ($tag_object.simpleId.length -eq 0) {
+                Throw "New-AutomateNOWResultMapping has detected that the tag [$tag_id] does not appear to exist. Please check again."
+                Break
+            }
+            [string]$tag_display = $tag_object | ConvertTo-Json -Compress
+            Write-Verbose -Message "Adding tag $tag_display [$current_tag of $total_tags]"
+            [string]$tag_name_sequence = ('tags' + $current_tag)
+            $ANOWResultMapping.Add($tag_name_sequence, $tag_id)
+            $include_properties += $tag_name_sequence
+            $current_tag++
+        }
+    }
+    If ($Folder.Length -gt 0) {
+        $Error.Clear()
+        Try {
+            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWFolder failed to confirm that the folder [$tag_id] existed under New-AutomateNOWResultMapping due to [$Message]"
+            Break
+        }
+        If ($folder_object.simpleId.Length -eq 0) {
+            Throw "Get-AutomateNOWFolder failed to locate the Folder [$Folder] under New-AutomateNOWResultMapping. Please check again."
+            Break
+        }
+        [string]$folder_display = $folder_object | ConvertTo-Json -Compress
+        Write-Verbose -Message "Adding folder $folder_display to [ANOWResultMapping] [$Id]"
+        $ANOWResultMapping.Add('folder', $Folder)
+        $include_properties += 'folder'
+    }
+    If ($CodeRepository.Length -gt 0) {
+        $Error.Clear()
+        Try {
+            [ANOWCodeRepository]$code_repository_object = Get-AutomateNOWCodeRepository -Id $CodeRepository
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWCodeRepository failed to confirm that the code repository [$CodeRepository] existed under New-AutomateNOWResultMapping due to [$Message]"
+            Break
+        }
+        If ($code_repository_object.simpleId.Length -eq 0) {
+            Throw "Get-AutomateNOWCodeRepository failed to locate the Code Repository [$CodeRepository] under New-AutomateNOWResultMapping. Please check again."
+            Break
+        }
+        [string]$code_repository_display = $code_repository_object | ConvertTo-Json -Compress
+        Write-Verbose -Message "Adding code repository $code_repository_display to [ANOWResultMapping] [$Id]"
+        $ANOWResultMapping.Add('codeRepository', $CodeRepository)
+        $include_properties += 'codeRepository'
+    }
+    [string]$BodyObject = ConvertTo-QueryString -InputObject $ANOWResultMapping -IncludeProperties id, description, tags, folder, codeRepository
+    [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+    $BodyMetaData.'_textMatchStyle' = 'exact'
+    $BodyMetaData.'_operationType' = 'add'
+    $BodyMetaData.'_oldValues' = '{}'
+    $BodyMetaData.'_componentId' = 'ResultMappingCreateWindow_form'
+    $BodyMetaData.'_dataSource' = 'ResultMappingDataSource'
+    $BodyMetaData.'isc_metaDataPrefix' = '_'
+    $BodyMetaData.'isc_dataFormat' = 'json'
+    [string]$BodyMetaDataString = ConvertTo-QueryString -InputObject $BodyMetaData
+    [string]$Body = ($BodyObject + '&' + $BodyMetaDataString)
+    [string]$command = '/resultMapping/create'
+    [hashtable]$parameters = @{}
+    $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+    $parameters.Add('Command', $command)
+    $parameters.Add('Method', 'POST')
+    $parameters.Add('Body', $Body)
+    If ($anow_session.NotSecure -eq $true) {
+        $parameters.Add('NotSecure', $true)
+    }
+    [string]$parameters_display = $parameters | ConvertTo-Json -Compress
+    $Error.Clear()
+    Try {
+        [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+    }
+    Catch {
+        [string]$Message = $_.Exception.Message
+        Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] with parameters $parameters_display due to [$Message]."
+        Break
+    }
+    If ($results.response.status -lt 0 -or $results.response.status -gt 0) {
+        [string]$results_display = $results.response.errors | ConvertTo-Json -Compress
+        Write-Warning -Message "Failed to create Result Mapping [$Id] of type [$Type] due to $results_display. The parameters used: $parameters_display"
+        Break
+    }
+    ElseIf ($null -eq $results.response.status) {
+        Write-Warning -Message "Failed to create Result Mapping [$Id] of type [$Type] due to [an empty response]. The parameters used: $parameters_display"
+        Break
+    }
+    $Error.Clear()
+    Try {
+        [ANOWResultMapping]$ResultMapping = $results.response.data[0]
+    }
+    Catch {
+        [string]$Message = $_.Exception.Message
+        Write-Warning -Message "Failed to create [ANOWResultMapping] object due to [$Message]."
+        Break
+    }        
+    If ($ResultMapping.id.Length -eq 0) {
+        Write-Warning -Message "Somehow the newly created [ANOWResultMapping] ResultMapping is empty!"
+        Break
+    }
+    Return $ResultMapping
+}
+
+Function Remove-AutomateNOWResultMapping {
+    <#
+    .SYNOPSIS
+    Removes a Result Mapping from an AutomateNOW! instance
+    
+    .DESCRIPTION    
+    Removes a Result Mapping from an AutomateNOW! instance
+    
+    .PARAMETER ResultMapping
+    An [ANOWResultMapping] object representing the Result Mapping to be deleted.
+
+    .PARAMETER Force
+    Force the removal without confirmation. This is equivalent to -Confirm:$false
+    
+    .INPUTS
+    ONLY [ANOWResultMapping] objects are accepted (including from the pipeline)
+    
+    .OUTPUTS
+    None. The status will be written to the console with Write-Verbose.
+    
+    .EXAMPLE
+    Remove a single Result Mapping by name
+
+    Get-AutomateNOWResultMapping -Id 'result_mapping01' | Remove-AutomateNOWResultMapping
+
+    .EXAMPLE
+    Removes a series of Result Mapping objects via input from the pipeline
+
+    @( 'result_mapping01', 'result_mapping02', 'result_mapping03') | Remove-AutomateNOWResultMapping
+
+    .EXAMPLE
+    Forcefully removes all Result Mapping objects that reside within a particular folder
+
+    Get-AutomateNOWResultMapping | Where-Object { $_.folder -eq 'folder_01'} | Remove-AutomateNOWResultMapping -Force
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $false, ValueFromPipeline = $True)]
+        [ANOWResultMapping]$ResultMapping,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [string]$command = '/resultMapping/delete'
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ResultMapping.id)")) -eq $true) {
+            If ($_.id.Length -gt 0) {
+                [string]$ResultMapping_id = $_.id
+            }
+            ElseIf ($ResultMapping.id.Length -gt 0) {
+                [string]$ResultMapping_id = $ResultMapping.id
+            }
+            ElseIf ($Id.Length -gt 0) {
+                [string]$ResultMapping_id = $Id
+            }
+            Else {
+                Write-Warning -Message "Unable to resolve the identity of the target under Remove-AutomateNOWResultMapping"
+                Break
+            }
+            [string]$Body = 'id=' + $ResultMapping_id
+            If ($null -eq $parameters.Body) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$ResultMapping_id] due to [$Message]."
+                Break
+            }    
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            }
+            Write-Verbose -Message "Result Mapping [$ResultMapping_id] successfully removed"
+        }
+    }
+    End {
+
+    }
+}
+
+Function Add-AutomateNOWResultMappingRule {
+    <#
+    .SYNOPSIS
+    Adds a Rule to a Result Mapping on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Adds a Rule to a Result Mapping on an AutomateNOW! instance
+
+    .PARAMETER ResultMapping
+    Mandatory [ANOWResultMapping] object (Use Get-AutomateNOWResultMapping to retrieve them). This is the object you created with New-AutomateNOWResultMapping.
+
+    .PARAMETER ResultMappingRule
+    Mandatory [ANOWResultMappingRule] object (use New-AutomateNOWResultMappingRule to create them).
+
+    .PARAMETER Quiet
+    Switch parameter to silence the output from a successful update
+
+    .INPUTS
+    ONLY [ANOWResultMapping] objects are accepted (including from the pipeline).
+
+    .OUTPUTS
+    The updated [ANOWResultMapping] object will be returned.
+
+    .EXAMPLE
+    Creates and adds two Rules to an existing Result Mapping object named 'result_mapping1' (multi-line format)
+
+    $criteria1 = New-AutomateNOWResultMappingRuleConditionCriteria -operatorNumber 'EQ_NUM' -FieldName 'statusCode' -value '1'
+    $criteria2 = New-AutomateNOWResultMappingRuleConditionCriteria -operatorNumber 'EQ_NUM' -FieldName 'statusCode' -value '2'
+    $criteria3 = New-AutomateNOWResultMappingRuleConditionCriteria -operatorNumber 'EQ_NUM' -FieldName 'statusCode' -value '3'
+    $criteria4 = New-AutomateNOWResultMappingRuleConditionCriteria -operatorNumber 'EQ_NUM' -FieldName 'statusCode' -value '4'
+    $condition1 = @($criteria1, $criteria2) | New-AutomateNOWResultMappingRuleCondition -operator 'AllMatch'
+    $condition2 = @($criteria3, $criteria4) | New-AutomateNOWResultMappingRuleCondition -operator 'AllMatch'
+    $rule1 = New-AutomateNOWResultMappingRule -ProcessingStatus 'COMPLETED' -StatusCode 0 -StatusMessage 'SUCCESS' -Condition $condition1
+    $rule2 = New-AutomateNOWResultMappingRule -ProcessingStatus 'FAILED' -StatusCode 1 -StatusMessage 'FAILED' -Condition $condition2
+    $result_mapping = Get-AutomateNOWResultMapping -Id 'result_mapping1'
+    @($rule1, $rule2) | Add-AutomateNOWResultMappingRule -ResultMapping $result_mapping -Quiet
+
+    .EXAMPLE
+    Creates and adds two Rules to an existing Result Mapping object named 'result_mapping1' (multi-line format)
+
+    @((New-AutomateNOWResultMappingRule -ProcessingStatus 'COMPLETED' -StatusCode 0 -StatusMessage 'SUCCESS' -Condition (@((New-AutomateNOWResultMappingRuleConditionCriteria -operatorNumber 'EQ_NUM' -FieldName 'statusCode' -value '1'), (New-AutomateNOWResultMappingRuleConditionCriteria -operatorNumber 'EQ_NUM' -FieldName 'statusCode' -value '2')) | New-AutomateNOWResultMappingRuleCondition -operator 'AllMatch')), (New-AutomateNOWResultMappingRule -ProcessingStatus 'FAILED' -StatusCode 1 -StatusMessage 'FAILED' -Condition (@((New-AutomateNOWResultMappingRuleConditionCriteria -operatorNumber 'EQ_NUM' -FieldName 'statusCode' -value '3'), (New-AutomateNOWResultMappingRuleConditionCriteria -operatorNumber 'EQ_NUM' -FieldName 'statusCode' -value '4')) | New-AutomateNOWResultMappingRuleCondition -operator 'AllMatch'))) | Add-AutomateNOWResultMappingRule -ResultMapping (Get-AutomateNOWResultMapping -Id 'result_mapping1') -Quiet
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    This capability should be considered limited. There are complex configurations of criteria and conditions which may not be supported. Avoid the "or" operators for now to avoid complexity.
+
+    #>
+    [CmdletBinding()]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [ANOWResultMapping]$ResultMapping,
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [ANOWResultMappingRule]$ResultMappingRule,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+        [PSCustomObject]$ResultMappingRuleArray = @()
+        [string]$command = '/resultMapping/update'
+    }
+    Process {
+        If ($_.Length -eq 0) {
+            [PSCustomObject[]]$ResultMappingRuleArray += $ResultMappingRule
+        }
+        Else {
+            [PSCustomObject[]]$ResultMappingRuleArray += $_
+        }
+    }
+    End {
+        ## Begin warning ##
+        ## Do not tamper with this below code which makes sure that the object does not previously exist before attempting to create it. This is a critical check with the console handles for you.
+        [string]$ResultMapping_id = $ResultMapping.simpleId
+        $Error.Clear()
+        Try {
+            [ANOWResultMapping]$current_result = Get-AutomateNOWResultMapping -Id $ResultMapping_id
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWTask failed to check if the Result Mapping [$ResultMapping_id] existed under Add-AutomateNOWResultMappingRule due to [$Message]."
+            Break
+        }
+        If ($current_result.id.length -eq 0) {
+            Write-Warning "The Result Mapping object that you specified [$ResultMapping_id] does not seem to exist under Add-AutomateNOWResultMappingRule"
+            Break
+        }
+        ## End warning ##
+        If ($ResultMapping.definition -is [ANOWResultMappingRule[]]) {
+            $ResultMappingRuleArray += $ResultMapping.definition
+        }
+        $Error.Clear()
+        Try {
+            [string]$ConvertedResultMappingRuleArray = $ResultMappingRuleArray | ConvertTo-Json -Depth 10 -Compress
+            If ($ConvertedResultMappingRuleArray[0] -ne '[') {
+                [string]$ResultMappingArrayFormatted = ('[' + $ConvertedResultMappingRuleArray + ']')
+            }
+            Else {
+                [string]$ResultMappingArrayFormatted = $ResultMappingRuleArray | ConvertTo-Json -Depth 10 -Compress
+            }
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "ConvertTo-Json failed to convert the array of Result Mapping rules due to [$Message]."
+            Break
+        }
+        [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+        $BodyMetaData.Add('id', $ResultMapping_id )
+        If ($ResultMapping.description.Length -gt 0) {
+            $BodyMetaData.Add('description', $ResultMapping.description)
+        }
+        Else {
+            $BodyMetaData.Add('description', $null)
+        }
+        If ($ResultMapping.codeRepository.Length -gt 0) {
+            $BodyMetaData.Add('codeRepository', $ResultMapping.codeRepository)
+        }
+        Else {
+            $BodyMetaData.Add('codeRepository', $null)
+        }
+        $BodyMetaData.Add('definition', $ResultMappingArrayFormatted )
+        $BodyMetaData.Add('_operationType', 'update')
+        $BodyMetaData.Add('_textMatchStyle', 'exact')
+        $BodyMetaData.Add('_oldValues', $ResultMapping.CreateOldValues())
+        $BodyMetaData.Add('_componentId', 'ResultMappingEditForm')
+        $BodyMetaData.Add('_dataSource', 'ResultMappingDataSource')
+        $BodyMetaData.Add('isc_metaDataPrefix', '_')
+        $BodyMetaData.Add('isc_dataFormat', 'json')
+        [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+        If ($null -eq $parameters.Body) {
+            $parameters.Add('Body', $Body)
+        }
+        Else {
+            $parameters.Body = $Body
+        }
+        $parameters.Add('command', $command)
+        $Error.Clear()
+        Try {
+            [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$Task_id] due to [$Message]."
+            Break
+        }    
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+        }
+        $Error.Clear()
+        [ANOWResultMappingRule[]]$definitions = Try {
+            ForEach ($definition in $results.response.data.definition) {
+                [ANOWResultMappingRule]$definition
+            }
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Failed to parse the response into a [ANOWResultMapping] object under Add-AutomateNOWResultMappingRule due to [$Message]."
+            Break
+        }
+        [PSCustomObject]$temp_results = $results.response.data | Select-Object -ExcludeProperty definition
+        $temp_results | Add-Member -MemberType NoteProperty -Name definition -Value $definitions -TypeName ANOWResultMappingRule
+        [ANOWResultMapping]$UpdatedResultMapping = $temp_results
+        If ($Quiet -ne $true) {
+            Return $UpdatedResultMapping
+        }
+    }
+}
+
+Function New-AutomateNOWResultMappingRuleConditionCriteria {
+    <#
+
+    .SYNOPSIS
+    Creates a Result Mapping Rule Condition Criteria object
+
+    .DESCRIPTION
+    Creates a Result Mapping Rule Condition Criteria object for use with Result Mapping Rule Condition objects
+
+    .PARAMETER operatorText
+    The name of the operator for text based criteria
+
+    .PARAMETER operatorNumber
+    The name of the operator for numeric based criteria
+
+    .PARAMETER operatorDate
+    The name of the operator for time based criteria
+
+    .PARAMETER fieldName
+    The name of the field to which the criteria is applied against. Valid values are: 'cycleActualCounter', 'duration', 'endTime', 'exitCode', 'exitMessage', 'id', 'name', 'owner', 'parentId', 'parentName', 'parentTemplate', 'processingStatus', 'processingTimestamp', 'rootId', 'rootName', 'rootTemplate', 'serviceStatus', 'skip', 'startTime', 'statusCode', 'statusMessage', 'template', 'timesRestarted'
+
+    .PARAMETER value
+    The value of the criteria.
+
+    .INPUTS
+    None. You cannot pipe objects to New-AutomateNOWResultMappingRuleConditionCriteria.
+
+    .OUTPUTS
+    An [ANOWResultMappingRuleConditionCriteria] object representing the newly created Result Mapping Rule Condition Criteria object
+
+    .EXAMPLE
+    New-AutomateNOWResultMappingRuleConditionCriteria -operatorNumber 'EQ_NUM' -FieldName 'statusCode' -value '1'
+
+    .NOTES
+    This function is intended to be used in conjunction with New-AutomateNOWResultMappingRuleCondition
+
+    Below is a table of the criteria operators based on their type (i.e. Text, Number or Date)
+
+    "Text"
+    ------
+    'EQ' = '=='
+    'NE' = '!='
+    'LT_TEXT' = '<'
+    'GT_TEXT' = '>'
+    'LE_TEXT' = '<='
+    'GE_TEXT' = '>='
+    'SW' = 'starts with'
+    'NSW' = 'does not start with'
+    'EW' = 'ends with'
+    'NEW' = 'does not end with'
+    'CONTAINS' = 'contains'
+    'NOT_CONTAIN' = 'does not contain'
+    'REGEXP' = 'matches'
+    'NOT_REGEXP' = 'does not match'
+    'IS_NULL' = 'is empty'
+    'IS_NOT_NULL' = 'is not empty'
+
+    "Number"
+    --------
+    'EQ_NUM' = '=='
+    'NE_NUM' = '!='
+    'LT_NUM' = '<'
+    'GT_NUM' = '>'
+    'LE_NUM' = '<='
+    'GE_NUM' = '>='
+
+    "Date"
+    ------
+    'EQ_DATE' = '=='
+    'NE_DATE' = '!='
+    'LT_DATE' = '<'
+    'GT_DATE' = '>'
+    'LE_DATE' = '<='
+    'GE_DATE' = '>='
+    'CAL' = 'in calendar'
+    'NOT_IN_CAL' = 'not in calendar'
+
+    #>
+    [OutputType([ANOWResultMappingRuleConditionCriteria])]
+    [CmdletBinding()]
+    Param(
+        [ValidateSet('EQ', 'NE', 'LT_TEXT', 'GT_TEXT', 'LE_TEXT', 'GE_TEXT', 'SW', 'NSW', 'EW', 'NEW', 'CONTAINS', 'NOT_CONTAIN', 'REGEXP', 'NOT_REGEXP', 'IS_NULL', 'IS_NOT_NULL')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'Text')]
+        [string]$operatorText,
+        [ValidateSet('EQ_NUM', 'NE_NUM', 'LT_NUM', 'GT_NUM', 'LE_NUM', 'GE_NUM')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'Number')]
+        [string]$operatorNumber,
+        [ValidateSet('EQ_DATE', 'NE_DATE', 'LT_DATE', 'GT_DATE', 'LE_DATE', 'GE_DATE', 'CAL', 'NOT_IN_CAL')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'Date')]
+        [string]$operatorDate,
+        [ValidateSet('cycleActualCounter', 'duration', 'endTime', 'exitCode', 'exitMessage', 'id', 'name', 'owner', 'parentId', 'parentName', 'parentTemplate', 'processingStatus', 'processingTimestamp', 'rootId', 'rootName', 'rootTemplate', 'serviceStatus', 'skip', 'startTime', 'statusCode', 'statusMessage', 'template', 'timesRestarted')]
+        [Parameter(Mandatory = $true)]
+        [string]$FieldName,
+        [Parameter(Mandatory = $true)]
+        [string]$value
+    )
+    If ($operatorText.Length -gt 0) {
+        [string]$operator = $operatorText
+    }
+    ElseIf ($operatorNumber.Length -gt 0) {
+        [string]$operator = $operatorNumber
+    }
+    Else {
+        [string]$operator = $operatorDate
+    }
+    [ANOWResultMappingRuleConditionCriteria]$criteria = [PSCustomObject]@{'operator' = $operator; 'fieldName' = $FieldName; 'value' = $value; }
+    Return $criteria    
+}
+
+Function New-AutomateNOWResultMappingRuleCondition {
+    <#
+    
+    .SYNOPSIS
+    Creates a Result Mapping Rule Condition object
+
+    .DESCRIPTION
+    Creates a Result Mapping Rule Condition object for use with Result Mapping Rule objects
+
+    .PARAMETER operator
+    The name of the operator for the condition. Valid values are: 'AllMatch', 'AnyMatch', 'SingleMatch', 'AllMismatch', 'AnyMismatch', 'SingleMismatch'
+
+    .PARAMETER criteria
+    A [ANOWResultMappingRuleConditionCriteria] representing the criteria for this condition. Use New-AutomateNOWResultMappingRuleConditionCriteria to create these.
+
+    .INPUTS
+    None. You cannot pipe objects to New-AutomateNOWResultMappingRuleCondition.
+
+    .OUTPUTS
+    An [ANOWResultMappingRuleCondition] object representing the newly created Result Mapping Rule Condition Criteria object
+
+    .EXAMPLE
+    New-AutomateNOWResultMappingRuleCondition -operator 'AllMatch' -criteria $criteria
+
+    .NOTES
+    This function is intended to be used in conjunction with New-AutomateNOWResultMapping
+
+    #>
+    [OutputType([ANOWResultMappingRuleCondition])]
+    [CmdletBinding()]
+    Param(
+        [ValidateSet('AllMatch', 'AnyMatch', 'SingleMatch', 'AllMismatch', 'AnyMismatch', 'SingleMismatch')]
+        [Parameter(Mandatory = $true)]
+        [string]$operator,
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [ANOWResultMappingRuleConditionCriteria]$criteria
+    )
+    Begin {        
+        [string]$operator_formatted = Switch ($operator) {
+            'AllMatch' { 'AND'; Break }
+            'AnyMatch' { 'OR'; Break }
+            'SingleMatch' { 'XOR'; Break }
+            'AllMismatch' { 'NAND'; Break }
+            'AnyMismatch' { 'NOR'; Break }
+            'SingleMismatch' { 'XNOR'; Break }
+        }
+        [ANOWResultMappingRuleConditionCriteria[]]$CriteriaArray = @()
+    }
+    Process {
+        If ($_.Length -eq 0) {
+            [ANOWResultMappingRuleConditionCriteria[]]$CriteriaArray += $criteria
+        }
+        Else {
+            [ANOWResultMappingRuleConditionCriteria[]]$CriteriaArray += $_
+        }
+    }
+    End {
+        [ANOWResultMappingRuleCondition]$condition = [PSCustomObject]@{'operator' = $operator_formatted; 'criteria' = $CriteriaArray; }        
+        Return $condition
+    }
+}
+
+Function New-AutomateNOWResultMappingRule {
+    <#
+    .SYNOPSIS
+    Creates a Result Mapping Rule for use with Add-AutomateNOWResultMapping
+
+    .DESCRIPTION
+    Creates a Result Mapping Rule for use with Add-AutomateNOWResultMapping
+
+    .PARAMETER Condition
+    The mandatory condition object that must be included. Use New-AutomateNOWResultMappingRuleCondition to create it.
+
+    .PARAMETER ProcessingStatus
+    Processing Status to be set on the Task if condition is true. Valid values are: COMPLETED, FAILED
+    
+    .PARAMETER StatusCode
+    Optional status code string to be set on the Task if condition is true. If not specified, the Result Mapping object will use exit code of the processing item.
+
+    .PARAMETER StatusMessage
+    Optional status message string to be set on the Task if condition is true. If not specified, the Result Mapping object will use exit code of the processing item.
+
+    .INPUTS
+    A single [ANOWResultMappingRuleCondition] object
+
+    .OUTPUTS
+    An [ANOWResultMapping] object representing the newly created Result Mapping
+
+    .EXAMPLE
+    New-AutomateNOWResultMappingRule -ProcessingStatus 'COMPLETED' -StatusCode 0 -StatusMessage 'SUCCESS' -Condition $condition
+
+    .NOTES
+    This cmdlet does not require a connection to the AutomateNOW console.
+
+    The statusCode and statusMessage parameters appear to have unlimited character length allowance!
+
+    #>
+    [OutputType([ANOWResultMappingRule])]
+    [CmdletBinding()]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [ANOWResultMappingRuleCondition]$condition,
+        [ValidateSet('COMPLETED', 'FAILED')]
+        [Parameter(Mandatory = $true)]
+        [string]$ProcessingStatus,
+        [Parameter(Mandatory = $false)]
+        [string]$StatusCode,
+        [Parameter(Mandatory = $false)]
+        [string]$StatusMessage
+    )    
+    $Error.Clear()
+    Try {        
+        [ANOWResultMappingRule]$rule = [PSCustomObject]@{ 'condition' = $condition; 'processingStatus' = $ProcessingStatus; 'statusCode' = $StatusCode; 'statusMessage' = $StatusMessage }
+    }
+    Catch {
+        [string]$Message = $_.Exception.Message
+        Write-Warning -Message "Failed to create the [ANOWResultMappingRule] object (under New-AutomateNOWResultMappingRule) due to [$Message]."
+        Break
+    }
+    Return $rule
+}
+
+#endregion
+
 #Region - Tags
 
 Function Get-AutomateNOWTag {
@@ -5816,7 +6932,7 @@ Function Set-AutomateNOWTag {
             $BodyMetaData.'_componentId' = 'TagEditForm'
             $BodyMetaData.'_dataSource' = 'TagDataSource'
             $BodyMetaData.'isc_metaDataPrefix' = '_'
-            $BodyMetaData.'isc_dataFormat ' = 'json'
+            $BodyMetaData.'isc_dataFormat' = 'json'
             [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties textColor, backgroundColor, id, description, iconSet, iconCode, codeRepository
             If ($null -eq $parameters.Body) {
                 $parameters.Add('Body', $Body)
@@ -6492,6 +7608,113 @@ Function Export-AutomateNOWTask {
             [string]$filelength_display = "{0:N0}" -f $filelength
             Write-Information -MessageData "Created file $ExportFileName ($filelength_display bytes)"
         }
+    }
+}
+
+Function Remove-AutomateNOWTask {
+    <#
+    .SYNOPSIS
+    Archives a Task from an AutomateNOW! instance
+
+    .DESCRIPTION
+    Archives a Task from an AutomateNOW! instance
+
+    .PARAMETER Task
+    An [ANOWTask] object representing the Task Template to be archived.
+
+    .PARAMETER Force
+    Force the archiving without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    ONLY [ANOWTask] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    None. The status will be written to the console with Write-Verbose.
+
+    .EXAMPLE
+    Get-AutomateNOWTask -Id 'Task01' | Remove-AutomateNOWTask 
+
+    .EXAMPLE
+    Get-AutomateNOWTask -Id 'Task01', 'Task02' | Remove-AutomateNOWTask 
+    
+    .EXAMPLE
+    @( 'Task1', 'Task2', 'Task3') | Remove-AutomateNOWTask 
+
+    .EXAMPLE
+    Get-AutomateNOWTask | ? { $_.serverTaskType -eq 'LINUX' } | Remove-AutomateNOWTask 
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    The term Remove and Archive are synonymous from the API perspective. In ANOW parlance, Templates are 'Deleted' and Tasks are 'Archived'.
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $false, ValueFromPipeline = $True)]
+        [ANOWTask]$Task,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [string]$command = '/processing/delete'
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [string]$Task_id = $_.id
+        }
+        ElseIf ($Task.id.Length -gt 0) {
+            [string]$Task_id = $Task.id
+        }
+        Else {
+            [string]$Task_id = $Id
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess($Task_id, 'Archive')) -eq $true) {            
+            [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
+            $Body.Add('id', $Task_id)
+            $Body.Add('_operationType', 'remove')
+            $Body.Add('_operationId', 'delete')
+            $Body.Add('_textMatchStyle', 'exact')
+            $Body.Add('_dataSource', 'ProcessingDataSource')
+            $Body.Add('isc_metaDataPrefix', '_')
+            $Body.Add('isc_dataFormat', 'json')            
+            [string]$Body = ConvertTo-QueryString -InputObject $Body
+            If ($null -eq $parameters.Body) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$Task_id] due to [$Message]."
+                Break
+            }    
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
+            }
+            Write-Verbose -Message "Task $Task_id successfully archived"
+        }
+    }
+    End {
+
     }
 }
 
@@ -7353,6 +8576,292 @@ Function Get-AutomateNOWTaskTemplate {
     }
 }
 
+Function Set-AutomateNOWTaskTemplate {
+    <#
+    .SYNOPSIS
+    Changes the settings of a Task Template on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Changes the settings of a Task Template on an AutomateNOW! instance
+
+    .PARAMETER TaskTemplate
+    An [ANOWTaskTemplate] object representing the Task Template to be changed.
+
+    .PARAMETER Description
+    Optional description of the Task Template (may not exceed 255 characters).
+
+    .PARAMETER Workspace
+    A string representing the name of the Workspace you wish to move this Task Template into.
+
+    .PARAMETER UnsetWorkspace
+    A switch parameter that will move the Task Template out of its current Workspace.
+
+    .PARAMETER Title
+    A string representing the "alias" of the Task Template (this property needs a better explanation)
+
+    .PARAMETER Weight
+    An integer representing a logical measure of resources required to process the item by the Server Node. Each Server Node has [a] maximum weight capacity[.] Weight determines [the] number of parallel processes that can run simultaneously. Default processing Weight is 1. Minimal Weight is 0.
+
+    .PARAMETER Priority
+    An integer representing the items priority which determines the order when queuing for resources (Stock and Locks) and [for] being executed by Server Nodes. Default Priority is 0. Minimal Priority is 0.
+    
+    .PARAMETER Owner
+    A string which appears to represent the user who owns the object. In practice, it is just a string. This particular property does not appear to be explained anywhere in the documentation.
+
+    .PARAMETER OnHold
+    A boolean to put the Task Template on Hold status. You must specify $true or $false here. When $true, it's the same as the Suspend-AutomateNOWTaskTemplate function. When $false, Resume-AutomateNOWTaskTemplate function.
+
+    .PARAMETER Skip
+    A boolean to put the Task Template on Skip status. You must specify $true or $false here. When $true, it's the same as the Skip-AutomateNOWTaskTemplate function. When $false, Skip-AutomateNOWTaskTemplate with -UnSkip parameter.
+
+    .PARAMETER AutoArchive
+    A boolean that causes the Tasks from this Task Template to be archived immediately after execution. You must specify $true or $false here.
+
+    .PARAMETER KeepResources
+    A boolean that indicates if the Tasks from this Task Template should keep its resources (Stocks and Locks) and reuse them on the restart so that they are not consumed by other tasks or workflows. You must specify $true or $false here.
+
+    .PARAMETER UseScripts
+    A boolean that indicates if the Tasks from this Task Template should ?
+
+    .PARAMETER EagerScriptExecution
+    A boolean that indicates if the scripts from the Tasks from this Task Template should use "Eager" load strategy. In orderto use this parameter, you must include -UseScripts $true.
+
+    .PARAMETER Force
+    Force the change without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    ONLY [ANOWTaskTemplate] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    The modified [ANOWTaskTemplate] object will be returned
+
+    .EXAMPLE
+    ?
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
+        [ANOWTaskTemplate]$TaskTemplate,
+        [ValidateScript({ $_.Length -le 255 })]
+        [Parameter(Mandatory = $false)]
+        [string]$Description,
+        [Parameter(Mandatory = $false)]
+        [string]$Title,
+        [Parameter(Mandatory = $false)]
+        [string]$Workspace,
+        [Parameter(Mandatory = $false)]
+        [switch]$UnsetWorkspace,
+        [Parameter(Mandatory = $false)]
+        [int32]$Weight,
+        [Parameter(Mandatory = $false)]
+        [int32]$Priority,
+        [Parameter(Mandatory = $false)]
+        [string]$Owner,
+        [Parameter(Mandatory = $false)]
+        [boolean]$OnHold,
+        [Parameter(Mandatory = $false)]
+        [boolean]$Skip,
+        [Parameter(Mandatory = $false)]
+        [boolean]$AutoArchive,
+        [Parameter(Mandatory = $false)]
+        [boolean]$KeepResources,
+        [Parameter(Mandatory = $false, ParameterSetName = 'UseScripts')]
+        [boolean]$UseScripts,
+        [Parameter(Mandatory = $false, ParameterSetName = 'UseScripts')]
+        [boolean]$EagerScriptExecution,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [string]$command = '/processingTemplate/update'
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+        If ($EagerScriptExecution -eq $true -and $UseScripts -ne $true) {
+            Write-Warning -Message 'To use -EagerScriptExecution, you must include -UseScripts $true'
+            Break
+        }
+        If ($UnsetWorkspace -eq $true -and $Workspace.Length -gt 0){
+            Write-Warning -Message "You cannot set the Workspace and unset it at the same time. Please choose one or the other."
+            Exit
+        }
+    }
+    Process {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($TaskTemplate.id)")) -eq $true) {
+            If ($_.id.Length -gt 0) {
+                [string]$TaskTemplate_id = $_.id
+            }
+            ElseIf ($TaskTemplate.id.Length -gt 0) {
+                [string]$TaskTemplate_id = $TaskTemplate.id
+            }
+            Else {
+                [string]$TaskTemplate_id = $Id
+            }
+            ## Begin warning ##
+            ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
+            $Error.Clear()
+            Try {
+                [boolean]$TaskTemplate_exists = ($null -eq (Get-AutomateNOWTaskTemplate -Id $TaskTemplate_id))
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Get-AutomateNOWTaskTemplate failed to check if the Task Template [$TaskTemplate_id] already existed due to [$Message]."
+                Break
+            }
+            If ($TaskTemplate_exists -eq $true) {
+                [string]$current_domain = $anow_session.header.domain
+                Write-Warning "There is not a Task Template named [$TaskTemplate_id] in the [$current_domain]. Please check into this."
+                Break
+            }
+            ## End warning ##
+            [System.Collections.ArrayList]$include_properties = [System.Collections.ArrayList]@()
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.'id' = $TaskTemplate_id
+            If ($Description.Length -gt 0) {
+                $BodyMetaData.'description' = $Description
+            }
+            If ($Title.Length -gt 0) {
+                $BodyMetaData.'title' = $Title
+            }
+            If ($Workspace.Length -gt 0) {
+                $Error.Clear()
+                Try {
+                    [ANOWWorkspace]$workspace_object = Get-AutomateNOWWorkspace -Id $Workspace
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Get-AutomateNOWWorkspace failed to confirm that the workspace [$Workspace] actually existed while running under Set-AutomateNOWTaskTemplate due to [$Message]"
+                    Break
+                }
+                If ($workspace_object.simpleId.Length -eq 0) {
+                    Throw "Get-AutomateNOWWorkspace failed to locate the Workspace [$Workspace] running under Set-AutomateNOWTaskTemplate. Please check again."
+                    Break
+                }
+                [string]$workspace_display = $workspace_object | ConvertTo-Json -Compress
+                Write-Verbose -Message "Adding workspace $workspace_display to [ANOWTaskTemplate] [$TaskTemplate_id]"
+                $BodyMetaData.'workspace' = $Workspace
+                $include_properties += 'workspace'
+            }
+            ElseIf($UnsetWorkspace -eq $true){
+                [string]$workspace_display = $workspace_object | ConvertTo-Json -Compress
+                Write-Verbose -Message "Removing [ANOWTaskTemplate] [$TaskTemplate_id] from Workspace $workspace_display"
+                $BodyMetaData.'workspace' = $null
+                $include_properties += 'workspace'
+            }
+            If ($Weight -ge 0) {
+                $BodyMetaData.'weight' = $Weight
+            }
+            If ($Priority -ge 0) {
+                $BodyMetaData.'priority' = $Priority
+            }
+            If ($Owner.Length -gt 0) {
+                $BodyMetaData.'owner' = $Owner
+            }
+            If ($OnHold -eq $false) {
+                $BodyMetaData.'onHold' = 'false'
+            }
+            ElseIf ($OnHold -eq $true) {
+                $BodyMetaData.'onHold' = 'true'
+            }
+            If ($Skip -eq $false) {
+                $BodyMetaData.'passBy' = 'false'
+            }
+            ElseIf ($Skip -eq $true) {
+                $BodyMetaData.'passBy' = 'true'
+            }
+            If ($AutoArchive -eq $false) {
+                $BodyMetaData.'autoArchive' = 'false'
+            }
+            ElseIf ($Skip -eq $true) {
+                $BodyMetaData.'autoArchive' = 'true'
+            }
+            If ($KeepResources -eq $false) {
+                $BodyMetaData.'keepResourcesOnFailure' = 'false'
+            }
+            ElseIf ($KeepResources -eq $true) {
+                $BodyMetaData.'keepResourcesOnFailure' = 'true'
+            }
+            If ($UseScripts -eq $false) {
+                $BodyMetaData.'useScripts' = 'false'
+            }
+            ElseIf ($UseScripts -eq $true) {
+                $BodyMetaData.'useScripts' = 'true'
+            }
+            If ($EagerScriptExecution -eq $false) {
+                $BodyMetaData.'eagerScriptExecution' = 'false'
+            }
+            ElseIf ($EagerScriptExecution -eq $true) {
+                $BodyMetaData.'eagerScriptExecution' = 'true'
+            }
+            $BodyMetaData.'_operationType' = 'update'
+            $BodyMetaData.'_textMatchStyle' = 'exact'
+            $BodyMetaData.'_oldValues' = $TaskTemplate.CreateOldValues()
+            $BodyMetaData.'_componentId' = 'ProcessingTemplateValuesManager'
+            $BodyMetaData.'_dataSource' = 'ProcessingTemplateDataSource'
+            $BodyMetaData.'isc_metaDataPrefix' = '_'
+            $BodyMetaData.'isc_dataFormat' = 'json'
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties $include_properties
+            If ($null -eq $parameters.Body) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$TaskTemplate_id] due to [$Message]."
+                Break
+            }    
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                If ($null -eq $results.response.status) {
+                    Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
+                    Break
+                }
+                Else {
+                    [string]$results_response = $results.response
+                    Write-Warning -Message "Received status code [$response_code] instead of 0. Something went wrong. Here's the full response: $results_response"
+                    Break
+                }
+            }
+            $Error.Clear()
+            Try {
+                [ANOWTaskTemplate]$UpdatedTaskTemplate = $results.response.data[0]
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Failed to parse the response into a [ANOWTaskTemplate] object (under Set-AutomateNOWTaskTemplate) due to [$Message]."
+                Break
+            }
+            If ($UpdatedTaskTemplate.id -eq $TaskTemplate_id) {
+                Write-Verbose -Message "Task Template $TaskTemplate_id was successfully updated"
+                Return $UpdatedTaskTemplate
+            }
+            Else {
+                Write-Warning -Message "Somehow the returned Task Template (under Set-AutomateNOWTaskTemplate) has an error. Please look into this."
+            }
+        }
+    }
+    End {
+        
+    }
+}
+
 Function Export-AutomateNOWTaskTemplate {
     <#
     .SYNOPSIS
@@ -7435,8 +8944,14 @@ Function New-AutomateNOWTaskTemplate {
     .DESCRIPTION
     Creates a Task Template within an AutomateNOW! instance and returns back the newly created [ANOWTaskTemplate] object
 
+    .PARAMETER InternalTaskType
+    Type of the Internal Task Template. Valid options are: ABORT, ADD_TAG, ADHOC_REPORT_SEND, AE_SCRIPT, ARCHIVE, ARCHIVE_CLEANUP, ARCHIVE_INTERVAL, CHECK_PROCESSING_STATE, CHECK_RESOURCE, CHECK_TIME, DESIGN_BACKUP, DESIGN_IMPORT, FORCE_COMPLETED, FORCE_FAILED, FORCE_READY, HOLD, KILL, NOTIFY_CHANNEL, NOTIFY_EMAIL, NOTIFY_GROUP, PROCESSING_ACTION_SKIP_OFF, PROCESSING_ACTION_SKIP_ON, PROCESSING_BASELINE_DEVIATION_MONITOR, PROCESSING_CLEAR_STATE_REGISTRY, PROCESSING_REGISTER_STATE, PROCESSING_RUN_NOW, PROCESSING_TEMPLATE_HOLD, PROCESSING_TEMPLATE_RESUME, PROCESSING_TEMPLATE_SKIP_OFF, PROCESSING_TEMPLATE_SKIP_ON, PROCESSING_UNREGISTER_STATE, RECALCULATE_STATISTICS, REMOVE_TAG, RESOURCE_ADD_TAG, RESOURCE_REMOVE_TAG, RESOURCE_SET_FOLDER, RESTART, RESUME, SERVER_NODE_ABORT_ALL, SERVER_NODE_ADD_TAG, SERVER_NODE_HOLD, SERVER_NODE_KILL_ALL, SERVER_NODE_REMOVE_TAG, SERVER_NODE_RESUME, SERVER_NODE_SET_FOLDER, SERVER_NODE_SET_TOTAL_WEIGHT_CAPACITY, SERVER_NODE_SKIP_OFF, SERVER_NODE_SKIP_ON, SERVER_NODE_STOP, SET_CONTEXT_VARIABLE_VALUE, SET_CONTEXT_VARIABLE_VALUES, SET_FOLDER, SET_PRIORITY, SET_RESOURCE, SET_STATUS_CODE, SKIP_OFF, SKIP_ON, USER_CONFIRM, USER_INPUT, WAIT
+
     .PARAMETER TaskType
-    Mandatory type of the Task Template. Valid options are: SH, AE_SHELL_SCRIPT, PYTHON, PERL, POWERSHELL, TCL, RUBY, PROCESSING_OBSERVER, TRIGGER_ITEM, GROOVY, SCALA, KOTLIN, C, CPP, JAVA, JAVASCRIPT, TYPESCRIPT, RUST, GO, SWIFT, VBSCRIPT, AS400_COMMAND_CALL, AS400_PROGRAM_CALL, AS400_BATCH_JOB, Z_OS_DYNAMIC_JCL, Z_OS_STORED_JCL, Z_OS_COMMAND, AWS_GLUE_WORKFLOW, AWS_GLUE_JOB, AWS_GLUE_CRAWLER, AWS_GLUE_TRIGGER, AWS_EMR_WORKFLOW, AWS_EMR_PUT, AWS_EMR_GET, AWS_EMR_START_NOTEBOOK_EXECUTION, AWS_EMR_STOP_NOTEBOOK_EXECUTION, AWS_EMR_API_COMMAND, AWS_EMR_ADD_STEPS, AWS_EMR_CANCEL_STEPS, AWS_EMR_TERMINATE_JOB_FLOW, AWS_SAGE_MAKER_API_COMMAND, AWS_SAGE_MAKER_ADD_MODEL, AWS_SAGE_MAKER_DELETE_MODEL, AWS_SAGE_MAKER_PROCESSING, AWS_SAGE_MAKER_TRAINING, AWS_SAGE_MAKER_TRANSFORM, AWS_SAGE_MAKER_TUNING, AWS_EC2_START_INSTANCE, AWS_EC2_STOP_INSTANCE, AWS_EC2_TERMINATE_INSTANCE, AWS_EC2_DELETE_VOLUME, AWS_LAMBDA_INVOKE, AWS_LAMBDA_CREATE_FUNCTION, AWS_LAMBDA_DELETE_FUNCTION, AWS_BATCH_JOB, AWS_START_STEP_FUNCTION_STATE_MACHINE, AWS_S3_DELETE_OBJECT, AWS_S3_COPY_OBJECT, AWS_S3_MOVE_OBJECT, AWS_S3_RENAME_OBJECT, AZURE_DATA_LAKE_JOB, AZURE_DATA_FACTORY_TRIGGER, AZURE_DATA_FACTORY_PIPELINE, AZURE_DATABRICKS_JOB, AZURE_DATABRICKS_TERMINATE_CLUSTER, AZURE_DATABRICKS_START_CLUSTER, AZURE_DATABRICKS_LIST_CLUSTERS, AZURE_DATABRICKS_DELETE_CLUSTER, AZURE_BATCH_JOB, AZURE_RUN_LOGIC_APP, GOOGLE_DATA_FLOW_JOB, INFORMATICA_CLOUD_TASKFLOW, HTTP_REQUEST, REST_WEB_SERVICE_CALL, SOAP_WEB_SERVICE_CALL, EMAIL_SEND, EMAIL_CONFIRMATION, EMAIL_INPUT, IBM_MQ_SEND, JMS_SEND, AMQP_SEND, RABBIT_MQ_SEND, KAFKA_SEND, MQTT_SEND, XMPP_SEND, STOMP_SEND, IBM_DATASTAGE, INFORMATICA_WORKFLOW, INFORMATICA_WS_WORKFLOW, INFORMATICA_START, INFORMATICA_EMAIL, INFORMATICA_ASSIGNMENT, INFORMATICA_TIMER, INFORMATICA_CONTROL, INFORMATICA_COMMAND, INFORMATICA_SESSION, INFORMATICA_EVENT_RAISE, INFORMATICA_EVENT_WAIT, SAP_R3_JOB, SAP_R3_VARIANT_CREATE, SAP_R3_VARIANT_COPY, SAP_R3_VARIANT_UPDATE, SAP_R3_VARIANT_DELETE, SAP_R3_RAISE_EVENT, SAP_R3_MONITOR_EXISTING_JOB, SAP_R3_RELEASE_EXISTING_JOB, SAP_R3_COPY_EXISTING_JOB, SAP_R3_START_SCHEDULED_JOB, SAP_R3_JOB_INTERCEPTOR, SAP_BW_PROCESS_CHAIN, SAP_ARCHIVE, SAP_CM_PROFILE_ACTIVATE, SAP_CM_PROFILE_DEACTIVATE, SAP_EXPORT_CALENDAR, SAP_FUNCTION_MODULE_CALL, SAP_READ_TABLE, SAP_EXPORT_JOB, SAP_MODIFY_INTERCEPTION_CRITERIA, SAP_GET_APPLICATION_LOG, SAP_SWITCH_OPERATION_MODE, SAP_4H_JOB, SAP_4H_VARIANT_CREATE, SAP_4H_VARIANT_COPY, SAP_4H_VARIANT_UPDATE, SAP_4H_VARIANT_DELETE, SAP_4H_RAISE_EVENT, SAP_4H_MONITOR_EXISTING_JOB, SAP_4H_RELEASE_EXISTING_JOB, SAP_4H_COPY_EXISTING_JOB, SAP_4H_START_SCHEDULED_JOB, SAP_4H_JOB_INTERCEPTOR, SAP_4H_BW_PROCESS_CHAIN, SAP_4H_ARCHIVE, SAP_4H_CM_PROFILE_ACTIVATE, SAP_4H_CM_PROFILE_DEACTIVATE, SAP_4H_EXPORT_CALENDAR, SAP_4H_FUNCTION_MODULE_CALL, SAP_4H_READ_TABLE, SAP_4H_EXPORT_JOB, SAP_4H_MODIFY_INTERCEPTION_CRITERIA, SAP_4H_GET_APPLICATION_LOG, SAP_4H_SWITCH_OPERATION_MODE, SAP_ODATA_API_CALL, SAP_IBP_JOB, SAP_IBP_CREATE_PROCESS, SAP_IBP_DELETE_PROCESS, SAP_IBP_SET_PROCESS_STEP_STATUS, ORACLE_EBS_PROGRAM, ORACLE_EBS_REQUEST_SET, ORACLE_EBS_EXECUTE_PROGRAM, ORACLE_EBS_EXECUTE_REQUEST_SET, PEOPLESOFT_APPLICATION_ENGINE_TASK, PEOPLESOFT_COBOL_SQL_TASK, PEOPLESOFT_CRW_ONLINE_TASK, PEOPLESOFT_CRYSTAL_REPORTS_TASK, PEOPLESOFT_CUBE_BUILDER_TASK, PEOPLESOFT_NVISION_TASK, PEOPLESOFT_SQR_PROCESS_TASK, PEOPLESOFT_SQR_REPORT_TASK, PEOPLESOFT_WINWORD_TASK, PEOPLESOFT_JOB_TASK, FILE_TRANSFER, XFTP_COMMAND, FILE_CHECK, FILE_WATCHER, DATASOURCE_UPLOAD_FILE, DATASOURCE_DOWNLOAD_FILE, DATASOURCE_DELETE_FILE, RDBMS_STORED_PROCEDURE, RDBMS_SQL_STATEMENT, RDBMS_SQL, MONGO_DB_INSERT, COUCH_DB_INSERT, CASSANDRA_CQL_SCRIPT, COUCH_BASE_INSERT, DYNAMO_DB_INSERT, ARANGO_DB_INSERT, NEO4J_INSERT, TITAN_INSERT, PROCESSING_ACTION_SKIP_ON, PROCESSING_ACTION_SKIP_OFF, NOTIFY_GROUP, NOTIFY_CHANNEL, NOTIFY_EMAIL, SET_PROCESSING_STATUS, SET_SERVER_NODE, SET_SEMAPHORE_STATE, SET_SEMAPHORE_TIMESTAMP_STATE, SET_TIME_WINDOW_STATE, SET_VARIABLE_VALUE, SET_VARIABLE_TIMESTAMP_VALUE, SET_STOCK_TOTAL_PERMITS, SET_BARRIER_TOTAL_PERMITS, SET_CONTEXT_VARIABLE_VALUE, SET_CONTEXT_VARIABLE_VALUES, SET_RESOURCES, SET_PHYSICAL_RESOURCE, SET_METRIC, PUSH_TO_QUEUE, POP_FROM_QUEUE, CLEAR_QUEUE, TRIGGER_EVENT, CHECK_SEMAPHORE_STATE, CHECK_TIME_WINDOW_STATE, CHECK_PROCESSING_STATE, CHECK_STOCK_TOTAL_PERMITS, CHECK_STOCK_AVAILABLE_PERMITS, CHECK_BARRIER_TOTAL_PERMITS, CHECK_BARRIER_AVAILABLE_PERMITS, CHECK_LOCK_STATE, CHECK_VARIABLE_VALUE, CHECK_PHYSICAL_RESOURCE, CHECK_METRIC, CHECK_CALENDAR, CHECK_QUEUE, RESOURCE_ADD_TAG, RESOURCE_REMOVE_TAG, RESOURCE_SET_FOLDER, PROCESSING_REGISTER_STATE, PROCESSING_UNREGISTER_STATE, PROCESSING_CLEAR_STATE_REGISTRY, RESTART, RETRY, FORCE_COMPLETED, FORCE_FAILED, FORCE_READY, HOLD, RESUME, ABORT, KILL, SKIP_ON, SKIP_OFF, SET_PRIORITY, ADD_TAG, REMOVE_TAG, SET_FOLDER, PROCESSING_RUN_NOW, SET_STATUS_CODE, SERVER_NODE_ABORT_ALL, SERVER_NODE_KILL_ALL, SERVER_NODE_HOLD, SERVER_NODE_SET_CONNECTION, SERVER_NODE_RESUME, SERVER_NODE_SKIP_ON, SERVER_NODE_SKIP_OFF, SERVER_NODE_STOP, SERVER_NODE_ADD_TAG, SERVER_NODE_REMOVE_TAG, SERVER_NODE_SET_FOLDER, SERVER_NODE_SET_PARAMETERS, SERVER_NODE_SET_TOTAL_WEIGHT_CAPACITY, PROCESSING_TEMPLATE_HOLD, PROCESSING_TEMPLATE_RESUME, PROCESSING_TEMPLATE_SKIP_ON, PROCESSING_TEMPLATE_SKIP_OFF, ARCHIVE, ARCHIVE_INTERVAL, ARCHIVE_CLEANUP, RECALCULATE_STATISTICS, DESIGN_BACKUP, DESIGN_IMPORT, CHECK_TIME, WAIT, USER_CONFIRM, USER_INPUT, ADHOC_REPORT_SEND, AE_SCRIPT, MS_SSIS, RAINCODE_DYNAMIC_JCL, RAINCODE_STORED_JCL, OPENTEXT_DYNAMIC_JCL, OPENTEXT_STORED_JCL, SAS_DI, SAS_4GL, SAS_JOB, SAS_VIYA_JOB, ODI_SESSION, ODI_LOAD_PLAN, DBT_JOB, TALEND_JOB, REDIS_CLI, REDIS_SET, REDIS_GET, REDIS_DELETE, FLINK_JAR_UPLOAD, FLINK_JAR_DELETE, FLINK_RUN_JOB, HDFS_UPLOAD_FILE, HDFS_APPEND_FILE, HDFS_DOWNLOAD_FILE, HDFS_DELETE_FILE, HDFS_CREATE_DIRECTORY, HDFS_DELETE_DIRECTORY, HDFS_RENAME, SPARK_RUN_JOB, SPARK_JAVA, SPARK_SCALA, SPARK_R, SPARK_PYTHON, SPARK_SQL, MICROSOFT_POWER_BI_DATASET_REFRESH, MICROSOFT_POWER_BI_DATAFLOW_REFRESH, BLUE_PRISM_STOP_ROBOT, BLUE_PRISM_START_ROBOT, BLUE_PRISM_UNDEPLOY_ROBOT, BLUE_PRISM_DEPLOY_ROBOT, BLUE_PRISM, UI_PATH_STOP_ROBOT, UI_PATH_START_ROBOT, UI_PATH_UNDEPLOY_ROBOT, UI_PATH_DEPLOY_ROBOT, UI_PATH, AUTOMATION_ANYWHERE, AUTOMATION_ANYWHERE_STOP_ROBOT, AUTOMATION_ANYWHERE_START_ROBOT, AUTOMATION_ANYWHERE_UNDEPLOY_ROBOT, AUTOMATION_ANYWHERE_DEPLOY_ROBOT, WORK_FUSION_STOP_ROBOT, WORK_FUSION_START_ROBOT, WORK_FUSION_UNDEPLOY_ROBOT, WORK_FUSION_DEPLOY_ROBOT, PEGA_STOP_ROBOT, PEGA_START_ROBOT, PEGA_UNDEPLOY_ROBOT, PEGA_DEPLOY_ROBOT, ROBOT_FRAMEWORK_STOP_ROBOT, ROBOT_FRAMEWORK_START_ROBOT, ROBOT_FRAMEWORK_UNDEPLOY_ROBOT, ROBOT_FRAMEWORK_DEPLOY_ROBOT, CONTROL_M_RUN_JOB, STONEBRANCH_RUN_JOB, CA_WLA_RUN_JOB, AUTOMIC_WLA_RUN_JOB, IBM_WLA_RUN_JOB, TERMA_RUN_JOB, TIDAL_RUN_JOB, AUTOMATE_NOW_RUN_JOB, FACEBOOK_POST, INSTAGRAM_POST, TWITTER_POST, YOUTUBE_POST, LINKED_IN_POST, TUMBLR_POST, TIKTOK_POST, REDDIT_POST, TELEGRAM_MESSAGE, WHATSAPP_MESSAGE, JIRA_ADD_ISSUE, SERVICE_NOW_CREATE_INCIDENT, SERVICE_NOW_UPDATE_INCIDENT, SERVICE_NOW_RESOLVE_INCIDENT, SERVICE_NOW_CLOSE_INCIDENT, SERVICE_NOW_INCIDENT_STATUS_SENSOR, ORACLE_SERVICE_CENTER_CASE, IBM_CONTROL_DESK_INCIDENT, BMC_REMEDY_INCIDENT, CA_SERVICE_MANAGEMENT_INCIDENT, SAP_SOLUTION_MANAGER_TICKET, HP_OPEN_VIEW_SERVICE_MANAGER_INCIDENT, AUTOMATE_NOW_TRIGGER_EVENT, APACHE_AIRFLOW_RUN_DAG, ANSIBLE_PLAYBOOK_PATH, ANSIBLE_PLAYBOOK, CTRLM_DELETE_CONDITION, CTRLM_ADD_CONDITION, CTRLM_ORDER_JOB, CTRLM_CREATE_JOB, CTRLM_RESOURCE_TABLE_ADD, CTRLM_RESOURCE_TABLE_UPDATE, CTRLM_RESOURCE_TABLE_DELETE
+    Type of the Task Template. Valid options are: AE_SHELL_SCRIPT, AMQP_SEND, ANSIBLE_PLAYBOOK, ANSIBLE_PLAYBOOK_PATH, APACHE_AIRFLOW_RUN_DAG, ARANGO_DB_INSERT, AS400_BATCH_JOB, AS400_COMMAND_CALL, AS400_PROGRAM_CALL, AUTOMATE_NOW_RUN_JOB, AUTOMATE_NOW_TRIGGER_EVENT, AUTOMATION_ANYWHERE, AUTOMATION_ANYWHERE_DEPLOY_ROBOT, AUTOMATION_ANYWHERE_START_ROBOT, AUTOMATION_ANYWHERE_STOP_ROBOT, AUTOMATION_ANYWHERE_UNDEPLOY_ROBOT, AUTOMIC_WLA_RUN_JOB, AWS_BATCH_JOB, AWS_EC2_DELETE_VOLUME, AWS_EC2_START_INSTANCE, AWS_EC2_STOP_INSTANCE, AWS_EC2_TERMINATE_INSTANCE, AWS_EMR_ADD_STEPS, AWS_EMR_API_COMMAND, AWS_EMR_CANCEL_STEPS, AWS_EMR_GET, AWS_EMR_PUT, AWS_EMR_START_NOTEBOOK_EXECUTION, AWS_EMR_STOP_NOTEBOOK_EXECUTION, AWS_EMR_TERMINATE_JOB_FLOW, AWS_EMR_WORKFLOW, AWS_GLUE_CRAWLER, AWS_GLUE_JOB, AWS_GLUE_TRIGGER, AWS_GLUE_WORKFLOW, AWS_LAMBDA_CREATE_FUNCTION, AWS_LAMBDA_DELETE_FUNCTION, AWS_LAMBDA_INVOKE, AWS_S3_COPY_OBJECT, AWS_S3_DELETE_OBJECT, AWS_S3_MOVE_OBJECT, AWS_S3_RENAME_OBJECT, AWS_SAGE_MAKER_ADD_MODEL, AWS_SAGE_MAKER_API_COMMAND, AWS_SAGE_MAKER_DELETE_MODEL, AWS_SAGE_MAKER_PROCESSING, AWS_SAGE_MAKER_TRAINING, AWS_SAGE_MAKER_TRANSFORM, AWS_SAGE_MAKER_TUNING, AWS_START_STEP_FUNCTION_STATE_MACHINE, AZURE_BATCH_JOB, AZURE_DATA_FACTORY_PIPELINE, AZURE_DATA_FACTORY_TRIGGER, AZURE_DATA_LAKE_JOB, AZURE_DATABRICKS_DELETE_CLUSTER, AZURE_DATABRICKS_JOB, AZURE_DATABRICKS_LIST_CLUSTERS, AZURE_DATABRICKS_START_CLUSTER, AZURE_DATABRICKS_TERMINATE_CLUSTER, AZURE_RUN_LOGIC_APP, BLUE_PRISM, BLUE_PRISM_DEPLOY_ROBOT, BLUE_PRISM_START_ROBOT, BLUE_PRISM_STOP_ROBOT, BLUE_PRISM_UNDEPLOY_ROBOT, BMC_REMEDY_INCIDENT, C, CA_SERVICE_MANAGEMENT_INCIDENT, CA_WLA_RUN_JOB, CASSANDRA_CQL_SCRIPT, CHECK_BARRIER_AVAILABLE_PERMITS, CHECK_BARRIER_TOTAL_PERMITS, CHECK_CALENDAR, CHECK_LOCK_STATE, CHECK_METRIC, CHECK_PHYSICAL_RESOURCE, CHECK_QUEUE, CHECK_SEMAPHORE_STATE, CHECK_STOCK_AVAILABLE_PERMITS, CHECK_STOCK_TOTAL_PERMITS, CHECK_TIME_WINDOW_STATE, CHECK_VARIABLE_VALUE, CLEAR_QUEUE, CONTROL_M_RUN_JOB, COUCH_BASE_INSERT, COUCH_DB_INSERT, CPP, CTRLM_ADD_CONDITION, CTRLM_CREATE_JOB, CTRLM_DELETE_CONDITION, CTRLM_ORDER_JOB, CTRLM_RESOURCE_TABLE_ADD, CTRLM_RESOURCE_TABLE_DELETE, CTRLM_RESOURCE_TABLE_UPDATE, DATASOURCE_DELETE_FILE, DATASOURCE_DOWNLOAD_FILE, DATASOURCE_UPLOAD_FILE, DBT_JOB, DYNAMO_DB_INSERT, EMAIL_CONFIRMATION, EMAIL_INPUT, EMAIL_SEND, FACEBOOK_POST, FILE_CHECK, FILE_TRANSFER, FILE_WATCHER, FLINK_JAR_DELETE, FLINK_JAR_UPLOAD, FLINK_RUN_JOB, GO, GOOGLE_DATA_FLOW_JOB, GROOVY, HDFS_APPEND_FILE, HDFS_CREATE_DIRECTORY, HDFS_DELETE_DIRECTORY, HDFS_DELETE_FILE, HDFS_DOWNLOAD_FILE, HDFS_RENAME, HDFS_UPLOAD_FILE, HP_OPEN_VIEW_SERVICE_MANAGER_INCIDENT, HTTP_REQUEST, IBM_CONTROL_DESK_INCIDENT, IBM_DATASTAGE, IBM_MQ_SEND, IBM_WLA_RUN_JOB, INFORMATICA_ASSIGNMENT, INFORMATICA_CLOUD_TASKFLOW, INFORMATICA_COMMAND, INFORMATICA_CONTROL, INFORMATICA_EMAIL, INFORMATICA_EVENT_RAISE, INFORMATICA_EVENT_WAIT, INFORMATICA_SESSION, INFORMATICA_START, INFORMATICA_TIMER, INFORMATICA_WORKFLOW, INFORMATICA_WS_WORKFLOW, INSTAGRAM_POST, JAVA, JAVASCRIPT, JIRA_ADD_ISSUE, JMS_SEND, KAFKA_SEND, KOTLIN, LINKED_IN_POST, MICROSOFT_POWER_BI_DATAFLOW_REFRESH, MICROSOFT_POWER_BI_DATASET_REFRESH, MONGO_DB_INSERT, MQTT_SEND, MS_SSIS, NEO4J_INSERT, ODI_LOAD_PLAN, ODI_SESSION, OPENTEXT_DYNAMIC_JCL, OPENTEXT_STORED_JCL, ORACLE_EBS_EXECUTE_PROGRAM, ORACLE_EBS_EXECUTE_REQUEST_SET, ORACLE_EBS_PROGRAM, ORACLE_EBS_REQUEST_SET, ORACLE_SERVICE_CENTER_CASE, PEGA_DEPLOY_ROBOT, PEGA_START_ROBOT, PEGA_STOP_ROBOT, PEGA_UNDEPLOY_ROBOT, PEOPLESOFT_APPLICATION_ENGINE_TASK, PEOPLESOFT_COBOL_SQL_TASK, PEOPLESOFT_CRW_ONLINE_TASK, PEOPLESOFT_CRYSTAL_REPORTS_TASK, PEOPLESOFT_CUBE_BUILDER_TASK, PEOPLESOFT_JOB_TASK, PEOPLESOFT_NVISION_TASK, PEOPLESOFT_SQR_PROCESS_TASK, PEOPLESOFT_SQR_REPORT_TASK, PEOPLESOFT_WINWORD_TASK, PERL, POP_FROM_QUEUE, POWERSHELL, PROCESSING_OBSERVER, PUSH_TO_QUEUE, PYTHON, RABBIT_MQ_SEND, RAINCODE_DYNAMIC_JCL, RAINCODE_STORED_JCL, RDBMS_SQL, RDBMS_SQL_STATEMENT, RDBMS_STORED_PROCEDURE, REDDIT_POST, REDIS_CLI, REDIS_DELETE, REDIS_GET, REDIS_SET, REST_WEB_SERVICE_CALL, RETRY, ROBOT_FRAMEWORK_DEPLOY_ROBOT, ROBOT_FRAMEWORK_START_ROBOT, ROBOT_FRAMEWORK_STOP_ROBOT, ROBOT_FRAMEWORK_UNDEPLOY_ROBOT, RUBY, RUST, SAP_4H_ARCHIVE, SAP_4H_BW_PROCESS_CHAIN, SAP_4H_CM_PROFILE_ACTIVATE, SAP_4H_CM_PROFILE_DEACTIVATE, SAP_4H_COPY_EXISTING_JOB, SAP_4H_EXPORT_CALENDAR, SAP_4H_EXPORT_JOB, SAP_4H_FUNCTION_MODULE_CALL, SAP_4H_GET_APPLICATION_LOG, SAP_4H_JOB, SAP_4H_JOB_INTERCEPTOR, SAP_4H_MODIFY_INTERCEPTION_CRITERIA, SAP_4H_MONITOR_EXISTING_JOB, SAP_4H_RAISE_EVENT, SAP_4H_READ_TABLE, SAP_4H_RELEASE_EXISTING_JOB, SAP_4H_START_SCHEDULED_JOB, SAP_4H_SWITCH_OPERATION_MODE, SAP_4H_VARIANT_COPY, SAP_4H_VARIANT_CREATE, SAP_4H_VARIANT_DELETE, SAP_4H_VARIANT_UPDATE, SAP_ARCHIVE, SAP_BW_PROCESS_CHAIN, SAP_CM_PROFILE_ACTIVATE, SAP_CM_PROFILE_DEACTIVATE, SAP_EXPORT_CALENDAR, SAP_EXPORT_JOB, SAP_FUNCTION_MODULE_CALL, SAP_GET_APPLICATION_LOG, SAP_IBP_CREATE_PROCESS, SAP_IBP_DELETE_PROCESS, SAP_IBP_JOB, SAP_IBP_SET_PROCESS_STEP_STATUS, SAP_MODIFY_INTERCEPTION_CRITERIA, SAP_ODATA_API_CALL, SAP_R3_COPY_EXISTING_JOB, SAP_R3_JOB, SAP_R3_JOB_INTERCEPTOR, SAP_R3_MONITOR_EXISTING_JOB, SAP_R3_RAISE_EVENT, SAP_R3_RELEASE_EXISTING_JOB, SAP_R3_START_SCHEDULED_JOB, SAP_R3_VARIANT_COPY, SAP_R3_VARIANT_CREATE, SAP_R3_VARIANT_DELETE, SAP_R3_VARIANT_UPDATE, SAP_READ_TABLE, SAP_SOLUTION_MANAGER_TICKET, SAP_SWITCH_OPERATION_MODE, SAS_4GL, SAS_DI, SAS_JOB, SAS_VIYA_JOB, SCALA, SERVER_NODE_SET_CONNECTION, SERVER_NODE_SET_PARAMETERS, SERVICE_NOW_CLOSE_INCIDENT, SERVICE_NOW_CREATE_INCIDENT, SERVICE_NOW_INCIDENT_STATUS_SENSOR, SERVICE_NOW_RESOLVE_INCIDENT, SERVICE_NOW_UPDATE_INCIDENT, SET_BARRIER_TOTAL_PERMITS, SET_METRIC, SET_PHYSICAL_RESOURCE, SET_PROCESSING_STATUS, SET_RESOURCES, SET_SEMAPHORE_STATE, SET_SEMAPHORE_TIMESTAMP_STATE, SET_SERVER_NODE, SET_STOCK_TOTAL_PERMITS, SET_TIME_WINDOW_STATE, SET_VARIABLE_TIMESTAMP_VALUE, SET_VARIABLE_VALUE, SH, SOAP_WEB_SERVICE_CALL, SPARK_JAVA, SPARK_PYTHON, SPARK_R, SPARK_RUN_JOB, SPARK_SCALA, SPARK_SQL, STOMP_SEND, STONEBRANCH_RUN_JOB, SWIFT, TALEND_JOB, TCL, TELEGRAM_MESSAGE, TERMA_RUN_JOB, TIDAL_RUN_JOB, TIKTOK_POST, TITAN_INSERT, TRIGGER_EVENT, TRIGGER_ITEM, TUMBLR_POST, TWITTER_POST, TYPESCRIPT, UI_PATH, UI_PATH_DEPLOY_ROBOT, UI_PATH_START_ROBOT, UI_PATH_STOP_ROBOT, UI_PATH_UNDEPLOY_ROBOT, VBSCRIPT, WHATSAPP_MESSAGE, WORK_FUSION_DEPLOY_ROBOT, WORK_FUSION_START_ROBOT, WORK_FUSION_STOP_ROBOT, WORK_FUSION_UNDEPLOY_ROBOT, XFTP_COMMAND, XMPP_SEND, YOUTUBE_POST, Z_OS_COMMAND, Z_OS_DYNAMIC_JCL, Z_OS_STORED_JCL
+
+    .PARAMETER ServiceManagerTaskType
+    Type of the Task Template. Valid options are: SLA_SERVICE_MANAGER, PROCESSING_DEADLINE_MONITOR
 
     .PARAMETER Id
     Mandatory "name" of the Task Template. For example: 'LinuxTaskTemplate1'. This value may not contain the domain in brackets. This is the unique key of this object.
@@ -7460,7 +8975,10 @@ Function New-AutomateNOWTaskTemplate {
     Optional string representing the Code Repository to place this object into.
 
     .PARAMETER ServerNodeType
-    Mandatory name of the Server Node Type that drives the Task Template. Use a string here! Valid options are: AZURE, AWS, GOOGLE_CLOUD, GOOGLE_DATA_FLOW, AZURE_DATABRICKS, INFORMATICA_CLOUD, UNIX, LINUX, WINDOWS, SOLARIS, HPUX, AIX, OPENVMS, MACOS, AS400, Z_OS, RAINCODE, CTRL_M, OPENTEXT, INFORMATICA, INFORMATICA_WS, SAS, SAS_VIYA, IBM_DATASTAGE, ODI, MS_SSIS, AB_INITIO, SAP_BODI, SKYVIA, TALEND, DBT, SAP, SAP_S4_HANA, SAP_S4_HANA_CLOUD, SAP_IBP, JD_EDWARDS, ORACLE_EBS, PEOPLESOFT, MICROSOFT_DYNAMICS, HIVE_QL, GOOGLE_BIG_QUERY, AZURE_SQL_DATA_WAREHOUSE, AZURE_SQL_DATABASE, DASHDB, DB2, MYSQL, NETEZZA, ORACLE, POSTGRESQL, SQL_SERVER, TERADATA, SINGLESTORE, SNOWFLAKE, VERTICA, PRESTO_DB, SYBASE, INFORMIX, H2, FILE_MANAGER, SNMP, HTTP, EMAIL, SOAP_WEB_SERVICE, REST_WEB_SERVICE, INTERNAL, IBM_MQ, RABBIT_MQ, SQS, ACTIVE_MQ, QPID, IBM_SIBUS, HORNETQ, SOLACE, JORAM_MQ, QMQ, ZERO_MQ, KAFKA, PULSAR, AMAZON_KINESIS, GOOGLE_CLOUD_PUB_SUB, MICROSOFT_AZURE_EVENT_HUB, AMQP, XMPP, STOMP, HDFS, REDIS, HADOOP, HIVE, IMPALA, SQOOP, YARN, SPARK, FLUME, FLINK, STORM, OOZIE, AMBARI, ELASTIC_SEARCH, CASSANDRA, SAP_HANA, MONGO_DB, COUCH_DB, COUCH_BASE, DYNAMO_DB, ARANGO_DB, NEO4J, ORIENT_DB, TITAN, ANDROID, IOS, WINDOWS_MOBILE, MICROSOFT_POWER_BI, BLUE_PRISM, UI_PATH, AUTOMATION_ANYWHERE, WORK_FUSION, PEGA, ROBOT_FRAMEWORK, CONTROL_M, STONEBRANCH, CA_WLA, AUTOMIC_WLA, IBM_WLA, TIDAL, FACEBOOK, INSTAGRAM, TWITTER, YOUTUBE, LINKED_IN, TUMBLR, TIKTOK, REDDIT, TELEGRAM, WHATSAPP, JIRA, SERVICE_NOW, ORACLE_SERVICE_CENTER, BMC_REMEDY, CA_SERVICE_MANAGEMENT, IBM_CONTROL_DESK, HP_OPEN_VIEW_SERVICE_MANAGER, SAP_SOLUTION_MANAGER, AUTOMATE_NOW, APACHE_AIRFLOW, ANSIBLE
+    Name of the Server Node Type that drives the Task Template. Use a string here! You cannot combine this parameter with -InternalTask. Valid options are: AZURE, AWS, GOOGLE_CLOUD, GOOGLE_DATA_FLOW, AZURE_DATABRICKS, INFORMATICA_CLOUD, UNIX, LINUX, WINDOWS, SOLARIS, HPUX, AIX, OPENVMS, MACOS, AS400, Z_OS, RAINCODE, CTRL_M, OPENTEXT, INFORMATICA, INFORMATICA_WS, SAS, SAS_VIYA, IBM_DATASTAGE, ODI, MS_SSIS, AB_INITIO, SAP_BODI, SKYVIA, TALEND, DBT, SAP, SAP_S4_HANA, SAP_S4_HANA_CLOUD, SAP_IBP, JD_EDWARDS, ORACLE_EBS, PEOPLESOFT, MICROSOFT_DYNAMICS, HIVE_QL, GOOGLE_BIG_QUERY, AZURE_SQL_DATA_WAREHOUSE, AZURE_SQL_DATABASE, DASHDB, DB2, MYSQL, NETEZZA, ORACLE, POSTGRESQL, SQL_SERVER, TERADATA, SINGLESTORE, SNOWFLAKE, VERTICA, PRESTO_DB, SYBASE, INFORMIX, H2, FILE_MANAGER, SNMP, HTTP, EMAIL, SOAP_WEB_SERVICE, REST_WEB_SERVICE, INTERNAL, IBM_MQ, RABBIT_MQ, SQS, ACTIVE_MQ, QPID, IBM_SIBUS, HORNETQ, SOLACE, JORAM_MQ, QMQ, ZERO_MQ, KAFKA, PULSAR, AMAZON_KINESIS, GOOGLE_CLOUD_PUB_SUB, MICROSOFT_AZURE_EVENT_HUB, AMQP, XMPP, STOMP, HDFS, REDIS, HADOOP, HIVE, IMPALA, SQOOP, YARN, SPARK, FLUME, FLINK, STORM, OOZIE, AMBARI, ELASTIC_SEARCH, CASSANDRA, SAP_HANA, MONGO_DB, COUCH_DB, COUCH_BASE, DYNAMO_DB, ARANGO_DB, NEO4J, ORIENT_DB, TITAN, ANDROID, IOS, WINDOWS_MOBILE, MICROSOFT_POWER_BI, BLUE_PRISM, UI_PATH, AUTOMATION_ANYWHERE, WORK_FUSION, PEGA, ROBOT_FRAMEWORK, CONTROL_M, STONEBRANCH, CA_WLA, AUTOMIC_WLA, IBM_WLA, TIDAL, FACEBOOK, INSTAGRAM, TWITTER, YOUTUBE, LINKED_IN, TUMBLR, TIKTOK, REDDIT, TELEGRAM, WHATSAPP, JIRA, SERVICE_NOW, ORACLE_SERVICE_CENTER, BMC_REMEDY, CA_SERVICE_MANAGEMENT, IBM_CONTROL_DESK, HP_OPEN_VIEW_SERVICE_MANAGER, SAP_SOLUTION_MANAGER, AUTOMATE_NOW, APACHE_AIRFLOW, ANSIBLE
+
+    .PARAMETER InternalTask
+    Switch to indicate the task is internal. You cannot combine this parameter with -ServerNodeType.
 
     .PARAMETER Quiet
     Optional switch to suppress the return of the newly created object
@@ -7481,14 +8999,18 @@ Function New-AutomateNOWTaskTemplate {
 
     The name (id) of the Task Template must be unique (per domain). It may consist only of letters, numbers, underscore, dot or hypen.
 
-    The Server Node Type is not enforced by this function! Be careful. This on the wish list to improve.
+    You must specify one of the three following parameters: -TaskType, -InternalTaskType or -ServiceManagerTaskType
 
     #>
     [OutputType([ANOWTaskTemplate])]
     [Cmdletbinding()]
     Param(
-        [Parameter(Mandatory = $true)]
-        [ANOWTaskTemplate_taskType]$TaskType,
+        [Parameter(Mandatory = $true, ParameterSetName = 'InternalTask')]
+        [ANOWTaskTemplateCustom_InternalTasks]$InternalTaskType,
+        [Parameter(Mandatory = $true, ParameterSetName = 'NodeTask')]
+        [ANOWTaskTemplateCustom_Tasks]$TaskType,
+        [Parameter(Mandatory = $true, ParameterSetName = 'ServiceManagerTask')]
+        [ANOWTaskTemplateCustom_ServiceManagers]$ServiceManagerTaskType,
         [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
         [Parameter(Mandatory = $true)]
         [string]$Id,
@@ -7505,7 +9027,7 @@ Function New-AutomateNOWTaskTemplate {
         [string]$Workspace,
         [Parameter(Mandatory = $false)]
         [string]$CodeRepository,
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory = $true, ParameterSetName = 'NodeTask')]
         [ANOWTaskTemplate_serverNodeType]$ServerNodeType,
         [Parameter(Mandatory = $false)]
         [switch]$Quiet
@@ -7514,17 +9036,29 @@ Function New-AutomateNOWTaskTemplate {
         Write-Warning -Message "Somehow there is not a valid token confirmed."
         Break
     }
-    [string[]]$ValidServerNodeTypes = Resolve-AutomateNOWTaskType2ServerNodeType -TaskType $TaskType
-    [int32]$ValidServerNodeTypesCount = $ValidServerNodeTypes.Count
-    If ($ValidServerNodeTypesCount -eq 0) {
-        Write-Warning -Message "Somehow the TaskType2ServerNodeType lookup table has failed"
-        Break
+    [string]$processingType = 'TASK'
+    If ($InternalTaskType.Length -gt 0 -or $ServiceManagerTaskType.Length -gt 0) {
+        [string]$ServerNodeType = 'INTERNAL'
+        If ($InternalTaskType.Length -gt 0) {
+            [string]$TaskType = $InternalTaskType
+        }
+        Else {
+            [string]$processingType = 'SERVICE'
+        }
     }
     Else {
-        If ($ServerNodeType -notin $ValidServerNodeTypes) {
-            [string]$ValidServerNodeTypesDisplay = $ValidServerNodeTypes -join ', '
-            Write-Warning -Message "Sorry, [$ServerNodeType] is not a valid server node type for a [$TaskType] task. Please use one of these instead: $ValidServerNodeTypesDisplay"
+        [string[]]$ValidServerNodeTypes = Resolve-AutomateNOWTaskType2ServerNodeType -TaskType $TaskType
+        [int32]$ValidServerNodeTypesCount = $ValidServerNodeTypes.Count
+        If ($ValidServerNodeTypesCount -eq 0) {
+            Write-Warning -Message "Somehow the TaskType2ServerNodeType lookup table has failed"
             Break
+        }
+        Else {
+            If ($ServerNodeType -notin $ValidServerNodeTypes) {
+                [string]$ValidServerNodeTypesDisplay = $ValidServerNodeTypes -join ', '
+                Write-Warning -Message "Sorry, [$ServerNodeType] is not a valid server node type for a [$TaskType] task. Please use one of these instead: $ValidServerNodeTypesDisplay"
+                Break
+            }
         }
     }
     ## Begin warning ##
@@ -7543,12 +9077,21 @@ Function New-AutomateNOWTaskTemplate {
         Write-Warning "There is already a Task Template named [$Id] in [$current_domain]. Please check into this."
         Break
     }
-    ## End warning ##
+    ## End warning ##    
     [System.Collections.Specialized.OrderedDictionary]$ANOWTaskTemplate = [System.Collections.Specialized.OrderedDictionary]@{}
     $ANOWTaskTemplate.Add('id', $Id)
-    $ANOWTaskTemplate.Add('processingType', 'TASK')
-    $ANOWTaskTemplate.Add('taskType', $TaskType)
+    $ANOWTaskTemplate.Add('processingType', $processingType)
+    If ($ServiceManagerTaskType.Length -eq 0) {
+        $ANOWTaskTemplate.Add('taskType', $TaskType)
+        [string]$old_values = ('{"processingType":"TASK","taskType":"' + $TaskType + '","serverNodeType":"' + $ServerNodeType + '"}')
+    }
+    Else {
+        $ANOWTaskTemplate.Add('serviceType', 'SERVICE_MANAGER')
+        $ANOWTaskTemplate.Add('serviceManagerType', $ServiceManagerTaskType)
+        [string]$old_values = '{"processingType":"SERVICE","serviceType":"SERVICE_MANAGER","serviceManagerType":"' + $ServiceManagerTaskType + '","workspace":null,"serverNodeType":"INTERNAL"}'
+    }
     $ANOWTaskTemplate.Add('serverNodeType', $ServerNodeType)
+    $ANOWTaskTemplate.Add('_oldValues', $old_values)
     [string[]]$include_properties = 'id', 'processingType', 'taskType', 'serverNodeType'
     If ($Description.Length -gt 0) {
         $ANOWTaskTemplate.Add('description', $Description)
@@ -7644,7 +9187,7 @@ Function New-AutomateNOWTaskTemplate {
     [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
     $BodyMetaData.'_textMatchStyle' = 'exact'
     $BodyMetaData.'_operationType' = 'add'
-    $BodyMetaData.'_oldValues' = '{"processingType":"TASK","taskType":"' + $TaskType + '","workspace":null}'
+    $BodyMetaData.'_oldValues' = $old_values
     $BodyMetaData.'_componentId' = 'ProcessingTemplateCreateWindow_form'
     $BodyMetaData.'_dataSource' = 'ProcessingTemplateDataSource'
     $BodyMetaData.'isc_metaDataPrefix' = '_'
@@ -9308,8 +10851,8 @@ Function Get-AutomateNOWUser {
                 # Note: I'm not sure why routine this was needed
                 Try {
                     ForEach ($Property in ($FormattedUser | Get-Member -MemberType Property | Select-Object -ExpandProperty Name)) {
-                        If($null -eq $User.$Property){
-                            If($Property -in @('lastAccountExpired')){
+                        If ($null -eq $User.$Property) {
+                            If ($Property -in @('lastAccountExpired')) {
                                 $FormattedUser.$Property = Get-Date -Date '1970-01-01'
                             }
                         }
@@ -9978,6 +11521,116 @@ Function Export-AutomateNOWWorkflow {
             [string]$filelength_display = "{0:N0}" -f $filelength
             Write-Information -MessageData "Created file $ExportFileName ($filelength_display bytes)"
         }
+    }
+}
+
+Function Remove-AutomateNOWWorkflow {
+    <#
+    .SYNOPSIS
+    Archives a Workflow from an AutomateNOW! instance
+
+    .DESCRIPTION
+    Archives a Workflow from an AutomateNOW! instance
+
+    .PARAMETER Workflow
+    An [ANOWWorkflow] object representing the Workflow Template to be archived.
+
+    .PARAMETER Force
+    Force the archiving without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    ONLY [ANOWWorkflow] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    None. The status will be written to the console with Write-Verbose.
+
+    .EXAMPLE
+    Archives a single workflow
+
+    Get-AutomateNOWWorkflow -Id 'Workflow01' | Remove-AutomateNOWWorkflow 
+
+    .EXAMPLE
+    Archives a series of workflows without prompting
+
+    @( 'Workflow1', 'Workflow2', 'Workflow3') | Remove-AutomateNOWWorkflow -Force
+
+    .EXAMPLE
+    Archives all for_each workflows
+    
+    Get-AutomateNOWWorkflow | ? { $_.serverWorkflowType -eq 'FOR_EACH' } | Remove-AutomateNOWWorkflow 
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    The term Remove and Archive are synonymous from the API perspective. In ANOW parlance, Templates are 'Deleted' and Workflows are 'Archived'.
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $false, ValueFromPipeline = $True)]
+        [ANOWWorkflow]$Workflow,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [string]$command = '/processing/delete'
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [string]$Workflow_id = $_.id
+        }
+        ElseIf ($Workflow.id.Length -gt 0) {
+            [string]$Workflow_id = $Workflow.id
+        }
+        Else {
+            [string]$Workflow_id = $Id
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess($Workflow_id, 'Archive')) -eq $true) {            
+            [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
+            $Body.Add('id', $Workflow_id)
+            $Body.Add('_operationType', 'remove')
+            $Body.Add('_operationId', 'delete')
+            $Body.Add('_textMatchStyle', 'exact')
+            $Body.Add('_dataSource', 'ProcessingDataSource')
+            $Body.Add('isc_metaDataPrefix', '_')
+            $Body.Add('isc_dataFormat', 'json')            
+            [string]$Body = ConvertTo-QueryString -InputObject $Body
+            If ($null -eq $parameters.Body) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$Workflow_id] due to [$Message]."
+                Break
+            }    
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
+            }
+            Write-Verbose -Message "Workflow $Workflow_id successfully archived"
+        }
+    }
+    End {
+
     }
 }
 
@@ -12465,13 +14118,52 @@ Function Get-AutomateNOWWorkspace {
 Function Set-AutomateNOWWorkspace {
     <#
     .SYNOPSIS
-    Changes the settings of a Workspace from an AutomateNOW! instance
+    Changes the settings of a Workspace on an AutomateNOW! instance
 
     .DESCRIPTION
-    Changes the settings of a Workspace from an AutomateNOW! instance
+    Changes the settings of a Workspace on an AutomateNOW! instance
 
     .PARAMETER Workspace
     An [ANOWWorkspace] object representing the Workspace to be changed.
+
+    .PARAMETER Description
+    A text description of at least 1 character.
+
+    .PARAMETER RemoveIcon
+    Switch parameter that will remove the icon configured for this workspace.
+
+    .PARAMETER iconSet
+    The name of the icon library (if you choose to use one). Possible choices are: FAT_COW, FUGUE (note that FONT_AWESOME is not an actual icon library)
+
+    .PARAMETER iconCode
+    The name of the icon which matches the chosen library. To see the list of available iconCodes, use Import-AutomateNOWIcon (or Import-AutomateNOWLocalIcon) then try $anow_assets.icon_library."FUGUE"[0..10] to see the names of the first 10 icons from the Fugue library.
+    
+    .PARAMETER UnsetFolder
+    Switch parameter that will unset the folder configuration. This is equivalent to unticking the box for 'Automatically set folder to workspace template'
+
+    .PARAMETER SetFolderType
+    Enables the 'Automatically set tags to workspace template'. Valid choices are: SET_WORKSPACE_FOLDER, SET_SPECIFIC_FOLDER, CREATE_SUB_FOLDER_PER_WORKFLOW. Note, if you specify SET_SPECIFIC_FOLDER then you must include the -Folder parameter as well with the name (string) of the Folder object.
+
+    .PARAMETER Folder
+    String that specifies the name of the folder object that you are specifying with the SET_SPECIFIC_FOLDER folder type. Do not use this parameter with the other two folder types.
+
+    .PARAMETER UnsetTags
+    Switch parameter that will unset the tag configuration. If this is the SET_SPECIFIC_TAGS type, the tags set will be removed. This is equivalent to unticking the box for 'Automatically set tags to workspace templates'
+
+    .PARAMETER SetTagType
+    Enables the 'Automatically set tags to workspace template'. Valid choices are: SET_WORKSPACE_TAGS, SET_SPECIFIC_TAGS. Note, if you specify SET_SPECIFIC_TAGS then you must include the -Tag parameter as well with the names (string array) of the Tag objects.
+
+    .PARAMETER Tag
+    String array that specifies the name(s) of the Tag objects that you are specifying with the SET_SPECIFIC_TAGS tag type. Do not use this parameter with the other tag type.
+
+    .PARAMETER Folder
+    String that specifies the name of the folder object that you are specifying with the SET_SPECIFIC_FOLDER folder type. Do not use this parameter with the other two folder types.
+
+    .PARAMETER SetPrefix
+    String that enables the 'Add prefix to workspace template' and sets the prefix to the string provided. Unlike the console, a default suggested prefix will not be made for you.
+
+    .PARAMETER UnsetPrefix
+    Switch parameter that will unset the prefix configuration. This is equivalent to unticking the box for 'Add prefix to workspace template'
 
     .PARAMETER Force
     Force the change without confirmation. This is equivalent to -Confirm:$false
@@ -12483,28 +14175,134 @@ Function Set-AutomateNOWWorkspace {
     The modified [ANOWWorkspace] object will be returned
 
     .EXAMPLE
-    Get-AutomateNOWWorkspace -Id 'Workspace01' | Set-AutomateNOWWorkspace -Description 'New Description'
+    Sets the description on a Workspace
+    Set-AutomateNOWWorkspace -Workspace $workspace -Description 'My Description' -Force
+
+    .EXAMPLE
+    Unsets the description on a Workspace
+    Set-AutomateNOWWorkspace -Workspace $workspace -RemoveDescription -Force
+
+    .EXAMPLE
+    Unsets the icon on a Workspace
+    Set-AutomateNOWWorkspace -Workspace $workspace -RemoveIcon -Force
+
+    .EXAMPLE
+    Sets the icon on a Workspace (example 1)
+    Import-AutomateNOWLocalIcon
+    Set-AutomateNOWWorkspace -Workspace $workspace -iconSet FUGUE -iconCode address-book -Force
+
+    .EXAMPLE
+    Sets the icon on a Workspace (example 2)
+    Import-AutomateNOWLocalIcon
+    Set-AutomateNOWWorkspace -Workspace $workspace -iconSet FAT_COW -iconCode abacus -Force
+
+    .EXAMPLE
+    Unsets the folder configuration for a Workspace
+    Set-AutomateNOWWorkspace -Workspace $workspace -UnsetFolder -Force
+
+    .EXAMPLE
+    Sets the folder configuration for a Workspace (example 1)
+    Set-AutomateNOWWorkspace -Workspace $workspace -SetFolderType CREATE_SUB_FOLDER_PER_WORKFLOW -Force
+
+    .EXAMPLE
+    Sets the folder configuration for a Workspace (example 2)
+    Set-AutomateNOWWorkspace -Workspace $workspace -SetFolderType SET_WORKSPACE_FOLDER -Force
+
+    .EXAMPLE
+    Sets the folder configuration for a Workspace (example 3) note the -Folder parameter
+    Set-AutomateNOWWorkspace -Workspace $workspace -SetFolderType SET_SPECIFIC_FOLDER -Folder 'MJS'
+
+    .EXAMPLE
+    Unsets the tag configuration for a Workspace
+    Set-AutomateNOWWorkspace -Workspace $workspace -UnsetTags -Force
+
+    .EXAMPLE
+    Sets the tag configuration for a Workspace (example 1)
+    Set-AutomateNOWWorkspace -Workspace $workspace -SetTagType 'SET_WORKSPACE_TAGS' -Force
+
+    .EXAMPLE
+    Sets the tag configuration for a Workspace (example 2) note the -Tags parameter adding multiple tags
+    Set-AutomateNOWWorkspace -Workspace $workspace -SetTagType 'SET_SPECIFIC_TAGS' -Tags Tag1, Tag2 -Force
+
+    .EXAMPLE
+    Sets a prefix on a Workspace
+    Set-AutomateNOWWorkspace -Workspace $workspace -SetPrefix 'prefix01_' -Force
+
+    .EXAMPLE
+    Unsets the prefix on a Workspace
+    Set-AutomateNOWWorkspace -Workspace $workspace -UnsetPrefix -Force
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
 
-    The only property which the console allows to be changed is the description. This is a work in progress.
+    You may only make 1 change a time! That's why there are so many parameter sets. This is done out of caution.
+
+    The -iconSet and -iconCode parameter set requires that you import the local icon names with Import-AutomateNOWIcon or Import-AutomateNOWLocalIcon. This is only to check that the name of the icon being sent to the API is valid.
+    
+    If you have three tags on a Workspace and wanted to remove one then use the -SetTags parameter to apply the 2 that you want to keep. If you want to remove all tags then use -UnsetTags.
 
     #>
     [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
     Param(
         [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
         [ANOWWorkspace]$Workspace,
-        [Parameter(Mandatory = $true, HelpMessage = "Enter a descriptive string between 0 and 255 characters in length. UTF8 characters are accepted.")]
         [AllowEmptyString()]
-        [ValidateScript({ $_.Length -le 255 })]
+        [ValidateScript({ $_.Length -ge 1 -and $_.Length -le 255 })]
+        [Parameter(Mandatory = $true, ParameterSetName = 'SetDescription', HelpMessage = "Enter a descriptive string between 1 and 255 characters in length. UTF8 characters are accepted.")]
         [string]$Description,
+        [Parameter(Mandatory = $true, ParameterSetName = 'ResetDescription')]
+        [switch]$RemoveDescription,
+        [Parameter(Mandatory = $true, ParameterSetName = 'SetIcon')]
+        [ANOWiconSetIconsOnly]$iconSet,
+        [Parameter(Mandatory = $true, ParameterSetName = 'SetIcon')]
+        [string]$iconCode,
+        [Parameter(Mandatory = $true, ParameterSetName = 'RemoveIcon')]
+        [switch]$RemoveIcon,
+        [Parameter(Mandatory = $true, ParameterSetName = 'UnsetFolder')]
+        [switch]$UnsetFolder,
+        [Parameter(Mandatory = $true, ParameterSetName = 'SetFolder')]
+        [ANOWWorkspace_workspaceSetFolderType]$SetFolderType,
+        [Parameter(Mandatory = $false, ParameterSetName = 'SetFolder')]
+        [string]$Folder,
+        [Parameter(Mandatory = $true, ParameterSetName = 'UnsetTags')]
+        [switch]$UnsetTags,
+        [Parameter(Mandatory = $true, ParameterSetName = 'SetTags')]
+        [ANOWWorkspace_workspaceSetTagType]$SetTagType,
+        [Parameter(Mandatory = $false, ParameterSetName = 'SetTags')]
+        [string[]]$Tags,
+        [ValidateScript({ $_.Length -ge 1 -and $_.Length -le 255 })]
+        [Parameter(Mandatory = $true, ParameterSetName = 'SetPrefix', HelpMessage = "Enter a descriptive string between 1 and 255 characters in length. UTF8 characters are accepted. Example 'MyWorkspace_'")]
+        [string]$SetPrefix,
+        [Parameter(Mandatory = $true, ParameterSetName = 'UnsetPrefix')]
+        [switch]$UnsetPrefix,
         [Parameter(Mandatory = $false)]
         [switch]$Force
     )
     Begin {
         If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
             Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        If ($iconSet.length -gt 0 ) {
+            If ($anow_assets.icon_library.length -eq 0) {
+                Write-Warning -Message "Please import the ANOW icons into your session with Import-AutomateNOWIcon or Import-AutomateNOWLocalIcon"
+                Break
+            }
+            If ($iconCode -notin ($anow_assets.icon_library."$iconSet")) {
+                Write-Warning -Message "The icon [$iconCode] does not appear to exist within the [$iconSet] icon set. Please check again."
+                Break
+            }
+        }
+        ElseIf ($AddPrefix -eq $true -and $Prefix.Length -eq 0) {
+            Write-Warning -Message 'You must include the -Prefix parameter when specifying -AddPrefix. Please refer to the help.'
+            Break
+        }
+        ElseIf ($SetFolderType -eq 'SET_SPECIFIC_FOLDER' -and $Folder.Length -eq 0) {
+            Write-Warning -Message 'You must include the name of the folder with -Folder if you are specifying the ''SET_SPECIFIC_FOLDER'' folder type. Please try again.'
+            Break
+        }
+        ElseIf ($SetFolderType -in ('SET_WORKSPACE_FOLDER', 'CREATE_SUB_FOLDER_PER_WORKFLOW') -and $Folder.Length -gt 0) {
+            Write-Warning -Message 'Please do not include the -Folder parameter if you are not specifying the ''SET_SPECIFIC_FOLDER'' folder type. This is not compatible.'
             Break
         }
         [string]$command = '/workspace/update'
@@ -12544,19 +14342,186 @@ Function Set-AutomateNOWWorkspace {
                 Break
             }
             ## End warning ##
+            [System.Collections.ArrayList]$include_properties = [System.Collections.ArrayList]@()
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
-            $BodyMetaData.'id', $Workspace.id
-            $BodyMetaData.'parent' = $Workspace.parent
-            $BodyMetaData.'codeRepository' = $Workspace.codeRepository
-            $BodyMetaData.'_oldValues' = $Workspace.CreateOldValues()
+            $BodyMetaData.'id' = $Workspace_id
+            If ($Description.Length -gt 0) {
+                $BodyMetaData.'description' = $Description
+            }
+            ElseIf ($RemoveDescription -eq $true) {
+                $BodyMetaData.'description' = $null
+            }
+            ElseIf ($RemoveIcon -eq $true) {
+                $BodyMetaData.'iconSet' = $null
+                $BodyMetaData.'fugueIcon' = $null
+                $BodyMetaData.'fatCowIcon' = $null
+                $BodyMetaData.'codeRepository' = $Workspace.codeRepository
+                $BodyMetaData.'_componentId' = 'WorkspaceVM'
+                $BodyMetaData.'_oldValues' = $Workspace.CreateOldValues()
+                [void]$include_properties.Add('iconSet')
+                [void]$include_properties.Add('setWorkspaceTags')
+                [void]$include_properties.Add('fugueIcon')
+                [void]$include_properties.Add('fatCowIcon')
+                [void]$include_properties.Add('codeRepository')     
+            }
+            
+            ElseIf ($iconCode.Length -gt 0) {
+                $BodyMetaData.'iconCode' = $iconCode
+                $BodyMetaData.'iconSet' = $iconSet
+                $BodyMetaData.'fugueIcon' = $null
+                $BodyMetaData.'fatCowIcon' = $null
+                $BodyMetaData.'codeRepository' = $Workspace.codeRepository
+                $BodyMetaData.'_componentId' = 'WorkspaceEditForm'
+                [void]$include_properties.Add('fugueIcon')
+                [void]$include_properties.Add('fatCowIcon')
+                [void]$include_properties.Add('codeRepository')
+            }
+            ElseIf ($UnsetFolder -eq $true) {
+                $BodyMetaData.'setFolder' = 'false'
+                $BodyMetaData.'workspaceSetFolderType' = $null
+                $BodyMetaData.'iconCode' = $Workspace.iconCode
+                $BodyMetaData.'iconSet' = $Workspace.iconSet
+                $BodyMetaData.'fugueIcon' = $null
+                $BodyMetaData.'fatCowIcon' = $null
+                $BodyMetaData.'codeRepository' = $Workspace.codeRepository
+                $BodyMetaData.'_componentId' = 'WorkspaceVM'
+                $BodyMetaData.'_oldValues' = $Workspace.CreateOldValues()
+                [void]$include_properties.Add('iconSet')
+                [void]$include_properties.Add('setWorkspaceTags')
+                [void]$include_properties.Add('fugueIcon')
+                [void]$include_properties.Add('fatCowIcon')
+                [void]$include_properties.Add('codeRepository')    
+            }
+            ElseIf ($SetFolderType.Length -gt 0) {
+                $BodyMetaData.'setFolder' = 'true'
+                $BodyMetaData.'workspaceSetFolderType' = $SetFolderType
+                If ($Folder.Length -gt 0) {
+                    $Error.Clear()
+                    Try {
+                        [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
+                    }
+                    Catch {
+                        [string]$Message = $_.Exception.Message
+                        Write-Warning -Message "Get-AutomateNOWFolder failed to confirm that the folder [$tag_id] actually existed under Set-AutomateNOWWorkspace due to [$Message]"
+                        Break
+                    }
+                    If ($folder_object.simpleId.Length -eq 0) {
+                        Throw "Get-AutomateNOWFolder failed to locate the Folder [$Folder] under Set-AutomateNOWWorkspace. Please check again."
+                        Break
+                    }
+                    [string]$folder_display = $folder_object | ConvertTo-Json -Compress
+                    Write-Verbose -Message "Adding folder $folder_display to [ANOWWorkflowTemplate] [$Workspace_id]"
+                    $BodyMetaData.'setWorkspaceFolder' = $Folder
+                    [void]$include_properties.Add('setWorkspaceFolder')
+                }
+                $BodyMetaData.'iconSet' = $Workspace.iconSet
+                $BodyMetaData.'iconCode' = $Workspace.iconCode
+                $BodyMetaData.'fugueIcon' = $null
+                $BodyMetaData.'fatCowIcon' = $null
+                $BodyMetaData.'_componentId' = 'WorkspaceVM'
+                $BodyMetaData.'_oldValues' = $Workspace.CreateOldValues()
+                $BodyMetaData.'codeRepository' = $Workspace.codeRepository
+                $BodyMetaData.'setWorkspaceTags' = $Workspace.setWorkspaceTags
+                [void]$include_properties.Add('iconSet')
+                [void]$include_properties.Add('setWorkspaceTags')
+                [void]$include_properties.Add('fugueIcon')
+                [void]$include_properties.Add('fatCowIcon')
+                [void]$include_properties.Add('codeRepository')
+            }
+            ElseIf ($UnsetTags -eq $true) {
+                $BodyMetaData.'setTags' = 'false'
+                $BodyMetaData.'workspaceSetTagType' = $null
+                $BodyMetaData.'iconCode' = $Workspace.iconCode
+                $BodyMetaData.'iconSet' = $Workspace.iconSet
+                $BodyMetaData.'fugueIcon' = $null
+                $BodyMetaData.'fatCowIcon' = $null
+                $BodyMetaData.'_componentId' = 'WorkspaceVM'
+                $BodyMetaData.'codeRepository' = $Workspace.codeRepository
+                $BodyMetaData.'_oldValues' = $Workspace.CreateOldValues()                
+                [void]$include_properties.Add('iconSet')
+                [void]$include_properties.Add('workspaceSetTagType')
+                [void]$include_properties.Add('fugueIcon')
+                [void]$include_properties.Add('fatCowIcon')
+                [void]$include_properties.Add('codeRepository')    
+            }
+            ElseIf ($SetTagType.Length -gt 0) {
+                $BodyMetaData.'setTags' = 'true'
+                $BodyMetaData.'workspaceSetTagType' = $SetTagType
+                If ($Tags.Count -gt 0 -and $SetTagType -eq 'SET_SPECIFIC_TAGS') {
+                    [int32]$total_tags = $Tags.Count
+                    [int32]$current_tag = 1
+                    ForEach ($tag_id in $Tags) {
+                        $Error.Clear()
+                        Try {
+                            [ANOWTag]$tag_object = Get-AutomateNOWTag -Id $tag_id
+                        }
+                        Catch {
+                            [string]$Message = $_.Exception.Message
+                            Write-Warning -Message "Get-AutomateNOWTag had an error while retrieving the tag [$tag_id] running under Set-AutomateNOWWorkspace due to [$message]"
+                            Break
+                        }
+                        If ($tag_object.simpleId.length -eq 0) {
+                            Throw "New-AutomateNOWTaskTemplate has detected that the tag [$tag_id] does not appear to exist running under Set-AutomateNOWWorkspace. Please check again."
+                            Break
+                        }
+                        [string]$tag_display = $tag_object | ConvertTo-Json -Compress
+                        Write-Verbose -Message "Adding tag $tag_display [$current_tag of $total_tags]"
+                        [string]$tag_name_sequence = ('setWorkspaceTags' + $current_tag)
+                        $BodyMetaData."$tag_name_sequence" = $tag_id
+                        $include_properties += $tag_name_sequence
+                        $current_tag++
+                    }
+                }
+                $BodyMetaData.'iconSet' = $Workspace.iconSet
+                $BodyMetaData.'iconCode' = $Workspace.iconCode
+                $BodyMetaData.'fugueIcon' = $null
+                $BodyMetaData.'fatCowIcon' = $null
+                $BodyMetaData.'_componentId' = 'WorkspaceVM'
+                $BodyMetaData.'_oldValues' = $Workspace.CreateOldValues()
+                $BodyMetaData.'codeRepository' = $Workspace.codeRepository
+                [void]$include_properties.Add('iconSet')
+                [void]$include_properties.Add('setWorkspaceTags')
+                [void]$include_properties.Add('fugueIcon')
+                [void]$include_properties.Add('fatCowIcon')
+                [void]$include_properties.Add('codeRepository')
+            }
+            ElseIf ($SetPrefix.Length -gt 0) {
+                $BodyMetaData.'addPrefix' = 'true'
+                $BodyMetaData.'prefix' = $SetPrefix
+                $BodyMetaData.'iconSet' = $Workspace.iconSet
+                $BodyMetaData.'iconCode' = $Workspace.iconCode
+                $BodyMetaData.'fugueIcon' = $null
+                $BodyMetaData.'fatCowIcon' = $null
+                $BodyMetaData.'_componentId' = 'WorkspaceVM'
+                $BodyMetaData.'_oldValues' = $Workspace.CreateOldValues()
+                $BodyMetaData.'codeRepository' = $Workspace.codeRepository
+                [void]$include_properties.Add('iconSet')
+                [void]$include_properties.Add('setWorkspaceTags')
+                [void]$include_properties.Add('fugueIcon')
+                [void]$include_properties.Add('fatCowIcon')
+                [void]$include_properties.Add('codeRepository')
+            }
+            ElseIf ($UnsetPrefix -eq $true) {
+                $BodyMetaData.'addPrefix' = 'false'
+                $BodyMetaData.'iconCode' = $Workspace.iconCode
+                $BodyMetaData.'iconSet' = $Workspace.iconSet
+                $BodyMetaData.'fugueIcon' = $null
+                $BodyMetaData.'fatCowIcon' = $null
+                $BodyMetaData.'_componentId' = 'WorkspaceVM'
+                $BodyMetaData.'codeRepository' = $Workspace.codeRepository
+                $BodyMetaData.'_oldValues' = $Workspace.CreateOldValues()
+                [void]$include_properties.Add('iconSet')
+                [void]$include_properties.Add('setWorkspaceTags')
+                [void]$include_properties.Add('fugueIcon')
+                [void]$include_properties.Add('fatCowIcon')
+                [void]$include_properties.Add('codeRepository')    
+            }
             $BodyMetaData.'_operationType' = 'update'
             $BodyMetaData.'_textMatchStyle' = 'exact'
-            $BodyMetaData.'_componentId' = 'WorkspaceEditForm'
             $BodyMetaData.'_dataSource' = 'WorkspaceDataSource'
             $BodyMetaData.'isc_metaDataPrefix' = '_'
-            $BodyMetaData.'isc_dataFormat ' = 'json'
-            $BodyMetaData.description = $Description
-            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            $BodyMetaData.'isc_dataFormat' = 'json'
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties $include_properties
             If ($null -eq $parameters.Body) {
                 $parameters.Add('Body', $Body)
             }
@@ -12834,7 +14799,7 @@ Function New-AutomateNOWWorkspace {
     $BodyMetaData.'_componentId' = 'WorkspaceCreateWindow_form'
     $BodyMetaData.'_dataSource' = 'WorkspaceDataSource'
     $BodyMetaData.'isc_metaDataPrefix' = '_'
-    $BodyMetaData.'isc_dataFormat ' = 'json'
+    $BodyMetaData.'isc_dataFormat' = 'json'
     [string]$BodyMetaDataString = ConvertTo-QueryString -InputObject $BodyMetaData
     [string]$Body = ($BodyObject + '&' + $BodyMetaDataString)
     [string]$command = '/workspace/create'
