@@ -24,7 +24,7 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 - PowerShell Core & Windows PowerShell compatible
 - Classes and enums are defined (see Classes.ps1)
 - Pipeline capability to streamline your workloads
-- Task Templates can be moved into & out of Workspaces
+- Task & Workflow Templates can be moved to/from Workspaces
 - Session tokens will be automatically refreshed during usage
 - All functions can return help with Get-Help or the -? parameter
 - PSScriptAnalyzer compliant / Approved verbs only
@@ -34,16 +34,31 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 
 This module has been tested against the below versions of AutomateNOW!
 
-- 3.3.1.75HF3
+- 3.3.1.75HF3 (3.3.1.76HF1 not tested yet)
 <br/><br/>
 ## Change Log 📝
+
+## 1.0.15
+- Added new functions: `Add-AutomateNOWApprovalRule`, `Copy-AutomateNOWApproval`, `Copy-AutomateNOWEndpoint`, `Export-AutomateNOWApproval`, `Export-AutomateNOWCalendar`, `Export-AutomateNOWEndpoint`, `Get-AutomateNOWApproval`, `Get-AutomateNOWCalendar`, `Get-AutomateNOWEndpoint`, `New-AutomateNOWApproval`, `New-AutomateNOWApprovalRule`, `New-AutomateNOWCalendar`, `New-AutomateNOWEndpoint`, `Remove-AutomateNOWApproval`, `Remove-AutomateNOWCalendar`, `Remove-AutomateNOWEndpoint`, `Set-AutomateNOWApproval`, `Set-AutomateNOWEndpoint`, `Set-AutomateNOWWorkflowTemplate`, `Show-AutomateNOWEndpointType`, `Unprotect-AutomateNOWEncryptedString`
+- Fixed an issue for PowerShell 7 that could prevent the classes.psm1 from loading
+- Fixed an issue with Daylight Saving Time that impacted `Connect-AutomateNOW`
+- Fixed an issue with the `-ReadJSONFromClipboard` parameter of `Connect-AutomateNOW`
+- Aligned some parameter names throughout the 
+- Added -Quiet parameter to all of the New-* functions
+- Added 2 new parameters `-LoadBalancersOnly`, `-ChildNodesOnly` to `Get-AutomateNOWNode`
+- `Connect-AutomateNOW` now enforces that the domain supplied on the -Domain parameter must actually exist
+- `Connect-AutomateNOW` now halts when the -Domain parameter is not supplied but it will display the available domains
+- `Get-AutomateNOWTaskTemplate` no longer retrieves a named processing item that is actually a workflow
+- `Get-AutomateNOWWorkflowTemplate` no longer retrieves a named processing item that is actually a task
+- `Set-AutomateNOWWorkflowTemplate` has support for most of the settings in the Attributes tab. It can also move Workflow Templates into and out of Workspaces.
+- `New-AutomateNOWAuthenticationEncryptedString` was renamed to `Protect-AutomateNOWAuthenticationString`
 
 ## 1.0.14
 - Added new functions: `Add-AutomateNOWResultMappingRule` `Export-AutomateNOWResultMapping` `Get-AutomateNOWResultMapping` `New-AutomateNOWResultMapping` `New-AutomateNOWResultMappingRule` `New-AutomateNOWResultMappingRuleCondition` `New-AutomateNOWResultMappingRuleConditionCriteria` `Remove-AutomateNOWResultMapping` `Remove-AutomateNOWTask` `Remove-AutomateNOWWorkflow` `Restart-AutomateNOWTask` `Restart-AutomateNOWWorkflow` `Resume-AutomateNOWTask` `Resume-AutomateNOWWorkflow` `Set-AutomateNOWDataSource` `Set-AutomateNOWTaskTemplate` `Skip-AutomateNOWTask` `Skip-AutomateNOWWorkflow` `Stop-AutomateNOWTask` `Stop-AutomateNOWWorkflow` `Suspend-AutomateNOWTask` `Suspend-AutomateNOWWorkflow`
 - Fixed an issue with JSON depth and `Get-AutomateNOWAuditlog`
 - `New-AutomateNOWTaskTemplate` will now differentiate between Internal Tasks, Service Manager Tasks and Standard Tasks
 - `Set-AutomateNOWWorkspace` has support for all of the settings in the Attributes tab
-- `Set-AutomateNOWTaskTemplate` has support for many of the settings in the Attributes tab. It can also move Task Templates into and out of Workspaces.
+- `Set-AutomateNOWTaskTemplate` has support for most of the settings in the Attributes tab. It can also move Task Templates into and out of Workspaces.
 
 ## 1.0.13
 - Fixed an issue with `Connect-AutomateNOW`
@@ -153,9 +168,13 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 ## Functions 🛠
 
+`Add-AutomateNOWApprovalRule`
+
 `Add-AutomateNOWDataSourceItem`
 
 `Add-AutomateNOWResultMappingRule`
+
+`Compare-ObjectProperty`
 
 `Confirm-AutomateNOWSession`
 
@@ -165,13 +184,23 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Connect-AutomateNOW`
 
+`ConvertTo-QueryString`
+
+`Copy-AutomateNOWApproval`
+
+`Copy-AutomateNOWEndpoint`
+
 `Copy-AutomateNOWTaskTemplate`
 
 `Copy-AutomateNOWWorkflowTemplate`
 
 `Disconnect-AutomateNOW`
 
+`Export-AutomateNOWApproval`
+
 `Export-AutomateNOWAuditLog`
+
+`Export-AutomateNOWCalendar`
 
 `Export-AutomateNOWCodeRepository`
 
@@ -180,6 +209,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Export-AutomateNOWDataSourceItem`
 
 `Export-AutomateNOWDomain`
+
+`Export-AutomateNOWEndpoint`
 
 `Export-AutomateNOWFolder`
 
@@ -207,7 +238,11 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Find-AutomateNOWObjectReferral`
 
+`Get-AutomateNOWApproval`
+
 `Get-AutomateNOWAuditLog`
+
+`Get-AutomateNOWCalendar`
 
 `Get-AutomateNOWCodeRepository`
 
@@ -216,6 +251,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Get-AutomateNOWDataSourceItem`
 
 `Get-AutomateNOWDomain`
+
+`Get-AutomateNOWEndpoint`
 
 `Get-AutomateNOWFolder`
 
@@ -247,7 +284,17 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Invoke-AutomateNOWAPI`
 
+`New-AutomateNOWApproval`
+
+`New-AutomateNOWApprovalRule`
+
+`New-AutomateNOWCalendar`
+
 `New-AutomateNOWDataSource`
+
+`New-AutomateNOWDefaultProcessingTitle`
+
+`New-AutomateNOWEndpoint`
 
 `New-AutomateNOWFolder`
 
@@ -269,11 +316,21 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `New-AutomateNOWWorkspace`
 
+`New-WebkitBoundaryString`
+
+`Protect-AutomateNOWAuthenticationString`
+
 `Read-AutomateNOWIcon`
+
+`Remove-AutomateNOWApproval`
+
+`Remove-AutomateNOWCalendar`
 
 `Remove-AutomateNOWDataSource`
 
 `Remove-AutomateNOWDataSourceItem`
+
+`Remove-AutomateNOWEndpoint`
 
 `Remove-AutomateNOWFolder`
 
@@ -311,7 +368,11 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Resume-AutomateNOWWorkflowTemplate`
 
+`Set-AutomateNOWApproval`
+
 `Set-AutomateNOWDataSource`
+
+`Set-AutomateNOWEndpoint`
 
 `Set-AutomateNOWFolder`
 
@@ -323,7 +384,11 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Set-AutomateNOWUser`
 
+`Set-AutomateNOWWorkflowTemplate`
+
 `Set-AutomateNOWWorkspace`
+
+`Show-AutomateNOWEndpointType`
 
 `Show-AutomateNOWTaskTemplateType`
 
@@ -356,6 +421,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Suspend-AutomateNOWWorkflowTemplate`
 
 `Switch-AutomateNOWDomain`
+
+`Unprotect-AutomateNOWEncryptedString`
 
 `Update-AutomateNOWToken`
 

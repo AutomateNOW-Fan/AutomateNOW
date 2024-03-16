@@ -1,0 +1,4722 @@
+[
+  {
+    "id": "Africa/Abidjan",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Accra",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Addis_Ababa",
+    "gmtOffset": "+03:00",
+    "rawOffset": 10800000,
+    "name": "East Africa Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Algiers",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Asmara",
+    "gmtOffset": "+03:00",
+    "rawOffset": 10800000,
+    "name": "East Africa Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Asmera",
+    "gmtOffset": "+03:00",
+    "rawOffset": 10800000,
+    "name": "East Africa Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Bamako",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Bangui",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "West Africa Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Banjul",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Bissau",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Blantyre",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Central Africa Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Brazzaville",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "West Africa Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Bujumbura",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Central Africa Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Cairo",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Eastern European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Casablanca",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Western European Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Ceuta",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Africa/Conakry",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Dakar",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Dar_es_Salaam",
+    "gmtOffset": "+03:00",
+    "rawOffset": 10800000,
+    "name": "East Africa Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Djibouti",
+    "gmtOffset": "+03:00",
+    "rawOffset": 10800000,
+    "name": "East Africa Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Douala",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "West Africa Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/El_Aaiun",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Western European Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Freetown",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Gaborone",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Central Africa Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Harare",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Central Africa Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Johannesburg",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "South Africa Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Juba",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Central Africa Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Kampala",
+    "gmtOffset": "+03:00",
+    "rawOffset": 10800000,
+    "name": "East Africa Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Khartoum",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Central Africa Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Kigali",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Central Africa Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Kinshasa",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "West Africa Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Lagos",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "West Africa Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Libreville",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "West Africa Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Lome",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Luanda",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "West Africa Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Lubumbashi",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Central Africa Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Lusaka",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Central Africa Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Malabo",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "West Africa Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Maputo",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Central Africa Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Maseru",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "South Africa Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Mbabane",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "South Africa Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Mogadishu",
+    "gmtOffset": "+03:00",
+    "rawOffset": 10800000,
+    "name": "East Africa Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Monrovia",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Nairobi",
+    "gmtOffset": "+03:00",
+    "rawOffset": 10800000,
+    "name": "East Africa Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Ndjamena",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "West Africa Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Niamey",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "West Africa Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Nouakchott",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Ouagadougou",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Porto-Novo",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "West Africa Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Sao_Tome",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Timbuktu",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Tripoli",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Eastern European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Tunis",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Africa/Windhoek",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central Africa Time",
+    "inDaylightTime": true,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Adak",
+    "gmtOffset": "-09:00",
+    "rawOffset": -32400000,
+    "name": "Hawaii-Aleutian Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Anchorage",
+    "gmtOffset": "-08:00",
+    "rawOffset": -28800000,
+    "name": "Alaska Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Anguilla",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Atlantic Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Antigua",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Atlantic Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Araguaina",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Brasilia Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Argentina/Buenos_Aires",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Argentina Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Argentina/Catamarca",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Argentina Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Argentina/ComodRivadavia",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Argentina Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Argentina/Cordoba",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Argentina Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Argentina/Jujuy",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Argentina Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Argentina/La_Rioja",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Argentina Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Argentina/Mendoza",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Argentina Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Argentina/Rio_Gallegos",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Argentina Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Argentina/Salta",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Argentina Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Argentina/San_Juan",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Argentina Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Argentina/San_Luis",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Argentina Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Argentina/Tucuman",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Argentina Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Argentina/Ushuaia",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Argentina Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Aruba",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Atlantic Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Asuncion",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Paraguay Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Atikokan",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Atka",
+    "gmtOffset": "-09:00",
+    "rawOffset": -32400000,
+    "name": "Hawaii-Aleutian Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Bahia",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Brasilia Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Bahia_Banderas",
+    "gmtOffset": "-06:00",
+    "rawOffset": -21600000,
+    "name": "Central Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Barbados",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Atlantic Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Belem",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Brasilia Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Belize",
+    "gmtOffset": "-06:00",
+    "rawOffset": -21600000,
+    "name": "Central Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Blanc-Sablon",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Atlantic Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Boa_Vista",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Amazon Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Bogota",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Colombia Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Boise",
+    "gmtOffset": "-06:00",
+    "rawOffset": -21600000,
+    "name": "Mountain Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Buenos_Aires",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Argentina Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Cambridge_Bay",
+    "gmtOffset": "-06:00",
+    "rawOffset": -21600000,
+    "name": "Mountain Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Campo_Grande",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Amazon Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Cancun",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Caracas",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Venezuela Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Catamarca",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Argentina Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Cayenne",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "French Guiana Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Cayman",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Chicago",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Central Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Chihuahua",
+    "gmtOffset": "-06:00",
+    "rawOffset": -21600000,
+    "name": "Central Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Coral_Harbour",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Cordoba",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Argentina Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Costa_Rica",
+    "gmtOffset": "-06:00",
+    "rawOffset": -21600000,
+    "name": "Central Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Creston",
+    "gmtOffset": "-07:00",
+    "rawOffset": -25200000,
+    "name": "Mountain Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Cuiaba",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Amazon Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Curacao",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Atlantic Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Danmarkshavn",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Dawson",
+    "gmtOffset": "-07:00",
+    "rawOffset": -25200000,
+    "name": "Mountain Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Dawson_Creek",
+    "gmtOffset": "-07:00",
+    "rawOffset": -25200000,
+    "name": "Mountain Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Denver",
+    "gmtOffset": "-06:00",
+    "rawOffset": -21600000,
+    "name": "Mountain Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Detroit",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Dominica",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Atlantic Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Edmonton",
+    "gmtOffset": "-06:00",
+    "rawOffset": -21600000,
+    "name": "Mountain Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Eirunepe",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Acre Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/El_Salvador",
+    "gmtOffset": "-06:00",
+    "rawOffset": -21600000,
+    "name": "Central Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Ensenada",
+    "gmtOffset": "-07:00",
+    "rawOffset": -25200000,
+    "name": "Pacific Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Fort_Nelson",
+    "gmtOffset": "-07:00",
+    "rawOffset": -25200000,
+    "name": "Mountain Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Fort_Wayne",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Fortaleza",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Brasilia Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Glace_Bay",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Atlantic Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Godthab",
+    "gmtOffset": "-02:00",
+    "rawOffset": -7200000,
+    "name": "West Greenland Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Goose_Bay",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Atlantic Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Grand_Turk",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Grenada",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Atlantic Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Guadeloupe",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Atlantic Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Guatemala",
+    "gmtOffset": "-06:00",
+    "rawOffset": -21600000,
+    "name": "Central Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Guayaquil",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Ecuador Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Guyana",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Guyana Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Halifax",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Atlantic Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Havana",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Cuba Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Hermosillo",
+    "gmtOffset": "-07:00",
+    "rawOffset": -25200000,
+    "name": "Mexican Pacific Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Indiana/Indianapolis",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Indiana/Knox",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Central Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Indiana/Marengo",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Indiana/Petersburg",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Indiana/Tell_City",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Central Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Indiana/Vevay",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Indiana/Vincennes",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Indiana/Winamac",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Indianapolis",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Inuvik",
+    "gmtOffset": "-06:00",
+    "rawOffset": -21600000,
+    "name": "Mountain Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Iqaluit",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Jamaica",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Jujuy",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Argentina Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Juneau",
+    "gmtOffset": "-08:00",
+    "rawOffset": -28800000,
+    "name": "Alaska Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Kentucky/Louisville",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Kentucky/Monticello",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Knox_IN",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Central Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Kralendijk",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Atlantic Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/La_Paz",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Bolivia Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Lima",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Peru Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Los_Angeles",
+    "gmtOffset": "-07:00",
+    "rawOffset": -25200000,
+    "name": "Pacific Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Louisville",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Lower_Princes",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Atlantic Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Maceio",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Brasilia Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Managua",
+    "gmtOffset": "-06:00",
+    "rawOffset": -21600000,
+    "name": "Central Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Manaus",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Amazon Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Marigot",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Atlantic Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Martinique",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Atlantic Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Matamoros",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Central Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Mazatlan",
+    "gmtOffset": "-07:00",
+    "rawOffset": -25200000,
+    "name": "Mexican Pacific Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Mendoza",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Argentina Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Menominee",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Central Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Merida",
+    "gmtOffset": "-06:00",
+    "rawOffset": -21600000,
+    "name": "Central Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Metlakatla",
+    "gmtOffset": "-08:00",
+    "rawOffset": -28800000,
+    "name": "Alaska Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Mexico_City",
+    "gmtOffset": "-06:00",
+    "rawOffset": -21600000,
+    "name": "Central Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Miquelon",
+    "gmtOffset": "-02:00",
+    "rawOffset": -7200000,
+    "name": "St. Pierre & Miquelon Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Moncton",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Atlantic Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Monterrey",
+    "gmtOffset": "-06:00",
+    "rawOffset": -21600000,
+    "name": "Central Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Montevideo",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Uruguay Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Montreal",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Montserrat",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Atlantic Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Nassau",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/New_York",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Nipigon",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Nome",
+    "gmtOffset": "-08:00",
+    "rawOffset": -28800000,
+    "name": "Alaska Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Noronha",
+    "gmtOffset": "-02:00",
+    "rawOffset": -7200000,
+    "name": "Fernando de Noronha Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/North_Dakota/Beulah",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Central Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/North_Dakota/Center",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Central Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/North_Dakota/New_Salem",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Central Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Nuuk",
+    "gmtOffset": "-02:00",
+    "rawOffset": -7200000,
+    "name": "West Greenland Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Ojinaga",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Central Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Panama",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Pangnirtung",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Paramaribo",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Suriname Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Phoenix",
+    "gmtOffset": "-07:00",
+    "rawOffset": -25200000,
+    "name": "Mountain Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Port-au-Prince",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Port_of_Spain",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Atlantic Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Porto_Acre",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Acre Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Porto_Velho",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Amazon Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Puerto_Rico",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Atlantic Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Punta_Arenas",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Punta Arenas Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Rainy_River",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Central Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Rankin_Inlet",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Central Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Recife",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Brasilia Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Regina",
+    "gmtOffset": "-06:00",
+    "rawOffset": -21600000,
+    "name": "Central Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Resolute",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Central Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Rio_Branco",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Acre Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Rosario",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Argentina Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Santa_Isabel",
+    "gmtOffset": "-07:00",
+    "rawOffset": -25200000,
+    "name": "Northwest Mexico Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Santarem",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Brasilia Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Santiago",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Chile Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Santo_Domingo",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Atlantic Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Sao_Paulo",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Brasilia Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Scoresbysund",
+    "gmtOffset": "-01:00",
+    "rawOffset": -3600000,
+    "name": "East Greenland Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Shiprock",
+    "gmtOffset": "-06:00",
+    "rawOffset": -21600000,
+    "name": "Mountain Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Sitka",
+    "gmtOffset": "-08:00",
+    "rawOffset": -28800000,
+    "name": "Alaska Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/St_Barthelemy",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Atlantic Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/St_Johns",
+    "gmtOffset": "-02:30",
+    "rawOffset": -9000000,
+    "name": "Newfoundland Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/St_Kitts",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Atlantic Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/St_Lucia",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Atlantic Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/St_Thomas",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Atlantic Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/St_Vincent",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Atlantic Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Swift_Current",
+    "gmtOffset": "-06:00",
+    "rawOffset": -21600000,
+    "name": "Central Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Tegucigalpa",
+    "gmtOffset": "-06:00",
+    "rawOffset": -21600000,
+    "name": "Central Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Thule",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Atlantic Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Thunder_Bay",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Tijuana",
+    "gmtOffset": "-07:00",
+    "rawOffset": -25200000,
+    "name": "Pacific Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Toronto",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Tortola",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Atlantic Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Vancouver",
+    "gmtOffset": "-07:00",
+    "rawOffset": -25200000,
+    "name": "Pacific Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Virgin",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Atlantic Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Whitehorse",
+    "gmtOffset": "-07:00",
+    "rawOffset": -25200000,
+    "name": "Mountain Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "America/Winnipeg",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Central Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Yakutat",
+    "gmtOffset": "-08:00",
+    "rawOffset": -28800000,
+    "name": "Alaska Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "America/Yellowknife",
+    "gmtOffset": "-06:00",
+    "rawOffset": -21600000,
+    "name": "Mountain Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Antarctica/Casey",
+    "gmtOffset": "+11:00",
+    "rawOffset": 39600000,
+    "name": "Casey Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Antarctica/Davis",
+    "gmtOffset": "+07:00",
+    "rawOffset": 25200000,
+    "name": "Davis Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Antarctica/DumontDUrville",
+    "gmtOffset": "+10:00",
+    "rawOffset": 36000000,
+    "name": "Dumont-d’Urville Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Antarctica/Macquarie",
+    "gmtOffset": "+11:00",
+    "rawOffset": 39600000,
+    "name": "Australian Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Antarctica/Mawson",
+    "gmtOffset": "+05:00",
+    "rawOffset": 18000000,
+    "name": "Mawson Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Antarctica/McMurdo",
+    "gmtOffset": "+13:00",
+    "rawOffset": 46800000,
+    "name": "New Zealand Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Antarctica/Palmer",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Chile Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Antarctica/Rothera",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Rothera Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Antarctica/South_Pole",
+    "gmtOffset": "+13:00",
+    "rawOffset": 46800000,
+    "name": "New Zealand Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Antarctica/Syowa",
+    "gmtOffset": "+03:00",
+    "rawOffset": 10800000,
+    "name": "Syowa Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Antarctica/Troll",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 7200000
+  },
+  {
+    "id": "Antarctica/Vostok",
+    "gmtOffset": "+06:00",
+    "rawOffset": 21600000,
+    "name": "Vostok Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Arctic/Longyearbyen",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Asia/Aden",
+    "gmtOffset": "+03:00",
+    "rawOffset": 10800000,
+    "name": "Arabian Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Almaty",
+    "gmtOffset": "+06:00",
+    "rawOffset": 21600000,
+    "name": "East Kazakhstan Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Amman",
+    "gmtOffset": "+03:00",
+    "rawOffset": 10800000,
+    "name": "Eastern European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Anadyr",
+    "gmtOffset": "+12:00",
+    "rawOffset": 43200000,
+    "name": "Anadyr Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Aqtau",
+    "gmtOffset": "+05:00",
+    "rawOffset": 18000000,
+    "name": "West Kazakhstan Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Aqtobe",
+    "gmtOffset": "+05:00",
+    "rawOffset": 18000000,
+    "name": "West Kazakhstan Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Ashgabat",
+    "gmtOffset": "+05:00",
+    "rawOffset": 18000000,
+    "name": "Turkmenistan Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Ashkhabad",
+    "gmtOffset": "+05:00",
+    "rawOffset": 18000000,
+    "name": "Turkmenistan Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Atyrau",
+    "gmtOffset": "+05:00",
+    "rawOffset": 18000000,
+    "name": "West Kazakhstan Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Baghdad",
+    "gmtOffset": "+03:00",
+    "rawOffset": 10800000,
+    "name": "Arabian Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Bahrain",
+    "gmtOffset": "+03:00",
+    "rawOffset": 10800000,
+    "name": "Arabian Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Baku",
+    "gmtOffset": "+04:00",
+    "rawOffset": 14400000,
+    "name": "Azerbaijan Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Bangkok",
+    "gmtOffset": "+07:00",
+    "rawOffset": 25200000,
+    "name": "Indochina Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Barnaul",
+    "gmtOffset": "+07:00",
+    "rawOffset": 25200000,
+    "name": "Barnaul Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Beirut",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Eastern European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Asia/Bishkek",
+    "gmtOffset": "+06:00",
+    "rawOffset": 21600000,
+    "name": "Kyrgyzstan Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Brunei",
+    "gmtOffset": "+08:00",
+    "rawOffset": 28800000,
+    "name": "Brunei Darussalam Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Calcutta",
+    "gmtOffset": "+05:30",
+    "rawOffset": 19800000,
+    "name": "India Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Chita",
+    "gmtOffset": "+09:00",
+    "rawOffset": 32400000,
+    "name": "Yakutsk Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Choibalsan",
+    "gmtOffset": "+08:00",
+    "rawOffset": 28800000,
+    "name": "Ulaanbaatar Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Chongqing",
+    "gmtOffset": "+08:00",
+    "rawOffset": 28800000,
+    "name": "China Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Chungking",
+    "gmtOffset": "+08:00",
+    "rawOffset": 28800000,
+    "name": "China Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Colombo",
+    "gmtOffset": "+05:30",
+    "rawOffset": 19800000,
+    "name": "India Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Dacca",
+    "gmtOffset": "+06:00",
+    "rawOffset": 21600000,
+    "name": "Bangladesh Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Damascus",
+    "gmtOffset": "+03:00",
+    "rawOffset": 10800000,
+    "name": "Eastern European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Dhaka",
+    "gmtOffset": "+06:00",
+    "rawOffset": 21600000,
+    "name": "Bangladesh Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Dili",
+    "gmtOffset": "+09:00",
+    "rawOffset": 32400000,
+    "name": "East Timor Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Dubai",
+    "gmtOffset": "+04:00",
+    "rawOffset": 14400000,
+    "name": "Gulf Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Dushanbe",
+    "gmtOffset": "+05:00",
+    "rawOffset": 18000000,
+    "name": "Tajikistan Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Famagusta",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Eastern European Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Asia/Gaza",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Eastern European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Asia/Harbin",
+    "gmtOffset": "+08:00",
+    "rawOffset": 28800000,
+    "name": "China Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Hebron",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Eastern European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Asia/Ho_Chi_Minh",
+    "gmtOffset": "+07:00",
+    "rawOffset": 25200000,
+    "name": "Indochina Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Hong_Kong",
+    "gmtOffset": "+08:00",
+    "rawOffset": 28800000,
+    "name": "Hong Kong Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Hovd",
+    "gmtOffset": "+07:00",
+    "rawOffset": 25200000,
+    "name": "Hovd Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Irkutsk",
+    "gmtOffset": "+08:00",
+    "rawOffset": 28800000,
+    "name": "Irkutsk Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Istanbul",
+    "gmtOffset": "+03:00",
+    "rawOffset": 10800000,
+    "name": "Turkey Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Jakarta",
+    "gmtOffset": "+07:00",
+    "rawOffset": 25200000,
+    "name": "Western Indonesia Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Jayapura",
+    "gmtOffset": "+09:00",
+    "rawOffset": 32400000,
+    "name": "Eastern Indonesia Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Jerusalem",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Israel Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Asia/Kabul",
+    "gmtOffset": "+04:30",
+    "rawOffset": 16200000,
+    "name": "Afghanistan Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Kamchatka",
+    "gmtOffset": "+12:00",
+    "rawOffset": 43200000,
+    "name": "Petropavlovsk-Kamchatski Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Karachi",
+    "gmtOffset": "+05:00",
+    "rawOffset": 18000000,
+    "name": "Pakistan Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Kashgar",
+    "gmtOffset": "+06:00",
+    "rawOffset": 21600000,
+    "name": "Xinjiang Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Kathmandu",
+    "gmtOffset": "+05:45",
+    "rawOffset": 20700000,
+    "name": "Nepal Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Katmandu",
+    "gmtOffset": "+05:45",
+    "rawOffset": 20700000,
+    "name": "Nepal Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Khandyga",
+    "gmtOffset": "+09:00",
+    "rawOffset": 32400000,
+    "name": "Yakutsk Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Kolkata",
+    "gmtOffset": "+05:30",
+    "rawOffset": 19800000,
+    "name": "India Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Krasnoyarsk",
+    "gmtOffset": "+07:00",
+    "rawOffset": 25200000,
+    "name": "Krasnoyarsk Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Kuala_Lumpur",
+    "gmtOffset": "+08:00",
+    "rawOffset": 28800000,
+    "name": "Malaysia Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Kuching",
+    "gmtOffset": "+08:00",
+    "rawOffset": 28800000,
+    "name": "Malaysia Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Kuwait",
+    "gmtOffset": "+03:00",
+    "rawOffset": 10800000,
+    "name": "Arabian Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Macao",
+    "gmtOffset": "+08:00",
+    "rawOffset": 28800000,
+    "name": "China Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Macau",
+    "gmtOffset": "+08:00",
+    "rawOffset": 28800000,
+    "name": "China Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Magadan",
+    "gmtOffset": "+11:00",
+    "rawOffset": 39600000,
+    "name": "Magadan Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Makassar",
+    "gmtOffset": "+08:00",
+    "rawOffset": 28800000,
+    "name": "Central Indonesia Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Manila",
+    "gmtOffset": "+08:00",
+    "rawOffset": 28800000,
+    "name": "Philippine Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Muscat",
+    "gmtOffset": "+04:00",
+    "rawOffset": 14400000,
+    "name": "Gulf Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Nicosia",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Eastern European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Asia/Novokuznetsk",
+    "gmtOffset": "+07:00",
+    "rawOffset": 25200000,
+    "name": "Krasnoyarsk Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Novosibirsk",
+    "gmtOffset": "+07:00",
+    "rawOffset": 25200000,
+    "name": "Novosibirsk Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Omsk",
+    "gmtOffset": "+06:00",
+    "rawOffset": 21600000,
+    "name": "Omsk Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Oral",
+    "gmtOffset": "+05:00",
+    "rawOffset": 18000000,
+    "name": "West Kazakhstan Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Phnom_Penh",
+    "gmtOffset": "+07:00",
+    "rawOffset": 25200000,
+    "name": "Indochina Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Pontianak",
+    "gmtOffset": "+07:00",
+    "rawOffset": 25200000,
+    "name": "Western Indonesia Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Pyongyang",
+    "gmtOffset": "+09:00",
+    "rawOffset": 32400000,
+    "name": "Korean Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Qatar",
+    "gmtOffset": "+03:00",
+    "rawOffset": 10800000,
+    "name": "Arabian Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Qostanay",
+    "gmtOffset": "+06:00",
+    "rawOffset": 21600000,
+    "name": "East Kazakhstan Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Qyzylorda",
+    "gmtOffset": "+05:00",
+    "rawOffset": 18000000,
+    "name": "West Kazakhstan Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Rangoon",
+    "gmtOffset": "+06:30",
+    "rawOffset": 23400000,
+    "name": "Myanmar Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Riyadh",
+    "gmtOffset": "+03:00",
+    "rawOffset": 10800000,
+    "name": "Arabian Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Saigon",
+    "gmtOffset": "+07:00",
+    "rawOffset": 25200000,
+    "name": "Indochina Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Sakhalin",
+    "gmtOffset": "+11:00",
+    "rawOffset": 39600000,
+    "name": "Sakhalin Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Samarkand",
+    "gmtOffset": "+05:00",
+    "rawOffset": 18000000,
+    "name": "Uzbekistan Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Seoul",
+    "gmtOffset": "+09:00",
+    "rawOffset": 32400000,
+    "name": "Korean Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Shanghai",
+    "gmtOffset": "+08:00",
+    "rawOffset": 28800000,
+    "name": "China Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Singapore",
+    "gmtOffset": "+08:00",
+    "rawOffset": 28800000,
+    "name": "Singapore Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Srednekolymsk",
+    "gmtOffset": "+11:00",
+    "rawOffset": 39600000,
+    "name": "Srednekolymsk Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Taipei",
+    "gmtOffset": "+08:00",
+    "rawOffset": 28800000,
+    "name": "Taipei Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Tashkent",
+    "gmtOffset": "+05:00",
+    "rawOffset": 18000000,
+    "name": "Uzbekistan Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Tbilisi",
+    "gmtOffset": "+04:00",
+    "rawOffset": 14400000,
+    "name": "Georgia Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Tehran",
+    "gmtOffset": "+03:30",
+    "rawOffset": 12600000,
+    "name": "Iran Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Tel_Aviv",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Israel Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Asia/Thimbu",
+    "gmtOffset": "+06:00",
+    "rawOffset": 21600000,
+    "name": "Bhutan Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Thimphu",
+    "gmtOffset": "+06:00",
+    "rawOffset": 21600000,
+    "name": "Bhutan Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Tokyo",
+    "gmtOffset": "+09:00",
+    "rawOffset": 32400000,
+    "name": "Japan Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Tomsk",
+    "gmtOffset": "+07:00",
+    "rawOffset": 25200000,
+    "name": "Tomsk Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Ujung_Pandang",
+    "gmtOffset": "+08:00",
+    "rawOffset": 28800000,
+    "name": "Central Indonesia Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Ulaanbaatar",
+    "gmtOffset": "+08:00",
+    "rawOffset": 28800000,
+    "name": "Ulaanbaatar Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Ulan_Bator",
+    "gmtOffset": "+08:00",
+    "rawOffset": 28800000,
+    "name": "Ulaanbaatar Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Urumqi",
+    "gmtOffset": "+06:00",
+    "rawOffset": 21600000,
+    "name": "Xinjiang Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Ust-Nera",
+    "gmtOffset": "+10:00",
+    "rawOffset": 36000000,
+    "name": "Vladivostok Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Vientiane",
+    "gmtOffset": "+07:00",
+    "rawOffset": 25200000,
+    "name": "Indochina Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Vladivostok",
+    "gmtOffset": "+10:00",
+    "rawOffset": 36000000,
+    "name": "Vladivostok Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Yakutsk",
+    "gmtOffset": "+09:00",
+    "rawOffset": 32400000,
+    "name": "Yakutsk Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Yangon",
+    "gmtOffset": "+06:30",
+    "rawOffset": 23400000,
+    "name": "Myanmar Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Yekaterinburg",
+    "gmtOffset": "+05:00",
+    "rawOffset": 18000000,
+    "name": "Yekaterinburg Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Asia/Yerevan",
+    "gmtOffset": "+04:00",
+    "rawOffset": 14400000,
+    "name": "Armenia Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Atlantic/Azores",
+    "gmtOffset": "-01:00",
+    "rawOffset": -3600000,
+    "name": "Azores Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Atlantic/Bermuda",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Atlantic Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Atlantic/Canary",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Western European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Atlantic/Cape_Verde",
+    "gmtOffset": "-01:00",
+    "rawOffset": -3600000,
+    "name": "Cape Verde Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Atlantic/Faeroe",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Western European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Atlantic/Faroe",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Western European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Atlantic/Jan_Mayen",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Atlantic/Madeira",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Western European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Atlantic/Reykjavik",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Atlantic/South_Georgia",
+    "gmtOffset": "-02:00",
+    "rawOffset": -7200000,
+    "name": "South Georgia Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Atlantic/St_Helena",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Atlantic/Stanley",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Falkland Islands Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Australia/ACT",
+    "gmtOffset": "+11:00",
+    "rawOffset": 39600000,
+    "name": "Australian Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Australia/Adelaide",
+    "gmtOffset": "+10:30",
+    "rawOffset": 37800000,
+    "name": "Australian Central Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Australia/Brisbane",
+    "gmtOffset": "+10:00",
+    "rawOffset": 36000000,
+    "name": "Australian Eastern Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Australia/Broken_Hill",
+    "gmtOffset": "+10:30",
+    "rawOffset": 37800000,
+    "name": "Australian Central Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Australia/Canberra",
+    "gmtOffset": "+11:00",
+    "rawOffset": 39600000,
+    "name": "Australian Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Australia/Currie",
+    "gmtOffset": "+11:00",
+    "rawOffset": 39600000,
+    "name": "Australian Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Australia/Darwin",
+    "gmtOffset": "+09:30",
+    "rawOffset": 34200000,
+    "name": "Australian Central Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Australia/Eucla",
+    "gmtOffset": "+08:45",
+    "rawOffset": 31500000,
+    "name": "Australian Central Western Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Australia/Hobart",
+    "gmtOffset": "+11:00",
+    "rawOffset": 39600000,
+    "name": "Australian Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Australia/LHI",
+    "gmtOffset": "+11:00",
+    "rawOffset": 39600000,
+    "name": "Lord Howe Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 1800000
+  },
+  {
+    "id": "Australia/Lindeman",
+    "gmtOffset": "+10:00",
+    "rawOffset": 36000000,
+    "name": "Australian Eastern Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Australia/Lord_Howe",
+    "gmtOffset": "+11:00",
+    "rawOffset": 39600000,
+    "name": "Lord Howe Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 1800000
+  },
+  {
+    "id": "Australia/Melbourne",
+    "gmtOffset": "+11:00",
+    "rawOffset": 39600000,
+    "name": "Australian Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Australia/NSW",
+    "gmtOffset": "+11:00",
+    "rawOffset": 39600000,
+    "name": "Australian Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Australia/North",
+    "gmtOffset": "+09:30",
+    "rawOffset": 34200000,
+    "name": "Australian Central Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Australia/Perth",
+    "gmtOffset": "+08:00",
+    "rawOffset": 28800000,
+    "name": "Australian Western Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Australia/Queensland",
+    "gmtOffset": "+10:00",
+    "rawOffset": 36000000,
+    "name": "Australian Eastern Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Australia/South",
+    "gmtOffset": "+10:30",
+    "rawOffset": 37800000,
+    "name": "Australian Central Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Australia/Sydney",
+    "gmtOffset": "+11:00",
+    "rawOffset": 39600000,
+    "name": "Australian Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Australia/Tasmania",
+    "gmtOffset": "+11:00",
+    "rawOffset": 39600000,
+    "name": "Australian Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Australia/Victoria",
+    "gmtOffset": "+11:00",
+    "rawOffset": 39600000,
+    "name": "Australian Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Australia/West",
+    "gmtOffset": "+08:00",
+    "rawOffset": 28800000,
+    "name": "Australian Western Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Australia/Yancowinna",
+    "gmtOffset": "+10:30",
+    "rawOffset": 37800000,
+    "name": "Australian Central Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Brazil/Acre",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Acre Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Brazil/DeNoronha",
+    "gmtOffset": "-02:00",
+    "rawOffset": -7200000,
+    "name": "Fernando de Noronha Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Brazil/East",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Brasilia Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Brazil/West",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Amazon Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "CET",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "CST6CDT",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Central Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Canada/Atlantic",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Atlantic Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Canada/Central",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Central Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Canada/Eastern",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Canada/Mountain",
+    "gmtOffset": "-06:00",
+    "rawOffset": -21600000,
+    "name": "Mountain Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Canada/Newfoundland",
+    "gmtOffset": "-02:30",
+    "rawOffset": -9000000,
+    "name": "Newfoundland Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Canada/Pacific",
+    "gmtOffset": "-07:00",
+    "rawOffset": -25200000,
+    "name": "Pacific Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Canada/Saskatchewan",
+    "gmtOffset": "-06:00",
+    "rawOffset": -21600000,
+    "name": "Central Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Canada/Yukon",
+    "gmtOffset": "-07:00",
+    "rawOffset": -25200000,
+    "name": "Mountain Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Chile/Continental",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "Chile Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Chile/EasterIsland",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Easter Island Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Cuba",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Cuba Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "EET",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Eastern European Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "EST5EDT",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Egypt",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Eastern European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Eire",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Etc/GMT",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Etc/GMT+0",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Etc/GMT+1",
+    "gmtOffset": "-01:00",
+    "rawOffset": -3600000,
+    "name": "GMT-01:00",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Etc/GMT+10",
+    "gmtOffset": "-10:00",
+    "rawOffset": -36000000,
+    "name": "GMT-10:00",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Etc/GMT+11",
+    "gmtOffset": "-11:00",
+    "rawOffset": -39600000,
+    "name": "GMT-11:00",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Etc/GMT+12",
+    "gmtOffset": "-12:00",
+    "rawOffset": -43200000,
+    "name": "GMT-12:00",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Etc/GMT+2",
+    "gmtOffset": "-02:00",
+    "rawOffset": -7200000,
+    "name": "GMT-02:00",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Etc/GMT+3",
+    "gmtOffset": "-03:00",
+    "rawOffset": -10800000,
+    "name": "GMT-03:00",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Etc/GMT+4",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "GMT-04:00",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Etc/GMT+5",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "GMT-05:00",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Etc/GMT+6",
+    "gmtOffset": "-06:00",
+    "rawOffset": -21600000,
+    "name": "GMT-06:00",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Etc/GMT+7",
+    "gmtOffset": "-07:00",
+    "rawOffset": -25200000,
+    "name": "GMT-07:00",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Etc/GMT+8",
+    "gmtOffset": "-08:00",
+    "rawOffset": -28800000,
+    "name": "GMT-08:00",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Etc/GMT+9",
+    "gmtOffset": "-09:00",
+    "rawOffset": -32400000,
+    "name": "GMT-09:00",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Etc/GMT-0",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Etc/GMT-1",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "GMT+01:00",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Etc/GMT-10",
+    "gmtOffset": "+10:00",
+    "rawOffset": 36000000,
+    "name": "GMT+10:00",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Etc/GMT-11",
+    "gmtOffset": "+11:00",
+    "rawOffset": 39600000,
+    "name": "GMT+11:00",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Etc/GMT-12",
+    "gmtOffset": "+12:00",
+    "rawOffset": 43200000,
+    "name": "GMT+12:00",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Etc/GMT-13",
+    "gmtOffset": "+13:00",
+    "rawOffset": 46800000,
+    "name": "GMT+13:00",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Etc/GMT-14",
+    "gmtOffset": "+14:00",
+    "rawOffset": 50400000,
+    "name": "GMT+14:00",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Etc/GMT-2",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "GMT+02:00",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Etc/GMT-3",
+    "gmtOffset": "+03:00",
+    "rawOffset": 10800000,
+    "name": "GMT+03:00",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Etc/GMT-4",
+    "gmtOffset": "+04:00",
+    "rawOffset": 14400000,
+    "name": "GMT+04:00",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Etc/GMT-5",
+    "gmtOffset": "+05:00",
+    "rawOffset": 18000000,
+    "name": "GMT+05:00",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Etc/GMT-6",
+    "gmtOffset": "+06:00",
+    "rawOffset": 21600000,
+    "name": "GMT+06:00",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Etc/GMT-7",
+    "gmtOffset": "+07:00",
+    "rawOffset": 25200000,
+    "name": "GMT+07:00",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Etc/GMT-8",
+    "gmtOffset": "+08:00",
+    "rawOffset": 28800000,
+    "name": "GMT+08:00",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Etc/GMT-9",
+    "gmtOffset": "+09:00",
+    "rawOffset": 32400000,
+    "name": "GMT+09:00",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Etc/GMT0",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Etc/Greenwich",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Etc/UCT",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Coordinated Universal Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Etc/UTC",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Coordinated Universal Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Etc/Universal",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Coordinated Universal Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Etc/Zulu",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Coordinated Universal Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Europe/Amsterdam",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Andorra",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Astrakhan",
+    "gmtOffset": "+04:00",
+    "rawOffset": 14400000,
+    "name": "Astrakhan Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Europe/Athens",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Eastern European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Belfast",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Belgrade",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Berlin",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Bratislava",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Brussels",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Bucharest",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Eastern European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Budapest",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Busingen",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Chisinau",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Eastern European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Copenhagen",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Dublin",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Gibraltar",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Guernsey",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Helsinki",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Eastern European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Isle_of_Man",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Istanbul",
+    "gmtOffset": "+03:00",
+    "rawOffset": 10800000,
+    "name": "Turkey Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Europe/Jersey",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Kaliningrad",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Eastern European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Europe/Kiev",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Eastern European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Kirov",
+    "gmtOffset": "+03:00",
+    "rawOffset": 10800000,
+    "name": "Kirov Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Europe/Lisbon",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Western European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Ljubljana",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/London",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Luxembourg",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Madrid",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Malta",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Mariehamn",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Eastern European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Minsk",
+    "gmtOffset": "+03:00",
+    "rawOffset": 10800000,
+    "name": "Moscow Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Europe/Monaco",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Moscow",
+    "gmtOffset": "+03:00",
+    "rawOffset": 10800000,
+    "name": "Moscow Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Europe/Nicosia",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Eastern European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Oslo",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Paris",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Podgorica",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Prague",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Riga",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Eastern European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Rome",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Samara",
+    "gmtOffset": "+04:00",
+    "rawOffset": 14400000,
+    "name": "Samara Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Europe/San_Marino",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Sarajevo",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Saratov",
+    "gmtOffset": "+04:00",
+    "rawOffset": 14400000,
+    "name": "Saratov Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Europe/Simferopol",
+    "gmtOffset": "+03:00",
+    "rawOffset": 10800000,
+    "name": "Moscow Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Europe/Skopje",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Sofia",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Eastern European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Stockholm",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Tallinn",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Eastern European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Tirane",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Tiraspol",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Eastern European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Ulyanovsk",
+    "gmtOffset": "+04:00",
+    "rawOffset": 14400000,
+    "name": "Ulyanovsk Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Europe/Uzhgorod",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Eastern European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Vaduz",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Vatican",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Vienna",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Vilnius",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Eastern European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Volgograd",
+    "gmtOffset": "+03:00",
+    "rawOffset": 10800000,
+    "name": "Volgograd Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Europe/Warsaw",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Zagreb",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Zaporozhye",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Eastern European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Europe/Zurich",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "GB",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "GB-Eire",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "GMT",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "GMT0",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Greenwich",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Hongkong",
+    "gmtOffset": "+08:00",
+    "rawOffset": 28800000,
+    "name": "Hong Kong Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Iceland",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Greenwich Mean Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Indian/Antananarivo",
+    "gmtOffset": "+03:00",
+    "rawOffset": 10800000,
+    "name": "East Africa Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Indian/Chagos",
+    "gmtOffset": "+06:00",
+    "rawOffset": 21600000,
+    "name": "Indian Ocean Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Indian/Christmas",
+    "gmtOffset": "+07:00",
+    "rawOffset": 25200000,
+    "name": "Christmas Island Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Indian/Cocos",
+    "gmtOffset": "+06:30",
+    "rawOffset": 23400000,
+    "name": "Cocos Islands Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Indian/Comoro",
+    "gmtOffset": "+03:00",
+    "rawOffset": 10800000,
+    "name": "East Africa Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Indian/Kerguelen",
+    "gmtOffset": "+05:00",
+    "rawOffset": 18000000,
+    "name": "French Southern & Antarctic Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Indian/Mahe",
+    "gmtOffset": "+04:00",
+    "rawOffset": 14400000,
+    "name": "Seychelles Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Indian/Maldives",
+    "gmtOffset": "+05:00",
+    "rawOffset": 18000000,
+    "name": "Maldives Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Indian/Mauritius",
+    "gmtOffset": "+04:00",
+    "rawOffset": 14400000,
+    "name": "Mauritius Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Indian/Mayotte",
+    "gmtOffset": "+03:00",
+    "rawOffset": 10800000,
+    "name": "East Africa Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Indian/Reunion",
+    "gmtOffset": "+04:00",
+    "rawOffset": 14400000,
+    "name": "Réunion Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Iran",
+    "gmtOffset": "+03:30",
+    "rawOffset": 12600000,
+    "name": "Iran Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Israel",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Israel Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Jamaica",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Japan",
+    "gmtOffset": "+09:00",
+    "rawOffset": 32400000,
+    "name": "Japan Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Kwajalein",
+    "gmtOffset": "+12:00",
+    "rawOffset": 43200000,
+    "name": "Marshall Islands Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Libya",
+    "gmtOffset": "+02:00",
+    "rawOffset": 7200000,
+    "name": "Eastern European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "MET",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Middle Europe Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "MST7MDT",
+    "gmtOffset": "-06:00",
+    "rawOffset": -21600000,
+    "name": "Mountain Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Mexico/BajaNorte",
+    "gmtOffset": "-07:00",
+    "rawOffset": -25200000,
+    "name": "Pacific Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Mexico/BajaSur",
+    "gmtOffset": "-07:00",
+    "rawOffset": -25200000,
+    "name": "Mexican Pacific Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Mexico/General",
+    "gmtOffset": "-06:00",
+    "rawOffset": -21600000,
+    "name": "Central Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "NZ",
+    "gmtOffset": "+13:00",
+    "rawOffset": 46800000,
+    "name": "New Zealand Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "NZ-CHAT",
+    "gmtOffset": "+13:45",
+    "rawOffset": 49500000,
+    "name": "Chatham Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Navajo",
+    "gmtOffset": "-06:00",
+    "rawOffset": -21600000,
+    "name": "Mountain Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "PRC",
+    "gmtOffset": "+08:00",
+    "rawOffset": 28800000,
+    "name": "China Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "PST8PDT",
+    "gmtOffset": "-07:00",
+    "rawOffset": -25200000,
+    "name": "Pacific Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Pacific/Apia",
+    "gmtOffset": "+13:00",
+    "rawOffset": 46800000,
+    "name": "Apia Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Auckland",
+    "gmtOffset": "+13:00",
+    "rawOffset": 46800000,
+    "name": "New Zealand Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Pacific/Bougainville",
+    "gmtOffset": "+11:00",
+    "rawOffset": 39600000,
+    "name": "Bougainville Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Chatham",
+    "gmtOffset": "+13:45",
+    "rawOffset": 49500000,
+    "name": "Chatham Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Pacific/Chuuk",
+    "gmtOffset": "+10:00",
+    "rawOffset": 36000000,
+    "name": "Chuuk Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Easter",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Easter Island Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Pacific/Efate",
+    "gmtOffset": "+11:00",
+    "rawOffset": 39600000,
+    "name": "Vanuatu Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Enderbury",
+    "gmtOffset": "+13:00",
+    "rawOffset": 46800000,
+    "name": "Phoenix Islands Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Fakaofo",
+    "gmtOffset": "+13:00",
+    "rawOffset": 46800000,
+    "name": "Tokelau Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Fiji",
+    "gmtOffset": "+12:00",
+    "rawOffset": 43200000,
+    "name": "Fiji Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Funafuti",
+    "gmtOffset": "+12:00",
+    "rawOffset": 43200000,
+    "name": "Tuvalu Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Galapagos",
+    "gmtOffset": "-06:00",
+    "rawOffset": -21600000,
+    "name": "Galapagos Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Gambier",
+    "gmtOffset": "-09:00",
+    "rawOffset": -32400000,
+    "name": "Gambier Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Guadalcanal",
+    "gmtOffset": "+11:00",
+    "rawOffset": 39600000,
+    "name": "Solomon Islands Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Guam",
+    "gmtOffset": "+10:00",
+    "rawOffset": 36000000,
+    "name": "Chamorro Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Honolulu",
+    "gmtOffset": "-10:00",
+    "rawOffset": -36000000,
+    "name": "Hawaii-Aleutian Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Johnston",
+    "gmtOffset": "-10:00",
+    "rawOffset": -36000000,
+    "name": "Hawaii-Aleutian Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Kiritimati",
+    "gmtOffset": "+14:00",
+    "rawOffset": 50400000,
+    "name": "Line Islands Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Kosrae",
+    "gmtOffset": "+11:00",
+    "rawOffset": 39600000,
+    "name": "Kosrae Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Kwajalein",
+    "gmtOffset": "+12:00",
+    "rawOffset": 43200000,
+    "name": "Marshall Islands Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Majuro",
+    "gmtOffset": "+12:00",
+    "rawOffset": 43200000,
+    "name": "Marshall Islands Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Marquesas",
+    "gmtOffset": "-09:30",
+    "rawOffset": -34200000,
+    "name": "Marquesas Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Midway",
+    "gmtOffset": "-11:00",
+    "rawOffset": -39600000,
+    "name": "Samoa Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Nauru",
+    "gmtOffset": "+12:00",
+    "rawOffset": 43200000,
+    "name": "Nauru Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Niue",
+    "gmtOffset": "-11:00",
+    "rawOffset": -39600000,
+    "name": "Niue Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Norfolk",
+    "gmtOffset": "+12:00",
+    "rawOffset": 43200000,
+    "name": "Norfolk Island Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Pacific/Noumea",
+    "gmtOffset": "+11:00",
+    "rawOffset": 39600000,
+    "name": "New Caledonia Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Pago_Pago",
+    "gmtOffset": "-11:00",
+    "rawOffset": -39600000,
+    "name": "Samoa Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Palau",
+    "gmtOffset": "+09:00",
+    "rawOffset": 32400000,
+    "name": "Palau Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Pitcairn",
+    "gmtOffset": "-08:00",
+    "rawOffset": -28800000,
+    "name": "Pitcairn Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Pohnpei",
+    "gmtOffset": "+11:00",
+    "rawOffset": 39600000,
+    "name": "Ponape Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Ponape",
+    "gmtOffset": "+11:00",
+    "rawOffset": 39600000,
+    "name": "Ponape Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Port_Moresby",
+    "gmtOffset": "+10:00",
+    "rawOffset": 36000000,
+    "name": "Papua New Guinea Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Rarotonga",
+    "gmtOffset": "-10:00",
+    "rawOffset": -36000000,
+    "name": "Cook Islands Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Saipan",
+    "gmtOffset": "+10:00",
+    "rawOffset": 36000000,
+    "name": "Chamorro Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Samoa",
+    "gmtOffset": "-11:00",
+    "rawOffset": -39600000,
+    "name": "Samoa Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Tahiti",
+    "gmtOffset": "-10:00",
+    "rawOffset": -36000000,
+    "name": "Tahiti Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Tarawa",
+    "gmtOffset": "+12:00",
+    "rawOffset": 43200000,
+    "name": "Gilbert Islands Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Tongatapu",
+    "gmtOffset": "+13:00",
+    "rawOffset": 46800000,
+    "name": "Tonga Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Truk",
+    "gmtOffset": "+10:00",
+    "rawOffset": 36000000,
+    "name": "Chuuk Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Wake",
+    "gmtOffset": "+12:00",
+    "rawOffset": 43200000,
+    "name": "Wake Island Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Wallis",
+    "gmtOffset": "+12:00",
+    "rawOffset": 43200000,
+    "name": "Wallis & Futuna Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Pacific/Yap",
+    "gmtOffset": "+10:00",
+    "rawOffset": 36000000,
+    "name": "Chuuk Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Poland",
+    "gmtOffset": "+01:00",
+    "rawOffset": 3600000,
+    "name": "Central European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Portugal",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Western European Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "ROK",
+    "gmtOffset": "+09:00",
+    "rawOffset": 32400000,
+    "name": "Korean Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Singapore",
+    "gmtOffset": "+08:00",
+    "rawOffset": 28800000,
+    "name": "Singapore Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Turkey",
+    "gmtOffset": "+03:00",
+    "rawOffset": 10800000,
+    "name": "Turkey Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "UCT",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Coordinated Universal Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "US/Alaska",
+    "gmtOffset": "-08:00",
+    "rawOffset": -28800000,
+    "name": "Alaska Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "US/Aleutian",
+    "gmtOffset": "-09:00",
+    "rawOffset": -32400000,
+    "name": "Hawaii-Aleutian Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "US/Arizona",
+    "gmtOffset": "-07:00",
+    "rawOffset": -25200000,
+    "name": "Mountain Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "US/Central",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Central Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "US/East-Indiana",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "US/Eastern",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "US/Hawaii",
+    "gmtOffset": "-10:00",
+    "rawOffset": -36000000,
+    "name": "Hawaii-Aleutian Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "US/Indiana-Starke",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Central Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "US/Michigan",
+    "gmtOffset": "-04:00",
+    "rawOffset": -14400000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "US/Mountain",
+    "gmtOffset": "-06:00",
+    "rawOffset": -21600000,
+    "name": "Mountain Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "US/Pacific",
+    "gmtOffset": "-07:00",
+    "rawOffset": -25200000,
+    "name": "Pacific Standard Time",
+    "inDaylightTime": true,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "US/Samoa",
+    "gmtOffset": "-11:00",
+    "rawOffset": -39600000,
+    "name": "Samoa Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "UTC",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Coordinated Universal Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "Universal",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Coordinated Universal Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "W-SU",
+    "gmtOffset": "+03:00",
+    "rawOffset": 10800000,
+    "name": "Moscow Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "WET",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Western European Time",
+    "inDaylightTime": false,
+    "dstSavings": 3600000
+  },
+  {
+    "id": "Zulu",
+    "gmtOffset": "00:00",
+    "rawOffset": 0,
+    "name": "Coordinated Universal Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "EST",
+    "gmtOffset": "-05:00",
+    "rawOffset": -18000000,
+    "name": "Eastern Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "HST",
+    "gmtOffset": "-10:00",
+    "rawOffset": -36000000,
+    "name": "Hawaii Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  },
+  {
+    "id": "MST",
+    "gmtOffset": "-07:00",
+    "rawOffset": -25200000,
+    "name": "Mountain Standard Time",
+    "inDaylightTime": false,
+    "dstSavings": 0
+  }
+]

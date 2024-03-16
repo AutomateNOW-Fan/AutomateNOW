@@ -2,6 +2,42 @@ Add-Type -AssemblyName Microsoft.PowerShell.Commands.Utility
 
 #Region Enums
 
+#Region - Enum [ApprovalRules]
+
+Enum ANOWApprovalRule_approvalLevel {
+    LOW; MEDIUM; HIGH;
+}
+
+Enum ANOWApprovalRule_approvalActionType {
+    READY_TO_START; PROCESSING_RESTART; PROCESSING_FORCE_READY; PROCESSING_FORCE_COMPLETED; PROCESSING_FORCE_FAILED; PROCESSING_SKIP_ON; PROCESSING_SKIP_OFF; PROCESSING_HOLD; PROCESSING_RESUME; PROCESSING_INTERNAL_ACTION; PROCESSING_ABORT; PROCESSING_KILL; PROCESSING_ARCHIVED; PROCESSING_ARCHIVED_CLEANUP;
+}
+
+#endregion
+
+#Region - Enum [Calendars]
+
+Enum ANOWCalendar_calendarState {
+    ON; OFF;
+}
+
+Enum ANOWCalendar_statisticFunction {
+    CURRENT_VALUE; AVERAGE; MEDIAN; FIRST_QUARTILE; SECOND_QUARTILE; THIRD_QUARTILE; FOURTH_QUARTILE; MIN; MAX; COUNT; MEAN; GEOMETRIC_MEAN; POPULATION_VARIANCE; PRODUCT; SUM_LOG; SUM_SQ; VARIANCE; KURTOSIS; SKEWNESS; STANDARD_DEVIATION;
+}
+
+Enum ANOWCalendar_lockState {
+    UNLOCKED; SHARED; EXCLUSIVE;
+}
+
+Enum ANOWCalendar_calendarType {
+    BASE; AND; OR; NOT; CAL_SELECT;
+}
+
+Enum ANOWCalendar_semaphoreState {
+    ON; OFF;
+}
+
+#endregion
+
 #Region - Enum [Icons]
 
 Enum ANOWiconSet {
@@ -39,6 +75,14 @@ Enum ANOWDataSource_validity {
 
 Enum ANOWDataSource_dataSourceType {
     LOCAL_DICTIONARY; LOCAL_KEY_VALUE_STORE; LOCAL_FILE_STORE; LOCAL_TEXT_FILE_STORE; # Note: There are three additional types (REST; SQL; LOCAL;) which are not selectable in the UI.
+}
+
+#endregion
+
+#Region - End [Endpoints]
+
+Enum ANOWEndpoint_endpointType {
+    USER; FTP; MAINFRAME_FTP; FTPS; MAINFRAME_FTPS; SFTP; S3; HDFS; AZURE_BLOB; AZURE_FILE; GOOGLE_COULD_STORAGE_BUCKET; PGP; HTTP; REST_WEB_SERVICE; SOAP_WEB_SERVICE; EMAIL; EMAIL_EWS; AWS; AZURE; GOOGLE_CLOUD; GOOGLE_DATA_FLOW; AZURE_DATABRICKS; INFORMATICA_CLOUD; AWS_COMMON; IBM_MQ; RABBIT_MQ; SQS; ACTIVE_MQ; QPID; IBM_SIBUS; HORNETQ; SOLACE; JORAM_MQ; QMQ; ZERO_MQ; KAFKA; PULSAR; AMAZON_KINESIS; GOOGLE_CLOUD_PUB_SUB; MICROSOFT_AZURE_EVENT_HUB; AMQP; XMPP; STOMP; REDIS; HADOOP; HIVE; IMPALA; SQOOP; YARN; SPARK; FLUME; FLINK; STORM; OOZIE; AMBARI; ELASTIC_SEARCH; CASSANDRA; SAP_HANA; MONGO_DB; COUCH_DB; COUCH_BASE; DYNAMO_DB; ARANGO_DB; NEO4J; ORIENT_DB; TITAN; SSH; WINRM; HIVE_QL; GOOGLE_BIG_QUERY; DASHDB; DB2; MYSQL; NETEZZA; AZURE_SQL_DATABASE; AZURE_SQL_DATA_WAREHOUSE; ORACLE; POSTGRESQL; SQL_SERVER; SQL_SERVER_JTDS; TERADATA; SINGLESTORE; VERTICA; SNOWFLAKE; PRESTO_DB; SYBASE; INFORMIX; H2; AS400; Z_OS; Z_OS_REST; RAINCODE; OPENTEXT; CTRL_M; INFORMATICA; INFORMATICA_WS; SAS; SAS_VIYA; IBM_DATASTAGE; ODI; MS_SSIS; AB_INITIO; SAP_BODI; SKYVIA; TALEND; DBT; SAP; SAP_S4_HANA; SAP_S4_HANA_CLOUD; SAP_IBP; JD_EDWARDS; ORACLE_EBS; PEOPLESOFT; MICROSOFT_DYNAMICS; JIRA; SERVICE_NOW; ORACLE_SERVICE_CENTER; BMC_REMEDY; CA_SERVICE_MANAGEMENT; IBM_CONTROL_DESK; HP_OPEN_VIEW_SERVICE_MANAGER; SAP_SOLUTION_MANAGER; FACEBOOK; INSTAGRAM; TWITTER; YOUTUBE; LINKED_IN; TUMBLR; TIKTOK; REDDIT; TELEGRAM; WHATSAPP; MICROSOFT_POWER_BI; TABLEAU; BLUE_PRISM; UI_PATH; AUTOMATION_ANYWHERE; WORK_FUSION; PEGA; ROBOT_FRAMEWORK; AUTOMATE_NOW; APACHE_AIRFLOW; ANSIBLE;
 }
 
 #endregion
@@ -424,7 +468,7 @@ Enum ANOWWorkflowTemplate_integrationType {
 
 #endregion
 
-#Region - Enum [Workspace]
+#Region - Enum [Workspaces]
 
 Enum ANOWWorkspace_workspaceSetFolderType {
     SET_WORKSPACE_FOLDER; SET_SPECIFIC_FOLDER; CREATE_SUB_FOLDER_PER_WORKFLOW;
@@ -458,80 +502,101 @@ Class ANOW {
     [string]$userIp
 
     [boolean] ValidateBaseObject() {
-        If ($this.simpleId -notmatch '^[0-9a-zA-z_.-]{1,512}$') {
+        If ($this.simpleId -notmatch '^[0-9a-zA-z_.-]{ 1, 512 }$') {
             If ($this.simpleId.Length -le 512) {
                 [string]$validation_error_message = 'Check #1a failed: The simpleId may only consist of the following: numbers, letters (both cases), underscore, hyphen (dash) and period (dot).'
-            }
-            Else {
-                [string]$validation_error_message = 'Check #1b failed: The length of the simpleId may not exceed 512 characters except for folders, ___ and tags where it is limited to 128.'
-            }
-            Write-Warning -Message $validation_error_message
-            Return $false
-        }
-        ElseIf ($this.description.length -gt 255) {
-            [string]$validation_error_message = "Check #2a failed: The length of the description may not exceed 255 characters."
-            Write-Warning -Message $validation_error_message
-            Return $false
-        }
-        Else {
-            Return $true
-        }
-    }
+}
+Else {
+    [string]$validation_error_message = 'Check #1b failed: The length of the simpleId may not exceed 512 characters except for folders, ___ and tags where it is limited to 128.'
+}
+Write-Warning -Message $validation_error_message
+Return $false
+}
+ElseIf ($this.description.length -gt 255) {
+    [string]$validation_error_message = "Check #2a failed: The length of the description may not exceed 255 characters."
+    Write-Warning -Message $validation_error_message
+    Return $false
+}
+Else {
+    Return $true
+}
+}
 
-    # The primary goal of this method is to return back the same json string that the ANOW application produces when it converts an object into JSON
-    # The secondary goal of this method is to stringify the object in preparation for encoding to URL format faithfully
-    [string] ToString([string[]]$optional_properties) {        
-        #[hashtable]$this2 = @{}
-        [System.Collections.Specialized.OrderedDictionary]$this2 = [System.Collections.Specialized.OrderedDictionary]@{}
-        [Microsoft.PowerShell.Commands.MemberDefinition[]]$current_members = $this | Get-Member | Where-Object { $_.MemberType -eq 'Property' }
-        If($null -ne ($current_members | Where-Object { $_.Name -eq 'id' })){
-            [Microsoft.PowerShell.Commands.MemberDefinition[]]$current_members = @($current_members | Where-Object { $_.Name -eq 'id' }) + @($current_members | Where-Object { $_.Name -ne 'id' })
-        }
-        ForEach ($current_member in $current_members) {
-            [string]$current_member_name = $current_member.Name
-            $current_member_value = $this.$current_member_name # this variable cannot be hard typed
-            # This omits pre-defined optional properties for this specific class when they are empty
-            If (-not ($current_member_value.Length -eq 0 -and $current_member_name -in ($optional_properties))) {
-                If ($current_member.definition -match '^datetime [a-zA-Z]{1,} {.{1,}}$' ) {
-                    # This ensures that datetimes are always formatted into ISO 8601 format. Powershell is not consistent on recognizing strings that can be safely casted into dates.
-                    [string]$current_member_value = Get-Date -Date $current_member_value -Format 'yyyy-MM-ddTHH:mm:ss.fff'
-                    $this2.Add($current_member_name, $current_member_value)
-                }
-                ElseIf ($current_member.definition -match '^bool [a-zA-Z]{1,} {.{1,}}$' ) {
-                    # This ensures that booleans are converted the same way that the application expects
-                    If ($current_member_value -eq $false) {
-                        $this2.Add($current_member_name, $false)
-                    }
-                    Else {
-                        $this2.Add($current_member_name, $true)
-                    }
-                }
-                ElseIf ($current_member_value -is [System.Enum]) {
-                    # This ensures that enums are resolved into their string value instead of the numerical index
-                    [string]$current_member_value = $current_member_value.ToString()
-                    $this2.Add($current_member_name, $current_member_value)
-                }
-                ElseIf ($current_member.definition -match '^[A-Za-z]{1,}\[] [a-zA-Z]{1,} {.{1,}}$' -and $current_member_value.Count -eq 1) {
-                    # This ensures that arrays which only contain a single item are not converted into strings
-                    $this2.Add($current_member_name, @(, $current_member_value))
-                }
-                ElseIf ($current_member_value.Length -eq 0) {
-                    # This ensures that null values remain null instead of being converted to a string
-                    $this2.Add($current_member_name, $null)
+# The primary goal of this method is to return back the same json string that the ANOW application produces when it converts an object into JSON
+# The secondary goal of this method is to stringify the object in preparation for encoding to URL format faithfully
+[string] ToString([string[]]$optional_properties) {        
+    #[hashtable]$this2 = @{}
+    [System.Collections.Specialized.OrderedDictionary]$this2 = [System.Collections.Specialized.OrderedDictionary]@{}
+    [array]$current_members = $this | Get-Member | Where-Object { $_.MemberType -eq 'Property' }
+    If ($null -ne ($current_members | Where-Object { $_.Name -eq 'id' })) {
+        [array]$current_members = @($current_members | Where-Object { $_.Name -eq 'id' }) + @($current_members | Where-Object { $_.Name -ne 'id' })
+    }
+    ForEach ($current_member in $current_members) {
+        [string]$current_member_name = $current_member.Name
+        $current_member_value = $this.$current_member_name # this variable cannot be hard typed
+        # This omits pre-defined optional properties for this specific class when they are empty
+        If (-not ($current_member_value.Length -eq 0 -and $current_member_name -in ($optional_properties))) {
+            If ($current_member.definition -match '^datetime [a-zA-Z]{1,} {.{1,}}$' ) {
+                # This ensures that datetimes are always formatted into ISO 8601 format. Powershell is not consistent on recognizing strings that can be safely casted into dates.
+                [string]$current_member_value = Get-Date -Date $current_member_value -Format 'yyyy-MM-ddTHH:mm:ss.fff'
+                $this2.Add($current_member_name, $current_member_value)
+            }
+            ElseIf ($current_member.definition -match '^bool [a-zA-Z]{1,} {.{1,}}$' ) {
+                # This ensures that booleans are converted the same way that the application expects
+                If ($current_member_value -eq $false) {
+                    $this2.Add($current_member_name, $false)
                 }
                 Else {
-                    $this2.Add($current_member_name, $current_member_value)
+                    $this2.Add($current_member_name, $true)
                 }
             }
+            ElseIf ($current_member_value -is [System.Enum]) {
+                # This ensures that enums are resolved into their string value instead of the numerical index
+                [string]$current_member_value = $current_member_value.ToString()
+                $this2.Add($current_member_name, $current_member_value)
+            }
+            ElseIf ($current_member.definition -match '^[A-Za-z]{1,}\[] [a-zA-Z]{1,} {.{1,}}$' -and $current_member_value.Count -eq 1) {
+                # This ensures that arrays which only contain a single item are not converted into strings
+                $this2.Add($current_member_name, @(, $current_member_value))
+            }
+            ElseIf ($current_member_value.Length -eq 0) {
+                # This ensures that null values remain null instead of being converted to a string
+                $this2.Add($current_member_name, $null)
+            }
+            Else {
+                $this2.Add($current_member_name, $current_member_value)
+            }
         }
-        [string]$stringified_object = $this2 | ConvertTo-JSON -Compress -Depth 10        
-        Return $stringified_object
     }
-    # The primary goal of this method is to URL encode an ANOW object for conversion into the _oldValues string. The _oldValues is typically (but not always) included by the ANOW application whenever modifying an object. The behavior of this method should match the ANOW application as closely as possible. Rigorous and frequent testing will always be needed to ensure that valid payloads are sent when modifying existing objects in the ANOW application.
-    [string] ToURL([string[]]$optional_properties) {
-        [string]$stringified_object = $this.ToString([string[]]$optional_properties)
-        [string]$escaped_object = [System.Uri]::EscapeDataString($stringified_object)
-        Return $escaped_object
+    [string]$stringified_object = $this2 | ConvertTo-JSON -Compress -Depth 10        
+    Return $stringified_object
+}
+# The primary goal of this method is to URL encode an ANOW object for conversion into the _oldValues string. The _oldValues is typically (but not always) included by the ANOW application whenever modifying an object. The behavior of this method should match the ANOW application as closely as possible. Rigorous and frequent testing will always be needed to ensure that valid payloads are sent when modifying existing objects in the ANOW application.
+[string] ToURL([string[]]$optional_properties) {
+    [string]$stringified_object = $this.ToString([string[]]$optional_properties)
+    [string]$escaped_object = [System.Uri]::EscapeDataString($stringified_object)
+    Return $escaped_object
+}
+}
+
+#endregion
+
+#region Class - [ApprovalRule]
+
+Class ANOWApprovalRule {
+    [ANOWApprovalRule_approvalLevel]$approvalLevel
+    [ANOWApprovalRule_approvalActionType]$approvalActionType
+    [boolean]$noSelfApproval
+    [boolean]$passwordConfirmation
+
+    # Default constructor
+    ANOWApprovalRule() {
+        $this.Init(@{}) 
+    }
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
     }
 }
 
@@ -838,7 +903,7 @@ Class ANOWResultMappingRuleConditionCriteria {
     # This is a custom class specific to this module
     [ValidateSet('EQ', 'NE', 'LT_TEXT', 'GT_TEXT', 'LE_TEXT', 'GE_TEXT', 'SW', 'NSW', 'EW', 'NEW', 'CONTAINS', 'NOT_CONTAIN', 'REGEXP', 'NOT_REGEXP', 'IS_NULL', 'IS_NOT_NULL', 'EQ_NUM', 'NE_NUM', 'LT_NUM', 'GT_NUM', 'LE_NUM', 'GE_NUM', 'EQ_DATE', 'NE_DATE', 'LT_DATE', 'GT_DATE', 'LE_DATE', 'GE_DATE', 'CAL', 'NOT_IN_CAL')]
     [string]$operator
-    [ValidateSet('cycleActualCounter', 'duration', 'endTime', 'exitCode', 'exitMessage', 'id', 'name', 'owner', 'parentId', 'parentName', 'parentTemplate', 'processingStatus', 'processingTimestamp', 'rootId', 'rootName', 'rootTemplate', 'serviceStatus', 'skip', 'startTime', 'statusCode', 'statusMessage', 'template', 'timesRestarted')]
+    #[ValidateSet('cycleActualCounter', 'duration', 'endTime', 'exitCode', 'exitMessage', 'id', 'name', 'owner', 'parentId', 'parentName', 'parentTemplate', 'processingStatus', 'processingTimestamp', 'rootId', 'rootName', 'rootTemplate', 'serviceStatus', 'skip', 'startTime', 'statusCode', 'statusMessage', 'template', 'timesRestarted')] # note: these are the available values to choose from but you can actually specify your own custom string.
     [string]$fieldName
     [string]$value
     # Default constructor
@@ -879,8 +944,6 @@ Class ANOWResultMappingRule {
         }
     }
 }
-
-
 
 #endregion
 
@@ -1171,14 +1234,13 @@ Class ANOWSecurityRole {
 
 #Region - Sub Classes
 
-#region Class - [ANOWFolder]
+#region Class - [ANOWApproval]
 
-Class ANOWFolder : ANOW {
-    [string]$parent
-    [string]$folderPath
+Class ANOWApproval : ANOW {
+    [ANOWApprovalRule[]]$rules
 
     # Default constructor
-    ANOWFolder() { $this.Init(@{}) }
+    ANOWApproval() { $this.Init(@{}) }
     
     [void] Init([hashtable]$Properties) {
         foreach ($Property in $Properties.Keys) {
@@ -1186,11 +1248,109 @@ Class ANOWFolder : ANOW {
         }
     }
     [string] CreateOldValues() {
-        [string[]]$optional_properties = 'description', 'folderPath'
+        [string[]]$optional_properties = 'rules'
         [string]$old_values = $this.ToURL($optional_properties)
         Return $old_values
     }
 }
+
+#endregion
+
+#region Class - [ANOWCalendar]
+
+Class ANOWCalendarDetail : ANOW {
+    [datetime[]]$calculatedDates    
+    [int64]$valueLowThreshold
+    [string]$calendarDates
+    [ANOWCalendar_calendarState]$calendarState
+    [int64]$valueHighThreshold
+    [string]$timeZone
+    [datetime[]]$dates
+    [string[]]$tags
+    [string]$folder
+    [int64]$valueVeryHighThreshold
+    [int32[]]$dayOfMonth
+    [string]$valueUnit
+    [int32[]]$dayOfWeek
+    [int64]$valueVeryLowThreshold
+    [string]$value
+    [string]$calendarDaysOfMonth
+    [ANOWCalendar_calendarType]$calendarType
+    [string]$calendarDaysOfWeek
+    [string]$calendars
+    [boolean]$calendarLimitExpression
+    [string]$resourceType
+    [Nullable[datetime]]$nextOpenDate
+    [Nullable[datetime]]$nextCloseDate
+
+    # Default constructor
+    ANOWCalendarDetail() { $this.Init(@{}) }
+    
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = 'description'
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
+    }
+}
+
+Class ANOWCalendar : ANOW {
+    
+    [int64]$valueLowThreshold
+    [boolean]$composite
+    [int64]$occupiedPermits
+    [string]$calendarDates
+    [string]$maxValue
+    [ANOWCalendar_calendarState]$calendarState
+    [int64]$valueHighThreshold
+    [string]$timeZone
+    [datetime[]]$dates
+    [string[]]$tags
+    [string]$resourceStatus
+    [string]$folder
+    [PSCustomObject]$customFieldValues
+    [int64]$valueVeryHighThreshold
+    [int32[]]$dayOfMonth
+    [Nullable[ANOWCalendar_statisticFunction]]$statisticFunction
+    [string]$valueUnit
+    [int64]$availablePermits
+    [ANOWCalendar_lockState]$lockState
+    [string]$minValue
+    [int32[]]$dayOfWeek
+    [int64]$valueVeryLowThreshold
+    [string]$value
+    [string]$calendarDaysOfMonth
+    [PSCustomObject]$calendarStateId
+    [ANOWCalendar_calendarType]$calendarType
+    [string]$calendarDaysOfWeek
+    [string]$calendars
+    [boolean]$calendarLimitExpression
+    [int64]$totalPermits
+    [Nullable[ANOWCalendar_semaphoreState]]$semaphoreState
+    [string]$resourceType
+    [PSCustomObject[]]$historicalValues
+    [Nullable[datetime]]$nextOpenDate
+    [Nullable[datetime]]$nextCloseDate
+
+    # Default constructor
+    ANOWCalendar() { $this.Init(@{}) }
+    
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = 'description'
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
+    }
+}
+
 
 #endregion
 
@@ -1283,6 +1443,56 @@ Class ANOWLocalTextFileStoreRecord : ANOWDataSourceItem {
     [string]$content
     [int64]$size
     [string]$key
+}
+
+#endregion
+
+#region Class - [ANOWEndpoint]
+
+Class ANOWEndpoint : ANOW {
+    [PSCustomObject]$customFieldValues
+    [PSCustomObject]$endpointProperties
+    [string[]]$tags
+    [ANOWEndpoint_endpointType]$endpointType
+    [string]$folder
+    [string]$sshKeyPath
+
+    # Default constructor
+    ANOWEndpoint() { $this.Init(@{}) }
+    
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = @()
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
+    }
+}
+
+#endregion
+
+#region Class - [ANOWFolder]
+
+Class ANOWFolder : ANOW {
+    [string]$parent
+    [string]$folderPath
+
+    # Default constructor
+    ANOWFolder() { $this.Init(@{}) }
+    
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = 'description', 'folderPath'
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
+    }
 }
 
 #endregion
@@ -1501,6 +1711,8 @@ Class ANOWTask : ANOW {
     [boolean]$skipChildrenUpdate
     [boolean]$skipParentUpdate
     [boolean]$skipProcessingVariables
+    [boolean]$stopped
+    [boolean]$stopWithError
     [boolean]$templateNotFound
     [boolean]$useScripts
     [boolean]$wasCritical
@@ -1869,6 +2081,8 @@ Class ANOWWorkflow : ANOW {
     [boolean]$skipChildrenUpdate
     [boolean]$skipParentUpdate
     [boolean]$skipProcessingVariables
+    [boolean]$stopped
+    [boolean]$stopWithError
     [boolean]$templateNotFound
     [boolean]$useScripts
     [boolean]$wasCritical
