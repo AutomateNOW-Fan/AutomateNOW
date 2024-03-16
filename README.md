@@ -43,7 +43,7 @@ This module has been tested against the below versions of AutomateNOW!
 - Fixed an issue for PowerShell 7 that could prevent the classes.psm1 from loading
 - Fixed an issue with Daylight Saving Time that impacted `Connect-AutomateNOW`
 - Fixed an issue with the `-ReadJSONFromClipboard` parameter of `Connect-AutomateNOW`
-- Aligned some parameter names throughout the 
+- Aligned some parameter names throughout the Set-* functions
 - Added -Quiet parameter to all of the New-* functions
 - Added 2 new parameters `-LoadBalancersOnly`, `-ChildNodesOnly` to `Get-AutomateNOWNode`
 - `Connect-AutomateNOW` now enforces that the domain supplied on the -Domain parameter must actually exist
