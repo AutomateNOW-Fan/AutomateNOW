@@ -34,9 +34,17 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 
 This module has been tested against the below versions of AutomateNOW!
 
-- 3.3.1.75HF3 (3.3.1.76HF1 not tested yet)
+- 3.3.1.76HF2
 <br/><br/>
 ## Change Log 📝
+
+## 1.0.16
+- Added new functions: `Copy-AutomateNOWDataSource`
+- Added preliminary support for the new Notes feature
+- Added experimental parameter `-All` to `Get-AutomateNOWDataSourceItem`
+- Fixed an issue with `Get-AutomateNOWUser` and parsing the domain roles of the root admin account
+- Minor improvements to `Disconnect-AutomateNOW`
+- Minor improvements to `Connect-AutomateNOW`
 
 ## 1.0.15
 - Added new functions: `Add-AutomateNOWApprovalRule`, `Copy-AutomateNOWApproval`, `Copy-AutomateNOWEndpoint`, `Export-AutomateNOWApproval`, `Export-AutomateNOWCalendar`, `Export-AutomateNOWEndpoint`, `Get-AutomateNOWApproval`, `Get-AutomateNOWCalendar`, `Get-AutomateNOWEndpoint`, `New-AutomateNOWApproval`, `New-AutomateNOWApprovalRule`, `New-AutomateNOWCalendar`, `New-AutomateNOWEndpoint`, `Remove-AutomateNOWApproval`, `Remove-AutomateNOWCalendar`, `Remove-AutomateNOWEndpoint`, `Set-AutomateNOWApproval`, `Set-AutomateNOWEndpoint`, `Set-AutomateNOWWorkflowTemplate`, `Show-AutomateNOWEndpointType`, `Unprotect-AutomateNOWEncryptedString`
@@ -187,6 +195,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `ConvertTo-QueryString`
 
 `Copy-AutomateNOWApproval`
+
+`Copy-AutomateNOWDataSource`
 
 `Copy-AutomateNOWEndpoint`
 

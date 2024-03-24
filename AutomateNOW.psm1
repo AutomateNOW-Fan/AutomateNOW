@@ -730,7 +730,7 @@ Function Connect-AutomateNOW {
     Connects to the API of an AutomateNOW! instance
 
     .DESCRIPTION
-    The `Connect-AutomateNow` function authenticates to the API of an AutomateNOW! instance. It then sets the access token globally.
+    Connects to the API of an AutomateNOW! instance. The session details are then set to global variable $anow_session.
 
     .PARAMETER Instance
     Specifies the name of the AutomateNOW! instance. For example: s2.infinitedata.com
@@ -800,12 +800,13 @@ Function Connect-AutomateNOW {
     Connect-AutomateNOW -Instance 's2.infinitedata.com' -User 'user.10' -Pass '********' -Domain 'Test' -Quiet
 
     .NOTES
-    1. You only need to specify the -Instance parameter. You -should- specify the -Domain parameter as well, otherwise you will need to immediately use Switch-Domain.
+    1. You only need to specify the -Instance parameter. You -really should- specify the -Domain parameter as well, otherwise you will need to immediately use Switch-Domain.
     1. The -User and -Pass parameters really should be removed as using them would put your credential into your command history. However, they are still available in case that approach is still desireable.
     2. If you're going to use -AccessToken then you *should* include -RefreshToken and -ExpirationDate as well (but you don't have to).
     3. The -ReadJSONFromClipboard parameter is mainly intended for demonstration purposes to speed things up and not have to worry about typing mistakes.
-    4. Just like the console does, this module will auto-refresh your token. The difference is that the console will refresh if your token is at least 1 second old whereas this module refreshes after 300 seconds (See Update-AutomateNOWToken for more info)
+    4. This module will auto-refresh your token (same as the console). The difference is that the console may refresh if your token after 1 second of age. This module by defaults waits until the token is 300 seconds before automatically refreshing (See Update-AutomateNOWToken for more info).
     5. Always use Disconnect-AutomateNOW after you have concluded your session
+    6. If you trying to find the session details with your token, check the global variable --> $anow_session
 
     #>
     [OutputType([string])]
@@ -999,6 +1000,10 @@ Function Connect-AutomateNOW {
             Break
         }
         Return $token_properties
+    }
+    If ($Instance -match '^http[s]{0,}://') {
+        Write-Warning -Message "Please do not include https:// in the name of the instance. See Get-Help Connect-AutomateNOW for examples."
+        Break
     }
     If ($NotSecure -eq $true) {
         [string]$protocol = 'http'
@@ -1469,6 +1474,10 @@ Function Disconnect-AutomateNOW {
         Write-Warning -Message "Somehow there is not a valid token confirmed."
         Break
     }
+    If ($null -eq $anow_session.Instance) {
+        Write-Warning -Message "You are not actually connected so you can't disconnect"
+        Break
+    }
     [string]$command = '/logoutEvent'
     [hashtable]$parameters = @{}
     $parameters.Add('Command', $command)
@@ -1484,20 +1493,23 @@ Function Disconnect-AutomateNOW {
         [string]$Message = $_.Exception.Message
         Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] while running Disconnect-AutomateNOW due to [$Message]."
         Break
+    }    
+    If ($results.response.status -eq 0) {
+        [string]$response_text = $results.response.data
+        Write-Information -MessageData "[$Instance] reports $response_text"        
     }
-    [PSCustomObject]$response = $results.response
-    If ($response.status -eq 0) {
-        [string]$Instance = $anow_session.Instance
-        $Error.Clear()
-        Try {
-            Remove-Variable -Name anow_session -Scope Global -Force
-        }
-        Catch {
-            [string]$Message = $_.Exception.Message
-            Write-Warning "Remove-Variable failed to remove the `$anow_session variable due to [$Message]."
-            Break
-        }
-        Write-Information -MessageData "Successfully disconnected from [$Instance]."
+    Else {
+        Write-Warning -Message "Failed to received acknowledgement of disconnection from [$Instance]"
+    }
+    [string]$Instance = $anow_session.Instance
+    $Error.Clear()
+    Try {
+        Remove-Variable -Name anow_session -Scope Global -Force
+    }
+    Catch {
+        [string]$Message = $_.Exception.Message
+        Write-Warning "Remove-Variable failed to remove the `$anow_session variable due to [$Message]."
+        Break
     }
 }
 
@@ -2818,7 +2830,6 @@ Function Get-AutomateNOWAuditLog {
     Gets the oldest 1000 audit log entries
 
     Get-AutomateNOWAuditLog -startRow 0 -endRow 1000 -Ascending
-
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
@@ -4505,6 +4516,215 @@ Function Set-AutomateNOWDataSource {
     }
 }
 
+Function Copy-AutomateNOWDataSource {
+    <#
+    .SYNOPSIS
+    Copies an DataSource from an AutomateNOW! instance
+
+    .DESCRIPTION
+    Copies an DataSource from an AutomateNOW! instance. AutomateNOW object id can never be changed, but we can copy the object to a new id and it will include all of the items therein.
+
+    .PARAMETER DataSource
+    Mandatory [ANOWDataSource] object to be copied.
+
+    .PARAMETER NewId
+    The name (Id) of the new DataSource. The new Id must be unique (per domain). It may consist only of letters, numbers, underscore, dot or hypen.
+
+    .PARAMETER UnsetDescription
+    Optional switch that will ensure that the newly created DataSource will not have a description set.
+
+    .PARAMETER Description
+    Optional description to set on the new DataSource object. If you do not set this, the new DataSource object will copy the Description of the source object.
+
+    .PARAMETER UnsetFolder
+    Optional switch that will ensure that the newly created DataSource will not have a Folder set.
+
+    .PARAMETER Folder
+    Optional description to set a different folder on the new DataSource object. If you do not set this, the new DataSource object will use the same Folder of the source object.
+
+    .PARAMETER UnsetTags
+    Optional switch that will ensure that the newly created DataSource will not have any Tags set.
+
+    .PARAMETER Tags
+    Optional strings to set a different set of Tags on the new DataSource object. If you do not set this, the new DataSource object will appy the same Tags of the source object.
+
+    .INPUTS
+    ONLY [ANOWDataSource] object is accepted. Pipeline support is intentionally unavailable.
+
+    .OUTPUTS
+    None. The status will be written to the console with Write-Verbose.
+
+    .EXAMPLE
+    Creates a copy of an DataSource and changes the description (multi-line format)
+    $DataSource01 = Get-AutomateNOWDataSource -Id 'DataSource_01'
+    Copy-AutomateNOWDataSource -DataSource $DataSource01 -NewId 'DataSource_01_production' -Description 'DataSource 01 Production'
+
+    .EXAMPLE
+    Creates a copy of an DataSource that omits the description (one-liner format)
+    Copy-AutomateNOWDataSource -DataSource (Get-AutomateNOWDataSource -Id 'DataSource_01') -NewId 'DataSource_01_production' -UnsetDescription -Tags 'Tag1', 'Tag2'
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [Cmdletbinding()]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [ANOWDataSource]$DataSource,
+        [Parameter(Mandatory = $true)]
+        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [string]$NewId,
+        [Parameter(Mandatory = $false)]
+        [ValidateScript({ $_.Length -le 255 })]
+        [string]$Description,
+        [Parameter(Mandatory = $false)]
+        [switch]$UnsetDescription,
+        [Parameter(Mandatory = $false)]
+        [string[]]$Tags,
+        [Parameter(Mandatory = $false)]
+        [switch]$UnsetTags,
+        [Parameter(Mandatory = $false)]
+        [string]$Folder,
+        [Parameter(Mandatory = $false)]
+        [switch]$UnsetFolder
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        If ($UnsetDescription -eq $true -and $Description.Length -gt 0) {
+            Write-Warning -Message "You cannot set the description and unset it at the same time. Please choose one or the other."
+            Break
+        }
+        If ($UnsetFolder -eq $true -and $Folder.Length -gt 0) {
+            Write-Warning -Message "You cannot set the Folder and unset it at the same time. Please choose one or the other."
+            Break
+        }
+        If ($UnsetTags -eq $true -and $Tags.Count -gt 0) {
+            Write-Warning -Message "You cannot set the Tags and unset them at the same time. Please choose one or the other. Tags from the source object will be carried over to the new object if you do not specify any tag-related parameters."
+            Break
+        }
+        [string]$DataSourceType = $DataSource.dataSourceType
+        Write-Verbose -Message "This is a [$DataSourceType] type of Data Source"
+        ## Begin warning ##
+        ## Do not tamper with this below code which makes sure that the object does not previously exist before attempting to create it. Technically, the console will not allow a duplicate object to be created. However, it would be cleaner to use the Get function first to ensure we are not trying to create a duplicate here.
+        $Error.Clear()
+        Try {
+            [boolean]$DataSource_exists = ($null -ne (Get-AutomateNOWDataSource -Id $NewId))
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWDataSource failed to check if the DataSource [$NewId] already existed due to [$Message]."
+            Break
+        }
+        If ($DataSource_exists -eq $true) {
+            [string]$current_domain = $anow_session.header.domain
+            Write-Warning "There is already an DataSource named [$NewId] in [$current_domain]. You may not proceed."
+            [boolean]$PermissionToProceed = $false
+        }
+        ## End warning ##
+        [string]$command = '/dataSource/copy'
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($PermissionToProceed -ne $false) {
+            [string]$DataSource_oldId = $DataSource.id
+            If ($DataSource_oldId -eq $NewId) {
+                Write-Warning -Message "The new id cannot be the same as the old id."
+                Break
+            }
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            If ($UnsetFolder -eq $True) {
+                $BodyMetaData.'folder' = $Null
+            }
+            ElseIf ($Folder.Length -gt 0) {
+                $BodyMetaData.'folder' = $Folder
+            }
+            Else {
+                If ($DataSource.folder.Length -gt 0) {
+                    $BodyMetaData.'folder' = $DataSource.folder
+                }
+            }
+            If ($Tags.Count -gt 0) {
+                [int32]$tag_count = 1
+                ForEach ($tag in $Tags) {
+                    $BodyMetaData.('tags' + $tag_count ) = $tag
+                    $tag_count++
+                }
+            }
+            ElseIf ($UnsetTags -eq $true) {
+                $BodyMetaData.'tags' = $Null
+            }
+            Else {
+                If ($DataSource.Tags -gt 0) {
+                    [int32]$tag_count = 1
+                    ForEach ($tag in $DataSource.tags) {
+                        $BodyMetaData.('tags' + $tag_count ) = $tag
+                        $tag_count++
+                    }
+                }
+            }
+            $BodyMetaData.'oldId' = $DataSource_oldId
+            $BodyMetaData.'domain' = $DataSource.domain
+            $BodyMetaData.'id' = $NewId
+            If ($UnsetDescription -ne $true) {
+                If ($Description.Length -gt 0) {
+                    $BodyMetaData.'description' = $Description
+                }
+                Else {
+                    $BodyMetaData.'description' = $DataSource.description
+                }
+            }
+            $BodyMetaData.'_operationType' = 'add'
+            $BodyMetaData.'_operationId' = 'copy'
+            $BodyMetaData.'_textMatchStyle' = 'exact'
+            $BodyMetaData.'_dataSource' = 'DataSourceDataSource'
+            $BodyMetaData.'isc_metaDataPrefix' = '_'
+            $BodyMetaData.'isc_dataFormat' = 'json'
+            $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
+            $parameters.Body = $Body
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$DataSource_oldId] due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            }
+            $Error.Clear()
+            Try {
+                [ANOWDataSource]$NewDataSource = $results.response.data[0]
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Failed to create copied [ANOWDataSource] object [$NewId] due to [$Message]."
+                Break
+            }
+            If ($NewDataSource.id.Length -eq 0) {
+                Write-Warning -Message "Somehow the newly created (copied) [ANOWDataSource] object [$NewId] is empty!"
+                Break
+            }
+            Return $NewDataSource
+        }
+    }
+    End {
+
+    }
+}
+
 #endregion
 
 #Region - DataSourceItems
@@ -4551,14 +4771,16 @@ Function Get-AutomateNOWDataSourceItem {
 
     #>
     [OutputType([ANOWDataSourceItem[]])]
-    [Cmdletbinding()]
+    [Cmdletbinding(DefaultParameterSetName = 'Default')]
     Param(
         [Parameter(Mandatory = $True, ValueFromPipeline = $True)]
         [ANOWDataSource]$DataSource,
         [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
         [int32]$startRow = 0,
         [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
-        [int32]$endRow = 100
+        [int32]$endRow = 100,
+        [Parameter(Mandatory = $False, ParameterSetName = 'All')]
+        [switch]$All
     )
     Begin {
         If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
@@ -4584,8 +4806,14 @@ Function Get-AutomateNOWDataSourceItem {
         [string]$DataSource_id = $DataSource.id
         $Body.Add('masterDataSource', $DataSource_id)
         $Body.Add('_operationType', 'fetch')
-        $Body.Add('_startRow', $startRow)
-        $Body.Add('_endRow', $endRow)
+        If ($All -eq $true) {
+            $Body.Add('_startRow', 0)
+            $Body.Add('_endRow', 50000)
+        }
+        Else {
+            $Body.Add('_startRow', $startRow)
+            $Body.Add('_endRow', $endRow)
+        }
         $Body.Add('_textMatchStyle', 'substring')
         If ($Type -eq 'LOCAL_DICTIONARY') {
             [string]$command = '/localDictionaryRecord/read?'
@@ -4645,6 +4873,10 @@ Function Get-AutomateNOWDataSourceItem {
             }
         }
         [int32]$DataSourceItemsCount = $results.response.data.count
+        If ($DataSourceItemsCount -gt 50000) {
+            Write-Warning -Message "This Data Source has over 50,000 items! This module does not support that yet."
+            Break
+        }
         If ($DataSourceItemsCount -gt 0) {
             If ($Type -eq 'LOCAL_DICTIONARY') {
                 $Error.Clear()
@@ -13718,9 +13950,7 @@ Function Export-AutomateNOWTimeZone {
 
     .NOTES
 
-
     #>
-
     [Cmdletbinding(DefaultParameterSetName = 'Pipeline')]
     Param(
         [Parameter(Mandatory = $true, ValueFromPipeline = $true, ParameterSetName = 'Pipeline')]
@@ -14093,7 +14323,7 @@ Function Get-AutomateNOWUser {
                 }
                 [ANOWSecurityRole[]]$secRoles2 = ForEach ($secRole in $User.secRoles) {
                     [ANOWDomainRole[]]$domain_roles = $secRole.domainRoles
-                    If($User_Id -ne 'Administrator'){
+                    If ($User_Id -ne 'Administrator') {
                         $secRole.domainRoles = $domain_roles
                     }
                     $secRole

@@ -1,5 +1,8 @@
 ﻿<#	
-Developed against AutomateNOW! version 3.3.1.75HF3
+Developed against AutomateNOW! version 3.3.1.76HF2
+
+This version *will not work correctly* with 3.3.1.75 or below.
+
 #>
 @{	
 	# Author of this module
@@ -9,10 +12,10 @@ Developed against AutomateNOW! version 3.3.1.75HF3
 	RootModule = 'AutomateNOW.psm1'
 	
 	# Version number of this module.
-	ModuleVersion = '1.0.15'
+	ModuleVersion = '1.0.16'
 	
 	# ID used to uniquely identify this module
-	GUID = '2a3216de-b1de-3aa2-2538-2d13e4a25b1f'
+	GUID = '3b4326de-b1de-3aa2-2538-2d13e4a25b1f'
 	
 	# Copyright statement for this module
 	Copyright = 'not affiliated with InfiniteDATA'
