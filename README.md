@@ -26,7 +26,7 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 - Completely browserless operation
 - Both http & https protocols supported
 - PowerShell Core & Windows PowerShell compatible
-- Classes and enums are defined (see Classes.ps1)
+- Classes and enums are defined (see Classes.psm1)
 - Pipeline capability to streamline your workloads
 - Session tokens will be automatically refreshed during usage
 - All functions can return help with Get-Help or the -? parameter
@@ -37,7 +37,7 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 
 ## 1.0.17
 - Added new functions: `Add-AutomateNOWProcessingTimeTrigger`, `Copy-AutomateNOWAdhocReport`, `Copy-AutomateNOWAgent`, `Copy-AutomateNOWCalendar`, `Copy-AutomateNOWScheduleTemplate`, `Copy-AutomateNOWSemaphore`, `Export-AutomateNOWAdhocReport`, `Export-AutomateNOWAgent`, `Export-AutomateNOWProcessingTimeTrigger`, `Export-AutomateNOWSchedule`, `Export-AutomateNOWScheduleTemplate`, `Export-AutomateNOWSemaphore`, `Get-AutomateNOWAdhocReport`, `Get-AutomateNOWAgent`, `Get-AutomateNOWProcessingTimeTrigger`, `Get-AutomateNOWSchedule`, `Get-AutomateNOWScheduleTemplate`, `Get-AutomateNOWSemaphore`, `Import-AutomateNOWLocalTimeZone`, `Invoke-AutomateNOWAdhocReport`, `New-AutomateNOWAdhocReport`, `New-AutomateNOWAgent`, `New-AutomateNOWScheduleTemplate`, `New-AutomateNOWSemaphore`, `Remove-AutomateNOWAdhocReport`, `Remove-AutomateNOWAgent`, `Remove-AutomateNOWProcessingTimeTrigger`, `Remove-AutomateNOWSchedule`, `Remove-AutomateNOWScheduleTemplate`, `Remove-AutomateNOWSemaphore`, `Rename-AutomateNOWScheduleTemplate`, `Restart-AutomateNOWSchedule`, `Resume-AutomateNOWSchedule`, `Resume-AutomateNOWScheduleTemplate`, `Set-AutomateNOWAdhocReport`, `Set-AutomateNOWAgent`, `Set-AutomateNOWScheduleTemplate`, `Set-AutomateNOWSemaphore`, `Skip-AutomateNOWSchedule`, `Skip-AutomateNOWScheduleTemplate`, `Start-AutomateNOWScheduleTemplate`, `Stop-AutomateNOWSchedule`, `Suspend-AutomateNOWSchedule`, `Suspend-AutomateNOWScheduleTemplate`
-- Bump compatibility to version 3.3.1.78 HF2
+- Bump compatibility to ANOW version 3.3.1.78 HF2
 - Added new filtering parameter -processingStatus to `Get-AutomateNOWTask` and `Get-AutomateNOWWorkflow`
 - Added new filtering parameter -Tags to `Get-AutomateNOWTaskTemplate`
 - Fixed an issue with `Get-AutomateNOWDomain` and domains that have a logo png applied
@@ -45,6 +45,7 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 
 ## 1.0.16
 - Added new functions: `Copy-AutomateNOWDataSource`
+- Bump compatibility to ANOW version 3.3.1.76 HF2
 - Added preliminary support for the new Notes feature
 - Added experimental parameter `-All` to `Get-AutomateNOWDataSourceItem`
 - Fixed an issue with `Get-AutomateNOWUser` and parsing the domain roles of the root admin account
@@ -68,6 +69,7 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 
 ## 1.0.14
 - Added new functions: `Add-AutomateNOWResultMappingRule` `Export-AutomateNOWResultMapping` `Get-AutomateNOWResultMapping` `New-AutomateNOWResultMapping` `New-AutomateNOWResultMappingRule` `New-AutomateNOWResultMappingRuleCondition` `New-AutomateNOWResultMappingRuleConditionCriteria` `Remove-AutomateNOWResultMapping` `Remove-AutomateNOWTask` `Remove-AutomateNOWWorkflow` `Restart-AutomateNOWTask` `Restart-AutomateNOWWorkflow` `Resume-AutomateNOWTask` `Resume-AutomateNOWWorkflow` `Set-AutomateNOWDataSource` `Set-AutomateNOWTaskTemplate` `Skip-AutomateNOWTask` `Skip-AutomateNOWWorkflow` `Stop-AutomateNOWTask` `Stop-AutomateNOWWorkflow` `Suspend-AutomateNOWTask` `Suspend-AutomateNOWWorkflow`
+- Bump compatibility to ANOW version 3.3.1.75 HF3
 - Fixed an issue with JSON depth and `Get-AutomateNOWAuditlog`
 - `New-AutomateNOWTaskTemplate` will now differentiate between Internal Tasks, Service Manager Tasks and Standard Tasks
 - `Set-AutomateNOWWorkspace` has support for all of the settings in the Attributes tab
@@ -86,6 +88,7 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 
 ## 1.0.11
 - Added new functions: `Confirm-AutomateNOWTaskTemplate`, `Confirm-AutomateNOWWorkflowTemplate`, `Copy-AutomateNOWTaskTemplate`, `Export-AutomateNOWCodeRepository`, `Get-AutomateNOWCodeRepository`, `Rename-AutomateNOWTaskTemplate`, `Resolve-AutomateNOWTaskType2ServerNodeType`,`Resume-AutomateNOWTaskTemplate`, `Resume-AutomateNOWWorkflowTemplate`, `Skip-AutomateNOWTaskTemplate`, `Skip-AutomateNOWWorkflowTemplate`, `Start-AutomateNOWNode`, `Start-AutomateNOWTaskTemplate`, `Start-AutomateNOWWorkflowTemplate`, `Stop-AutomateNOWNode`, `Suspend-AutomateNOWTaskTemplate`, `Suspend-AutomateNOWWorkflowTemplate`
+- Bump compatibility to ANOW version 3.3.1.75 HF1
 - Improved the global session variable to use class objects (e.g. [ANOWTimeZone], [ANOWUser])
 - Enhanced the `Get-AutomatenowUser` function to fetch the full user details. If you don't know the username (e.g. using an access token) then use the -LoggedOnUser parameter.
 - Decorated the [ANOWUser] object with [ANOWDomainRole] and [ANOWSecurityRole] class objects
@@ -121,6 +124,7 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 
 ### 1.0.8
 - Added new functions: `Get-AutomateNOWAdhocReport`, `Get-AutomateNOWAuditLog`, `Get-AutomateNOWCalendar`, `Get-AutomateNOWOverview`, `Read-AutomateNOWTimeZone`
+- Bump compatibility to ANOW version 3.3.1.75 HF0
 - Replaced hard-coded query strings with properly defined URL parameter hashtables with the help of `ConvertTo-QueryString`
 - Fixed an issue with `Import-AutomateNOWIcon` exporting the .csv to the wrong location
 - Added support for entering your own session token directly into `Connect-AutomateNOW` (optionally include refresh token + expiration date for best results)
@@ -168,6 +172,7 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 
 ### 1.0.0
 - Initial release (feedback requested)
+- Compatibile with ANOW version 3.2.1.69
 <br/><br/>
 ## Caution 🚸
 
