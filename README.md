@@ -188,9 +188,7 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 - List tags, folders etc. on an instance that you may not have permission to in the UI
 - (Psuedo) Rename Task Templates & Workflow Templates
 - Move items freely into and out of Workspaces
-- Decrypt credential objects
 - Automatic text file MIME type detection (for Add-AutomateNOWDataSourceItem)
-- Include archived Tasks & Workflows in the Timeline view
 
 ## Questions ❓
 
