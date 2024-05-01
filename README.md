@@ -10,6 +10,10 @@ Created by AutomateNOW-Fan
 ```
 ⚠ Not affiliated with InfiniteDATA
 ```
+## Efficacy 🧪
+
+This module has been tested against the below version 3.3.1.78HF2 of AutomateNOW!
+<br/><br/>
 ## Installation 🏗
 
 Install from the PowerShell Gallery 👉 `Install-Module -Name AutomateNOW -Scope CurrentUser`
@@ -30,13 +34,15 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 - PSScriptAnalyzer compliant / Approved verbs only
 - Alternate encryption key bytes can be supplied (let's hope it is never needed 🤞)
 <br/><br/>
-## Efficacy 🧪
-
-This module has been tested against the below versions of AutomateNOW!
-
-- 3.3.1.76HF2
-<br/><br/>
 ## Change Log 📝
+
+## 1.0.17
+- Added new functions: `Add-AutomateNOWProcessingTimeTrigger`, `Copy-AutomateNOWAdhocReport`, `Copy-AutomateNOWAgent`, `Copy-AutomateNOWCalendar`, `Copy-AutomateNOWScheduleTemplate`, `Copy-AutomateNOWSemaphore`, `Export-AutomateNOWAdhocReport`, `Export-AutomateNOWAgent`, `Export-AutomateNOWProcessingTimeTrigger`, `Export-AutomateNOWSchedule`, `Export-AutomateNOWScheduleTemplate`, `Export-AutomateNOWSemaphore`, `Get-AutomateNOWAdhocReport`, `Get-AutomateNOWAgent`, `Get-AutomateNOWProcessingTimeTrigger`, `Get-AutomateNOWSchedule`, `Get-AutomateNOWScheduleTemplate`, `Get-AutomateNOWSemaphore`, `Import-AutomateNOWLocalTimeZone`, `Invoke-AutomateNOWAdhocReport`, `New-AutomateNOWAdhocReport`, `New-AutomateNOWAgent`, `New-AutomateNOWScheduleTemplate`, `New-AutomateNOWSemaphore`, `Remove-AutomateNOWAdhocReport`, `Remove-AutomateNOWAgent`, `Remove-AutomateNOWProcessingTimeTrigger`, `Remove-AutomateNOWSchedule`, `Remove-AutomateNOWScheduleTemplate`, `Remove-AutomateNOWSemaphore`, `Rename-AutomateNOWScheduleTemplate`, `Restart-AutomateNOWSchedule`, `Resume-AutomateNOWSchedule`, `Resume-AutomateNOWScheduleTemplate`, `Set-AutomateNOWAdhocReport`, `Set-AutomateNOWAgent`, `Set-AutomateNOWScheduleTemplate`, `Set-AutomateNOWSemaphore`, `Skip-AutomateNOWSchedule`, `Skip-AutomateNOWScheduleTemplate`, `Start-AutomateNOWScheduleTemplate`, `Stop-AutomateNOWSchedule`, `Suspend-AutomateNOWSchedule`, `Suspend-AutomateNOWScheduleTemplate`
+- Bump compatibility to version 3.3.1.78 HF2
+- Added new filtering parameter -processingStatus to `Get-AutomateNOWTask` and `Get-AutomateNOWWorkflow`
+- Added new filtering parameter -Tags to `Get-AutomateNOWTaskTemplate`
+- Fixed an issue with `Get-AutomateNOWDomain` and domains that have a logo png applied
+- Renamed `Protect-AutomateNOWAuthenticationString` to `Protect-AutomateNOWEncryptedString`
 
 ## 1.0.16
 - Added new functions: `Copy-AutomateNOWDataSource`
@@ -167,18 +173,74 @@ This module has been tested against the below versions of AutomateNOW!
 ## Caution 🚸
 
 Use the _-NotSecure_ parameter when connecting to an instance that doesn't use https 😒
+
 ## Wish List 🌠
 
 - Enrich the sorting options for all Get functions
 - Export diagrams to PNG
-- Detect the mime type of binary files (for Add-AutomateNOWDataSourceItem)
+- Automatic binary file MIME type detection (for Add-AutomateNOWDataSourceItem)
 - Refactor redundant code
+- Export functions should convert objects containing an object type to JSON strings
+
+## Cheats 🎰
+
+- Execute Adhoc Reports where you may not have permission to in the UI
+- List tags, folders etc. on an instance that you may not have permission to in the UI
+- (Psuedo) Rename Task Templates & Workflow Templates
+- Move items freely into and out of Workspaces
+- Decrypt credential objects
+- Automatic text file MIME type detection (for Add-AutomateNOWDataSourceItem)
+- Include archived Tasks & Workflows in the Timeline view
+
+## Questions ❓
+
+### Where are the connection details stored in my PowerShell session after successfully authenticating?
+>Check the global variable $anow_session for a lot of useful information about your session and the instance you are connected to.
+
+### Which version of PowerShell do I need?
+>This module is compatible with both Windows PowerShell 5.1 and PowerShell Core 7.x
+
+### Do the functions in this module utilize the PowerShell pipeline?
+>Yes, except for the Rename commands (functions).
+
+### I imported the AutomateNOW module into my PowerShell session. What's next?
+>Try `Connect-AutomateNOW -?` to get the help details for that command. You can also try `Get-Command -Module AutomateNOW` to list all of the available commands.
+
+### How can I specify the domain with `Connect-AutomateNOW` if I don't know what the available domains are?
+>You can omit the -Domain parameter from `Connect-AutomateNOW` to show the available domains.
+
+### How do I use a particular command? Where's the help?
+>For now, type the name of the command followed by -?.
+
+### How do I change to a different domain after connecting?
+>Use Switch-AutomateNOWDomain.
+
+### How do I retrieve Tasks by their RunId?
+>Use `Get-AutomateNOWTask` and refer to the Id of the returned objects.
+
+### Why do I only receive a maximum of 100 results when using the Get commands? I should be getting more results...
+>The default values of -startRow and -endRow are 0 and 100 respectively. You can use those parameters to paginate the results.
+
+### How do I paginate the results?
+>You will have to develop your own routine for cycling through pages. Pay careful attention to the property by which you are sorting! (I'm looking at you Design Audit Log)
+
+### Why doesn't this module work correctly with my older version of AutomateNOW?
+>This module uses classes and enums to manage the schema. InfiniteDATA is making frequent updates to this schema (with most new non-hotfix patch updates). Hence, this cannot be helped.
+
+### How does the password encryption in this module work?
+>It's the same as the console. See the `Protect-AutomateNOWEncryptedString` and `Unprotect-AutomateNOWEncryptedString` functions for technical details.
+
+### Why do some of the columns in the .csv files provided by the Export-AutomateNOW* functions contain "[System.Object]"?
+>All of the Export functions are preliminary. Each export function in this module needs to be fine-tuned to ensure each column is property exported. This is on the wish list.
+
 
 ## Functions 🛠
 
 `Add-AutomateNOWApprovalRule`
 
 `Add-AutomateNOWDataSourceItem`
+
+`Add-AutomateNOWProcessingTimeTrigger`
 
 `Add-AutomateNOWResultMappingRule`
 
@@ -194,17 +256,31 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `ConvertTo-QueryString`
 
+`Copy-AutomateNOWAdhocReport`
+
+`Copy-AutomateNOWAgent`
+
 `Copy-AutomateNOWApproval`
+
+`Copy-AutomateNOWCalendar`
 
 `Copy-AutomateNOWDataSource`
 
 `Copy-AutomateNOWEndpoint`
+
+`Copy-AutomateNOWScheduleTemplate`
+
+`Copy-AutomateNOWSemaphore`
 
 `Copy-AutomateNOWTaskTemplate`
 
 `Copy-AutomateNOWWorkflowTemplate`
 
 `Disconnect-AutomateNOW`
+
+`Export-AutomateNOWAdhocReport`
+
+`Export-AutomateNOWAgent`
 
 `Export-AutomateNOWApproval`
 
@@ -228,7 +304,15 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Export-AutomateNOWNode`
 
+`Export-AutomateNOWProcessingTimeTrigger`
+
 `Export-AutomateNOWResultMapping`
+
+`Export-AutomateNOWSchedule`
+
+`Export-AutomateNOWScheduleTemplate`
+
+`Export-AutomateNOWSemaphore`
 
 `Export-AutomateNOWTag`
 
@@ -247,6 +331,10 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Export-AutomateNOWWorkspace`
 
 `Find-AutomateNOWObjectReferral`
+
+`Get-AutomateNOWAdhocReport`
+
+`Get-AutomateNOWAgent`
 
 `Get-AutomateNOWApproval`
 
@@ -268,7 +356,15 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Get-AutomateNOWNode`
 
+`Get-AutomateNOWProcessingTimeTrigger`
+
 `Get-AutomateNOWResultMapping`
+
+`Get-AutomateNOWSchedule`
+
+`Get-AutomateNOWScheduleTemplate`
+
+`Get-AutomateNOWSemaphore`
 
 `Get-AutomateNOWTag`
 
@@ -290,9 +386,17 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Import-AutomateNOWLocalIcon`
 
+`Import-AutomateNOWLocalTimeZone`
+
 `Import-AutomateNOWTimeZone`
 
+`Invoke-AutomateNOWAdhocReport`
+
 `Invoke-AutomateNOWAPI`
+
+`New-AutomateNOWAdhocReport`
+
+`New-AutomateNOWAgent`
 
 `New-AutomateNOWApproval`
 
@@ -318,6 +422,10 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `New-AutomateNOWResultMappingRuleConditionCriteria`
 
+`New-AutomateNOWScheduleTemplate`
+
+`New-AutomateNOWSemaphore`
+
 `New-AutomateNOWTag`
 
 `New-AutomateNOWTaskTemplate`
@@ -328,9 +436,15 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `New-WebkitBoundaryString`
 
-`Protect-AutomateNOWAuthenticationString`
+`Protect-AutomateNOWEncryptedString`
 
 `Read-AutomateNOWIcon`
+
+`Read-AutomateNOWWorkflowTemplateTimeline`
+
+`Remove-AutomateNOWAdhocReport`
+
+`Remove-AutomateNOWAgent`
 
 `Remove-AutomateNOWApproval`
 
@@ -346,7 +460,15 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Remove-AutomateNOWNode`
 
+`Remove-AutomateNOWProcessingTimeTrigger`
+
 `Remove-AutomateNOWResultMapping`
+
+`Remove-AutomateNOWSchedule`
+
+`Remove-AutomateNOWScheduleTemplate`
+
+`Remove-AutomateNOWSemaphore`
 
 `Remove-AutomateNOWTag`
 
@@ -360,15 +482,23 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Remove-AutomateNOWWorkspace`
 
+`Rename-AutomateNOWScheduleTemplate`
+
 `Rename-AutomateNOWTaskTemplate`
 
 `Rename-AutomateNOWWorkflowTemplate`
 
 `Resolve-AutomateNOWTaskType2ServerNodeType`
 
+`Restart-AutomateNOWSchedule`
+
 `Restart-AutomateNOWTask`
 
 `Restart-AutomateNOWWorkflow`
+
+`Resume-AutomateNOWSchedule`
+
+`Resume-AutomateNOWScheduleTemplate`
 
 `Resume-AutomateNOWTask`
 
@@ -377,6 +507,10 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Resume-AutomateNOWWorkflow`
 
 `Resume-AutomateNOWWorkflowTemplate`
+
+`Set-AutomateNOWAdhocReport`
+
+`Set-AutomateNOWAgent`
 
 `Set-AutomateNOWApproval`
 
@@ -387,6 +521,10 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Set-AutomateNOWFolder`
 
 `Set-AutomateNOWPassword`
+
+`Set-AutomateNOWScheduleTemplate`
+
+`Set-AutomateNOWSemaphore`
 
 `Set-AutomateNOWTag`
 
@@ -402,6 +540,10 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Show-AutomateNOWTaskTemplateType`
 
+`Skip-AutomateNOWSchedule`
+
+`Skip-AutomateNOWScheduleTemplate`
+
 `Skip-AutomateNOWTask`
 
 `Skip-AutomateNOWTaskTemplate`
@@ -412,15 +554,23 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Start-AutomateNOWNode`
 
+`Start-AutomateNOWScheduleTemplate`
+
 `Start-AutomateNOWTaskTemplate`
 
 `Start-AutomateNOWWorkflowTemplate`
 
 `Stop-AutomateNOWNode`
 
+`Stop-AutomateNOWSchedule`
+
 `Stop-AutomateNOWTask`
 
 `Stop-AutomateNOWWorkflow`
+
+`Suspend-AutomateNOWSchedule`
+
+`Suspend-AutomateNOWScheduleTemplate`
 
 `Suspend-AutomateNOWTask`
 
@@ -437,4 +587,3 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Update-AutomateNOWToken`
 
 `Write-AutomateNOWIconData`
-
