@@ -28,7 +28,6 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 - PowerShell Core & Windows PowerShell compatible
 - Classes and enums are defined (see Classes.ps1)
 - Pipeline capability to streamline your workloads
-- Task & Workflow Templates can be moved to/from Workspaces
 - Session tokens will be automatically refreshed during usage
 - All functions can return help with Get-Help or the -? parameter
 - PSScriptAnalyzer compliant / Approved verbs only
