@@ -196,17 +196,22 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 ## Questions ❓
 
+### What exactly can I do with this module? How complete is this?
+>See the feature chart below
+
+![image](feature-chart.png)
+
 ### Where are the connection details stored in my PowerShell session after successfully authenticating?
->Check the global variable $anow_session for a lot of useful information about your session and the instance you are connected to.
+>All of the information about your session will be in the global variable `$anow_session`
 
 ### Which version of PowerShell do I need?
->This module is compatible with both Windows PowerShell 5.1 and PowerShell Core 7.x
+>This module is compatible with both `Windows PowerShell 5.1` and `PowerShell Core 7.x`
 
 ### Do the functions in this module utilize the PowerShell pipeline?
->Yes, except for the Rename commands (functions).
+>Yes, except for the `Rename` commands (functions).
 
 ### I imported the AutomateNOW module into my PowerShell session. What's next?
->Try `Connect-AutomateNOW -?` to get the help details for that command. You can also try `Get-Command -Module AutomateNOW` to list all of the available commands.
+>Try `Connect-AutomateNOW -?`. Also try `Get-Command -Module AutomateNOW`.
 
 ### How can I specify the domain with `Connect-AutomateNOW` if I don't know what the available domains are?
 >You can omit the -Domain parameter from `Connect-AutomateNOW` to show the available domains.
@@ -215,16 +220,16 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 >For now, type the name of the command followed by -?.
 
 ### How do I change to a different domain after connecting?
->Use Switch-AutomateNOWDomain.
+>Use `Switch-AutomateNOWDomain`.
 
 ### How do I retrieve Tasks by their RunId?
 >Use `Get-AutomateNOWTask` and refer to the Id of the returned objects.
 
-### Why do I only receive a maximum of 100 results when using the Get commands? I should be getting more results...
->The default values of -startRow and -endRow are 0 and 100 respectively. You can use those parameters to paginate the results.
+### Why do I only receive 100 results when using the Get commands? I should be getting more results...
+>The default values of `-startRow` and `-endRow` are 0 and 100 respectively. You can use those parameters to paginate the results.
 
 ### How do I paginate the results?
->You will have to develop your own routine for cycling through pages. Pay careful attention to the property by which you are sorting! (I'm looking at you Design Audit Log)
+>You will have to develop your own routine for cycling through pages. Pay careful attention to the property by which you are sorting! (I'm looking at you `Design Audit Log`)
 
 ### Why doesn't this module work correctly with my older version of AutomateNOW?
 >This module uses classes and enums to manage the schema. InfiniteDATA is making frequent updates to this schema (with most new non-hotfix patch updates). Hence, this cannot be helped.
@@ -232,7 +237,7 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 ### How does the password encryption in this module work?
 >It's the same as the console. See the `Protect-AutomateNOWEncryptedString` and `Unprotect-AutomateNOWEncryptedString` functions for technical details.
 
-### Why do some of the columns in the .csv files provided by the Export-AutomateNOW* functions contain "[System.Object]"?
+### Why are some of the columns in the export .csv containing `[System.Object]`?
 >All of the Export functions are preliminary. Each export function in this module needs to be fine-tuned to ensure each column is property exported. This is on the wish list.
 
 
