@@ -12,7 +12,7 @@ Created by AutomateNOW-Fan
 ```
 ## Efficacy 🧪
 
-This module has been tested against the below version 3.3.1.78HF2 of AutomateNOW!
+This module has been tested against AutomateNOW! version 3.3.1.78HF2
 <br/><br/>
 ## Installation 🏗
 
