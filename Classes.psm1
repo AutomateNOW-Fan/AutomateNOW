@@ -349,6 +349,10 @@ Enum ANOWScheduleTemplateCustom_ServiceManagers {
 
 #Region - Enum [Semaphores]
 
+Enum ANOWSemaphore_lockState {
+    UNLOCKED; SHARED; EXCLUSIVE;
+}
+
 Enum ANOWSemaphore_semaphoreState {
     ON; OFF;
 }
@@ -1378,6 +1382,31 @@ Class ANOWSecurityRole {
         [string[]]$optional_properties = '?'
         [string]$old_values = $this.ToURL($optional_properties)
         Return $old_values
+    }
+}
+
+#endregion
+
+#region Class - [SemaphoreTimestamp] (custom class)
+
+Class ANOWSemaphoreTimestamp {
+    [int64]$id
+    [datetime]$timestamp
+    [string]$resource
+    [string]$lastUpdatedBy
+    [datetime]$dateCreated
+    [datetime]$lastUpdated
+    [string]$value
+    [string]$createdBy
+    [string]$domain
+    [ValidateSet('BINARY_SEMAPHORE')]
+    [string]$resourceType
+    
+    ANOWSemaphoreTimestamp() { $this.Init(@{}) }
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
     }
 }
 
@@ -2434,51 +2463,7 @@ Class ANOWScheduleTemplate : ANOW {
 
 #endregion
 
-#region Class - [ANOWCalendar]
-
-Class ANOWANOWSemaphoreDetail : ANOW {
-    [datetime[]]$calculatedDates
-    [int64]$valueLowThreshold
-    [string]$calendarDates
-    [Nullable[ANOWCalendar_calendarState]]$calendarState
-    [int64]$valueHighThreshold
-    [string]$timeZone
-    [datetime[]]$dates
-    [string[]]$tags
-    [string]$folder
-    [int64]$valueVeryHighThreshold
-    [int32[]]$dayOfMonth
-    [string]$valueUnit
-    [int32[]]$dayOfWeek
-    [int64]$valueVeryLowThreshold
-    [string]$value
-    [string]$calendarDaysOfMonth
-    [Nullable[ANOWCalendar_calendarType]]$calendarType
-    [string]$calendarDaysOfWeek
-    [string]$calendars
-    [boolean]$calendarLimitExpression
-    [string]$resourceType
-    [Nullable[datetime]]$nextOpenDate
-    [Nullable[datetime]]$nextCloseDate
-    [boolean]$hasNotes
-    [boolean]$hasPendingNotes
-    [int64]$noteCount
-    [int64]$pendingNoteCount
-
-    # Default constructor
-    ANOWSemaphoreDetail() { $this.Init(@{}) }
-
-    [void] Init([hashtable]$Properties) {
-        foreach ($Property in $Properties.Keys) {
-            $this.$Property = $Properties.$Property
-        }
-    }
-    [string] CreateOldValues() {
-        [string[]]$optional_properties = 'description'
-        [string]$old_values = $this.ToURL($optional_properties)
-        Return $old_values
-    }
-}
+#region Class - [ANOWSemaphore]
 
 Class ANOWSemaphore : ANOW {
 
@@ -2524,6 +2509,39 @@ Class ANOWSemaphore : ANOW {
 
     # Default constructor
     ANOWSemaphore() { $this.Init(@{}) }
+
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = 'description'
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
+    }
+}
+
+Class ANOWSemaphoreDetail : ANOW {
+    [int64]$pendingNoteCount
+    [boolean]$hasPendingNotes
+    [boolean]$hasNotes
+    [string[]]$tags
+    [ValidateSet('BINARY_SEMAPHORE')]
+    [string]$resourceType
+    [boolean]$composite
+    [string]$folder
+    [int64]$noteCount
+    [ANOWSemaphore_semaphoreState]$semaphoreState
+    [int32[]]$dayOfWeek
+    [int32[]]$dayOfMonth
+    [datetime[]]$dates
+    [int64]$availablePermits
+    [ANOWSemaphore_lockState]$lockState
+    [string]$resourceStatus
+
+    # Default constructor
+    ANOWSemaphoreDetail() { $this.Init(@{}) }
 
     [void] Init([hashtable]$Properties) {
         foreach ($Property in $Properties.Keys) {

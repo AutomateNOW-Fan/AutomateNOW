@@ -12,7 +12,7 @@ Created by AutomateNOW-Fan
 ```
 ## Efficacy 🧪
 
-This module has been tested against AutomateNOW! version 3.3.1.78HF2
+Compatible with AutomateNOW! version 3.3.1.78HF2
 <br/><br/>
 ## Installation 🏗
 
@@ -34,6 +34,11 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 - Alternate encryption key bytes can be supplied (let's hope it is never needed 🤞)
 <br/><br/>
 ## Change Log 📝
+
+## 1.0.18
+- Added new functions: `Copy-AutomateNOWNode`, `Copy-AutomateNOWResultMapping`, `Copy-AutomateNOWUser`, `Get-AutomateNOWSemaphoreTimestamp`, `New-AutomateNOWServerDayTimestamp`, `New-AutomateNOWUser`, `Remove-AutomateNOWUser`, `Set-AutomateNOWSemaphoreTimestamp`, `Test-AutomateNOWUserPassword`
+- Removed `Read-AutomateNOWWorkflowTemplateTimeline` temporarily
+- Tiny fixes to some warning messages
 
 ## 1.0.17
 - Added new functions: `Add-AutomateNOWProcessingTimeTrigger`, `Copy-AutomateNOWAdhocReport`, `Copy-AutomateNOWAgent`, `Copy-AutomateNOWCalendar`, `Copy-AutomateNOWScheduleTemplate`, `Copy-AutomateNOWSemaphore`, `Export-AutomateNOWAdhocReport`, `Export-AutomateNOWAgent`, `Export-AutomateNOWProcessingTimeTrigger`, `Export-AutomateNOWSchedule`, `Export-AutomateNOWScheduleTemplate`, `Export-AutomateNOWSemaphore`, `Get-AutomateNOWAdhocReport`, `Get-AutomateNOWAgent`, `Get-AutomateNOWProcessingTimeTrigger`, `Get-AutomateNOWSchedule`, `Get-AutomateNOWScheduleTemplate`, `Get-AutomateNOWSemaphore`, `Import-AutomateNOWLocalTimeZone`, `Invoke-AutomateNOWAdhocReport`, `New-AutomateNOWAdhocReport`, `New-AutomateNOWAgent`, `New-AutomateNOWScheduleTemplate`, `New-AutomateNOWSemaphore`, `Remove-AutomateNOWAdhocReport`, `Remove-AutomateNOWAgent`, `Remove-AutomateNOWProcessingTimeTrigger`, `Remove-AutomateNOWSchedule`, `Remove-AutomateNOWScheduleTemplate`, `Remove-AutomateNOWSemaphore`, `Rename-AutomateNOWScheduleTemplate`, `Restart-AutomateNOWSchedule`, `Resume-AutomateNOWSchedule`, `Resume-AutomateNOWScheduleTemplate`, `Set-AutomateNOWAdhocReport`, `Set-AutomateNOWAgent`, `Set-AutomateNOWScheduleTemplate`, `Set-AutomateNOWSemaphore`, `Skip-AutomateNOWSchedule`, `Skip-AutomateNOWScheduleTemplate`, `Start-AutomateNOWScheduleTemplate`, `Stop-AutomateNOWSchedule`, `Suspend-AutomateNOWSchedule`, `Suspend-AutomateNOWScheduleTemplate`
@@ -186,13 +191,16 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 - Refactor redundant code
 - Export functions should convert objects containing an object type to JSON strings
 
-## Cheats 🎰
+## Cheats* 🎰
 
 - Execute Adhoc Reports where you may not have permission to in the UI
 - List tags, folders etc. on an instance that you may not have permission to in the UI
 - (Psuedo) Rename Task Templates & Workflow Templates
 - Move items freely into and out of Workspaces
 - Automatic text file MIME type detection (for Add-AutomateNOWDataSourceItem)
+- Specify the theme and ui density at the time of user creation
+
+<sub>* things the console does not allow</sub>
 
 ## Questions ❓
 
@@ -275,11 +283,17 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Copy-AutomateNOWEndpoint`
 
+`Copy-AutomateNOWNode`
+
+`Copy-AutomateNOWResultMapping`
+
 `Copy-AutomateNOWScheduleTemplate`
 
 `Copy-AutomateNOWSemaphore`
 
 `Copy-AutomateNOWTaskTemplate`
+
+`Copy-AutomateNOWUser`
 
 `Copy-AutomateNOWWorkflowTemplate`
 
@@ -373,6 +387,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Get-AutomateNOWSemaphore`
 
+`Get-AutomateNOWSemaphoreTimestamp`
+
 `Get-AutomateNOWTag`
 
 `Get-AutomateNOWTask`
@@ -433,9 +449,13 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `New-AutomateNOWSemaphore`
 
+`New-AutomateNOWServerDayTimestamp`
+
 `New-AutomateNOWTag`
 
 `New-AutomateNOWTaskTemplate`
+
+`New-AutomateNOWUser`
 
 `New-AutomateNOWWorkflowTemplate`
 
@@ -446,8 +466,6 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Protect-AutomateNOWEncryptedString`
 
 `Read-AutomateNOWIcon`
-
-`Read-AutomateNOWWorkflowTemplateTimeline`
 
 `Remove-AutomateNOWAdhocReport`
 
@@ -482,6 +500,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Remove-AutomateNOWTask`
 
 `Remove-AutomateNOWTaskTemplate`
+
+`Remove-AutomateNOWUser`
 
 `Remove-AutomateNOWWorkflow`
 
@@ -532,6 +552,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Set-AutomateNOWScheduleTemplate`
 
 `Set-AutomateNOWSemaphore`
+
+`Set-AutomateNOWSemaphoreTimestamp`
 
 `Set-AutomateNOWTag`
 
@@ -588,6 +610,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Suspend-AutomateNOWWorkflowTemplate`
 
 `Switch-AutomateNOWDomain`
+
+`Test-AutomateNOWUserPassword`
 
 `Unprotect-AutomateNOWEncryptedString`
 
