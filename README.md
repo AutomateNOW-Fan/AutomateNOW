@@ -37,7 +37,7 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 
 ## 1.0.19
 - Added new functions: `Add-AutomateNOWWorkflowTemplateItem` `Copy-AutomateNOWLock` `Copy-AutomateNOWStock` `Copy-AutomateNOWVariable` `Export-AutomateNOWLock` `Export-AutomateNOWStock` `Export-AutomateNOWVariable` `Get-AutomateNOWLock` `Get-AutomateNOWStock` `Get-AutomateNOWVariable` `Get-AutomateNOWVariableTimestamp` `New-AutomateNOWLock` `New-AutomateNOWStock` `New-AutomateNOWVariable` `Read-AutomateNOWWorkflowTemplateItem` `Remove-AutomateNOWLock` `Remove-AutomateNOWStock` `Remove-AutomateNOWVariable` `Rename-AutomateNOWLock` `Rename-AutomateNOWStock`, `Rename-AutomateNOWVariable`, `Set-AutomateNOWLock`, `Set-AutomateNOWStock`, `Set-AutomateNOWVariable`, `Set-AutomateNOWVariableTimestamp`
-- Fixed an issue with `Get-AutomateNOWTask` when using the -Id parameter
+- Fixed an issue with `Get-AutomateNOWTask` when using the `-Id` parameter
 - Added a new parameter `-ChildNodes` to `Get-AutomateNOWNode`, some other parameters were renamed as well
 - Added preliminary support for adding Task Templates to Workflow Templates by way of `Add-AutomateNOWWorkflowTemplateItem`
 - Enhanced password validity checking to `Set-AutomateNOWPassword` by way of `Test-AutomateNOWPassword`
