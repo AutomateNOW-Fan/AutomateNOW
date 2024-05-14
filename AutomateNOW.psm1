@@ -167,7 +167,7 @@ Function ConvertTo-QueryString {
             continue
         }
         [string]$Result = $QueryString.ToString()
-        [string]$Result = $Result -creplace '\+', '%20' -creplace 'criteria[0-9]{1,}=', 'criteria=' -creplace 'setWorkspaceTags[0-9]{1,}=', 'setWorkspaceTags=' -creplace 'tags[0-9]{1,}=', 'tags='
+        [string]$Result = $Result -creplace '\+', '%20' -creplace 'criteria[0-9]{1,}=', 'criteria=' -creplace '_sortBy[0-9]{1,}=', '_sortBy' -creplace 'setWorkspaceTags[0-9]{1,}=', 'setWorkspaceTags=' -creplace 'tags[0-9]{1,}=', 'tags='
         Write-Output $Result
     }
 }
@@ -1805,7 +1805,7 @@ Function New-AutomateNOWServerDayTimestamp {
     Generates a timestamp that can be used for time-based objects where the time-range is a full-day.
 
     .DESCRIPTION
-    Generates a timestamp that can be used for time-based objects where the time-range is a full-day. Example: Enabling a Semaphore on a particular day.
+    Generates a timestamp that can be used for time-based objects where the time-range is a full-day. Example: Enabling a Variable on a particular day.
 
     #>
     [OutputType([string])]
@@ -10423,7 +10423,7 @@ Function Set-AutomateNOWLock {
         If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
             Write-Warning -Message "Somehow there is not a valid token confirmed."
             Break
-        }        
+        }
         If ($UnsetDescription -eq $true -and $Description.Length -gt 0) {
             Write-Warning -Message "You cannot set the description and unset it at the same time. Please choose one or the other."
             Break
@@ -11325,7 +11325,7 @@ Function Get-AutomateNOWNode {
 
     .EXAMPLE
     Gets a series of nodes by feeding their names through the pipeline.
-    
+
     @( 'my_node_01', 'my_node_02' ) | Get-AutomateNOWNode
 
     .EXAMPLE
@@ -11340,7 +11340,7 @@ Function Get-AutomateNOWNode {
 
     .EXAMPLE
     Gets the child nodes of the specified load balancer
-    
+
     Get-AutomateNOW -Id 'LoadBalancer01' -ChildNodes
 
     .NOTES
@@ -11418,11 +11418,11 @@ Function Get-AutomateNOWNode {
         Else {
             $Body.'_constructor' = 'AdvancedCriteria'
             $Body.'operator' = 'and'
-            If($ChildNodes -eq $true){
+            If ($ChildNodes -eq $true) {
                 $Body.'criteria1' = '{"fieldName":"parentLoadBalancer","operator":"equals","value":"' + $Id + '"}'
                 $Body.'_componentId' = 'LoadBalancerNodeList'
             }
-            Else{
+            Else {
                 $Body.'_componentId' = 'ServerNodeList'
             }
             [string]$textMatchStyle = 'substring'
@@ -17915,10 +17915,10 @@ Function Get-AutomateNOWSemaphoreTimestamp {
 Function Set-AutomateNOWSemaphoreTimestamp {
     <#
     .SYNOPSIS
-    Sets a Sempaphore timestate (On/Off state) for a *specific day*.
+    Sets a Semaphore timestate (On/Off state) for a *specific day*.
 
     .DESCRIPTION
-    Sets a Sempaphore timestate (On/Off state) for a *specific day*.
+    Sets a Semaphore timestate (On/Off state) for a *specific day*.
 
     .PARAMETER Semaphore
     An [ANOWSemaphore] object representing the Semaphore to be modified.
@@ -17956,7 +17956,7 @@ Function Set-AutomateNOWSemaphoreTimestamp {
     .EXAMPLE
     Calculates and forcibly sets every day (individually) of the following month to ON (green light) in a Semaphore object.
     $semaphore = Get-AutomateNOWSemaphore -Id 'Semaphore1'
-    $(For($i=1; $i -le ([datetime]::DaysInMonth(((Get-Date).ToUniversalTime()).AddMonths(1).Year, ((Get-Date).ToUniversalTime()).AddMonths(1).Month)); $i++) { [string]((Get-Date).ToUniversalTime().AddMonths(1).Month).ToString("00") + "-" + ($i.ToString("00") + "-" + [string](Get-Date).ToUniversalTime().AddMonths(1).Year) }) | Set-AutomateNOWSemaphoreTimestamp -Semaphore $semaphore -setOn -Force
+    $(For($i=1; $i -le ([datetime]::DaysInMonth(((Get-Date).ToUniversalTime()).AddMonths(1).Year, ((Get-Date).ToUniversalTime()).AddMonths(1).Month)); $i++) { [string](Get-Date).ToUniversalTime().AddMonths(1).Year  + "-" + [string]((Get-Date).ToUniversalTime().AddMonths(1).Month).ToString("00") + "-" + ($i.ToString("00")) }) | Set-AutomateNOWVariableTimestamp -Semaphore $semaphore -setOn -Force
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
@@ -20223,7 +20223,7 @@ Function Set-AutomateNOWStock {
         If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
             Write-Warning -Message "Somehow there is not a valid token confirmed."
             Break
-        }        
+        }
         If ($UnsetDescription -eq $true -and $Description.Length -gt 0) {
             Write-Warning -Message "You cannot set the description and unset it at the same time. Please choose one or the other."
             Break
@@ -20281,7 +20281,7 @@ Function Set-AutomateNOWStock {
                 $BodyMetaData.'newTotalPermits' = $TotalPermits
                 [string]$operationId = 'adjustStockPermits'
                 [string]$operationType = 'custom'
-                $BodyMetaData.'_operationId' = $operationId                
+                $BodyMetaData.'_operationId' = $operationId
                 [string]$command = "/resource/$operationId"
             }
             ElseIf ($TotalPermits -gt 0 -and ($Stock_total_permits -eq $TotalPermits)) {
@@ -21997,7 +21997,7 @@ Function Get-AutomateNOWTask {
     }
     End {
 
-    }   
+    }
 }
 
 Function Export-AutomateNOWTask {
@@ -27116,7 +27116,7 @@ Function New-AutomateNOWUser {
 
     .EXAMPLE
     Creates a new admin user with all properties set and a non-expiring password
-    
+
     New-AutomateNOWUser -Id 'TestUser1' -FirstName 'John' -LastName 'Smith' -Department 'Sanitation Engineering' -Location 'The basement' -Email 'jsmith@contoso.com' -PhoneNumber '8675309' -Pass 'AwesomePassword!11!' -PasswordValidDays 100 -AccountValidUntil '2030-12-31' -Admin -skinThemeType CONTRAST_ULTRA -skinDensityType COMPACT
 
     .NOTES
@@ -27724,7 +27724,7 @@ Function Set-AutomateNOWVariable {
         If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
             Write-Warning -Message "Somehow there is not a valid token confirmed."
             Break
-        }        
+        }
         If ($UnsetDescription -eq $true -and $Description.Length -gt 0) {
             Write-Warning -Message "You cannot set the description and unset it at the same time. Please choose one or the other."
             Break
@@ -27751,10 +27751,10 @@ Function Set-AutomateNOWVariable {
         [string]$Variable_id = $Variable.id
         [string]$Variable_simpleId = $Variable.simpleId
         [string]$current_Variable_value = $Variable.value
-        If($current_Variable_value.Length -eq 0){
+        If ($current_Variable_value.Length -eq 0) {
             Write-Debug -Message "Detected the value of Variable object [$Variable_simpleId] is empty"
         }
-        Else{
+        Else {
             Write-Debug -Message "Detected the value of Variable object [$Variable_simpleId] to be [$current_Variable_value]"
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Variable.id)")) -eq $true) {
@@ -27782,13 +27782,13 @@ Function Set-AutomateNOWVariable {
                     Write-Warning -Message "No action is required. The Variable [$Variable_simpleId] is already set to [$Value]"
                     Break
                 }
-                Else{
+                Else {
                     Write-Debug -Message "Changing the value of [$Variable_simpleId] from [$current_Variable_value] to [$Value]"
                 }
                 $BodyMetaData.'newValue' = $Value
                 [string]$operationId = 'setValue'
                 [string]$operationType = 'custom'
-                $BodyMetaData.'_operationId' = $operationId                
+                $BodyMetaData.'_operationId' = $operationId
                 [string]$command = "/resource/$operationId"
             }
             ElseIf ($TotalPermits -gt 0 -and ($Variable_total_permits -eq $TotalPermits)) {
@@ -28843,10 +28843,10 @@ Function Get-AutomateNOWVariableTimestamp {
 Function Set-AutomateNOWVariableTimestamp {
     <#
     .SYNOPSIS
-    Sets a Sempaphore timestate (On/Off state) for a *specific day*.
+    Sets a Variable value and timestape for a *specific day*.
 
     .DESCRIPTION
-    Sets a Sempaphore timestate (On/Off state) for a *specific day*.
+    Sets a Variable value and timestape for a *specific day*.
 
     .PARAMETER Variable
     An [ANOWVariable] object representing the Variable to be modified.
@@ -28854,11 +28854,11 @@ Function Set-AutomateNOWVariableTimestamp {
     .PARAMETER Date
     A string in ISO-8601 specifying the year, month and day to set the state of the Variable for (example: 2029-12-31). This is a simple 10 character date string without hours, minutes seconds. This function will make the neccessary adjustment to the timestamp based on the server Java timezone.
 
-    .PARAMETER setStateOn
-    Switch parameter to set the Variable to GO (green light) status for the date specified in the -Date parameter. Cannot be combined with -setStateOn.
+    .PARAMETER Value
+    String that sets the value of the Variable for the specified day timestamp. You must specify either -Value or -UnsetValue.
 
-    .PARAMETER setStateOff
-    Switch parameter to set the Variable to STOP (red light) status for the date specified in the -Date parameter. Cannot be combined with -setStateOff.
+    .PARAMETER UnsetValue
+    Switch parameter that unsets (removes) the value of the Variable for the specified day timestamp. You must specify either -Value or -UnsetValue.
 
     .PARAMETER Force
     Force the change without confirmation. This is equivalent to -Confirm:$false
@@ -28870,44 +28870,43 @@ Function Set-AutomateNOWVariableTimestamp {
     None
 
     .EXAMPLE
-    Sets a single day of a Variable object to Off
+    Sets the value for a single day within a Variable
 
     $Variable = Get-AutomateNOWVariable -Id 'Variable1'
-    Set-AutomateNOWVariableTimetamp -Variable $Variable -setOff -Date '2029-06-02'
+    Set-AutomateNOWVariableTimetamp -Variable $Variable -Value 'abc' -Date '2029-06-02'
 
     .EXAMPLE
-    Forcibly sets a series of dates to ON for a Variable object using the pipeline
+    Forcibly removes the value on a series of dates in a Variable object. The dates are sent through the pipeline.
 
     $Variable = Get-AutomateNOWVariable -Id 'Variable1'
-    @('2029-06-01', '2029-06-02', '2029-06-03') | Set-AutomateNOWVariableTimetamp -Variable $Variable -setOn -Force
+    @('2029-06-01', '2029-06-02', '2029-06-03') | Set-AutomateNOWVariableTimetamp -Variable $Variable -UnsetValue -Force
 
     .EXAMPLE
-    Calculates and forcibly sets every day (individually) of the following month to ON (green light) in a Variable object.
+    Calculates and forcibly sets the value for all days of the following month (i.e. "next month") into the Variable object.
     $Variable = Get-AutomateNOWVariable -Id 'Variable1'
-    $(For($i=1; $i -le ([datetime]::DaysInMonth(((Get-Date).ToUniversalTime()).AddMonths(1).Year, ((Get-Date).ToUniversalTime()).AddMonths(1).Month)); $i++) { [string]((Get-Date).ToUniversalTime().AddMonths(1).Month).ToString("00") + "-" + ($i.ToString("00") + "-" + [string](Get-Date).ToUniversalTime().AddMonths(1).Year) }) | Set-AutomateNOWVariableTimestamp -Variable $Variable -setOn -Force
+    $Value = 'abc'
+    $(For($i=1; $i -le ([datetime]::DaysInMonth(((Get-Date).ToUniversalTime()).AddMonths(1).Year, ((Get-Date).ToUniversalTime()).AddMonths(1).Month)); $i++) { [string](Get-Date).ToUniversalTime().AddMonths(1).Year  + "-" + [string]((Get-Date).ToUniversalTime().AddMonths(1).Month).ToString("00") + "-" + ($i.ToString("00")) }) | Set-AutomateNOWVariableTimestamp -Variable $Variable -Value $Value -Force
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
 
-    Use Set-AutomateNOWVariable if you wish to change the entire ON/OFF state of the Variable. This function is only for setting the individual dates within a Variable object.
-
-    The -setStateOn and -setStateOff parameters are isolated into their own parameter sets. Please try `Set-AutomateNOWVariableTimetamp -?` for more information.
+    Use Set-AutomateNOWVariable if you wish to change the 'global' value of the Variable. This function is for setting the -individual- dates (day timestamps) within a Variable object.
 
     #>
     [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
     Param(
-        [Parameter(Mandatory = $true, ParameterSetName = 'setOn', ValueFromPipeline = $True)]
-        [Parameter(Mandatory = $true, ParameterSetName = 'setOff', ValueFromPipeline = $True)]
+        [Parameter(Mandatory = $true, ParameterSetName = 'Default', ValueFromPipeline = $True)]
+        [Parameter(Mandatory = $true, ParameterSetName = 'unSet', ValueFromPipeline = $True)]
         [string]$date,
-        [Parameter(Mandatory = $true, ParameterSetName = 'setOn')]
-        [Parameter(Mandatory = $true, ParameterSetName = 'setOff')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'unSet')]
         [ANOWVariable]$Variable,
-        [Parameter(Mandatory = $true, ParameterSetName = 'setOn')]
-        [switch]$setOn,
-        [Parameter(Mandatory = $true, ParameterSetName = 'setOff')]
-        [switch]$setOff,
-        [Parameter(Mandatory = $false, ParameterSetName = 'setOn')]
-        [Parameter(Mandatory = $false, ParameterSetName = 'setOff')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'Default')]
+        [string]$Value,
+        [Parameter(Mandatory = $true, ParameterSetName = 'unSet')]
+        [switch]$unsetValue,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'unSet')]
         [switch]$Force
     )
     Begin {
@@ -28951,18 +28950,11 @@ Function Set-AutomateNOWVariableTimestamp {
             ## End warning ##
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
             $BodyMetaData.'resource' = $Variable_id
-            $BodyMetaData.'resourceType' = 'BINARY_Variable'
-            If ($setOn -eq $true ) {
-                [string]$value = 'ON'
+            $BodyMetaData.'resourceType' = 'VARIABLE'
+            If ($unsetValue -eq $true ) {
+                [string]$Value = ''
             }
-            ElseIf ($setOff -eq $true ) {
-                [string]$value = 'OFF'
-            }
-            Else {
-                Write-Warning -Message "Somehow could not determine the on/off state in the request under Set-AutomateNOWVariableTimetamp. Please look into this."
-                Break
-            }
-            $BodyMetaData.'value' = $value
+            $BodyMetaData.'value' = $Value
             $Error.Clear()
             Try {
                 [string]$timestamp = New-AutomateNOWServerDayTimestamp -date $date
@@ -31157,7 +31149,7 @@ Function Remove-AutomateNOWWorkflowTemplate {
     Removes a Workflow Template from an AutomateNOW! instance
 
     .PARAMETER WorkflowTemplate
-    An [ANOWworkflowTemplate] object representing the Workflow Template to be deleted.
+    An [ANOWWorkflowTemplate] object representing the Workflow Template to be deleted.
 
     .PARAMETER Force
     Force the removal without confirmation. This is equivalent to -Confirm:$false
@@ -31261,7 +31253,7 @@ Function Copy-AutomateNOWWorkflowTemplate {
     Copies a Workflow Template from an AutomateNOW! instance. AutomateNOW object id can never be changed, but we can copy the object to a new id and it will include all of the items therein.
 
     .PARAMETER WorkflowTemplate
-    Mandatory [ANOWworkflowTemplate] object to be copied.
+    Mandatory [ANOWWorkflowTemplate] object to be copied.
 
     .PARAMETER NewId
     Mandatory string indicating the new id or name of the Workflow Template. Please remember that the Id is the same as a primary key, it must be unique. The console will provide the old Id + '_COPY' in the UI when making a copy. The Id is limited to 1024 characters.
@@ -31460,7 +31452,7 @@ Function Rename-AutomateNOWWorkflowTemplate {
     Performs a psuedo-rename operations of a Workflow Template from an AutomateNOW! instance by copying it first and then deleting the source. This function merely combines Copy-AutomateNOWWorkflowTemplate and Remove-AutomateNOWWorkflowTemplate therefore it is to be considered destructive.
 
     .PARAMETER WorkflowTemplate
-    An [ANOWworkflowTemplate] object representing the Workflow Template to be renamed.
+    An [ANOWWorkflowTemplate] object representing the Workflow Template to be renamed.
 
     .PARAMETER NewId
     Mandatory string indicating the new id or name of the Workflow Template. Please remember that the Id is the same as a primary key, it must be unique. The console will provide the old Id + '_COPY' in the UI when making a copy. The Id is limited to 1024 characters.
@@ -32301,6 +32293,244 @@ Function Confirm-AutomateNOWWorkflowTemplate {
             Else {
                 Write-Information -MessageData "The Workflow Template $WorkflowTemplate_id is confirmed as valid."
             }
+        }
+    }
+    End {
+
+    }
+}
+
+Function Read-AutomateNOWWorkflowTemplateItem {
+    <#
+    .SYNOPSIS
+    Reads the processing items and their -sort order- within a Workflow Template from an AutomateNOW! instance
+
+    .DESCRIPTION
+    Reads the processing items and their -sort order- within a Workflow Template from an AutomateNOW! instance
+
+    .PARAMETER WorkflowTemplate
+    An [ANOWWorkflowTemplate] object representing the Workflow Template to be deleted.
+
+    .INPUTS
+    ONLY [ANOWWorkflowTemplate] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    A generic PSCustomObjects that represent the processing items.
+
+    .EXAMPLE
+    Get all of the items in a specified Workflow.
+
+    $workflow_template = Get-AutomateNOWWorkflowTemplate -Id 'WorkflowTemplate1'
+    $workflow_template_items = $workflow_template | Read-AutomateNOWWorkflowTemplateItems
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    The first item listed will be the workflow itself which has a sort order of -1. The remaining child items will start at sort order 1 or above. There is no sort order of 0.
+
+    #>
+    [OutputType([PSCustomObject])]
+    [Cmdletbinding()]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [ANOWWorkflowTemplate]$WorkflowTemplate,
+        [Parameter(Mandatory = $False)]
+        [int32]$startRow = 0,
+        [Parameter(Mandatory = $False)]
+        [int32]$endRow = 100,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        If ($endRow -le $startRow) {
+            Write-Warning -Message "The endRow must be greater than the startRow. Please try again."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'GET')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [string]$WorkflowTemplate_id = $_.id
+        }
+        ElseIf ($WorkflowTemplate.id.Length -gt 0) {
+            [string]$WorkflowTemplate_id = $WorkflowTemplate.id
+        }
+        Else {
+            [string]$WorkflowTemplate_id = $Id
+        }
+        [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+        $BodyMetaData.Add('workflow', $WorkflowTemplate_id )
+        $BodyMetaData.Add('_operationType', 'fetch')
+        $BodyMetaData.Add('_operationId', 'readWorkflow')
+        $BodyMetaData.Add('_startRow', $startRow)
+        $BodyMetaData.Add('_endRow', $endRow)
+        $BodyMetaData.Add('_sortBy1', '-isMasterRecord')
+        $BodyMetaData.Add('_sortBy2', 'sortOrder')
+        $BodyMetaData.Add('_sortBy3', 'title')
+        $BodyMetaData.Add('_textMatchStyle', 'exact')
+        $BodyMetaData.Add('_componentId', 'ProcessingTemplateItemList')
+        $BodyMetaData.Add('_dataSource', 'ProcessingTemplateItemDataSource')
+        $BodyMetaData.Add('isc_metaDataPrefix', '_')
+        $BodyMetaData.Add('isc_dataFormat', 'json')
+        [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+        [string]$command = ('/processingTemplateItem/readWorkflow' + '?' + $Body)
+        $parameters.Add('Command', $command)
+        $Error.Clear()
+        Try {
+            [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$WorkflowTemplate_id] due to [$Message]."
+            Break
+        }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+        }
+        Write-Verbose -Message "Workflow details successfully extracted from $WorkflowTemplate_id"
+        If ($results.response.data.count -gt 0) {
+            # Note: These objects are not defined into classes because InfiniteDATA has not released the schema with this information.
+            Return $results.response.data
+        }
+
+    }
+    End {
+
+    }
+}
+
+Function Add-AutomateNOWWorkflowTemplateItem {
+    <#
+    .SYNOPSIS
+    Adds a processing item to a Workflow Template
+
+    .DESCRIPTION
+    Adds a processing item (i.e. Task, Workflow, Service Manager or Integration) to a Workflow Template
+
+    .PARAMETER WorkflowTemplate
+    Mandatory [ANOWWorkflowTemplate] object representing the Workflow Template that will receive the new processing item.
+
+    .Parameter TaskTemplate
+    Mandatory [ANOWTaskTemplate] object representing the Task Template that is being added to the Workflow Template.
+
+    .PARAMETER sortOrder
+    Optional int32 specifying the sort order. When not specified, the sort order will be LAST. If needed, use Read-AutomateNOWWorkflow to obtain the current sort order of the items in the Workflow.
+
+    .PARAMETER Force
+    Force the addition without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    ONLY [ANOWWorkflowTemplate] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    None. The status will be written to the console with Write-Verbose.
+
+    .EXAMPLE
+    Forcibly adds three Task Templates to a Workflow Template using the pipeline
+    @('TaskTemplate1', 'TaskTemplate2', 'TaskTemplate3') | Get-AutomateNOWTaskTemplate | Add-AutomateNOWWorkflowTemplateItem -WorkflowTemplate $workflow_template -Force
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [ANOWWorkflowTemplate]$WorkflowTemplate,
+        [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
+        [ANOWTaskTemplate]$TaskTemplate,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [string]$WorkflowTemplate_id = $WorkflowTemplate.Id
+        [string]$command = '/processingTemplateItem/create'
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($WorkflowTemplate.id)")) -eq $true) {
+            If ($_.id.Length -gt 0) {
+                [string]$TaskTemplate_id = $_.id
+            }
+            ElseIf ($TaskTemplate.id.Length -gt 0) {
+                [string]$TaskTemplate_id = $TaskTemplate.id
+            }
+            Else {
+                [string]$TaskTemplate_id = $Id
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$WorkflowTemplateItems = Read-AutomateNOWWorkflowTemplateItem -WorkflowTemplate $WorkflowTemplate
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Read-AutomateNOWWorkflowTemplateItem failed to Read [$WorkflowTemplate_id] under Add-AutomateNOWWorkflowTemplateItem due to [$Message]."
+                Break
+            }
+            If ($WorkflowTemplateItems.Count -eq 0) {
+                Write-Warning -Message "Somehow there were no processing items within [$WorkflowTemplate_id]. Please look into this."
+                Break
+            }
+            [int32]$last_item_order = ($WorkflowTemplateItems | Sort-Object -Property sortOrder | Select-Object -Last 1 | Select-Object -ExpandProperty sortOrder) + 1
+            #[int32]$first_item_order = $WorkflowTemplateItems | Where-Object { $_.sortOrder -gt 0 } | Sort-Object -Property sortOrder | Select-Object -First 1 | Select-Object -ExpandProperty sortOrder
+            [string]$processingTemplate_id = $TaskTemplate.Id
+            [ANOWTaskTemplate_processingType]$processingType = $TaskTemplate.processingType
+            [ANOWTaskTemplate_taskType]$taskType = $TaskTemplate.taskType
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.Add('workflow', $WorkflowTemplate_id )
+            $BodyMetaData.Add('processingType', $processingType )
+            $BodyMetaData.Add('processingTemplate', $processingTemplate_id )
+            $BodyMetaData.Add('taskType', $taskType )
+            $BodyMetaData.Add('sortOrder', $last_item_order )
+            $BodyMetaData.Add('_operationType', 'add')
+            $BodyMetaData.Add('_textMatchStyle', 'exact')
+            $BodyMetaData.Add('_dataSource', 'ProcessingTemplateItemDataSource')
+            $BodyMetaData.Add('isc_metaDataPrefix', '_')
+            $BodyMetaData.Add('isc_dataFormat', 'json')
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            If ($null -eq $parameters.Body) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$WorkflowTemplate_id] due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
+            }
+            Write-Debug -Message "Task Template $TaskTemplate_id (task type $taskType, processing type $processingType) was added to $WorkflowTemplate_id (order $last_item_order)"
         }
     }
     End {
