@@ -550,7 +550,7 @@ Function Invoke-AutomateNOWAPI {
         }
         Catch {
             [string]$Message = $_.Exception.Message
-            Write-Warning -Message "ConvertFrom-JSON failed to convert the returned results due to [$Message]."
+            Write-Warning -Message "ConvertFrom-JSON failed to convert the returned results due to [$Message] full payload: $content"
             Break
         }
     }

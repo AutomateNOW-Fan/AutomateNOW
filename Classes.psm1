@@ -919,6 +919,7 @@ Class ANOWCodeRepository {
     [boolean]$mergeConflict
     [string]$createdBy
     [string]$domain
+    [string[]]$tags
     [boolean]$rebaseConflict
     [boolean]$rebaseInProgress
     [string]$user
@@ -2559,11 +2560,13 @@ Class ANOWScheduleTemplate : ANOW {
     [Nullable[ANOWScheduleTemplate_statisticPeriod]]$statisticPeriod
     [Nullable[datetime]]$checkoutDate
     [Nullable[datetime]]$nextTriggerDate
+    [PSCustomObject]$processingCommand
     [string]$checkoutBy
     [string]$folder
     [string]$integration
     [string]$nextTriggerTimeZone
     [string]$owner
+    [string]$processingCommandText
     [string]$priority
     [string]$weight
     [string[]]$tags
