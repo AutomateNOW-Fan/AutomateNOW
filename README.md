@@ -40,7 +40,7 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 - Fixed an issue with `Get-AutomateNOWTask` when using the `-Id` parameter
 - Added a new parameter `-ChildNodes` to `Get-AutomateNOWNode`, some other parameters were renamed as well
 - Added preliminary support for adding Task Templates to Workflow Templates by way of `Add-AutomateNOWWorkflowTemplateItem`
-- Enhanced password validity checking to `Set-AutomateNOWPassword` by way of `Test-AutomateNOWPassword`
+- Enhanced the password validity checking of `Set-AutomateNOWPassword` by way of `Test-AutomateNOWPassword`
 - Enhanced the output of `Invoke-AutomateNOWAPI` when there are JSON conversion issues (workaround: use `-JustGiveMeJSON`)
 
 ## 1.0.18
