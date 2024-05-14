@@ -74,19 +74,6 @@ Enum ANOWCommunicationNote_noteSourceType {
 
 #endregion
 
-#Region - Enum [Icons]
-
-Enum ANOWiconSet {
-    FAT_COW; FUGUE; FONT_AWESOME;
-}
-
-Enum ANOWiconSetIconsOnly {
-    # Notes: Some features (e.g. Workspace) only support the two real icon sets
-    FAT_COW; FUGUE;
-}
-
-#endregion
-
 #Region - Enum [CodeRepository]
 
 Enum ANOWCodeRepository_authenticationMethod {
@@ -123,6 +110,27 @@ Enum ANOWDataSource_dataSourceType {
 
 Enum ANOWEndpoint_endpointType {
     USER; FTP; MAINFRAME_FTP; FTPS; MAINFRAME_FTPS; SFTP; S3; HDFS; AZURE_BLOB; AZURE_FILE; GOOGLE_COULD_STORAGE_BUCKET; PGP; HTTP; REST_WEB_SERVICE; SOAP_WEB_SERVICE; EMAIL; EMAIL_EWS; AWS; AZURE; GOOGLE_CLOUD; GOOGLE_DATA_FLOW; AZURE_DATABRICKS; INFORMATICA_CLOUD; AWS_COMMON; IBM_MQ; RABBIT_MQ; SQS; ACTIVE_MQ; QPID; IBM_SIBUS; HORNETQ; SOLACE; JORAM_MQ; QMQ; ZERO_MQ; KAFKA; PULSAR; AMAZON_KINESIS; GOOGLE_CLOUD_PUB_SUB; MICROSOFT_AZURE_EVENT_HUB; AMQP; XMPP; STOMP; REDIS; HADOOP; HIVE; IMPALA; SQOOP; YARN; SPARK; FLUME; FLINK; STORM; OOZIE; AMBARI; ELASTIC_SEARCH; CASSANDRA; SAP_HANA; MONGO_DB; COUCH_DB; COUCH_BASE; DYNAMO_DB; ARANGO_DB; NEO4J; ORIENT_DB; TITAN; SSH; WINRM; HIVE_QL; GOOGLE_BIG_QUERY; DASHDB; DB2; MYSQL; NETEZZA; AZURE_SQL_DATABASE; AZURE_SQL_DATA_WAREHOUSE; ORACLE; POSTGRESQL; SQL_SERVER; SQL_SERVER_JTDS; TERADATA; SINGLESTORE; VERTICA; SNOWFLAKE; PRESTO_DB; SYBASE; INFORMIX; H2; AS400; Z_OS; Z_OS_REST; RAINCODE; RAINCODE_BRS; OPENTEXT; CTRL_M; INFORMATICA; INFORMATICA_WS; SAS; SAS_VIYA; IBM_DATASTAGE; ODI; MS_SSIS; AB_INITIO; SAP_BODI; SKYVIA; TALEND; DBT; SAP; SAP_S4_HANA; SAP_S4_HANA_CLOUD; SAP_IBP; JD_EDWARDS; ORACLE_EBS; PEOPLESOFT; MICROSOFT_DYNAMICS; JIRA; SERVICE_NOW; ORACLE_SERVICE_CENTER; BMC_REMEDY; CA_SERVICE_MANAGEMENT; IBM_CONTROL_DESK; HP_OPEN_VIEW_SERVICE_MANAGER; SAP_SOLUTION_MANAGER; FACEBOOK; INSTAGRAM; TWITTER; YOUTUBE; LINKED_IN; TUMBLR; TIKTOK; REDDIT; TELEGRAM; TEAMS; WHATSAPP; MICROSOFT_POWER_BI; TABLEAU; BLUE_PRISM; UI_PATH; AUTOMATION_ANYWHERE; WORK_FUSION; PEGA; ROBOT_FRAMEWORK; AUTOMATE_NOW; APACHE_AIRFLOW; ANSIBLE;
+}
+
+#endregion
+
+#Region - Enum [Icons]
+
+Enum ANOWiconSet {
+    FAT_COW; FUGUE; FONT_AWESOME;
+}
+
+Enum ANOWiconSetIconsOnly {
+    # Notes: Some features (e.g. Workspace) only support the two real icon sets
+    FAT_COW; FUGUE;
+}
+
+#endregion
+
+#Region - Enum [Stocks]
+
+Enum ANOWLock_lockState {
+    UNLOCKED; SHARED; EXCLUSIVE;
 }
 
 #endregion
@@ -355,6 +363,18 @@ Enum ANOWSemaphore_lockState {
 
 Enum ANOWSemaphore_semaphoreState {
     ON; OFF;
+}
+
+#endregion
+
+#Region - Enum [Stocks]
+
+Enum ANOWStock_calendarState {
+    ON; OFF;
+}
+
+Enum ANOWStock_lockState {
+    UNLOCKED; SHARED; EXCLUSIVE;
 }
 
 #endregion
@@ -1551,7 +1571,6 @@ Class ANOWUser {
     These properties are defined in the swagger but are not present in the application
 
     [string]$clientId
-    [string]$createdBy
     [ANOWUser_languageCode]$languageCode
     [int64]$numberOfSessions
     [string]$password
@@ -1560,6 +1579,8 @@ Class ANOWUser {
     #>
     [string]$id
     [string]$lastUpdatedBy
+    [boolean]$apiUser
+    [string]$createdBy
     [boolean]$passwordEncoded
     [datetime]$dateCreated
     [string]$firstName
@@ -1671,6 +1692,31 @@ Class ANOWUser {
         [string]$stringified_object = $this.ToString([string[]]$optional_properties)
         [string]$escaped_object = [System.Uri]::EscapeDataString($stringified_object)
         Return $escaped_object
+    }
+}
+
+#endregion
+
+#region Class - [VariableTimestamp] (custom class)
+
+Class ANOWVariableTimestamp {
+    [int64]$id
+    [datetime]$timestamp
+    [string]$resource
+    [string]$lastUpdatedBy
+    [datetime]$dateCreated
+    [datetime]$lastUpdated
+    [string]$value
+    [string]$createdBy
+    [string]$domain
+    [ValidateSet('VARIABLE')]
+    [string]$resourceType
+    
+    ANOWVariableTimestamp() { $this.Init(@{}) }
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
     }
 }
 
@@ -2025,6 +2071,87 @@ Class ANOWFolder : ANOW {
     }
     [string] CreateOldValues() {
         [string[]]$optional_properties = 'description', 'folderPath'
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
+    }
+}
+
+#endregion
+
+#region Class - [ANOWLock]
+
+Class ANOWLock : ANOW {
+
+    [Nullable[ANOWLock_lockState]]$lockState
+    [int64]$availablePermits
+    [int64]$valueLowThreshold
+    [boolean]$composite
+    [int64]$occupiedPermits
+    [string]$maxValue
+    [Nullable[ANOWStock_calendarState]]$calendarState
+    [int64]$valueHighThreshold
+    [string]$timeZone
+    [datetime[]]$dates
+    [string[]]$tags
+    [string]$resourceStatus
+    [string]$folder
+    [int64]$valueVeryHighThreshold
+    [int32[]]$dayOfMonth
+    [Nullable[ANOWCalendar_statisticFunction]]$statisticFunction
+    [string]$valueUnit
+    [string]$minValue
+    [int32[]]$dayOfWeek
+    [int64]$valueVeryLowThreshold
+    [string]$value
+    [string]$calendarDaysOfMonth
+    [Nullable[ANOWCalendar_calendarType]]$calendarType
+    [string]$calendarDaysOfWeek
+    [string]$calendars
+    [boolean]$calendarLimitExpression
+    [int64]$totalPermits
+    [Nullable[ANOWCalendar_semaphoreState]]$semaphoreState
+    [string]$resourceType
+    [Nullable[datetime]]$nextOpenDate #this value exists in the console but not in the schema
+    [Nullable[datetime]]$nextCloseDate #this value exists in the console but not in the schema
+    [boolean]$hasNotes
+    [boolean]$hasPendingNotes
+    [int64]$noteCount
+    [int64]$pendingNoteCount
+
+    # Default constructor
+    ANOWStock() { $this.Init(@{}) }
+
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = 'description'
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
+    }
+}
+
+Class ANOWLockDetail : ANOW {
+    [string[]]$tags
+    [string]$folder
+    [int64]$totalPermits
+    [ValidateSet('LOCK')]
+    [string]$resourceType
+    [Nullable[ANOWLock_lockState]]$lockState
+    [string]$resourceStatus
+
+    # Default constructor
+    ANOWLockDetail() { $this.Init(@{}) }
+
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = 'description'
         [string]$old_values = $this.ToURL($optional_properties)
         Return $old_values
     }
@@ -2557,6 +2684,88 @@ Class ANOWSemaphoreDetail : ANOW {
 
 #endregion
 
+#region Class - [ANOWStock]
+
+Class ANOWStock : ANOW {
+
+    [Nullable[ANOWStock_lockState]]$lockState
+    [int64]$availablePermits
+    [int64]$valueLowThreshold
+    [boolean]$composite
+    [int64]$occupiedPermits
+    [string]$maxValue
+    [Nullable[ANOWStock_calendarState]]$calendarState
+    [int64]$valueHighThreshold
+    [string]$timeZone
+    [datetime[]]$dates
+    [string[]]$tags
+    [string]$resourceStatus
+    [string]$folder
+    [int64]$valueVeryHighThreshold
+    [int32[]]$dayOfMonth
+    [Nullable[ANOWCalendar_statisticFunction]]$statisticFunction
+    [string]$valueUnit
+    [string]$minValue
+    [int32[]]$dayOfWeek
+    [int64]$valueVeryLowThreshold
+    [string]$value
+    [string]$calendarDaysOfMonth
+    [Nullable[ANOWCalendar_calendarType]]$calendarType
+    [string]$calendarDaysOfWeek
+    [string]$calendars
+    [boolean]$calendarLimitExpression
+    [int64]$totalPermits
+    [Nullable[ANOWCalendar_semaphoreState]]$semaphoreState
+    [string]$resourceType
+    [Nullable[datetime]]$nextOpenDate #this value exists in the console but not in the schema
+    [Nullable[datetime]]$nextCloseDate #this value exists in the console but not in the schema
+    [boolean]$hasNotes
+    [boolean]$hasPendingNotes
+    [int64]$noteCount
+    [int64]$pendingNoteCount
+
+    # Default constructor
+    ANOWStock() { $this.Init(@{}) }
+
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = 'description'
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
+    }
+}
+
+Class ANOWStockDetail : ANOW {
+    [string[]]$tags
+    [string]$folder
+    [int64]$totalPermits
+    [ValidateSet('STOCK')]
+    [string]$resourceType
+    [int64]$occupiedPermits
+    [int64]$availablePermits
+    [string]$resourceStatus
+
+    # Default constructor
+    ANOWStockDetail() { $this.Init(@{}) }
+
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = 'description'
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
+    }
+}
+
+#endregion
+
 #region Class - [ANOWTag]
 
 Class ANOWTag : ANOW {
@@ -2963,6 +3172,100 @@ Class ANOWTaskTemplate : ANOW {
         Return $old_values
     }
 
+}
+
+#endregion
+
+#region Class - [ANOWVariable]
+
+Class ANOWVariable : ANOW {
+
+    [int64]$valueLowThreshold
+    [boolean]$composite
+    [int64]$occupiedPermits
+    [string]$calendarDates
+    [string]$maxValue
+    [Nullable[ANOWCalendar_calendarState]]$calendarState
+    [int64]$valueHighThreshold
+    [string]$timeZone
+    [datetime[]]$dates
+    [string[]]$tags
+    [string]$resourceStatus
+    [string]$folder
+    [PSCustomObject]$customFieldValues
+    [int64]$valueVeryHighThreshold
+    [int32[]]$dayOfMonth
+    [Nullable[ANOWCalendar_statisticFunction]]$statisticFunction
+    [string]$valueUnit
+    [int64]$availablePermits
+    [ANOWCalendar_lockState]$lockState
+    [string]$minValue
+    [int32[]]$dayOfWeek
+    [int64]$valueVeryLowThreshold
+    [string]$value
+    [string]$calendarDaysOfMonth
+    [PSCustomObject]$calendarStateId
+    [Nullable[ANOWCalendar_calendarType]]$calendarType
+    [string]$calendarDaysOfWeek
+    [string]$calendars
+    [boolean]$calendarLimitExpression
+    [int64]$totalPermits
+    [Nullable[ANOWCalendar_semaphoreState]]$semaphoreState
+    [string]$resourceType
+    [PSCustomObject[]]$historicalValues
+    [Nullable[datetime]]$nextOpenDate #this value exists in the console but not in the schema
+    [Nullable[datetime]]$nextCloseDate #this value exists in the console but not in the schema
+    [boolean]$hasNotes
+    [boolean]$hasPendingNotes
+    [int64]$noteCount
+    [int64]$pendingNoteCount
+
+    # Default constructor
+    ANOWVariable() { $this.Init(@{}) }
+
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = 'description'
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
+    }
+}
+
+Class ANOWVariableDetail : ANOW {
+    [int64]$pendingNoteCount
+    [boolean]$hasPendingNotes
+    [boolean]$hasNotes
+    [string[]]$tags
+    [ValidateSet('VARIABLE')]
+    [string]$resourceType
+    [boolean]$composite
+    [string]$folder
+    [int64]$noteCount
+    [ANOWSemaphore_semaphoreState]$semaphoreState
+    [int32[]]$dayOfWeek
+    [int32[]]$dayOfMonth
+    [datetime[]]$dates
+    [int64]$availablePermits
+    [ANOWSemaphore_lockState]$lockState
+    [string]$resourceStatus
+
+    # Default constructor
+    ANOWVariableDetail() { $this.Init(@{}) }
+
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = 'description'
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
+    }
 }
 
 #endregion
@@ -3384,3 +3687,103 @@ Class ANOWWorkspace : ANOW {
 #endregion
 
 #EndRegion
+
+
+#region ProcessingTemplateItem [Workflows]
+
+Class ANOWProcessingTemplateItem : ANOW {
+    [array]$serviceStatusMapping
+    [boolean]$autoArchive
+    [boolean]$checkedOut
+    [boolean]$eagerScriptExecution
+    [boolean]$highRisk
+    [boolean]$keepResourcesOnFailure
+    [boolean]$lazyLoad
+    [boolean]$modifiedVersion
+    [boolean]$onHold
+    [boolean]$passActionsToChildren
+    [boolean]$passBy
+    [boolean]$passResourceDependenciesToChildren
+    [boolean]$sequentialProcessing
+    [boolean]$turnOffDurationEstimation
+    [boolean]$useScripts
+    [int64]$durationSum
+    [int64]$estimatedDuration
+    [int64]$preloadCounter
+    [int64]$statisticalDuration
+    [Nullable[ANOWTaskTemplate_endpointType]]$endpointType
+    [Nullable[ANOWTaskTemplate_highRiskStatisticMethod]]$highRiskStatisticMethod
+    [Nullable[ANOWTaskTemplate_highRiskStatisticPeriod]]$highRiskStatisticPeriod
+    [Nullable[ANOWTaskTemplate_integrationType]]$integrationType
+    [Nullable[ANOWTaskTemplate_monitorType]]$monitorType
+    [Nullable[ANOWTaskTemplate_outputFormat]]$outputFormat
+    [Nullable[ANOWTaskTemplate_processingType]]$processingType
+    [Nullable[ANOWTaskTemplate_sensorType]]$sensorType
+    [Nullable[ANOWTaskTemplate_serverNodeType]]$serverNodeType
+    [Nullable[ANOWTaskTemplate_serviceManagerAggregationMode]]$serviceManagerAggregationMode
+    [Nullable[ANOWTaskTemplate_serviceManagerType]]$serviceManagerType
+    [Nullable[ANOWTaskTemplate_serviceType]]$serviceType
+    [Nullable[ANOWTaskTemplate_statisticMethod]]$statisticMethod
+    [Nullable[ANOWTaskTemplate_statisticPeriod]]$statisticPeriod
+    [Nullable[ANOWTaskTemplate_taskType]]$taskType
+    [Nullable[ANOWTaskTemplate_triggerType]]$triggerType
+    [Nullable[ANOWTaskTemplate_workflowType]]$workflowType
+    [Nullable[datetime]]$checkoutDate
+    [Nullable[datetime]]$nextTriggerDate
+    [Nullable[int64]]$expectedDuration
+    [Nullable[int64]]$highRiskThreshold
+    [PSCustomObject]$customFieldValues
+    [PSCustomObject]$forceCompletedCondition
+    [PSCustomObject]$forceFailedCondition
+    [PSCustomObject]$ignoreCondition
+    [PSCustomObject]$inputFormValues
+    [PSCustomObject]$layoutPreset
+    [PSCustomObject]$layoutSettings
+    [PSCustomObject]$processingCommand
+    [string[]]$tags
+    [string]$abortCommand
+    [string]$approvalConfiguration
+    [string]$calendar
+    [string]$checkoutBy
+    [string]$comment
+    [string]$costCenter
+    [string]$endpoint
+    [string]$folder
+    [string]$integration
+    [string]$nextTriggerTimeZone
+    [string]$node
+    [string]$owner
+    [string]$ownerRole
+    [string]$postScript
+    [string]$preScript
+    [string]$priority
+    [string]$processingCommandText
+    [string]$reason
+    [string]$resultMapping
+    [string]$title
+    [string]$weight
+    [string]$workspace
+    [boolean]$hasNotes
+    [boolean]$hasPendingNotes
+    [int64]$noteCount
+    [int64]$pendingNoteCount
+    [Nullable[ANOWTask_agentOperatingSystemType]]$agentOperatingSystemType #added
+    [Nullable[ANOWTask_cycleDelayMode]]$cycleDelayMode #added
+    [Nullable[ANOWTask_cycleFailMode]]$cycleFailMode #added
+    # Default constructor
+    ANOWProcessingTemplateItem() { $this.Init(@{}) }
+
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = 'checkoutBy', 'checkoutDate', 'codeRepository', 'description', 'endpoint', 'endpointType', 'folder', 'forceCompletedCondition', 'highRiskStatisticMethod', 'highRiskStatisticPeriod', 'lastUpdatedBy', 'monitorType', 'node', 'owner', 'postScript', 'preScript', 'processingCommand', 'processingCommandText', 'resultMapping', 'sensorType', 'serviceType', 'statisticMethod', 'statisticPeriod', 'tags', 'taskType', 'title', 'workspace'
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
+    }
+
+}
+
+#endregion

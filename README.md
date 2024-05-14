@@ -35,6 +35,13 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 <br/><br/>
 ## Change Log 📝
 
+## 1.0.19
+- Added new functions: `Add-AutomateNOWWorkflowTemplateItem` `Copy-AutomateNOWLock` `Copy-AutomateNOWStock` `Copy-AutomateNOWVariable` `Export-AutomateNOWLock` `Export-AutomateNOWStock` `Export-AutomateNOWVariable` `Get-AutomateNOWLock` `Get-AutomateNOWStock` `Get-AutomateNOWVariable` `Get-AutomateNOWVariableTimestamp` `New-AutomateNOWLock` `New-AutomateNOWStock` `New-AutomateNOWVariable` `Read-AutomateNOWWorkflowTemplateItem` `Remove-AutomateNOWLock` `Remove-AutomateNOWStock` `Remove-AutomateNOWVariable` `Rename-AutomateNOWLock` `Rename-AutomateNOWStock`, `Rename-AutomateNOWVariable`, `Set-AutomateNOWLock`, `Set-AutomateNOWStock`, `Set-AutomateNOWVariable`, `Set-AutomateNOWVariableTimestamp`
+- Fixed a major bug with Get-AutomateNOWTask when using the -Id parameter
+- Added parameter `-ChildNodes` to `Get-AutomateNOWNode` and renamed some of its other parameters
+- Added preliminary support for adding Task Templates to Workflow Templates by way of `Add-AutomateNOWWorkflowTemplateItem`
+- Added proper password validity checking to `Set-AutomateNOWPassword` by way of `Test-AutomateNOWPassword`
+
 ## 1.0.18
 - Added new functions: `Copy-AutomateNOWNode`, `Copy-AutomateNOWResultMapping`, `Copy-AutomateNOWUser`, `Get-AutomateNOWSemaphoreTimestamp`, `New-AutomateNOWServerDayTimestamp`, `New-AutomateNOWUser`, `Remove-AutomateNOWUser`, `Set-AutomateNOWSemaphoreTimestamp`, `Test-AutomateNOWUserPassword`
 
@@ -246,6 +253,11 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 ### Why are some of the columns in the export .csv containing `[System.Object]`?
 >All of the Export functions are preliminary. Each export function in this module needs to be fine-tuned to ensure each column is property exported. This is on the wish list.
 
+### How do I add a Task Template to a Workflow?
+>Use Add-AutomateNOWWorkflowTemplateItem
+
+### How does this module stay up-to-date with each new version of AutomateNOW?
+>I have some custom routines that compare the enums and classes to the current swagger.json. These routines will eventally be added to this module.
 
 ## Functions 🛠
 
@@ -256,6 +268,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Add-AutomateNOWProcessingTimeTrigger`
 
 `Add-AutomateNOWResultMappingRule`
+
+`Add-AutomateNOWWorkflowTemplateItem`
 
 `Compare-ObjectProperty`
 
@@ -281,6 +295,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Copy-AutomateNOWEndpoint`
 
+`Copy-AutomateNOWLock`
+
 `Copy-AutomateNOWNode`
 
 `Copy-AutomateNOWResultMapping`
@@ -289,9 +305,13 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Copy-AutomateNOWSemaphore`
 
+`Copy-AutomateNOWStock`
+
 `Copy-AutomateNOWTaskTemplate`
 
 `Copy-AutomateNOWUser`
+
+`Copy-AutomateNOWVariable`
 
 `Copy-AutomateNOWWorkflowTemplate`
 
@@ -321,6 +341,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Export-AutomateNOWIcon`
 
+`Export-AutomateNOWLock`
+
 `Export-AutomateNOWNode`
 
 `Export-AutomateNOWProcessingTimeTrigger`
@@ -333,6 +355,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Export-AutomateNOWSemaphore`
 
+`Export-AutomateNOWStock`
+
 `Export-AutomateNOWTag`
 
 `Export-AutomateNOWTask`
@@ -342,6 +366,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Export-AutomateNOWTimeZone`
 
 `Export-AutomateNOWUser`
+
+`Export-AutomateNOWVariable`
 
 `Export-AutomateNOWWorkflow`
 
@@ -373,6 +399,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Get-AutomateNOWFolder`
 
+`Get-AutomateNOWLock`
+
 `Get-AutomateNOWNode`
 
 `Get-AutomateNOWProcessingTimeTrigger`
@@ -387,6 +415,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Get-AutomateNOWSemaphoreTimestamp`
 
+`Get-AutomateNOWStock`
+
 `Get-AutomateNOWTag`
 
 `Get-AutomateNOWTask`
@@ -396,6 +426,10 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Get-AutomateNOWTimeZone`
 
 `Get-AutomateNOWUser`
+
+`Get-AutomateNOWVariable`
+
+`Get-AutomateNOWVariableTimestamp`
 
 `Get-AutomateNOWWorkflow`
 
@@ -433,6 +467,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `New-AutomateNOWFolder`
 
+`New-AutomateNOWLock`
+
 `New-AutomateNOWNode`
 
 `New-AutomateNOWResultMapping`
@@ -449,11 +485,15 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `New-AutomateNOWServerDayTimestamp`
 
+`New-AutomateNOWStock`
+
 `New-AutomateNOWTag`
 
 `New-AutomateNOWTaskTemplate`
 
 `New-AutomateNOWUser`
+
+`New-AutomateNOWVariable`
 
 `New-AutomateNOWWorkflowTemplate`
 
@@ -464,6 +504,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Protect-AutomateNOWEncryptedString`
 
 `Read-AutomateNOWIcon`
+
+`Read-AutomateNOWWorkflowTemplateItem`
 
 `Remove-AutomateNOWAdhocReport`
 
@@ -481,6 +523,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Remove-AutomateNOWFolder`
 
+`Remove-AutomateNOWLock`
+
 `Remove-AutomateNOWNode`
 
 `Remove-AutomateNOWProcessingTimeTrigger`
@@ -493,6 +537,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Remove-AutomateNOWSemaphore`
 
+`Remove-AutomateNOWStock`
+
 `Remove-AutomateNOWTag`
 
 `Remove-AutomateNOWTask`
@@ -501,15 +547,23 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Remove-AutomateNOWUser`
 
+`Remove-AutomateNOWVariable`
+
 `Remove-AutomateNOWWorkflow`
 
 `Remove-AutomateNOWWorkflowTemplate`
 
 `Remove-AutomateNOWWorkspace`
 
+`Rename-AutomateNOWLock`
+
 `Rename-AutomateNOWScheduleTemplate`
 
+`Rename-AutomateNOWStock`
+
 `Rename-AutomateNOWTaskTemplate`
+
+`Rename-AutomateNOWVariable`
 
 `Rename-AutomateNOWWorkflowTemplate`
 
@@ -545,6 +599,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Set-AutomateNOWFolder`
 
+`Set-AutomateNOWLock`
+
 `Set-AutomateNOWPassword`
 
 `Set-AutomateNOWScheduleTemplate`
@@ -553,11 +609,17 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Set-AutomateNOWSemaphoreTimestamp`
 
+`Set-AutomateNOWStock`
+
 `Set-AutomateNOWTag`
 
 `Set-AutomateNOWTaskTemplate`
 
 `Set-AutomateNOWUser`
+
+`Set-AutomateNOWVariable`
+
+`Set-AutomateNOWVariableTimestamp`
 
 `Set-AutomateNOWWorkflowTemplate`
 
