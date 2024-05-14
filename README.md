@@ -41,7 +41,7 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 - Added a new parameter `-ChildNodes` to `Get-AutomateNOWNode`, some other parameters were renamed as well
 - Added preliminary support for adding Task Templates to Workflow Templates by way of `Add-AutomateNOWWorkflowTemplateItem`
 - Enhanced the password validity checking of `Set-AutomateNOWPassword` by way of `Test-AutomateNOWPassword`
-- Enhanced the output of `Invoke-AutomateNOWAPI` when there are JSON conversion issues (workaround: use `-JustGiveMeJSON`)
+- Enhanced the output of `Invoke-AutomateNOWAPI` when JSON conversion errors occur (hint: use `-JustGiveMeJSON`)
 
 ## 1.0.18
 - Added new functions: `Copy-AutomateNOWNode`, `Copy-AutomateNOWResultMapping`, `Copy-AutomateNOWUser`, `Get-AutomateNOWSemaphoreTimestamp`, `New-AutomateNOWServerDayTimestamp`, `New-AutomateNOWUser`, `Remove-AutomateNOWUser`, `Set-AutomateNOWSemaphoreTimestamp`, `Test-AutomateNOWUserPassword`
