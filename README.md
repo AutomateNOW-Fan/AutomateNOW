@@ -38,11 +38,10 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 ## 1.0.20
 - Added new functions: `Add-AutomateNOWScheduleTemplateItem`, `Confirm-AutomateNOWScheduleTemplate`, `Copy-AutomateNOWTimeWindow`, `Export-AutomateNOWTimeWindow`, `Get-AutomateNOWTimeWindow`, `New-AutomateNOWTimeWindow`, `Read-AutomateNOWScheduleTemplateItem`, `Remove-AutomateNOWTimeWindow`, `Rename-AutomateNOWTimeWindow`, `Set-AutomateNOWTimeWindow`
 - Fixed a (rare) issue with `Invoke-AutomateNOWAPI` and JSON deserialization (note that MaxJsonLength is set to 2,147,483,647 instead of the default 2,097,152)
-- Fixed a new issue with the Set-AutomateNowWorkflowTemplate (and Task) functions. Changing workspaces works again.
 - Added parameter `-serverNodeType` along with other minor improvements to `Get-AutomateNOWNode`
 - Added parameter `-Quiet` to `Set-AutomateNOWTaskTemplate` and `Set-AutomateNOWWorkflowTemplate`
-- Added parameter `-Parameters` to `Start-AutomateNOWTaskTemplate`, `Start-AutomateNOWWorkflowTemplate`, `Start-AutomateNOWScheduleTemplate`. This makes it finally possible to start a Processing Templates with parameters!
-- Extended support for adding Processing Template Items to Workflow Templates & Schedule Templates (only Task Templates & Workflow Templates are supported for now)
+- Added parameter `-Parameters` to `Start-AutomateNOWTaskTemplate`, `Start-AutomateNOWWorkflowTemplate`, `Start-AutomateNOWScheduleTemplate`. This makes it finally possible to execute Processing Templates with parameters!
+- Extended support for adding Processing Template Items to Workflow Templates & Schedule Templates
 - Added the ability to modify the tags, folder and code repository to `Set-AutomateNOWDataSource`
 
 ## 1.0.19
@@ -212,9 +211,9 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 - Execute Adhoc Reports where you may not have permission to in the UI
 - List tags, folders etc. on an instance that you may not have permission to in the UI
 - (Psuedo) Rename Task Templates & Workflow Templates
-- Move items freely into and out of Workspaces
 - Automatic text file MIME type detection (for Add-AutomateNOWDataSourceItem)
 - Specify the theme and ui density at the time of user creation
+~~- Move items freely into and out of Workspaces~~ (this has been recently disabled by InfiniteDATA)
 
 <sub>* things the console does not allow</sub>
 
