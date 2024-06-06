@@ -37,7 +37,7 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 
 ## 1.0.20
 - Added new functions: `Add-AutomateNOWScheduleTemplateItem`, `Confirm-AutomateNOWScheduleTemplate`, `Copy-AutomateNOWTimeWindow`, `Export-AutomateNOWTimeWindow`, `Get-AutomateNOWTimeWindow`, `New-AutomateNOWTimeWindow`, `Read-AutomateNOWScheduleTemplateItem`, `Remove-AutomateNOWTimeWindow`, `Rename-AutomateNOWTimeWindow`, `Set-AutomateNOWTimeWindow`
-- Fixed a (rare) issue with `Invoke-AutomateNOWAPI` and JSON deserialization
+- Fixed a (rare) issue with `Invoke-AutomateNOWAPI` and JSON deserialization (note that MaxJsonLength is set to 2,147,483,647 instead of the default 2,097,152)
 - Fixed a new issue with the Set-AutomateNowWorkflowTemplate (and Task) functions. Changing workspaces works again.
 - Added parameter `-serverNodeType` along with other minor improvements to `Get-AutomateNOWNode`
 - Added parameter `-Quiet` to `Set-AutomateNOWTaskTemplate` and `Set-AutomateNOWWorkflowTemplate`

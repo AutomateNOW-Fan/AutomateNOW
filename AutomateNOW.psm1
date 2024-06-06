@@ -551,19 +551,32 @@ Function Invoke-AutomateNOWAPI {
         Catch {
             [string]$Message = $_.Exception.Message
             Write-Debug -Message "ConvertFrom-JSON failed to convert the returned results due to [$Message]. Let's try to deserialize as a backup option..."
-            If ($ps_version_major -eq 5) {
+            If ($ps_version_major -eq 5) {                
                 $Error.Clear()
                 Try {
-                    Add-Type -TypeDefinition System.Web.Extensions
+                    [int32]$system_web_extensions_type_present = [System.AppDomain]::CurrentDomain.GetAssemblies() | Where-Object { $_.ManifestModule.Name -eq 'System.Web.Extensions.dll' } | Measure-Object | Select-Object -ExpandProperty Count
                 }
                 Catch {
                     [string]$Message = $_.Exception.Message
-                    Write-Warning -Message "Add-Type failed to add System.Web.Extensions due to [$Message]"
+                    Write-Warning -Message "The [System.AppDomain] class failed to invoke the due to CurrentDomain.GetAssemblies method due to [$Message]"
                     Break
+                }                
+                If ($system_web_extensions_type_present -eq 0) {
+                    $Error.Clear()
+                    Try {
+                        Add-Type -TypeDefinition System.Web.Extensions
+                    }
+                    Catch {
+                        [string]$Message = $_.Exception.Message
+                        Write-Warning -Message "Add-Type failed to add System.Web.Extensions due to [$Message]"
+                        Break
+                    }
                 }
                 $Error.Clear()
                 Try {
                     [Web.Script.Serialization.JavaScriptSerializer]$serializer = [Web.Script.Serialization.JavaScriptSerializer]::new()
+                    $serializer.MaxJsonLength = 2147483647 # this is the maximum value for int32
+                    $serializer.RecursionLimit = 2147483647 # this is the maximum value for int32
                     [hashtable]$content_hashtable = $serializer.Deserialize($content, [hashtable])
                     [PSCustomObject]$content_object = $content_hashtable
                 }
@@ -17154,7 +17167,7 @@ Function Add-AutomateNOWScheduleTemplateItem {
                 Write-Debug -Message "$ScheduleTemplate_id currently has $ScheduleTemplateItems_Count items before any changes were made"
                 [int32]$last_item_order = ($ScheduleTemplateItems | Sort-Object -Property sortOrder | Select-Object -Last 1 | Select-Object -ExpandProperty sortOrder) + 1
             }
-            Else{
+            Else {
                 Write-Debug -Message "$ScheduleTemplate_id does not have any items yet. This will be the first item added to it."
                 [int32]$last_item_order = 0
             }            
