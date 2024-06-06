@@ -8,11 +8,11 @@
 Created by AutomateNOW-Fan
 ```
 ```
-⚠ Not affiliated with InfiniteDATA
+⚠ Not affiliated with InfiniteDATA/Beta Systems
 ```
 ## Efficacy 🧪
 
-Compatible with AutomateNOW! version 3.3.1.78HF2
+Compatible with AutomateNOW! version 3.3.1.78 HF3
 <br/><br/>
 ## Installation 🏗
 
@@ -35,13 +35,23 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 <br/><br/>
 ## Change Log 📝
 
+## 1.0.20
+- Added new functions: `Add-AutomateNOWScheduleTemplateItem`, `Confirm-AutomateNOWScheduleTemplate`, `Copy-AutomateNOWTimeWindow`, `Export-AutomateNOWTimeWindow`, `Get-AutomateNOWTimeWindow`, `New-AutomateNOWTimeWindow`, `Read-AutomateNOWScheduleTemplateItem`, `Remove-AutomateNOWTimeWindow`, `Rename-AutomateNOWTimeWindow`, `Set-AutomateNOWTimeWindow`
+- Fixed a (rare) issue with `Invoke-AutomateNOWAPI` and JSON deserialization
+- Fixed a new issue with the Set-AutomateNowWorkflowTemplate (and Task) functions. Changing workspaces works again.
+- Added parameter `-serverNodeType` along with other minor improvements to `Get-AutomateNOWNode`
+- Added parameter `-Quiet` to `Set-AutomateNOWTaskTemplate` and `Set-AutomateNOWWorkflowTemplate`
+- Added parameter `-Parameters` to `Start-AutomateNOWTaskTemplate`, `Start-AutomateNOWWorkflowTemplate`, `Start-AutomateNOWScheduleTemplate`. This makes it finally possible to start a Processing Templates with parameters!
+- Extended support for adding Processing Template Items to Workflow Templates & Schedule Templates (only Task Templates & Workflow Templates are supported for now)
+- Added the ability to modify the tags, folder and code repository to `Set-AutomateNOWDataSource`
+
 ## 1.0.19
 - Added new functions: `Add-AutomateNOWWorkflowTemplateItem` `Copy-AutomateNOWLock` `Copy-AutomateNOWStock` `Copy-AutomateNOWVariable` `Export-AutomateNOWLock` `Export-AutomateNOWStock` `Export-AutomateNOWVariable` `Get-AutomateNOWLock` `Get-AutomateNOWStock` `Get-AutomateNOWVariable` `Get-AutomateNOWVariableTimestamp` `New-AutomateNOWLock` `New-AutomateNOWStock` `New-AutomateNOWVariable` `Read-AutomateNOWWorkflowTemplateItem` `Remove-AutomateNOWLock` `Remove-AutomateNOWStock` `Remove-AutomateNOWVariable` `Rename-AutomateNOWLock` `Rename-AutomateNOWStock`, `Rename-AutomateNOWVariable`, `Set-AutomateNOWLock`, `Set-AutomateNOWStock`, `Set-AutomateNOWVariable`, `Set-AutomateNOWVariableTimestamp`
 - Fixed an issue with `Get-AutomateNOWTask` when using the `-Id` parameter
 - Added a new parameter `-ChildNodes` to `Get-AutomateNOWNode`, some other parameters were renamed as well
 - Added preliminary support for adding Task Templates to Workflow Templates by way of `Add-AutomateNOWWorkflowTemplateItem`
 - Enhanced the password validity checking of `Set-AutomateNOWPassword` by way of `Test-AutomateNOWPassword`
-- Enhanced the output of `Invoke-AutomateNOWAPI` when JSON conversion errors occur (hint: use `-JustGiveMeJSON`)
+- Enhanced the output of `Invoke-AutomateNOWAPI` when JSON conversion errors occur (workaround: use `-JustGiveMeJSON`)
 
 ## 1.0.18
 - Added new functions: `Copy-AutomateNOWNode`, `Copy-AutomateNOWResultMapping`, `Copy-AutomateNOWUser`, `Get-AutomateNOWSemaphoreTimestamp`, `New-AutomateNOWServerDayTimestamp`, `New-AutomateNOWUser`, `Remove-AutomateNOWUser`, `Set-AutomateNOWSemaphoreTimestamp`, `Test-AutomateNOWUserPassword`
@@ -270,9 +280,13 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Add-AutomateNOWResultMappingRule`
 
+`Add-AutomateNOWScheduleTemplateItem`
+
 `Add-AutomateNOWWorkflowTemplateItem`
 
 `Compare-ObjectProperty`
+
+`Confirm-AutomateNOWScheduleTemplate`
 
 `Confirm-AutomateNOWSession`
 
@@ -309,6 +323,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Copy-AutomateNOWStock`
 
 `Copy-AutomateNOWTaskTemplate`
+
+`Copy-AutomateNOWTimeWindow`
 
 `Copy-AutomateNOWUser`
 
@@ -363,6 +379,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Export-AutomateNOWTask`
 
 `Export-AutomateNOWTaskTemplate`
+
+`Export-AutomateNOWTimeWindow`
 
 `Export-AutomateNOWTimeZone`
 
@@ -423,6 +441,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Get-AutomateNOWTask`
 
 `Get-AutomateNOWTaskTemplate`
+
+`Get-AutomateNOWTimeWindow`
 
 `Get-AutomateNOWTimeZone`
 
@@ -492,6 +512,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `New-AutomateNOWTaskTemplate`
 
+`New-AutomateNOWTimeWindow`
+
 `New-AutomateNOWUser`
 
 `New-AutomateNOWVariable`
@@ -505,6 +527,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Protect-AutomateNOWEncryptedString`
 
 `Read-AutomateNOWIcon`
+
+`Read-AutomateNOWScheduleTemplateItem`
 
 `Read-AutomateNOWWorkflowTemplateItem`
 
@@ -546,6 +570,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Remove-AutomateNOWTaskTemplate`
 
+`Remove-AutomateNOWTimeWindow`
+
 `Remove-AutomateNOWUser`
 
 `Remove-AutomateNOWVariable`
@@ -563,6 +589,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Rename-AutomateNOWStock`
 
 `Rename-AutomateNOWTaskTemplate`
+
+`Rename-AutomateNOWTimeWindow`
 
 `Rename-AutomateNOWVariable`
 
@@ -615,6 +643,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Set-AutomateNOWTag`
 
 `Set-AutomateNOWTaskTemplate`
+
+`Set-AutomateNOWTimeWindow`
 
 `Set-AutomateNOWUser`
 
