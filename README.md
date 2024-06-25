@@ -32,8 +32,16 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 - All functions can return help with Get-Help or the -? parameter
 - PSScriptAnalyzer compliant / Approved verbs only
 - Alternate encryption key bytes can be supplied (let's hope it is never needed 🤞)
+- Integration with the git app for showing out of sync item that require manual merging
 <br/><br/>
 ## Change Log 📝
+
+## 1.0.21
+- Added new functions: `Add-AutomateNOWCodeRepositoryItem`,  `Approve-AutomateNOWCodeRepositoryMergeRequest`,  `Compare-AutomateNOWCodeRepositoryOutOfSyncItem`,  `Confirm-AutomateNOWCodeRepository`,  `Deny-AutomateNOWCodeRepositoryMergeRequest`,  `Get-AutomateNOWCodeRepositoryBranch`,  `Get-AutomateNOWCodeRepositoryItem`,  `Get-AutomateNOWCodeRepositoryMergeRequest`,  `Get-AutomateNOWCodeRepositoryOutOfSyncItem`,  `Get-AutomateNOWCodeRepositoryTag`,  `Merge-AutomateNOWCodeRepositoryBranch`,  `Merge-AutomateNOWCodeRepositoryOutOfSyncItem`,  `New-AutomateNOWCodeRepository`,  `New-AutomateNOWCodeRepositoryBranch`,  `New-AutomateNOWCodeRepositoryTag`,  `Publish-AutomateNOWCodeRepository`,  `Receive-AutomateNOWCodeRepository`,  `Remove-AutomateNOWCodeRepository`,  `Remove-AutomateNOWCodeRepositoryBranch`,  `Remove-AutomateNOWCodeRepositoryItem`,  `Remove-AutomateNOWCodeRepositoryTag`,  `Remove-AutomateNOWScheduleTemplateItem`,  `Select-AutomateNOWCodeRepositoryBranch`,  `Select-AutomateNOWCodeRepositoryTag`,  `Send-AutomateNOWCodeRepository`,  `Set-AutomateNOWCodeRepository`,  `Set-AutomateNOWTask`,  `Show-AutomateNOWCodeRepositoryOutOfSyncItemComparison`,  `Sync-AutomateNOWCodeRepository`,  `UnPublish-AutomateNOWCodeRepository`
+- Added complete functionality with Git Repositories. `Show-AutomateNOWCodeRepositoryOutOfSyncItemComparison` requires the git executable to be available.
+- Added `-processingCommand` parameter to `Set-AutomateNOWTaskTemplate` allowing changes to the script within the Task Template (experimental)
+- Fixed an issue with case-sensitivity when adding Tags to an object
+- Improved `Set-AutomateNOWTaskTemplate` by making the boolean parameters nullable
 
 ## 1.0.20
 - Added new functions: `Add-AutomateNOWScheduleTemplateItem`, `Confirm-AutomateNOWScheduleTemplate`, `Copy-AutomateNOWTimeWindow`, `Export-AutomateNOWTimeWindow`, `Get-AutomateNOWTimeWindow`, `New-AutomateNOWTimeWindow`, `Read-AutomateNOWScheduleTemplateItem`, `Remove-AutomateNOWTimeWindow`, `Rename-AutomateNOWTimeWindow`, `Set-AutomateNOWTimeWindow`
@@ -205,14 +213,16 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 - Automatic binary file MIME type detection (for Add-AutomateNOWDataSourceItem)
 - Refactor redundant code
 - Export functions should convert objects containing an object type to JSON strings
+- Ability to action individual items in a code repository instead of applying the action to all items
 
 ## Cheats* 🎰
 
 - Execute Adhoc Reports where you may not have permission to in the UI
-- List tags, folders etc. on an instance that you may not have permission to in the UI
+- List & apply tags, folders etc. on an instance that you may not have permission to in the UI
 - (Psuedo) Rename Task Templates & Workflow Templates
 - Automatic text file MIME type detection (for Add-AutomateNOWDataSourceItem)
 - Specify the theme and ui density at the time of user creation
+- Retrieve all items inside a Code Repository with a single command
 ~~- Move items freely into and out of Workspaces~~ (this has been recently disabled by InfiniteDATA)
 
 <sub>* things the console does not allow</sub>
@@ -237,16 +247,13 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 >Try `Connect-AutomateNOW -?`. Also try `Get-Command -Module AutomateNOW`.
 
 ### How can I specify the domain with `Connect-AutomateNOW` if I don't know what the available domains are?
->You can omit the -Domain parameter from `Connect-AutomateNOW` to show the available domains.
+>Use `Connect-AutomateNOW` without the -Domain parameter to discover available domains to your account. Then run it again with the -Domain parameter.
 
 ### How do I use a particular command? Where's the help?
->For now, type the name of the command followed by -?.
+>Type the name of the command followed by -?.
 
-### How do I change to a different domain after connecting?
->Use `Switch-AutomateNOWDomain`.
-
-### How do I retrieve Tasks by their RunId?
->Use `Get-AutomateNOWTask` and refer to the Id of the returned objects.
+### Why don't the functions use the same exact verbs as the ANOW console? (e.g. Send-AutomateNOWCodeRepository instead of Push-AutomateNOWCodeRepository)
+>As a best practice this module uses only approved verbs that means sometimes the verbs won't match. See https://learn.microsoft.com/en-us/powershell/scripting/developer/cmdlet/approved-verbs-for-windows-powershell-commands for more information.
 
 ### Why do I only receive 100 results when using the Get commands? I should be getting more results...
 >The default values of `-startRow` and `-endRow` are 0 and 100 respectively. You can use those parameters to paginate the results.
@@ -263,15 +270,46 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 ### Why are some of the columns in the export .csv containing `[System.Object]`?
 >All of the Export functions are preliminary. Each export function in this module needs to be fine-tuned to ensure each column is property exported. This is on the wish list.
 
-### How do I add a Task Template to a Workflow?
+### How to add a Task Template to a Workflow?
 >Use Add-AutomateNOWWorkflowTemplateItem
 
-### How does this module stay up-to-date with each new version of AutomateNOW?
->I have some custom routines that compare the enums and classes to the current swagger.json. These routines will eventally be added to this module.
+### How to change domain?
+>Use `Switch-AutomateNOWDomain`
+
+### How to retrieve Tasks and Workflows by their RunId?
+>Use `Get-AutomateNOWTask` or `Get-AutomateNOWWorkflow` and refer to the Id's that are returned
+
+### How to push my changes to my properly configured code repository that my admin provided?
+> Step 1 - Select the branch of the repository
+> `Select-AutomateNOWCodeRepositoryBranch` -CodeRepository $repository -Branch 'development' -Force
+
+> Step 2 - Make a change to one of the items in the repository
+> `Set-AutomateNOWTaskTemplate` -TaskTemplate $task_template -processingCommand $script -Force
+
+> Step 3 - Commit all of the changes in the repository
+> `Publish-AutomateNOWCodeRepository` -CodeRepository $repository -Force
+
+> Step 4 - Push all of the commited changes in the local repository to the remote repository
+> `Send-AutomateNOWCodeRepository` -CodeRepository $repository -Force
+
+> Step 5 - Synchronize the local and remote repositories - Do not forget this step! 😅
+> `Sync-AutomateNOWCodeRepository` -CodeRepository $repository -Force
+
+### I made a change to the code on my properly configured remote repository. How do I pull it down to the local repository?
+> Step 1 - Select the branch of the repository
+> `Select-AutomateNOWCodeRepositoryBranch` -CodeRepository $repository -branch 'development' -Force -Quiet
+
+> Step 2 - Pull all of the commited changes in the remote repository to the local repository
+> `Receive-AutomateNOWCodeRepository` -CodeRepository $repository -Force
+
+> Step 3 - Synchronize the local and remote repositories - Do not forget this step! 😅
+> `Sync-AutomateNOWCodeRepository` -CodeRepository $repository -Force
 
 ## Functions 🛠
 
 `Add-AutomateNOWApprovalRule`
+
+`Add-AutomateNOWCodeRepositoryItem`
 
 `Add-AutomateNOWDataSourceItem`
 
@@ -283,7 +321,13 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Add-AutomateNOWWorkflowTemplateItem`
 
+`Approve-AutomateNOWCodeRepositoryMergeRequest`
+
+`Compare-AutomateNOWCodeRepositoryOutOfSyncItem`
+
 `Compare-ObjectProperty`
+
+`Confirm-AutomateNOWCodeRepository`
 
 `Confirm-AutomateNOWScheduleTemplate`
 
@@ -330,6 +374,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Copy-AutomateNOWVariable`
 
 `Copy-AutomateNOWWorkflowTemplate`
+
+`Deny-AutomateNOWCodeRepositoryMergeRequest`
 
 `Disconnect-AutomateNOW`
 
@@ -407,6 +453,16 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Get-AutomateNOWCodeRepository`
 
+`Get-AutomateNOWCodeRepositoryBranch`
+
+`Get-AutomateNOWCodeRepositoryItem`
+
+`Get-AutomateNOWCodeRepositoryMergeRequest`
+
+`Get-AutomateNOWCodeRepositoryOutOfSyncItem`
+
+`Get-AutomateNOWCodeRepositoryTag`
+
 `Get-AutomateNOWDataSource`
 
 `Get-AutomateNOWDataSourceItem`
@@ -469,6 +525,10 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Invoke-AutomateNOWAPI`
 
+`Merge-AutomateNOWCodeRepositoryBranch`
+
+`Merge-AutomateNOWCodeRepositoryOutOfSyncItem`
+
 `New-AutomateNOWAdhocReport`
 
 `New-AutomateNOWAgent`
@@ -478,6 +538,12 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `New-AutomateNOWApprovalRule`
 
 `New-AutomateNOWCalendar`
+
+`New-AutomateNOWCodeRepository`
+
+`New-AutomateNOWCodeRepositoryBranch`
+
+`New-AutomateNOWCodeRepositoryTag`
 
 `New-AutomateNOWDataSource`
 
@@ -525,11 +591,15 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Protect-AutomateNOWEncryptedString`
 
+`Publish-AutomateNOWCodeRepository`
+
 `Read-AutomateNOWIcon`
 
 `Read-AutomateNOWScheduleTemplateItem`
 
 `Read-AutomateNOWWorkflowTemplateItem`
+
+`Receive-AutomateNOWCodeRepository`
 
 `Remove-AutomateNOWAdhocReport`
 
@@ -538,6 +608,14 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Remove-AutomateNOWApproval`
 
 `Remove-AutomateNOWCalendar`
+
+`Remove-AutomateNOWCodeRepository`
+
+`Remove-AutomateNOWCodeRepositoryBranch`
+
+`Remove-AutomateNOWCodeRepositoryItem`
+
+`Remove-AutomateNOWCodeRepositoryTag`
 
 `Remove-AutomateNOWDataSource`
 
@@ -558,6 +636,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Remove-AutomateNOWSchedule`
 
 `Remove-AutomateNOWScheduleTemplate`
+
+`Remove-AutomateNOWScheduleTemplateItem`
 
 `Remove-AutomateNOWSemaphore`
 
@@ -615,11 +695,19 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Resume-AutomateNOWWorkflowTemplate`
 
+`Select-AutomateNOWCodeRepositoryBranch`
+
+`Select-AutomateNOWCodeRepositoryTag`
+
+`Send-AutomateNOWCodeRepository`
+
 `Set-AutomateNOWAdhocReport`
 
 `Set-AutomateNOWAgent`
 
 `Set-AutomateNOWApproval`
+
+`Set-AutomateNOWCodeRepository`
 
 `Set-AutomateNOWDataSource`
 
@@ -641,6 +729,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Set-AutomateNOWTag`
 
+`Set-AutomateNOWTask`
+
 `Set-AutomateNOWTaskTemplate`
 
 `Set-AutomateNOWTimeWindow`
@@ -654,6 +744,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Set-AutomateNOWWorkflowTemplate`
 
 `Set-AutomateNOWWorkspace`
+
+`Show-AutomateNOWCodeRepositoryOutOfSyncItemComparison`
 
 `Show-AutomateNOWEndpointType`
 
@@ -701,9 +793,13 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Switch-AutomateNOWDomain`
 
+`Sync-AutomateNOWCodeRepository`
+
 `Test-AutomateNOWUserPassword`
 
 `Unprotect-AutomateNOWEncryptedString`
+
+`UnPublish-AutomateNOWCodeRepository`
 
 `Update-AutomateNOWToken`
 

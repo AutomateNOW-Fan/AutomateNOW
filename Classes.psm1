@@ -86,6 +86,24 @@ Enum ANOWCodeRepository_sshKeyLocationType {
 
 #endregion
 
+#Region - Enum [CodeRepositoryMergeRequest]
+
+Enum ANOWCodeRepositoryMergeRequest_status {
+    ISSUED; REJECTED; ACCEPTED;
+}
+
+#endregion
+
+#Region - Enum [CodeRepositoryOutOfSyncItem]
+
+Enum ANOWCodeRepositoryOutOfSyncItem_itemType {
+    ProcessingTemplates; Schedules; BusinessViews; Workspaces; ResultMappings; Approvals; ServerNodes; Agents; Endpoints; Resources; DataSources; Anomalies; Interfaces; NotificationGroups; NotificationChannels; NotificationTemplates; RuntimeActions; Dashboards; AdhocReports; UserReports; Tags; Folders;
+}
+
+#endregion
+
+'ProcessingTemplates', 'Schedules', 'BusinessViews', 'Workspaces', 'ResultMappings', 'Approvals', 'ServerNodes', 'Agents', 'Endpoints', 'Resources', 'DataSources', 'Anomalies', 'Interfaces', 'NotificationGroups', 'NotificationChannels', 'NotificationTemplates', 'RuntimeActions', 'Dashboards', 'AdhocReports', 'UserReports', 'Tags', 'Folders'
+
 #Region - Enum [DataSource]
 
 Enum ANOWDataSource_dataType {
@@ -1024,12 +1042,175 @@ Class ANOWCodeRepository {
     [string]$createdBy
     [string]$domain
     [string[]]$tags
+    [string]$description
+    [string]$folder
     [boolean]$rebaseConflict
     [boolean]$rebaseInProgress
     [string]$user
     [string]$password
     # Default constructor
     ANOWCodeRepository() { $this.Init(@{}) }
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = ''
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
+    }
+    # The primary goal of this method is to return back the same json string that the ANOW application produces when it converts an object into JSON
+    # The secondary goal of this method is to stringify the object in preparation for encoding to URL format faithfully
+    [string] ToString([string[]]$optional_properties) {
+        [System.Collections.Specialized.OrderedDictionary]$this2 = [System.Collections.Specialized.OrderedDictionary]@{}
+        $current_members = $this | Get-Member | Where-Object { $_.MemberType -eq 'Property' }
+        ForEach ($current_member in $current_members) {
+            [string]$current_member_name = $current_member.Name
+            If ($current_member_value.Length -gt 0 -or $current_member_value.count -gt 0) {
+                Remove-Variable current_member_value -Force
+            }
+            If (($this.$current_member_name.count -gt 0)) {
+                If ($this.$current_member_name[0] -is [ANOWSecurityRole]) {
+                    [ANOWSecurityRole[]]$current_member_value = $this.$current_member_name
+                }
+                Else {
+                    $current_member_value = $this.$current_member_name # this variable cannot be hard typed
+                }
+            }
+            Else {
+                $current_member_value = $this.$current_member_name # this variable cannot be hard typed
+            }
+            # This omits pre-defined optional properties for this specific class when they are empty
+            If (-not ($current_member_value.Length -eq 0 -and $current_member_name -in ($optional_properties))) {
+                If ($current_member.definition -match '^datetime [a-zA-Z]{1,} {.{1,}}$' ) {
+                    # This ensures that datetimes are always formatted into ISO 8601 format. Powershell is not consistent on recognizing strings that can be safely casted into dates.
+                    [string]$current_member_value = Get-Date -Date $current_member_value -Format 'yyyy-MM-ddTHH:mm:ss.fff'
+                    $this2.Add($current_member_name, $current_member_value)
+                }
+                ElseIf ($current_member.definition -match '^bool [a-zA-Z]{1,} {.{1,}}$' ) {
+                    # This ensures that booleans are converted the same way that the application expects
+                    If ($current_member_value -eq $false) {
+                        $this2.Add($current_member_name, $false)
+                    }
+                    Else {
+                        $this2.Add($current_member_name, $true)
+                    }
+                }
+                ElseIf ($current_member_value -is [System.Enum]) {
+                    # This ensures that enums are resolved into their string value instead of the numerical index
+                    [string]$current_member_value = $current_member_value.ToString()
+                    $this2.Add($current_member_name, $current_member_value)
+                }
+                ElseIf ($current_member.definition -match '^[A-Za-z]{1,}\[] [a-zA-Z]{1,} {.{1,}}$' -and $current_member_value.Count -eq 1) {
+                    # This ensures that arrays which only contain a single item are not converted into strings
+                    $this2.Add($current_member_name, @(, $current_member_value))
+                }
+                ElseIf ($current_member_value.Length -eq 0) {
+                    # This ensures that null values remain null instead of being converted to a string
+                    $this2.Add($current_member_name, $null)
+                }
+                Else {
+                    $this2.Add($current_member_name, $current_member_value)
+                }
+            }
+        }
+        [string]$stringified_object = $this2 | ConvertTo-JSON -Compress -Depth 10
+        Return $stringified_object
+    }
+    # The primary goal of this method is to URL encode an ANOW object for conversion into the _oldValues string. The _oldValues is typically (but not always) included by the ANOW application whenever modifying an object. The behavior of this method should match the ANOW application as closely as possible. Rigorous and frequent testing will always be needed to ensure that valid payloads are sent when modifying existing objects in the ANOW application.
+    [string] ToURL([string[]]$optional_properties) {
+        [string]$stringified_object = $this.ToString([string[]]$optional_properties)
+        [string]$escaped_object = [System.Uri]::EscapeDataString($stringified_object)
+        Return $escaped_object
+    }
+}
+
+#endregion
+
+#region Class - [CodeRepositoryBranch]
+
+Class ANOWCodeRepositoryBranch {
+    [string]$id
+    [string]$codeRepository
+    # Default constructor
+    ANOWCodeRepositoryBranch() { $this.Init(@{}) }
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+}
+
+#endregion
+
+#region Class - [CodeRepositoryMergeRequest]
+
+Class ANOWCodeRepositoryMergeRequest {
+    [datetime]$dateCreated
+    [string]$description
+    [int64]$id
+    [datetime]$lastUpdated
+    [string]$sourceBranch
+    [string]$sourceCommitId
+    [ANOWCodeRepositoryMergeRequest_status]$status
+    [string]$targetBranch
+    [string]$targetCommitId
+    [string]$codeRepository
+    [string]$domain
+    [string]$lastUpdatedBy
+    [string]$createdBy
+    [string]$userIp
+    [boolean]$deleteSourceBranch = $false # note this property does not appear to be used in the AutomateNOW UI
+    
+    # Default constructor
+    ANOWCodeRepositoryMergeRequest() { $this.Init(@{}) }
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+}
+
+#endregion
+
+#region Class - [CodeRepositoryOutOfSyncItem]
+
+Class ANOWCodeRepositoryOutOfSyncItem {
+    [string]$id
+    [string]$domain
+    [string]$itemId
+    [string]$codeRepository
+    [string]$lastUpdatedBy
+    [datetime]$lastUpdated
+    [ANOWCodeRepositoryOutOfSyncItem_itemType]$itemType
+    [datetime]$dateCreated
+    [string]$createdBy
+
+    # Default constructor
+    ANOWCodeRepositoryOutOfSyncItem() { $this.Init(@{}) }
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+}
+
+#endregion
+
+#region Class - [CodeRepositoryTag]
+
+Class ANOWCodeRepositoryTag {
+    [string]$id
+    [string]$codeRepository
+    [string]$createdBy
+    [string]$description
+    [string]$domain
+    [string]$name
+    [string]$commit
+
+    # Default constructor
+    ANOWCodeRepositoryTag() { $this.Init(@{}) }
     [void] Init([hashtable]$Properties) {
         foreach ($Property in $Properties.Keys) {
             $this.$Property = $Properties.$Property
@@ -4078,4 +4259,3 @@ Class ANOWWorkspace : ANOW {
 #endregion
 
 #EndRegion
-

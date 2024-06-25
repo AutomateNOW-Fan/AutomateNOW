@@ -551,7 +551,7 @@ Function Invoke-AutomateNOWAPI {
         Catch {
             [string]$Message = $_.Exception.Message
             Write-Debug -Message "ConvertFrom-JSON failed to convert the returned results due to [$Message]. Let's try to deserialize as a backup option..."
-            If ($ps_version_major -eq 5) {                
+            If ($ps_version_major -eq 5) {
                 $Error.Clear()
                 Try {
                     [int32]$system_web_extensions_type_present = [System.AppDomain]::CurrentDomain.GetAssemblies() | Where-Object { $_.ManifestModule.Name -eq 'System.Web.Extensions.dll' } | Measure-Object | Select-Object -ExpandProperty Count
@@ -560,7 +560,7 @@ Function Invoke-AutomateNOWAPI {
                     [string]$Message = $_.Exception.Message
                     Write-Warning -Message "The [System.AppDomain] class failed to invoke the due to CurrentDomain.GetAssemblies method due to [$Message]"
                     Break
-                }                
+                }
                 If ($system_web_extensions_type_present -eq 0) {
                     $Error.Clear()
                     Try {
@@ -1058,29 +1058,32 @@ Function Connect-AutomateNOW {
     Else {
         [string]$protocol = 'https'
     }
-    If (($null -ne $anow_session.ExpirationDate) -and ($Instance -ne $anow_session.Instance) -and ($SkipPreviousSessionCheck -ne $true)) {
+    If (($anow_session.ExpirationDate -is [datetime]) -and ($SkipPreviousSessionCheck -ne $true)) {
         [datetime]$current_date = Get-Date
-        If ($current_date.IsDaylightSavingTime() -eq $true) {
-            $current_date.AddHours(1)
-        }
         [datetime]$expiration_date = $anow_session.ExpirationDate
         [timespan]$TimeRemaining = ($expiration_date - $current_date)
         [int32]$SecondsRemaining = $TimeRemaining.TotalSeconds
         If ($SecondsRemaining -gt 60) {
             [string]$AlreadyConnectedInstance = ($anow_session.Instance)
-            Write-Warning -Message "Please use Disconnect-AutomateNOW to terminate your previous connection to $AlreadyConnectedInstance (Use -SkipPreviousSessionCheck to override this)"
+            If ($Instance -eq $AlreadyConnectedInstance) {
+                Write-Warning -Message "Please use Disconnect-AutomateNOW to disconnect from $AlreadyConnectedInstance before connecting to $Instance (Use -SkipPreviousSessionCheck to override this)"
+            }
+            Else {
+                Write-Warning -Message "Please use Disconnect-AutomateNOW to disconnect your active connection to $AlreadyConnectedInstance (It still has [$SecondsRemaining] seconds remaining) (Use -SkipPreviousSessionCheck to override this)"
+            }
             Break
         }
-    }
-    ElseIf ($null -ne $anow_session) {
-        $Error.Clear()
-        Try {
-            Remove-Variable -Name anow_session -Scope Global -Force
-        }
-        Catch {
-            [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Remove-Variable failed to remove the `$anow_session variable due to [$Message]."
-            Break
+        Else {
+            Write-Warning -Message "The current token expired at $expiration_date ($SecondsRemaining seconds ago). Removing the session variable..."
+            $Error.Clear()
+            Try {
+                Remove-Variable -Name anow_session -Scope Global -Force
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Remove-Variable failed to remove the expired `$anow_session variable due to [$Message]."
+                Break
+            }
         }
     }
     If ($ReadJSONFromClipboard -eq $true) {
@@ -2093,7 +2096,7 @@ Function Set-AutomateNOWAdhocReport {
     Optional switch that will remove the Tags from the Adhoc Report object.
 
     .PARAMETER Tags
-    Optional strings to set a different set of Tags on the new Adhoc Report object.
+    Optional string array of CASE-SENSITIVE Tag Id's to set on the new Adhoc Report object.
 
     .PARAMETER Force
     Force the change without confirmation. This is equivalent to -Confirm:$false
@@ -2286,7 +2289,7 @@ Function New-AutomateNOWAdhocReport {
     Optional description of the AdhocReport (may not exceed 255 characters).
 
     .PARAMETER Tags
-    Optional string array containing the id's of the tags to assign to the new Adhoc Report. Do not pass [ANOWTag] objects here.
+    Optional string array containing the CASE-SENSITIVE id's of the tags to assign to the new Adhoc Report. Do not pass [ANOWTag] objects here.
 
     .PARAMETER Folder
     Optional name of the folder to place the Adhoc Report into.
@@ -2376,6 +2379,11 @@ Function New-AutomateNOWAdhocReport {
             }
             If ($tag_object.simpleId.length -eq 0) {
                 Throw "New-AutomateNOWAdhocReport has detected that the tag [$tag_id] does not appear to exist. Please check again."
+                Break
+            }
+            ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
+                [string]$tag_object_simpleId = $tag_object.simpleId
+                Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                 Break
             }
             [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -2509,7 +2517,7 @@ Function Copy-AutomateNOWAdhocReport {
     Optional switch that will ensure that the newly created Adhoc Report will not have any Tags set.
 
     .PARAMETER Tags
-    Optional strings to set a different set of Tags on the new AdhocReport object. If you do not set this, the new Adhoc Report object will appy the same Tags of the source object.
+    Optional string array of CASE-SENSITIVE Tag Id's to set on the new AdhocReport object. If you do not set this, the new Adhoc Report object will apply the same Tags of the source object.
 
     .INPUTS
     ONLY [ANOWAdhocReport] object is accepted. Pipeline support is intentionally unavailable.
@@ -3212,7 +3220,7 @@ Function Set-AutomateNOWAgent {
     Optional switch that will remove the Tags from the Agent object.
 
     .PARAMETER Tags
-    Optional strings to set a different set of Tags on the new Agent object.
+    Optional string array of CASE-SENSITIVE Tag Id's to set on the new Agent object.
 
     .PARAMETER Force
     Force the change without confirmation. This is equivalent to -Confirm:$false
@@ -3513,7 +3521,7 @@ Function New-AutomateNOWAgent {
     Optional description of the Agent (may not exceed 255 characters).
 
     .PARAMETER Tags
-    Optional string array containing the id's of the tags to assign to the new Agent. Do not pass [ANOWTag] objects here.
+    Optional string array containing the CASE-SENSITIVE id's of the tags to assign to the new Agent. Do not pass [ANOWTag] objects here.
 
     .PARAMETER Folder
     Optional name of the folder to place the Agent into.
@@ -3598,6 +3606,11 @@ Function New-AutomateNOWAgent {
             }
             If ($tag_object.simpleId.length -eq 0) {
                 Throw "New-AutomateNOWAgent has detected that the tag [$tag_id] does not appear to exist. Please check again."
+                Break
+            }
+            ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
+                [string]$tag_object_simpleId = $tag_object.simpleId
+                Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                 Break
             }
             [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -3831,7 +3844,7 @@ Function Copy-AutomateNOWAgent {
     Optional switch that will ensure that the newly created Agent will not have any Tags set.
 
     .PARAMETER Tags
-    Optional strings to set a different set of Tags on the new Agent object. If you do not set this, the new Agent object will appy the same Tags of the source object.
+    Optional string array of CASE-SENSITIVE Tag Id's to set on the new Agent object. If you do not set this, the new Agent object will apply the same Tags of the source object.
 
     .INPUTS
     ONLY the [ANOWAgent] object type is accepted. Pipeline support is intentionally unavailable.
@@ -4181,7 +4194,7 @@ Function Set-AutomateNOWApproval {
     .EXAMPLE
     Forcibly removes all of the Approval Rules from an Approval (using the pipeline)
 
-    $approval = Get-AutomateNOWApproval -Id 'TestApproval.mjs.apr'
+    $approval = Get-AutomateNOWApproval -Id 'TestApproval1'
     $approval | Set-AutomateNOWApproval -UnsetRules -Force
 
     .NOTES
@@ -5561,7 +5574,7 @@ Function New-AutomateNOWCalendar {
     Optional timezone for the calendar. If not specified, the default server timezone will be used. Valid choices are: 'Africa/Abidjan', 'Africa/Accra', 'Africa/Addis_Ababa', 'Africa/Algiers', 'Africa/Asmara', 'Africa/Asmera', 'Africa/Bamako', 'Africa/Bangui', 'Africa/Banjul', 'Africa/Bissau', 'Africa/Blantyre', 'Africa/Brazzaville', 'Africa/Bujumbura', 'Africa/Cairo', 'Africa/Casablanca', 'Africa/Ceuta', 'Africa/Conakry', 'Africa/Dakar', 'Africa/Dar_es_Salaam', 'Africa/Djibouti', 'Africa/Douala', 'Africa/El_Aaiun', 'Africa/Freetown', 'Africa/Gaborone', 'Africa/Harare', 'Africa/Johannesburg', 'Africa/Juba', 'Africa/Kampala', 'Africa/Khartoum', 'Africa/Kigali', 'Africa/Kinshasa', 'Africa/Lagos', 'Africa/Libreville', 'Africa/Lome', 'Africa/Luanda', 'Africa/Lubumbashi', 'Africa/Lusaka', 'Africa/Malabo', 'Africa/Maputo', 'Africa/Maseru', 'Africa/Mbabane', 'Africa/Mogadishu', 'Africa/Monrovia', 'Africa/Nairobi', 'Africa/Ndjamena', 'Africa/Niamey', 'Africa/Nouakchott', 'Africa/Ouagadougou', 'Africa/Porto-Novo', 'Africa/Sao_Tome', 'Africa/Timbuktu', 'Africa/Tripoli', 'Africa/Tunis', 'Africa/Windhoek', 'America/Adak', 'America/Anchorage', 'America/Anguilla', 'America/Antigua', 'America/Araguaina', 'America/Argentina/Buenos_Aires', 'America/Argentina/Catamarca', 'America/Argentina/ComodRivadavia', 'America/Argentina/Cordoba', 'America/Argentina/Jujuy', 'America/Argentina/La_Rioja', 'America/Argentina/Mendoza', 'America/Argentina/Rio_Gallegos', 'America/Argentina/Salta', 'America/Argentina/San_Juan', 'America/Argentina/San_Luis', 'America/Argentina/Tucuman', 'America/Argentina/Ushuaia', 'America/Aruba', 'America/Asuncion', 'America/Atikokan', 'America/Atka', 'America/Bahia', 'America/Bahia_Banderas', 'America/Barbados', 'America/Belem', 'America/Belize', 'America/Blanc-Sablon', 'America/Boa_Vista', 'America/Bogota', 'America/Boise', 'America/Buenos_Aires', 'America/Cambridge_Bay', 'America/Campo_Grande', 'America/Cancun', 'America/Caracas', 'America/Catamarca', 'America/Cayenne', 'America/Cayman', 'America/Chicago', 'America/Chihuahua', 'America/Coral_Harbour', 'America/Cordoba', 'America/Costa_Rica', 'America/Creston', 'America/Cuiaba', 'America/Curacao', 'America/Danmarkshavn', 'America/Dawson', 'America/Dawson_Creek', 'America/Denver', 'America/Detroit', 'America/Dominica', 'America/Edmonton', 'America/Eirunepe', 'America/El_Salvador', 'America/Ensenada', 'America/Fort_Nelson', 'America/Fort_Wayne', 'America/Fortaleza', 'America/Glace_Bay', 'America/Godthab', 'America/Goose_Bay', 'America/Grand_Turk', 'America/Grenada', 'America/Guadeloupe', 'America/Guatemala', 'America/Guayaquil', 'America/Guyana', 'America/Halifax', 'America/Havana', 'America/Hermosillo', 'America/Indiana/Indianapolis', 'America/Indiana/Knox', 'America/Indiana/Marengo', 'America/Indiana/Petersburg', 'America/Indiana/Tell_City', 'America/Indiana/Vevay', 'America/Indiana/Vincennes', 'America/Indiana/Winamac', 'America/Indianapolis', 'America/Inuvik', 'America/Iqaluit', 'America/Jamaica', 'America/Jujuy', 'America/Juneau', 'America/Kentucky/Louisville', 'America/Kentucky/Monticello', 'America/Knox_IN', 'America/Kralendijk', 'America/La_Paz', 'America/Lima', 'America/Los_Angeles', 'America/Louisville', 'America/Lower_Princes', 'America/Maceio', 'America/Managua', 'America/Manaus', 'America/Marigot', 'America/Martinique', 'America/Matamoros', 'America/Mazatlan', 'America/Mendoza', 'America/Menominee', 'America/Merida', 'America/Metlakatla', 'America/Mexico_City', 'America/Miquelon', 'America/Moncton', 'America/Monterrey', 'America/Montevideo', 'America/Montreal', 'America/Montserrat', 'America/Nassau', 'America/New_York', 'America/Nipigon', 'America/Nome', 'America/Noronha', 'America/North_Dakota/Beulah', 'America/North_Dakota/Center', 'America/North_Dakota/New_Salem', 'America/Nuuk', 'America/Ojinaga', 'America/Panama', 'America/Pangnirtung', 'America/Paramaribo', 'America/Phoenix', 'America/Port-au-Prince', 'America/Port_of_Spain', 'America/Porto_Acre', 'America/Porto_Velho', 'America/Puerto_Rico', 'America/Punta_Arenas', 'America/Rainy_River', 'America/Rankin_Inlet', 'America/Recife', 'America/Regina', 'America/Resolute', 'America/Rio_Branco', 'America/Rosario', 'America/Santa_Isabel', 'America/Santarem', 'America/Santiago', 'America/Santo_Domingo', 'America/Sao_Paulo', 'America/Scoresbysund', 'America/Shiprock', 'America/Sitka', 'America/St_Barthelemy', 'America/St_Johns', 'America/St_Kitts', 'America/St_Lucia', 'America/St_Thomas', 'America/St_Vincent', 'America/Swift_Current', 'America/Tegucigalpa', 'America/Thule', 'America/Thunder_Bay', 'America/Tijuana', 'America/Toronto', 'America/Tortola', 'America/Vancouver', 'America/Virgin', 'America/Whitehorse', 'America/Winnipeg', 'America/Yakutat', 'America/Yellowknife', 'Antarctica/Casey', 'Antarctica/Davis', 'Antarctica/DumontDUrville', 'Antarctica/Macquarie', 'Antarctica/Mawson', 'Antarctica/McMurdo', 'Antarctica/Palmer', 'Antarctica/Rothera', 'Antarctica/South_Pole', 'Antarctica/Syowa', 'Antarctica/Troll', 'Antarctica/Vostok', 'Arctic/Longyearbyen', 'Asia/Aden', 'Asia/Almaty', 'Asia/Amman', 'Asia/Anadyr', 'Asia/Aqtau', 'Asia/Aqtobe', 'Asia/Ashgabat', 'Asia/Ashkhabad', 'Asia/Atyrau', 'Asia/Baghdad', 'Asia/Bahrain', 'Asia/Baku', 'Asia/Bangkok', 'Asia/Barnaul', 'Asia/Beirut', 'Asia/Bishkek', 'Asia/Brunei', 'Asia/Calcutta', 'Asia/Chita', 'Asia/Choibalsan', 'Asia/Chongqing', 'Asia/Chungking', 'Asia/Colombo', 'Asia/Dacca', 'Asia/Damascus', 'Asia/Dhaka', 'Asia/Dili', 'Asia/Dubai', 'Asia/Dushanbe', 'Asia/Famagusta', 'Asia/Gaza', 'Asia/Harbin', 'Asia/Hebron', 'Asia/Ho_Chi_Minh', 'Asia/Hong_Kong', 'Asia/Hovd', 'Asia/Irkutsk', 'Asia/Istanbul', 'Asia/Jakarta', 'Asia/Jayapura', 'Asia/Jerusalem', 'Asia/Kabul', 'Asia/Kamchatka', 'Asia/Karachi', 'Asia/Kashgar', 'Asia/Kathmandu', 'Asia/Katmandu', 'Asia/Khandyga', 'Asia/Kolkata', 'Asia/Krasnoyarsk', 'Asia/Kuala_Lumpur', 'Asia/Kuching', 'Asia/Kuwait', 'Asia/Macao', 'Asia/Macau', 'Asia/Magadan', 'Asia/Makassar', 'Asia/Manila', 'Asia/Muscat', 'Asia/Nicosia', 'Asia/Novokuznetsk', 'Asia/Novosibirsk', 'Asia/Omsk', 'Asia/Oral', 'Asia/Phnom_Penh', 'Asia/Pontianak', 'Asia/Pyongyang', 'Asia/Qatar', 'Asia/Qostanay', 'Asia/Qyzylorda', 'Asia/Rangoon', 'Asia/Riyadh', 'Asia/Saigon', 'Asia/Sakhalin', 'Asia/Samarkand', 'Asia/Seoul', 'Asia/Shanghai', 'Asia/Singapore', 'Asia/Srednekolymsk', 'Asia/Taipei', 'Asia/Tashkent', 'Asia/Tbilisi', 'Asia/Tehran', 'Asia/Tel_Aviv', 'Asia/Thimbu', 'Asia/Thimphu', 'Asia/Tokyo', 'Asia/Tomsk', 'Asia/Ujung_Pandang', 'Asia/Ulaanbaatar', 'Asia/Ulan_Bator', 'Asia/Urumqi', 'Asia/Ust-Nera', 'Asia/Vientiane', 'Asia/Vladivostok', 'Asia/Yakutsk', 'Asia/Yangon', 'Asia/Yekaterinburg', 'Asia/Yerevan', 'Atlantic/Azores', 'Atlantic/Bermuda', 'Atlantic/Canary', 'Atlantic/Cape_Verde', 'Atlantic/Faeroe', 'Atlantic/Faroe', 'Atlantic/Jan_Mayen', 'Atlantic/Madeira', 'Atlantic/Reykjavik', 'Atlantic/South_Georgia', 'Atlantic/St_Helena', 'Atlantic/Stanley', 'Australia/ACT', 'Australia/Adelaide', 'Australia/Brisbane', 'Australia/Broken_Hill', 'Australia/Canberra', 'Australia/Currie', 'Australia/Darwin', 'Australia/Eucla', 'Australia/Hobart', 'Australia/LHI', 'Australia/Lindeman', 'Australia/Lord_Howe', 'Australia/Melbourne', 'Australia/NSW', 'Australia/North', 'Australia/Perth', 'Australia/Queensland', 'Australia/South', 'Australia/Sydney', 'Australia/Tasmania', 'Australia/Victoria', 'Australia/West', 'Australia/Yancowinna', 'Brazil/Acre', 'Brazil/DeNoronha', 'Brazil/East', 'Brazil/West', 'CET', 'CST6CDT', 'Canada/Atlantic', 'Canada/Central', 'Canada/Eastern', 'Canada/Mountain', 'Canada/Newfoundland', 'Canada/Pacific', 'Canada/Saskatchewan', 'Canada/Yukon', 'Chile/Continental', 'Chile/EasterIsland', 'Cuba', 'EET', 'EST5EDT', 'Egypt', 'Eire', 'Etc/GMT', 'Etc/GMT+0', 'Etc/GMT+1', 'Etc/GMT+10', 'Etc/GMT+11', 'Etc/GMT+12', 'Etc/GMT+2', 'Etc/GMT+3', 'Etc/GMT+4', 'Etc/GMT+5', 'Etc/GMT+6', 'Etc/GMT+7', 'Etc/GMT+8', 'Etc/GMT+9', 'Etc/GMT-0', 'Etc/GMT-1', 'Etc/GMT-10', 'Etc/GMT-11', 'Etc/GMT-12', 'Etc/GMT-13', 'Etc/GMT-14', 'Etc/GMT-2', 'Etc/GMT-3', 'Etc/GMT-4', 'Etc/GMT-5', 'Etc/GMT-6', 'Etc/GMT-7', 'Etc/GMT-8', 'Etc/GMT-9', 'Etc/GMT0', 'Etc/Greenwich', 'Etc/UCT', 'Etc/UTC', 'Etc/Universal', 'Etc/Zulu', 'Europe/Amsterdam', 'Europe/Andorra', 'Europe/Astrakhan', 'Europe/Athens', 'Europe/Belfast', 'Europe/Belgrade', 'Europe/Berlin', 'Europe/Bratislava', 'Europe/Brussels', 'Europe/Bucharest', 'Europe/Budapest', 'Europe/Busingen', 'Europe/Chisinau', 'Europe/Copenhagen', 'Europe/Dublin', 'Europe/Gibraltar', 'Europe/Guernsey', 'Europe/Helsinki', 'Europe/Isle_of_Man', 'Europe/Istanbul', 'Europe/Jersey', 'Europe/Kaliningrad', 'Europe/Kiev', 'Europe/Kirov', 'Europe/Lisbon', 'Europe/Ljubljana', 'Europe/London', 'Europe/Luxembourg', 'Europe/Madrid', 'Europe/Malta', 'Europe/Mariehamn', 'Europe/Minsk', 'Europe/Monaco', 'Europe/Moscow', 'Europe/Nicosia', 'Europe/Oslo', 'Europe/Paris', 'Europe/Podgorica', 'Europe/Prague', 'Europe/Riga', 'Europe/Rome', 'Europe/Samara', 'Europe/San_Marino', 'Europe/Sarajevo', 'Europe/Saratov', 'Europe/Simferopol', 'Europe/Skopje', 'Europe/Sofia', 'Europe/Stockholm', 'Europe/Tallinn', 'Europe/Tirane', 'Europe/Tiraspol', 'Europe/Ulyanovsk', 'Europe/Uzhgorod', 'Europe/Vaduz', 'Europe/Vatican', 'Europe/Vienna', 'Europe/Vilnius', 'Europe/Volgograd', 'Europe/Warsaw', 'Europe/Zagreb', 'Europe/Zaporozhye', 'Europe/Zurich', 'GB', 'GB-Eire', 'GMT', 'GMT0', 'Greenwich', 'Hongkong', 'Iceland', 'Indian/Antananarivo', 'Indian/Chagos', 'Indian/Christmas', 'Indian/Cocos', 'Indian/Comoro', 'Indian/Kerguelen', 'Indian/Mahe', 'Indian/Maldives', 'Indian/Mauritius', 'Indian/Mayotte', 'Indian/Reunion', 'Iran', 'Israel', 'Jamaica', 'Japan', 'Kwajalein', 'Libya', 'MET', 'MST7MDT', 'Mexico/BajaNorte', 'Mexico/BajaSur', 'Mexico/General', 'NZ', 'NZ-CHAT', 'Navajo', 'PRC', 'PST8PDT', 'Pacific/Apia', 'Pacific/Auckland', 'Pacific/Bougainville', 'Pacific/Chatham', 'Pacific/Chuuk', 'Pacific/Easter', 'Pacific/Efate', 'Pacific/Enderbury', 'Pacific/Fakaofo', 'Pacific/Fiji', 'Pacific/Funafuti', 'Pacific/Galapagos', 'Pacific/Gambier', 'Pacific/Guadalcanal', 'Pacific/Guam', 'Pacific/Honolulu', 'Pacific/Johnston', 'Pacific/Kiritimati', 'Pacific/Kosrae', 'Pacific/Kwajalein', 'Pacific/Majuro', 'Pacific/Marquesas', 'Pacific/Midway', 'Pacific/Nauru', 'Pacific/Niue', 'Pacific/Norfolk', 'Pacific/Noumea', 'Pacific/Pago_Pago', 'Pacific/Palau', 'Pacific/Pitcairn', 'Pacific/Pohnpei', 'Pacific/Ponape', 'Pacific/Port_Moresby', 'Pacific/Rarotonga', 'Pacific/Saipan', 'Pacific/Samoa', 'Pacific/Tahiti', 'Pacific/Tarawa', 'Pacific/Tongatapu', 'Pacific/Truk', 'Pacific/Wake', 'Pacific/Wallis', 'Pacific/Yap', 'Poland', 'Portugal', 'ROK', 'Singapore', 'Turkey', 'UCT', 'US/Alaska', 'US/Aleutian', 'US/Arizona', 'US/Central', 'US/East-Indiana', 'US/Eastern', 'US/Hawaii', 'US/Indiana-Starke', 'US/Michigan', 'US/Mountain', 'US/Pacific', 'US/Samoa', 'UTC', 'Universal', 'W-SU', 'WET', 'Zulu', 'EST', 'HST', 'MST'
 
     .PARAMETER Tags
-    Optional string array containing the id's of the tags to assign to the new Calendar. Do not pass [ANOWTag] objects here.
+    Optional string array containing the CASE-SENSITIVE id's of the tags to assign to the new Calendar. Do not pass [ANOWTag] objects here.
 
     .PARAMETER Folder
     Optional name of the folder to place the Calendar into.
@@ -5666,6 +5679,11 @@ Function New-AutomateNOWCalendar {
             }
             If ($tag_object.simpleId.length -eq 0) {
                 Throw "New-AutomateNOWCalendar has detected that the tag [$tag_id] does not appear to exist. Please check again."
+                Break
+            }
+            ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
+                [string]$tag_object_simpleId = $tag_object.simpleId
+                Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                 Break
             }
             [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -5919,7 +5937,7 @@ Function Copy-AutomateNOWCalendar {
     Optional switch that will ensure that the newly created Calendar will not have any Tags set.
 
     .PARAMETER Tags
-    Optional strings to set a different set of Tags on the new Calendar object. If you do not set this, the new Calendar object will appy the same Tags of the source object.
+    Optional string array of CASE-SENSITIVE Tag Id's to set on the new Calendar object. If you do not set this, the new Calendar object will apply the same Tags of the source object.
 
     .INPUTS
     ONLY [ANOWCalendar] object is accepted. Pipeline support is intentionally unavailable.
@@ -6231,6 +6249,710 @@ Function Get-AutomateNOWCodeRepository {
     }
 }
 
+Function Set-AutomateNOWCodeRepository {
+    <#
+    .SYNOPSIS
+    Modifies a local Code Repository in an AutomateNOW! instance
+
+    .DESCRIPTION
+    Modifies a local Code Repository in an AutomateNOW! instance
+
+    .PARAMETER CodeRepository
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWFolder to retrieve them)
+
+    .PARAMETER sshKeyLocationType
+    Mandatory string representing the type of SSH Key Location of the remote Git repository. Possible choices are: SSH_KEY_FILE_PATH, INLINE
+
+    .PARAMETER authenticationMethod
+    Mandatory string representing the authentication method of the remote Git repository. Possible choices are: SSH, PASSWORD
+
+    .PARAMETER repositoryURL
+    Mandatory string representing the URL of the remote Git repository
+
+    .PARAMETER sshKey
+    Mandatory (if authenticationMethod is SSH) string representing the path to an authorized SSH Key stored in the ANOW host server
+
+    .PARAMETER sshKeyPassPhrase
+    Optional (if authenticationMethod is SSH) securestring representing the pass phrase of the provided SSH key
+
+    .PARAMETER User
+    Mandatory (if authenticationMethod is Username/Password) string representing the name of the git user account with access to the remote code repository (the maximum length of this string is unknown)
+
+    .PARAMETER Password
+    Mandatory (if authenticationMethod is Username/Password) securestring representing the password of the git user account with access to the remote code repository
+
+    .PARAMETER localFolder
+    Mandatory string representing where ANOW will store its local copy of the Git repository in the host server
+
+    .PARAMETER codeRepositoryRoot
+    Optional string representing the sub-folder of the Git repository to which the ANOW JSON files will be stored
+
+    .PARAMETER UnsetDescription
+    Optional switch that will remove the Description from the Code Repository object.
+
+    .PARAMETER Description
+    Optional string to set on the Code Repository object.
+
+    .PARAMETER UnsetFolder
+    Optional switch that will remove the current Folder assignment from the Code Repository object.
+
+    .PARAMETER Folder
+    Optional string to set a different folder on the Code Repository object.
+
+    .PARAMETER UnsetTags
+    Optional switch that will remove the Tags from the Code Repository object.
+
+    .PARAMETER Tags
+    Optional string array of CASE-SENSITIVE Tag Id's to set on the Code Repository object.
+
+    .PARAMETER Quiet
+    Optional switch to suppress the display of the results
+
+    .PARAMETER Force
+    Force the modification of the object without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    The name of the Code Repository
+
+    .OUTPUTS
+    The modified Code Repository object will be returned.
+
+    .EXAMPLE
+    Sets multiple tags on a local Code Repository named 'CodeRepository1'
+
+    $repository = Get-AutomateNOWCodeRepository -Id 'CodeRepository1'
+    Set-AutomateNOWCodeRepository -CodeRepository $repository -Tags 'Tag1', 'Tag2'
+
+    .EXAMPLE
+    Forcibly sets the local folder on a local Code Repository named 'CodeRepository1'
+
+    $repository = Get-AutomateNOWCodeRepository -Id 'CodeRepository1'
+    Set-AutomateNOWCodeRepository -CodeRepository $repository -localfolder '/appl/archive/Anow/Prod/Git-repos/Prod/CodeRepository1' -Force
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    This function is not fully tested.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true, ParameterSetName = 'Default', ValueFromPipeline = $true)]
+        [Parameter(Mandatory = $true, ParameterSetName = 'SSH', ValueFromPipeline = $true)]
+        [Parameter(Mandatory = $true, ParameterSetName = 'Password', ValueFromPipeline = $true)]
+        [ANOWCodeRepository]$CodeRepository,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'SSH')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Password')]
+        [string]$repositoryURL,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'SSH')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Password')]
+        [ANOWCodeRepository_authenticationMethod]$authenticationMethod,
+        [Parameter(Mandatory = $true, ParameterSetName = 'SSH')]
+        [ANOWCodeRepository_sshKeyLocationType]$sshKeyLocationType,
+        [Parameter(Mandatory = $true, ParameterSetName = 'SSH')]
+        [string]$sshKeyPath,
+        [Parameter(Mandatory = $false, ParameterSetName = 'SSH')]
+        [SecureString]$sshKeyPassPhrase,
+        [Parameter(Mandatory = $true, ParameterSetName = 'Password')]
+        [string]$User,
+        [Parameter(Mandatory = $true, ParameterSetName = 'Password')]
+        [SecureString]$Password,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Password')]
+        [switch]$skipSslVerification,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'SSH')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Password')]
+        [string]$localFolder,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'SSH')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Password')]
+        [string]$codeRepositoryRoot,
+        [ValidateScript({ $_.Length -le 255 })]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'SSH')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Password')]
+        [string]$Description,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'SSH')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Password')]
+        [switch]$UnsetDescription,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'SSH')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Password')]
+        [string]$Folder,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'SSH')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Password')]
+        [switch]$UnsetFolder,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'SSH')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Password')]
+        [string[]]$Tags,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'SSH')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Password')]
+        [switch]$UnsetTags,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'SSH')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Password')]
+        [switch]$Force,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'SSH')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Password')]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        If ($Description.Length -gt 0 -and $UnsetDescription -eq $true) {
+            Write-Warning -Message 'You cannot set the Description and unset it at the same time. Please choose one or the other.'
+            Break
+        }
+        If ($UnsetFolder -eq $true -and $Folder.Length -gt 0) {
+            Write-Warning -Message "You cannot set the Folder and unset it at the same time. Please choose one or the other."
+            Break
+        }
+        If ($Tags.count -gt 0 -and $UnsetTags -eq $true) {
+            Write-Warning -Message "You cannot set the tags and unset them at the same time. Please choose one or the other."
+            Break
+        }
+        If ($User.Length -gt 0 -and $Password.Length -eq 0) {
+            Write-Warning -Message "You must include a password if you are specifying a git user account"
+            Break
+        }
+        If ($User.Length -eq 0 -and $Password.Length -gt 0) {
+            Write-Warning -Message "You must include a git user account if you are specifying a git user password"
+            Break
+        }
+        If ( $sshKeyLocationType.Length -gt 0 -and $sshKeyPath.Length -eq 0) {
+            Write-Warning -Message "You must include the path the SSH Key if you are specifying the SSH Key Location Type"
+            Break
+        }
+        If ( $sshKeyLocationType.Length -eq 0 -and $sshKeyPath.Length -gt 0) {
+            Write-Warning -Message "You must include the path the SSH Key Location Type if you are specifying the SSH Key"
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+        If ($User.Length -gt 0) {
+            $Error.Clear()
+            Try {
+                [string]$password = $Pass | ConvertFrom-SecureString -AsPlainText
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "ConvertFrom-SecureString failed to convert the secure password under New-AutomateNOWCodeRepository due to [$Message]."
+                Break
+            }
+            $Error.Clear()
+            Try {
+                [string]$encrypted_password = ('ENCRYPTED::' + (Protect-AutomateNOWEncryptedString -Pass $password))
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Protect-AutomateNOWEncryptedString failed to encrypt the plain text password under New-AutomateNOWCodeRepository due to [$Message]."
+                Break
+            }
+        }
+    }
+    Process {
+        If ($_.Id.Length -gt 0) {
+            [ANOWCodeRepository]$CodeRepository = $_
+        }
+        [string]$CodeRepository_Id = $CodeRepository.Id
+        ## Do not tamper with this code. It ensures that we are not trying to add a branch that already exists
+        $Error.Clear()
+        Try {
+            [ANOWCodeRepository]$existing_repository = Get-AutomateNOWCodeRepository -Id $CodeRepository_Id
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWCodeRepository failed to check if Code Repository [$CodeRepository_Id] existed under Set-AutomateNOWCodeRepository due to [$Message]."
+            Break
+        }
+        If ($CodeRepository_Id -eq $existing_repository.Id -and $CodeRepository_Id -cne $existing_repository.Id) {
+            [string]$existing_repository_Id = $existing_repository.Id
+            Write-Warning -Message "Objects in ANOW are case-sensitive! You specified $CodeRepository_Id but the actual case correct name of the Code Repository is $existing_repository_Id. Please check and try again."
+            Break
+        }
+        ##
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Proceed to modify the Code Repository $($CodeRepository_Id)?")) -eq $true) {
+            [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
+            $Body.'id' = $CodeRepository_Id
+            If ($Description.Length -gt 0) {
+                $Body.'description' = $Description
+            }
+            ElseIf ($UnsetDescription -eq $true) {
+                $Body.'description' = $null
+            }
+            If ($Folder.Length -gt 0) {
+                $Error.Clear()
+                Try {
+                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Get-AutomateNOWFolder failed to confirm that the Folder [$Folder] actually existed while running under Set-AutomateNOWCodeRepository due to [$Message]"
+                    Break
+                }
+                If ($folder_object.simpleId.Length -eq 0) {
+                    Throw "Get-AutomateNOWFolder failed to locate the Folder [$Folder] running under Set-AutomateNOWCodeRepository. Please check again."
+                    Break
+                }
+                [string]$folder_display = $folder_object | ConvertTo-Json -Compress
+                Write-Verbose -Message "Adding Folder $folder_display to [ANOWCodeRepository] [$CodeRepository_id]"
+                $Body.'folder' = $Folder
+            }
+            ElseIf ($UnsetFolder -eq $true) {
+                [string]$folder_display = $folder_object | ConvertTo-Json -Compress
+                Write-Verbose -Message "Removing [ANOWCodeRepository] [$CodeRepository_id] from Folder $folder_display"
+                $Body.'folder' = $null
+            }
+            If ($Tags.Count -gt 0) {
+                [int32]$total_tags = $Tags.Count
+                [int32]$current_tag = 1
+                ForEach ($tag_id in $Tags) {
+                    $Error.Clear()
+                    Try {
+                        [ANOWTag]$tag_object = Get-AutomateNOWTag -Id $tag_id
+                    }
+                    Catch {
+                        [string]$Message = $_.Exception.Message
+                        Write-Warning -Message "Get-AutomateNOWTag had an error while retrieving the tag [$tag_id] running under Set-AutomateNOWCodeRepository due to [$message]"
+                        Break
+                    }
+                    If ($tag_object.simpleId.length -eq 0) {
+                        Throw "New-AutomateNOWCodeRepository has detected that the tag [$tag_id] does not appear to exist. Please check again."
+                        Break
+                    }
+                    ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
+                        [string]$tag_object_simpleId = $tag_object.simpleId
+                        Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
+                        Break
+                    }
+                    [string]$tag_display = $tag_object | ConvertTo-Json -Compress
+                    Write-Verbose -Message "Adding tag $tag_display [$current_tag of $total_tags]"
+                    [string]$tag_name_sequence = ('tags' + $current_tag)
+                    $Body.Add($tag_name_sequence, $tag_id)
+                    $current_tag++
+                }
+            }
+            ElseIf ($UnsetTags -eq $true) {
+                [string]$tags_display = ($Calendar.tags) | ConvertTo-Json -Compress
+                Write-Verbose -Message "Removing tags [$tags_display] from [$CodeRepository_id]"
+                $Body.'tags' = $null
+            }
+            #
+            If ($authenticationMethod.Length -gt 0) {
+                $Body.'authenticationMethod' = $authenticationMethod
+            }
+            If ($repositoryURL.Length -gt 0) {
+                $Body.'repositoryURL' = $repositoryURL
+            }
+            If ($localFolder.Length -gt 0) {
+                $Body.'localFolder' = $localFolder
+            }
+            If ($codeRepositoryRoot.Length -gt 0) {
+                $Body.'codeRepositoryRoot' = $codeRepositoryRoot
+            }
+            If ($User.Length -gt 0) {
+                $Body.'user' = $User
+                $Body.'password' = $encrypted_password
+                If ($skipSslVerification -eq $true) {
+                    $Body.'skipSslVerification' = 'true'
+                }
+            }
+            If ( $sshKeyLocationType.Length -gt 0) {
+                $Body.'sshKeyLocationType' = $sshKeyLocationType
+                $Body.'sshKey' = $sshKey
+            }
+            $Body.'_operationType' = 'update'
+            $Body.'_textMatchStyle' = 'exact'
+            [string]$old_values = $CodeRepository.CreateOldValues()
+            $Body.'_oldValues' = $old_values
+            $Body.'_componentId' = 'CodeRepositorySettingsForm'
+            $Body.'_dataSource' = 'CodeRepositoryDataSource'
+            $Body.'isc_metaDataPrefix' = '_'
+            $Body.'isc_dataFormat' = 'json'
+            [string]$Body = ConvertTo-QueryString -InputObject $Body
+            If ($null -eq $parameters["Body"]) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            If ($null -eq $parameters["Command"]) {
+                [string]$command = ('/codeRepository/update')
+                $parameters.Add('Command', $command)
+            }
+            Else {
+                $parameters.Command = $command
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
+                Break
+            }
+            If ($results.response.status -ne 0) {
+                If ($null -eq $results.response.status) {
+                    Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
+                    Break
+                }
+                Else {
+                    [int32]$status_code = $results.response.status
+                    [string]$results_response = $results.response
+                    Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
+                    Break
+                }
+            }
+            $Error.Clear()
+            Try {
+                [ANOWCodeRepository]$CodeRepository = $results.response.data | Select-Object -First 1
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Failed to parse the result into an [ANOWCodeRepository] object due to [$Message]."
+                Break
+            }
+            If ($Quiet -ne $True) {
+                Return $CodeRepository
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+Function New-AutomateNOWCodeRepository {
+    <#
+    .SYNOPSIS
+    Creates a local Code Repository in an AutomateNOW! instance
+
+    .DESCRIPTION
+    Creates a local Code Repository in an AutomateNOW! instance
+
+    .PARAMETER Id
+    Mandatory string representing the name of the Code Repository. The name of the Code Repository may consist only of alphanumeric characters and 3 special characters (._-) and not to exceed 1024 characters in length.
+
+    .PARAMETER sshKeyLocationType
+    Mandatory string representing the type of SSH Key Location of the remote Git repository. Possible choices are: SSH_KEY_FILE_PATH, INLINE
+
+    .PARAMETER authenticationMethod
+    Mandatory string representing the authentication method of the remote Git repository. Possible choices are: SSH, PASSWORD
+
+    .PARAMETER repositoryURL
+    Mandatory string representing the URL of the remote Git repository
+
+    .PARAMETER sshKey
+    Mandatory (if authenticationMethod is SSH) string representing the path to an authorized SSH Key stored in the ANOW host server
+
+    .PARAMETER sshKeyPassPhrase
+    Optional (if authenticationMethod is SSH) securestring representing the pass phrase of the provided SSH key
+
+    .PARAMETER User
+    Mandatory (if authenticationMethod is Username/Password) string representing the name of the git user account with access to the remote code repository (the maximum length of this string is unknown)
+
+    .PARAMETER Password
+    Mandatory (if authenticationMethod is Username/Password) securestring representing the password of the git user account with access to the remote code repository
+
+    .PARAMETER localFolder
+    Mandatory string representing where ANOW will store its local copy of the Git repository in the host server
+
+    .PARAMETER codeRepositoryRoot
+    Optional string representing the sub-folder of the Git repository to which the ANOW JSON files will be stored
+
+    .PARAMETER Description
+    Optional description of the Code Repository (may not exceed 255 characters). Note that the ANOW console does not currently show this.
+
+    .PARAMETER Tags
+    Optional string array containing the CASE-SENSITIVE id's of the tags to assign to the new Code Repository. Do not pass [ANOWTag] objects here.
+
+    .PARAMETER Folder
+    Optional name of the folder to place the Code Repository into.
+
+    .PARAMETER Quiet
+    Optional switch to suppress the display of the results
+
+    .PARAMETER Force
+    Force the creation of the object without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+
+
+    .OUTPUTS
+    The newly created Code Repository object will be returned.
+
+    .EXAMPLE
+    Creates a new SSH-based local Code Repository named 'CodeRepository1' with a secure Passphrase
+
+    $sshPassPhrase = Read-Host -Prompt 'Please enter the password' -AsSecureString
+    New-AutomateNOWCodeRepository -Id 'CodeRepository1' -repositoryURL 'git@git.contoso.com:projects/CodeRepository1' -authenticationMethod SSH -sshKeyLocationType SSH_KEY_FILE_PATH -sshKeyPath '/appl/anow/.ssh/my-git-account' -sshKeyPassPhrase $sshKeyPassPhrase -localfolder '/appl/archive/Anow/Prod/Git-repos/Prod/CodeRepository1' -codeRepositoryRoot '/'
+
+    .EXAMPLE
+    Creates a new user-based local Code Repository named 'CodeRepository1' with SSL verification disabled
+
+    $Password = Read-Host -Prompt 'Please enter the password' -AsSecureString
+    New-AutomateNOWCodeRepository -Id 'CodeRepository1' -repositoryURL 'git@git.contoso.com:projects/CodeRepository1' -authenticationMethod PASSWORD -skipSslVerification -User 'username1' -Password $Password -localfolder '/appl/archive/Anow/Prod/Git-repos/Prod/CodeRepository1' -codeRepositoryRoot '/'
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    This function is not fully tested.
+
+    Be prepared for a long wait if the wrong information is sent.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [ValidateScript({ $_ -match '[0-9a-zA-Z._-]{1,1024}' })]
+        [Parameter(Mandatory = $true)]
+        [string]$Id,
+        [Parameter(Mandatory = $true)]
+        [string]$repositoryURL,
+        [Parameter(Mandatory = $true)]
+        [ANOWCodeRepository_authenticationMethod]$authenticationMethod,
+        [Parameter(Mandatory = $true, ParameterSetName = 'SSH')]
+        [ANOWCodeRepository_sshKeyLocationType]$sshKeyLocationType,
+        [Parameter(Mandatory = $true, ParameterSetName = 'SSH')]
+        [string]$sshKeyPath,
+        [Parameter(Mandatory = $false, ParameterSetName = 'SSH')]
+        [SecureString]$sshKeyPassPhrase,
+        [Parameter(Mandatory = $true, ParameterSetName = 'Password')]
+        [string]$User,
+        [Parameter(Mandatory = $true, ParameterSetName = 'Password')]
+        [SecureString]$Password,
+        [Parameter(Mandatory = $true, ParameterSetName = 'Password')]
+        [switch]$skipSslVerification,
+        [Parameter(Mandatory = $true)]
+        [string]$localFolder,
+        [Parameter(Mandatory = $true)]
+        [string]$codeRepositoryRoot,
+        [Parameter(Mandatory = $false, HelpMessage = "Enter a descriptive string between 0 and 255 characters in length. UTF8 characters are accepted.")]
+        [string]$Description,
+        [Parameter(Mandatory = $false)]
+        [string[]]$Tags,
+        [Parameter(Mandatory = $false)]
+        [string]$Folder,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+        If ($User.Length -gt 0) {
+            $Error.Clear()
+            Try {
+                [string]$Pass = $Password | ConvertFrom-SecureString -AsPlainText
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "ConvertFrom-SecureString failed to convert the secure password under New-AutomateNOWCodeRepository due to [$Message]."
+                Break
+            }
+            $Error.Clear()
+            Try {
+                [string]$encrypted_password = ('ENCRYPTED::' + (Protect-AutomateNOWEncryptedString -Pass $Pass))
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Protect-AutomateNOWEncryptedString failed to encrypt the plain text password under New-AutomateNOWCodeRepository due to [$Message]."
+                Break
+            }
+        }
+        If ($sshKeyPassPhrase.Length -gt 0) {
+            $Error.Clear()
+            Try {
+                [string]$sshKeyPasswordPhrase = $sshKeyPassPhrase | ConvertFrom-SecureString -AsPlainText
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "ConvertFrom-SecureString failed to convert the secure SSH Key Passphrase under New-AutomateNOWCodeRepository due to [$Message]."
+                Break
+            }
+            $Error.Clear()
+            Try {
+                [string]$encrypted_sshKeyPassPhrase = ('ENCRYPTED::' + (Protect-AutomateNOWEncryptedString -Pass $sshKeyPasswordPhrase))
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Protect-AutomateNOWEncryptedString failed to encrypt the plain text SSH Key Passphrase under New-AutomateNOWCodeRepository due to [$Message]."
+                Break
+            }
+        }
+    }
+    Process {
+        ## Do not tamper with this code. It ensures that we are not trying to add a branch that already exists
+        $Error.Clear()
+        Try {
+            [ANOWCodeRepository]$existing_repository = Get-AutomateNOWCodeRepository -Id $Id
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWCodeRepository failed to check if Code Repository [$Id] existed under New-AutomateNOWCodeRepository due to [$Message]."
+            Break
+        }
+        If ($Id -eq $existing_repository.Id) {
+            Write-Warning -Message "There is already a Code Repository named [$Id]. No action is required."
+            Break
+        }
+        ##
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Proceed to create the Code Repository $($Id) ?")) -eq $true) {
+            [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
+            If ($Tags.Count -gt 0) {
+                [int32]$total_tags = $Tags.Count
+                [int32]$current_tag = 1
+                ForEach ($tag_id in $Tags) {
+                    $Error.Clear()
+                    Try {
+                        [ANOWTag]$tag_object = Get-AutomateNOWTag -Id $tag_id
+                    }
+                    Catch {
+                        [string]$Message = $_.Exception.Message
+                        Write-Warning -Message "Get-AutomateNOWTag had an error while retrieving the tag [$tag_id] running under New-AutomateNOWCodeRepository due to [$message]"
+                        Break
+                    }
+                    If ($tag_object.simpleId.length -eq 0) {
+                        Throw "New-AutomateNOWCodeRepository has detected that the tag [$tag_id] does not appear to exist. Please check again."
+                        Break
+                    }
+                    ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
+                        [string]$tag_object_simpleId = $tag_object.simpleId
+                        Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
+                        Break
+                    }
+                    [string]$tag_display = $tag_object | ConvertTo-Json -Compress
+                    Write-Verbose -Message "Adding tag $tag_display [$current_tag of $total_tags]"
+                    [string]$tag_name_sequence = ('tags' + $current_tag)
+                    $Body."$tag_name_sequence" = $tag_id
+                    $current_tag++
+                }
+            }
+            If ($Folder.Length -gt 0) {
+                $Error.Clear()
+                Try {
+                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Get-AutomateNOWFolder failed to confirm that the folder [$tag_id] existed under New-AutomateNOWCodeRepository due to [$Message]"
+                    Break
+                }
+                If ($folder_object.simpleId.Length -eq 0) {
+                    Throw "Get-AutomateNOWFolder failed to locate the Folder [$Folder] under New-AutomateNOWCodeRepository. Please check again."
+                    Break
+                }
+                [string]$folder_display = $folder_object | ConvertTo-Json -Compress
+                Write-Verbose -Message "Adding folder $folder_display to [ANOWCodeRepository] [$Id]"
+                $Body.'folder' = $Folder
+            }
+            If ($Description.Length -gt 0) {
+                $Body.'description' = $Description
+            }
+            $Body.'authenticationMethod' = $authenticationMethod
+            $Body.'id' = $Id
+            $Body.'repositoryURL' = $repositoryURL
+            $Body.'localFolder' = $localFolder
+            $Body.'codeRepositoryRoot' = $codeRepositoryRoot
+            If ($User.Length -gt 0) {
+                $Body.'user' = $User
+                $Body.'password' = $encrypted_password
+                If ($skipSslVerification -eq $true) {
+                    $Body.'skipSslVerification' = 'true'
+                }
+            }
+            Else {
+                $Body.'sshKeyLocationType' = $sshKeyLocationType
+                $Body.'sshKey' = $sshKey
+                If ($sshKeyPassPhrase.Length -gt 0) {
+                    $Body.'sshKeyPassphrase' = $encrypted_sshKeyPassPhrase
+                }
+            }
+            $Body.'_operationType' = 'add'
+            $Body.'_textMatchStyle' = 'exact'
+            $Body.'_oldValues' = '{"authenticationMethod":"PASSWORD","sshKeyLocationType":"SSH_KEY_FILE_PATH"}'
+            $Body.'_componentId' = 'CodeRepositoryCreateWindow_form'
+            $Body.'_dataSource' = 'CodeRepositoryDataSource'
+            $Body.'isc_metaDataPrefix' = '_'
+            $Body.'isc_dataFormat' = 'json'
+            [string]$Body = ConvertTo-QueryString -InputObject $Body
+            If ($null -eq $parameters["Body"]) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            If ($null -eq $parameters["Command"]) {
+                [string]$command = ('/codeRepository/create')
+                $parameters.Add('Command', $command)
+            }
+            Else {
+                $parameters.Command = $command
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
+                Break
+            }
+            If ($results.response.status -ne 0) {
+                If ($null -eq $results.response.status) {
+                    Write-Warning -Message "Received an empty response when invoking the [$command] CodeRepository. Please look into this."
+                    Break
+                }
+                Else {
+                    [int32]$status_code = $results.response.status
+                    [string]$results_response = $results.response
+                    Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
+                    Break
+                }
+            }
+            # Note this code is untested
+            $Error.Clear()
+            Try {
+                [ANOWCodeRepository]$CodeRepository = $results.response.data
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Failed to parse the result into an [ANOWCodeRepository] object due to [$Message]."
+                Break
+            }
+            If ($Quiet -ne $True) {
+                Return $CodeRepository
+            }
+            # Note the above code is untested
+        }
+    }
+    End {
+
+    }
+}
+
 Function Export-AutomateNOWCodeRepository {
     <#
     .SYNOPSIS
@@ -6302,6 +7024,3939 @@ Function Export-AutomateNOWCodeRepository {
             [string]$filelength_display = "{0:N0}" -f $filelength
             Write-Information -MessageData "Created file $ExportFileName ($filelength_display bytes)"
         }
+    }
+}
+
+Function Remove-AutomateNOWCodeRepository {
+
+    <#
+    .SYNOPSIS
+    Deletes a local Code Repository in an AutomateNOW! instance
+
+    .DESCRIPTION
+    Deletes a local Code Repository in an AutomateNOW! instance
+
+    .PARAMETER CodeRepository
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWFolder to retrieve them)
+
+    .PARAMETER Quiet
+    Optional switch to suppress the display of the results
+
+    .PARAMETER Force
+    Force the removal without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    You must present a [ANOWCodeRepository] object
+
+    .OUTPUTS
+    An informational message indicating the results. Use -Quiet to suppress this.
+
+    .EXAMPLE
+    Uses the pipeline to forcibly and quietly delete a code repository named 'CodeRepository1'.
+
+    Get-AutomateNOWCodeRepository -Id 'CodeRepository1' | Remove-AutomateNOWCodeRepository -Force -Quiet
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [ANOWCodeRepository]$CodeRepository,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0 ) {
+            [ANOWCodeRepository]$CodeRepository = $_
+        }
+        [string]$CodeRepository_Id = $CodeRepository.Id
+        ## Do not tamper with this code. It ensures that we are not trying to remove a local Code Repository that doesn't exist
+        $Error.Clear()
+        Try {
+            [ANOWCodeRepository]$existing_repository = Get-AutomateNOWCodeRepository -Id $CodeRepository_Id
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWCodeRepository failed to retrieve $CodeRepository_Id under Remove-AutomateNOWCodeRepository due to [$Message]."
+            Break
+        }
+        If ($CodeRepository_Id -cne $existing_repository.Id) {
+            Write-Warning -Message "There is not a Code repository named $CodeRepository_Id. Please check the spelling and case sensitivity."
+            Break
+        }
+        ##
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Proceed to delete the Code Repository `"$($CodeRepository_Id)`" ?")) -eq $true) {
+            [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
+            $Body.'id' = $CodeRepository_Id
+            $Body.'_operationType' = 'remove'
+            $Body.'_textMatchStyle' = 'exact'
+            [string]$old_values = $CodeRepository.CreateOldValues()
+            $Body.'_oldValues' = $old_values
+            $Body.'_componentId' = 'CodeRepositoryList'
+            $Body.'_dataSource' = 'CodeRepositoryDataSource'
+            $Body.'isc_metaDataPrefix' = '_'
+            $Body.'isc_dataFormat' = 'json'
+            [string]$Body = ConvertTo-QueryString -InputObject $Body
+            If ($null -eq $parameters["Body"]) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            [string]$command = ('/codeRepository/delete')
+            If ($null -eq $parameters["Command"]) {
+                $parameters.Add('Command', $command)
+            }
+            Else {
+                $parameters.Command = $command
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
+                Break
+            }
+            If ($results.response.status -ne 0) {
+                If ($null -eq $results.response.status) {
+                    Write-Warning -Message "Received an empty response when invoking the [$command] CodeRepository. Please look into this."
+                    Break
+                }
+                Else {
+                    [int32]$status_code = $results.response.status
+                    [string]$results_response = $results.response
+                    Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
+                    Break
+                }
+            }
+            If ($Quiet -ne $True) {
+                Write-Information -MessageData "The local Code Repository $CodeRepository_Id was deleted"
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+Function Confirm-AutomateNOWCodeRepository {
+    <#
+    .SYNOPSIS
+    Confirms that a remote Code Repository on an AutomateNOW! instance is available
+
+    .DESCRIPTION
+    Confirms that a remote Code Repository on an AutomateNOW! instance is available
+
+    .PARAMETER CodeRepository
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWFolder to retrieve them)
+
+    .INPUTS
+    ONLY [ANOWCodeRepository] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    A string with the results from the API will returned.
+
+    .EXAMPLE
+    Validates a single Code Repository
+
+    Get-AutomateNOWCodeRepository -Id 'CodeRepository01' | Confirm-AutomateNOWCodeRepository
+
+    .EXAMPLE
+    Validates a series of Code Repositorys
+
+    @( 'CodeRepository1', 'CodeRepository2', 'CodeRepository3') | Confirm-AutomateNOWCodeRepository
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [Cmdletbinding()]
+    Param(
+        [Parameter(Mandatory = $false, ValueFromPipeline = $True)]
+        [ANOWCodeRepository]$CodeRepository,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [string]$CodeRepository_id = $_.id
+        }
+        ElseIf ($CodeRepository.id.Length -gt 0) {
+            [string]$CodeRepository_id = $CodeRepository.id
+        }
+        Else {
+            [string]$CodeRepository_id = $Id
+        }
+        [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+        $BodyMetaData.Add('id', $CodeRepository_id )
+        $BodyMetaData.Add('_operationType', 'fetch')
+        $BodyMetaData.Add('_operationId', 'status')
+        $BodyMetaData.Add('_textMatchStyle', 'exact')
+        $BodyMetaData.Add('_dataSource', 'CodeRepositoryDataSource')
+        $BodyMetaData.Add('isc_metaDataPrefix', '_')
+        $BodyMetaData.Add('isc_dataFormat', 'json')
+        [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+        $parameters.Add('Body', $Body)
+        [string]$command = ('/codeRepository/status')
+        $parameters.Add('Command', $command)
+        $Error.Clear()
+        Try {
+            [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$CodeRepository_id] due to [$Message]."
+            Break
+        }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            If ($Quiet -eq $true) {
+                Return $false
+            }
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "The response code was [$response_code] instead of 0. The Code Repository $CodeRepository_id is not validated. Please see the full response $full_response_display"
+        }
+        Else {
+            If ($Quiet -eq $true) {
+                Return $true
+            }
+            Else {
+                Write-Information -MessageData "The Code Repository $CodeRepository_id is confirmed as available."
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+Function Sync-AutomateNOWCodeRepository {
+    <#
+    .SYNOPSIS
+    Synchronizes the changes between the local and remote objects within a Code Repository on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Synchronizes the changes between the local and remote objects within a Code Repository on an AutomateNOW! instance
+
+    .PARAMETER CodeRepository
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWFolder to retrieve them)
+
+    .PARAMETER Quiet
+    Optional switch to suppress the display of the results
+
+    .PARAMETER Force
+    Force the synchronization without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    ONLY [ANOWCodeRepository] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    A table produced from Format-Table will be returned with the same results as the console delivers in this case (including out of sync count)
+
+    .EXAMPLE
+    Synchronizes a single git repository using the pipeline
+
+    Get-AutomateNOWCodeRepository -Id 'CodeRepository1' | Sync-AutomateNOWCodeRepository
+
+    .EXAMPLE
+    Forcibly synchronizes a single repository
+
+    Sync-AutomateNOWCodeRepository -CodeRepository $repo -Force
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $false, ValueFromPipeline = $True)]
+        [ANOWCodeRepository]$CodeRepository,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [string]$CodeRepository_id = $_.id
+        }
+        Else {
+            [string]$CodeRepository_id = $CodeRepository.id
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($CodeRepository_id)")) -eq $true) {
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.Add('id', $CodeRepository_id )
+            $BodyMetaData.Add('_operationType', 'custom')
+            $BodyMetaData.Add('_operationId', 'synchronizeAll')
+            $BodyMetaData.Add('_textMatchStyle', 'exact')
+            $BodyMetaData.Add('_dataSource', 'CodeRepositoryDataSource')
+            $BodyMetaData.Add('isc_metaDataPrefix', '_')
+            $BodyMetaData.Add('isc_dataFormat', 'json')
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            $parameters.Add('Body', $Body)
+            [string]$command = ('/codeRepository/synchronizeAll')
+            $parameters.Add('Command', $command)
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$CodeRepository_id] due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                If ($Quiet -eq $true) {
+                    Return $false
+                }
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "The response code was [$response_code] instead of 0. The Code Repository $CodeRepository_id sync was not successful. Please see the full response $full_response_display"
+            }
+            Else {
+                If ($Quiet -ne $true) {
+                    $sync_table = $results.response.data
+                    $sync_table | Format-Table -Autosize -Wrap
+                    Write-Information -MessageData "The Code Repository $CodeRepository_id synchronized successfully."
+                }
+                Else {
+                    Write-Debug -MessageData "The Code Repository $CodeRepository_id synchronized successfully."
+                }
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+Function Receive-AutomateNOWCodeRepository {
+    <#
+    .SYNOPSIS
+    Pulls (downloads) changes from the remote repository.
+
+    .DESCRIPTION
+    Pulls (downloads) changes from the remote repository.
+
+    .PARAMETER CodeRepository
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
+
+    .PARAMETER Quiet
+    Optional switch to suppress the display of the results
+
+    .PARAMETER Force
+    Force the pull without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    ONLY [ANOWCodeRepository] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    An informational message will be displayed similar to the console (e.g. "@{message=Ok; status=OK; branch=refs/heads/development}"). Use the -Quiet parameter to suppress this.
+
+    .EXAMPLE
+    Forcibly pulls a single git repository using the pipeline
+
+    Get-AutomateNOWCodeRepository -Id 'CodeRepository1' | Receive-AutomateNOWCodeRepository -Force
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    This function is the equivalent to the 'Push' button in the UI.
+
+    Use Receive-AutomateNOWCodeRepository if you need to perform a Pull operation from the remote repository to the local one.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $false, ValueFromPipeline = $True)]
+        [ANOWCodeRepository]$CodeRepository,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [string]$CodeRepository_id = $_.id
+        }
+        ElseIf ($CodeRepository.id.Length -gt 0) {
+            [string]$CodeRepository_id = $CodeRepository.id
+        }
+        Else {
+            [string]$CodeRepository_id = $Id
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($CodeRepository_id)")) -eq $true) {
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.Add('id', $CodeRepository_id )
+            $BodyMetaData.Add('_operationType', 'custom')
+            $BodyMetaData.Add('_operationId', 'pull')
+            $BodyMetaData.Add('_textMatchStyle', 'exact')
+            $BodyMetaData.Add('_dataSource', 'CodeRepositoryDataSource')
+            $BodyMetaData.Add('isc_metaDataPrefix', '_')
+            $BodyMetaData.Add('isc_dataFormat', 'json')
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            $parameters.Add('Body', $Body)
+            [string]$command = ('/codeRepository/pull')
+            $parameters.Add('Command', $command)
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on $CodeRepository_id due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                If ($Quiet -eq $true) {
+                    Return $false
+                }
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "The response code was [$response_code] instead of 0. The Code Repository $CodeRepository_id pull (download) was not successful. Please see the full response $full_response_display"
+            }
+            Else {
+                If ($Quiet -ne $true) {
+                    [string]$results_string = $results.response.data
+                    If ($results_string.Length -eq 0) {
+                        Write-Warning -Message "Somehow there was no response data from executing [$command] on $CodeRepository_id even though the response code indicated success."
+                        Break
+                    }
+                    Write-Information -Message "The Code Repository $CodeRepository_id replied to this pull request with: $results_string."
+                }
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+Function Send-AutomateNOWCodeRepository {
+    <#
+    .SYNOPSIS
+    Pushes (uploads) changes to the remote repository.
+
+    .DESCRIPTION
+    Pushes (uploads) changes to the remote repository.
+
+    .PARAMETER CodeRepository
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
+
+    .PARAMETER Quiet
+    Optional switch to suppress the display of the results
+
+    .PARAMETER Force
+    Force the push without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    ONLY [ANOWCodeRepository] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    #An informational message will be displayed similar to the console (e.g. "Committed [1] objects"). Use the -Quiet parameter to skip this.
+
+    .EXAMPLE
+    Forcibly pushes a single git repository using the pipeline
+
+    Get-AutomateNOWCodeRepository -Id 'CodeRepository1' | Send-AutomateNOWCodeRepository -Force
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    This function is the equivalent to the 'Push' button in the UI.
+
+    Use Receive-AutomateNOWCodeRepository if you need to perform a Pull operation from the remote repository to the local one.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $false, ValueFromPipeline = $True)]
+        [ANOWCodeRepository]$CodeRepository,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [string]$CodeRepository_id = $_.id
+        }
+        ElseIf ($CodeRepository.id.Length -gt 0) {
+            [string]$CodeRepository_id = $CodeRepository.id
+        }
+        Else {
+            [string]$CodeRepository_id = $Id
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($CodeRepository_id)")) -eq $true) {
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.Add('id', $CodeRepository_id )
+            $BodyMetaData.Add('_operationType', 'custom')
+            $BodyMetaData.Add('_operationId', 'push')
+            $BodyMetaData.Add('_textMatchStyle', 'exact')
+            $BodyMetaData.Add('_dataSource', 'CodeRepositoryDataSource')
+            $BodyMetaData.Add('isc_metaDataPrefix', '_')
+            $BodyMetaData.Add('isc_dataFormat', 'json')
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            $parameters.Add('Body', $Body)
+            [string]$command = ('/codeRepository/push')
+            $parameters.Add('Command', $command)
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$CodeRepository_id] due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                If ($Quiet -eq $true) {
+                    Return $false
+                }
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "The response code was [$response_code] instead of 0. The Code Repository $CodeRepository_id push (upload) was not successful. Please see the full response $full_response_display"
+            }
+            Else {
+                If ($Quiet -ne $true) {
+                    [string]$results_string = $results.response.data
+                    If ($results_string.Length -eq 0) {
+                        Write-Warning -Message "Somehow there was no response data from executing [$command] on $CodeRepository_id even though the response code indicated success."
+                        Break
+                    }
+                    Write-Information -Message "The Code Repository $CodeRepository_id replied to this pull request with: $results_string."
+                }
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+Function Publish-AutomateNOWCodeRepository {
+    <#
+    .SYNOPSIS
+    Commits the changes made in the application version to the local git repository for all objects included in the code repository from an instance of AutomateNOW!
+
+    .DESCRIPTION
+    Commits the changes made in the application version to the local git repository for all objects included in the code repository from an instance of AutomateNOW!
+
+    .PARAMETER CodeRepository
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWFolder to retrieve them)
+
+    .PARAMETER Quiet
+    Optional switch to suppress the display of the results
+
+    .PARAMETER Force
+    Force the commit without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    ONLY [ANOWCodeRepository] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    An informational message will be displayed similar to the console (e.g. "Committed [1] objects"). Use the -Quiet parameter to skip this.
+
+    .EXAMPLE
+    Commits a single git repository using the pipeline
+
+    Get-AutomateNOWCodeRepository -Id 'CodeRepository1' -Branch 'master' | Publish-AutomateNOWCodeRepository
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    This function is the equivalent to the 'Commit All' button in the UI.
+
+    Use Unpublish-AutomateNOWCodeRepository if you need to revert a commit.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
+        [ANOWCodeRepository]$CodeRepository,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [string]$CodeRepository_id = $_.id
+        }
+        Else {
+            [string]$CodeRepository_id = $CodeRepository.id
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($CodeRepository_id)")) -eq $true) {
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.Add('id', $CodeRepository_id )
+            $BodyMetaData.Add('_operationType', 'custom')
+            $BodyMetaData.Add('_operationId', 'commit')
+            $BodyMetaData.Add('_textMatchStyle', 'exact')
+            $BodyMetaData.Add('_dataSource', 'CodeRepositoryDataSource')
+            $BodyMetaData.Add('isc_metaDataPrefix', '_')
+            $BodyMetaData.Add('isc_dataFormat', 'json')
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            $parameters.Add('Body', $Body)
+            [string]$command = ('/codeRepository/commit')
+            $parameters.Add('Command', $command)
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$CodeRepository_id] due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                If ($Quiet -eq $true) {
+                    Return $false
+                }
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "The response code was [$response_code] instead of 0. The Code Repository $CodeRepository_id commit (Publish) was not successful. Please see the full response $full_response_display"
+            }
+            Else {
+                If ($Quiet -ne $true) {
+                    [string]$results_string = $results.response.data
+                    If ($results_string.Length -eq 0) {
+                        Write-Warning -Message "Somehow there was no response data from executing [$command] on [$CodeRepository_id] even though the response code indicated success."
+                        Break
+                    }
+                    Write-Information -Message "The Code Repository $CodeRepository_id $results_string."
+                }
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+Function UnPublish-AutomateNOWCodeRepository {
+    <#
+    .SYNOPSIS
+    Reverts (rolls back) the changes made in the application version to the local git repository for all objects included in the code repository from an instance of AutomateNOW!
+
+    .DESCRIPTION
+    Reverts (rolls back) the changes made in the application version to the local git repository for all objects included in the code repository from an instance of AutomateNOW!
+
+    .PARAMETER CodeRepository
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWFolder to retrieve them)
+
+    .PARAMETER Quiet
+    Optional switch to suppress the display of the results
+
+    .PARAMETER Force
+    Force the revert without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    ONLY [ANOWCodeRepository] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    An informational message will be displayed similar to the console (e.g. "Committed [1] objects"). Use the -Quiet parameter to skip this.
+
+    .EXAMPLE
+    Forcibly reverts a single git repository using the pipeline
+
+    Get-AutomateNOWCodeRepository -Id 'CodeRepository1' | UnPublish-AutomateNOWCodeRepository -Force
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    This function is the equivalent to the 'Rollback All' button in the UI.
+
+    Use Publish-AutomateNOWCodeRepository if you need to commit a change.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $false, ValueFromPipeline = $True)]
+        [ANOWCodeRepository]$CodeRepository,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [string]$CodeRepository_id = $_.id
+        }
+        ElseIf ($CodeRepository.id.Length -gt 0) {
+            [string]$CodeRepository_id = $CodeRepository.id
+        }
+        Else {
+            [string]$CodeRepository_id = $Id
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($CodeRepository_id)")) -eq $true) {
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.Add('id', $CodeRepository_id )
+            $BodyMetaData.Add('_operationType', 'custom')
+            $BodyMetaData.Add('_operationId', 'rollback')
+            $BodyMetaData.Add('_textMatchStyle', 'exact')
+            $BodyMetaData.Add('_dataSource', 'CodeRepositoryDataSource')
+            $BodyMetaData.Add('isc_metaDataPrefix', '_')
+            $BodyMetaData.Add('isc_dataFormat', 'json')
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            $parameters.Add('Body', $Body)
+            [string]$command = ('/codeRepository/rollback')
+            $parameters.Add('Command', $command)
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$CodeRepository_id] due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                If ($Quiet -eq $true) {
+                    Return $false
+                }
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "The response code was [$response_code] instead of 0. The Code Repository $CodeRepository_id rollback (Unpublish) was not successful. Please see the full response $full_response_display"
+            }
+            Else {
+                If ($Quiet -ne $true) {
+                    [string]$results_string = $results.response.data
+                    If ($results_string.Length -eq 0) {
+                        Write-Warning -Message "Somehow there was no response data from executing [$command] on [$CodeRepository_id] even though the response code indicated success."
+                        Break
+                    }
+                    Write-Information -Message "The Code Repository $CodeRepository_id $results_string."
+                }
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+#endregion
+
+#Region - CodeRepository Branches
+
+Function Get-AutomateNOWCodeRepositoryBranch {
+
+    <#
+    .SYNOPSIS
+    Gets the branches from a local Code Repository in an AutomateNOW! instance
+
+    .DESCRIPTION
+    Gets the branches from a local Code Repository in an AutomateNOW! instance
+
+    .PARAMETER CodeRepository
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
+
+    .PARAMETER Id
+    Optional string to filter the results to a single branch by name. Use this when you only want a specific branch.
+
+    .PARAMETER startRow
+    Integer to indicate the row to start from. This is intended for when you need to paginate the results. Default is 0.
+
+    .PARAMETER endRow
+    Integer to indicate the row to stop on. This is intended for when you need to paginate the results. Default is 2000.
+
+    .PARAMETER StringOnly
+    Switch parameter that will reduce the output to a string array of the names of the branches instead of returning [ANOWCodeRepositoryBranch] objects
+
+    .INPUTS
+    You must present [ANOWCodeRepository] objects
+
+    .OUTPUTS
+    [ANOWCodeRepositoryBranch] objects by default. Use the -StringOnly parameter to fetch only the names of the branches.
+
+    .EXAMPLE
+    Gets the names of the branches from a Code Repository
+
+    $repo = Get-AutomateNOWCodeRepository -Id 'Repository1'
+    $branches = Get-AutomateNOWCodeRepositoryBranch -CodeRepository $repo
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [OutputType([ANOWCodeRepositoryBranch[]])]
+    [Cmdletbinding(DefaultParameterSetName = 'All')]
+    Param(
+        [Parameter(Mandatory = $true, ParameterSetName = 'All', ValueFromPipeline = $true)]
+        [Parameter(Mandatory = $true, ParameterSetName = 'Single', ValueFromPipeline = $true)]
+        [ANOWCodeRepository]$CodeRepository,
+        [Parameter(Mandatory = $true, ParameterSetName = 'Single')]
+        [string]$Id,
+        [Parameter(Mandatory = $False, ParameterSetName = 'All')]
+        [int32]$startRow = 0,
+        [Parameter(Mandatory = $False, ParameterSetName = 'All')]
+        [int32]$endRow = 100,
+        [Parameter(Mandatory = $false, ParameterSetName = 'All')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Single')]
+        [switch]$StringOnly
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        If ($endRow -le $startRow) {
+            Write-Warning -Message "The endRow must be greater than the startRow. Please try again."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'GET')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
+        If ($_.Id.Length -gt 0 ) {
+            $Body.'codeRepository' = $_.Id
+        }
+        Else {
+            $Body.'codeRepository' = $CodeRepository.Id
+        }
+        $Body.'_startRow' = $startRow
+        $Body.'_endRow' = $endRow
+        $Body.'_operationType' = 'fetch'
+        $Body.'_textMatchStyle' = 'exact'
+        $Body.'_componentId' = 'CodeRepositoryBranchList'
+        $Body.'_dataSource' = 'CodeRepositoryBranchDataSource'
+        $Body.'isc_metaDataPrefix' = '_'
+        $Body.'isc_dataFormat' = 'json'
+        [string]$Body = ConvertTo-QueryString -InputObject $Body
+        [string]$command = ('/codeRepositoryBranch/read?' + $Body)
+        If ($null -eq $parameters["Command"]) {
+            $parameters.Add('Command', $command)
+        }
+        Else {
+            $parameters.Command = $command
+        }
+        $Error.Clear()
+        Try {
+            [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
+            Break
+        }
+        If ($results.response.status -ne 0) {
+            If ($null -eq $results.response.status) {
+                Write-Warning -Message "Received an empty response when invoking the [$command] CodeRepository. Please look into this."
+                Break
+            }
+            Else {
+                [int32]$status_code = $results.response.status
+                [string]$results_response = $results.response
+                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
+                Break
+            }
+        }
+        $Error.Clear()
+        Try {
+            [ANOWCodeRepositoryBranch[]]$CodeRepositoryBranches = $results.response.data
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Failed to parse the response into a series of [ANOWCodeRepositoryBranch] objects due to [$Message]."
+            Break
+        }
+        If ($Id.Length -gt 0) {
+            [ANOWCodeRepositoryBranch]$CodeRepositoryBranch = $CodeRepositoryBranches | Where-Object { $_.Id -eq $Id }
+        }
+        If ($Id.Length -eq 0 -and $CodeRepositoryBranches.Count -gt 0) {
+            If ($StringOnly -eq $true) {
+                [string[]]$branches = $CodeRepositoryBranches.id
+                Return $branches
+            }
+            Else {
+                Return $CodeRepositoryBranches
+            }
+        }
+        ElseIf ($Id.Length -gt 0) {
+            If ($StringOnly -eq $true) {
+                [string]$branch_name = $CodeRepositoryBranch.Id
+                Return $branch_name
+            }
+            Else {
+                Return $CodeRepositoryBranch
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+Function New-AutomateNOWCodeRepositoryBranch {
+    <#
+    .SYNOPSIS
+    Creates a branch on a local Code Repository in an AutomateNOW! instance
+
+    .DESCRIPTION
+    Creates a branch on a local Code Repository in an AutomateNOW! instance
+
+    .PARAMETER CodeRepository
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWFolder to retrieve them)
+
+    .PARAMETER Branch
+    Mandatory string for the name of the branch. The name of the branch may consist only of alphanumeric characters and 3 special characters (._-) and not to exceed 128 characters in length.
+
+    .PARAMETER Quiet
+    Optional switch to suppress the display of the results
+
+    .PARAMETER Force
+    Force the creation of the object without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    You must present [ANOWCodeRepository] objects
+
+    .OUTPUTS
+    An informational message indicating the results. Use -Quiet to suppress this.
+
+    .EXAMPLE
+    Creates a new branch named 'DevBranch2' on a repository named 'CodeRepository1'.
+
+    $repo = Get-AutomateNOWCodeRepository -Id 'CodeRepository1'
+    New-AutomateNOWCodeRepositoryBranch -CodeRepository $repo -Branch 'DevBranch2'
+
+    .EXAMPLE
+    Uses the pipeline to quietly and forcibly create three branches on a repository named 'CodeRepository1'
+
+    $repo = Get-AutomateNOWCodeRepository -Id 'CodeRepository1'
+    @('test', 'dev', 'production') | New-AutomateNOWCodeRepositoryBranch -CodeRepository $repo -Force -Quiet
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [ANOWCodeRepository]$CodeRepository,
+        [ValidateScript({ $_.Length -gt 0 -and $_.Length -le 128 })]
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [string]$Branch,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.Length -gt 0 ) {
+            [string]$Branch = $_
+        }
+        [string]$CodeRepository_Id = $CodeRepository.Id
+        ## Do not tamper with this code. It ensures that we are not trying to add a branch that already exists
+        [string[]]$existing_branches = Get-AutomateNOWCodeRepositoryBranch -CodeRepository $CodeRepository
+        If ($Branch -in $existing_branches) {
+            Write-Warning -Message "The branch [$Branch] already exists in $CodeRepository_id. No action is required."
+            Break
+        }
+        ##
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Proceed to create the branch `"$($Branch)`" on the Code Repository $($CodeRepository_id) ?")) -eq $true) {
+            [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
+            $Body.'codeRepository' = $CodeRepository_Id
+            $Body.'id' = $Branch
+            $Body.'_operationType' = 'add'
+            $Body.'_operationId' = 'createBranch'
+            $Body.'_textMatchStyle' = 'exact'
+            $Body.'_oldValues' = ('{"codeRepository":"' + $CodeRepository_Id + '","id":""}')
+            $Body.'_componentId' = 'CodeRepositoryBranchCreateWindow_form'
+            $Body.'_dataSource' = 'CodeRepositoryBranchDataSource'
+            $Body.'isc_metaDataPrefix' = '_'
+            $Body.'isc_dataFormat' = 'json'
+            [string]$Body = ConvertTo-QueryString -InputObject $Body
+            If ($null -eq $parameters["Body"]) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            If ($null -eq $parameters["Command"]) {
+                [string]$command = ('/codeRepositoryBranch/create')
+                $parameters.Add('Command', $command)
+            }
+            Else {
+                $parameters.Command = $command
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
+                Break
+            }
+            If ($results.response.status -ne 0) {
+                If ($null -eq $results.response.status) {
+                    Write-Warning -Message "Received an empty response when invoking the [$command] CodeRepository. Please look into this."
+                    Break
+                }
+                Else {
+                    [int32]$status_code = $results.response.status
+                    [string]$results_response = $results.response
+                    Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
+                    Break
+                }
+            }
+            If ($Quiet -ne $True) {
+                Return
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+Function Remove-AutomateNOWCodeRepositoryBranch {
+
+    <#
+    .SYNOPSIS
+    Deletes a branch on a local Code Repository in an AutomateNOW! instance
+
+    .DESCRIPTION
+    Deletes a branch on a local Code Repository in an AutomateNOW! instance
+
+    .PARAMETER CodeRepository
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWFolder to retrieve them)
+
+    .PARAMETER Branch
+    Mandatory string for the name of the branch to delete.
+
+    .PARAMETER Quiet
+    Optional switch to suppress the display of the results
+
+    .PARAMETER Force
+    Force the removal without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    You must present [ANOWCodeRepository] objects
+
+    .OUTPUTS
+    An informational message indicating the results. Use -Quiet to suppress this.
+
+    .EXAMPLE
+    Deletes a branch named 'DevBranch2' on a repository named 'CodeRepository1'.
+
+    $repo = Get-AutomateNOWCodeRepository -Id 'CodeRepository1'
+    Remove-AutomateNOWCodeRepositoryBranch -CodeRepository $repo -Branch 'DevBranch2'
+
+    .EXAMPLE
+    Uses the pipeline to quietly and forcibly delete three branches on a repository named 'CodeRepository1'
+
+    $repo = Get-AutomateNOWCodeRepository -Id 'CodeRepository1'
+    @('test1', 'test2', 'test3') | New-AutomateNOWCodeRepositoryBranch -CodeRepository $repo -Force -Quiet
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [ANOWCodeRepository]$CodeRepository,
+        [ValidateScript({ $_.Length -gt 0 -and $_.Length -le 128 })]
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [string]$Branch,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.Length -gt 0 ) {
+            [string]$Branch = $_
+        }
+        [string]$CodeRepository_Id = $CodeRepository.Id
+        ## Do not tamper with this code. It ensures that we are not trying to remove a branch that doesn't exist
+        $Error.Clear()
+        Try {
+            [string[]]$existing_branches = Get-AutomateNOWCodeRepositoryBranch -CodeRepository $CodeRepository
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWCodeRepositoryBranch failed to retrieve the branches from $CodeRepository_Id under Remove-AutomateNOWCodeRepositoryBranch due to [$Message]."
+            Break
+        }
+        If ($Branch -notin $existing_branches) {
+            Write-Warning -Message "The branch [$Branch] does not exist in $CodeRepository_id. No action is required."
+            Break
+        }
+        ##
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Proceed to delete the branch `"$($Branch)`" from the Code Repository $($CodeRepository_id) ?")) -eq $true) {
+            [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
+            $Body.'codeRepository' = $CodeRepository_Id
+            $Body.'id' = $Branch
+            $Body.'_operationType' = 'remove'
+            $Body.'_textMatchStyle' = 'exact'
+            $Body.'_dataSource' = 'CodeRepositoryBranchDataSource'
+            $Body.'isc_metaDataPrefix' = '_'
+            $Body.'isc_dataFormat' = 'json'
+            [string]$Body = ConvertTo-QueryString -InputObject $Body
+            If ($null -eq $parameters["Body"]) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            [string]$command = ('/codeRepositoryBranch/delete')
+            If ($null -eq $parameters["Command"]) {
+                $parameters.Add('Command', $command)
+            }
+            Else {
+                $parameters.Command = $command
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
+                Break
+            }
+            If ($results.response.status -ne 0) {
+                If ($null -eq $results.response.status) {
+                    Write-Warning -Message "Received an empty response when invoking the [$command] CodeRepository. Please look into this."
+                    Break
+                }
+                Else {
+                    [int32]$status_code = $results.response.status
+                    [string]$results_response = $results.response
+                    Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
+                    Break
+                }
+            }
+            If ($Quiet -ne $True) {
+                [string]$branch_name = $results.response.data.id
+                Write-Information -MessageData "The branch [$branch_name] was deleted from $CodeRepository_Id"
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+Function Select-AutomateNOWCodeRepositoryBranch {
+    <#
+    .SYNOPSIS
+    Selects (checks out) a branch of a Code Repository on an instance of AutomateNOW!
+
+    .DESCRIPTION
+    Selects (checks out) a branch of a Code Repository on an instance of AutomateNOW!
+
+    .PARAMETER CodeRepository
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
+
+    .PARAMETER Branch
+    Mandatory string containing the name of the branch (Use Get-AutomateNOWCodeRepositoryBranch to get the list of available branches)
+
+    .PARAMETER Quiet
+    Optional switch to suppress the display of the results
+
+    .PARAMETER Force
+    Force the selection without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    You must present both the [ANOWCodeRepository] object and the name of the branch
+
+    .OUTPUTS
+    An informational message indicating that the branch was successfully selected. Use the -Quiet parameter to silence this notification.
+
+    .EXAMPLE
+    Creates a variable named $repo2 with the needed branch selected.
+
+    $repo1 = Get-AutomateNOWCodeRepository -Id 'CodeRepository1'
+    $repo2 = Select-AutomateNOWCodeRepository -CodeRepository $repo1 -Branch 'dev'
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    This function is the equivalent to the 'Checkout Branch' button when 1 branch is selected in the Branches tab of a Code Repository.
+
+    This function will attempt to ensure that the branch exists before selecting it (checking it out). You will receive back a modified [ANOWCodeRepository] object with the branch selected.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [ANOWCodeRepository]$CodeRepository,
+        [Parameter(Mandatory = $true)]
+        [string]$Branch,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [string]$CodeRepository_id = $_.id
+            [ANOWCodeRepository]$CodeRepository = $_
+        }
+        Else {
+            [string]$CodeRepository_id = $CodeRepository.id
+        }
+        $Error.Clear()
+        Try {
+            [ANOWCodeRepositoryBranch[]]$available_branches = Get-AutomateNOWCodeRepositoryBranch -CodeRepository $CodeRepository
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWCodeRepositoryBranch failed to retrieve the branches from $CodeRepository_id under Select-AutomateNOWCodeRepositoryBranch due to [$Message]."
+            Break
+        }
+        If ($available_branches.Count -eq 0) {
+            Write-Warning -Message "There are no branches in the $CodeRepository_id. Nothing can be selected (checked out)."
+            Break
+        }
+        If ($branch -notin $available_branches.id) {
+            [string]$available_branches_display = $available_branches | ConvertTo-Json -Compress
+            Write-Warning -Message "The branch [$branch] is not available in $CodeRepository_id which has the following branches: $available_branches_display. Please check and try again."
+            Break
+        }
+        Else {
+            Write-Debug -Message "Confirmed that the brach [$branch] is available in $CodeRepository_Id."
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($CodeRepository_id)")) -eq $true) {
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.Add('branch', $branch )
+            $BodyMetaData.Add('id', $CodeRepository_id )
+            $BodyMetaData.Add('_operationType', 'custom')
+            $BodyMetaData.Add('_operationId', 'selectBranch')
+            $BodyMetaData.Add('_textMatchStyle', 'exact')
+            $BodyMetaData.Add('_dataSource', 'CodeRepositoryDataSource')
+            $BodyMetaData.Add('isc_metaDataPrefix', '_')
+            $BodyMetaData.Add('isc_dataFormat', 'json')
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            $parameters.Add('Body', $Body)
+            [string]$command = ('/codeRepository/selectBranch')
+            $parameters.Add('Command', $command)
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on $CodeRepository_id due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                If ($Quiet -eq $true) {
+                    Return $false
+                }
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "The response code was [$response_code] instead of 0. The Code Repository $CodeRepository_id push (Upload) was not successful. Please see the full response $full_response_display"
+            }
+            Else {
+                If ($Quiet -ne $true) {
+                    $sync_table = $results.response.data
+                    $sync_table | Format-Table -Autosize -Wrap
+                    Write-Information -MessageData "The $branch branch has been selected for $CodeRepository_id"
+                }
+                Else {
+                    Write-Debug -Message "The $branch branch has been selected for $CodeRepository_id"
+                }
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+Function Merge-AutomateNOWCodeRepositoryBranch {
+    <#
+    .SYNOPSIS
+    Merges two branches of a Code Repository on an instance of AutomateNOW! into a single Merge Request object
+
+    .DESCRIPTION
+    Merges two branches of a Code Repository on an instance of AutomateNOW! into a single Merge Request object
+
+    .PARAMETER CodeRepository
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
+
+    .PARAMETER SourceBranch
+    Mandatory [ANOWCodeRepositoryBranch] object from which you want to merge (Use Get-AutomateNOWCodeRepositoryBranch to get the list of available branches)
+
+    .PARAMETER TargetBranch
+    Mandatory [ANOWCodeRepositoryBranch] object to where you want to merge (Use Get-AutomateNOWCodeRepositoryBranch to get the list of available branches)
+
+    .PARAMETER Description
+    Option description of the Merge Request.
+
+    .PARAMETER Force
+    Force the merger without confirmation. This is equivalent to -Confirm:$false
+
+    .PARAMETER Quiet
+    Optional switch to suppress the display of the results
+
+    .INPUTS
+    You must present both the [ANOWCodeRepository] object and the name of the branch. You may not pipe objects to Merge-AutomateNOWCodeRepositoryBranch.
+
+    .OUTPUTS
+    An informational message indicating that the branch was successfully selected. Use the -Quiet parameter to silence this notification.
+
+    .EXAMPLE
+    Forcibly creates a Merge Request from a branch named 'master1' to a branch named 'master2' in a Code Repository named 'Repository1'
+
+    $repository = Get-AutomateNOWCodeRepository -Id 'Repository1'
+    $source_branch = Get-AutomatenowCodeRepositoryBranch -CodeRepository $repository -Id 'master1'
+    $target_branch = Get-AutomatenowCodeRepositoryBranch -CodeRepository $repository -Id 'master2'
+    Merge-AutomateNOWCodeRepositoryBranch -CodeRepository $repository -SourceBranch $source_branch -TargetBranch $target_branch -Description $desc -Force
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    This function will attempt to ensure that both branches exist before attempting to merge them. You will receive back a modified [ANOWCodeRepository] object with the branch selected.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [ANOWCodeRepository]$CodeRepository,
+        [Parameter(Mandatory = $true)]
+        [ANOWCodeRepositoryBranch]$SourceBranch,
+        [Parameter(Mandatory = $true)]
+        [ANOWCodeRepositoryBranch]$TargetBranch,
+        [Parameter(Mandatory = $false)]
+        [string]$Description,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.Id.Length -gt 0) {
+            [ANOWCodeRepository]$CodeRepository = $_
+        }
+        [string]$CodeRepository_id = $CodeRepository.Id
+        [string]$SourceBranch_id = $SourceBranch.Id
+        [string]$TargetBranch_id = $TargetBranch.Id
+        $Error.Clear()
+        Try {
+            [ANOWCodeRepositoryBranch[]]$available_branches = Get-AutomateNOWCodeRepositoryBranch -CodeRepository $CodeRepository
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWCodeRepositoryBranch failed to retrieve the branches from $CodeRepository_id under Select-AutomateNOWCodeRepositoryBranch due to [$Message]."
+            Break
+        }
+        If ($available_branches.Count -eq 0) {
+            Write-Warning -Message "There are no branches in the $CodeRepository_id. There is nothing to merge."
+            Break
+        }
+        Else {
+            [string]$available_branches_display = $available_branches.Id | ConvertTo-Json -Compress
+        }
+        If ($SourceBranch.id -notin $available_branches.id) {
+            Write-Warning -Message "The source branch [$SourceBranch_id] is not available in $CodeRepository_id which has the following branches: $available_branches_display. Please check and try again."
+            Break
+        }
+        ElseIf ($TargetBranch.id -notin $available_branches.id) {
+            Write-Warning -Message "The target branch [$TargetBranch_id] is not available in $CodeRepository_id which has the following branches: $available_branches_display. Please check and try again."
+            Break
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($CodeRepository_id)")) -eq $true) {
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.Add('codeRepository', $CodeRepository_id )
+            $BodyMetaData.Add('sourceBranch', $SourceBranch_id )
+            $BodyMetaData.Add('targetBranch', $TargetBranch_id )
+            If ($Description.Length -gt 0) {
+                $BodyMetaData.Add('description', $Description)
+            }
+            $BodyMetaData.Add('_operationType', 'add')
+            $BodyMetaData.Add('_textMatchStyle', 'exact')
+            $BodyMetaData.Add('_dataSource', 'MergeRequestDataSource')
+            $BodyMetaData.Add('_oldValues', ('"{codeRepository":"' + $CodeRepository_id + '"}' ) )
+            $BodyMetaData.Add('isc_metaDataPrefix', '_')
+            $BodyMetaData.Add('isc_dataFormat', 'json')
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            $parameters.Add('Body', $Body)
+            [string]$command = ('/mergeRequest/create')
+            $parameters.Add('Command', $command)
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on $CodeRepository_id due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                If ($Quiet -eq $true) {
+                    Return $false
+                }
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "The response code was [$response_code] instead of 0. The Code Repository $CodeRepository_id Merge Request was not successful. Please see the full response $full_response_display"
+            }
+            $Error.Clear()
+            Try {
+                [ANOWCodeRepositoryMergeRequest]$CodeRepositoryMergeRequest = $results.response.data | Select-Object -First 1
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Failed to parse the response into [ANOWCodeRepositoryMergeRequest] object due to [$Message]."
+                Break
+            }
+            If ($Quiet -ne $true) {
+                Return $CodeRepositoryMergeRequest
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+#endregion
+
+#Region - CodeRepository Items
+
+Function Get-AutomateNOWCodeRepositoryItem {
+
+    <#
+    .SYNOPSIS
+    Gets the items from a local Code Repository in an AutomateNOW! instance
+
+    .DESCRIPTION
+    Gets the items from a local Code Repository in an AutomateNOW! instance
+
+    .PARAMETER CodeRepository
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWFolder to retrieve them)
+
+    .PARAMETER itemType
+    Optional string to filter the items by type. Use -All if you prefer to receive all items in a single array. Valid choices are: 'ProcessingTemplates', 'Schedules', 'BusinessViews', 'Workspaces', 'ResultMappings', 'Approvals', 'ServerNodes', 'Agents', 'Endpoints', 'Resources', 'DataSources', 'Anomalies', 'Interfaces', 'NotificationGroups', 'NotificationChannels', 'NotificationTemplates', 'RuntimeActions', 'Dashboards', 'AdhocReports', 'UserReports', 'Tags', 'Folders'
+
+    .PARAMETER All
+    Optional switch to retrieve all items in the Code Repository. You must include either -All or -itemType.
+
+    .PARAMETER startRow
+    Integer to indicate the row to start from. This is intended for when you need to paginate the results. Default is 0.
+
+    .PARAMETER endRow
+    Integer to indicate the row to stop on. This is intended for when you need to paginate the results. Default is 2000.
+
+    .INPUTS
+    Accepts a string representing the simple id of the Code Repository from the pipeline or individually (but not an array).
+
+    .OUTPUTS
+    An array of PSCustomObjects representing the selected item types.
+
+    .EXAMPLE
+    Gets only the Processing Template items within a Code Repository
+
+    $repo = Get-AutomateNOWCodeRepository -Id 'CodeRepository1'
+    $items = Get-AutomateNOWCodeRepositoryItem -CodeRepository $repo -itemType 'ProcessingTemplates'
+
+    .EXAMPLE
+    Gets all of the items from a Code Repository
+
+    $repo = Get-AutomateNOWCodeRepository -Id 'CodeRepository1'
+    $items = Get-AutomateNOWCodeRepositoryItem -CodeRepository $repo -All
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [OutputType([ANOWCodeRepository[]])]
+    [Cmdletbinding(DefaultParameterSetName = 'AllItems')]
+    Param(
+        [Parameter(Mandatory = $true, ParameterSetName = 'ItemType', ValueFromPipeline = $true)]
+        [Parameter(Mandatory = $true, ParameterSetName = 'AllItems', ValueFromPipeline = $true)]
+        [ANOWCodeRepository]$CodeRepository,
+        [ValidateSet('ProcessingTemplates', 'Schedules', 'BusinessViews', 'Workspaces', 'ResultMappings', 'Approvals', 'ServerNodes', 'Agents', 'Endpoints', 'Resources', 'DataSources', 'Anomalies', 'Interfaces', 'NotificationGroups', 'NotificationChannels', 'NotificationTemplates', 'RuntimeActions', 'Dashboards', 'AdhocReports', 'UserReports', 'Tags', 'Folders')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'ItemType')]
+        [string]$itemType,
+        [Parameter(Mandatory = $false, ParameterSetName = 'AllItems')]
+        [switch]$All,
+        [Parameter(Mandatory = $false, ParameterSetName = 'ItemType')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'AllItems')]
+        [int32]$startRow = 0,
+        [Parameter(Mandatory = $false, ParameterSetName = 'ItemType')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'AllItems')]
+        [int32]$endRow = 100
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        If ($endRow -le $startRow) {
+            Write-Warning -Message "The endRow must be greater than the startRow. Please try again."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'GET')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+        If ($All -ne $true -and $itemType.length -eq 0) {
+            Write-Warning -Message "You must specify either the -itemType or use the -All switch"
+            Break
+        }
+    }
+    Process {
+        If ($All -eq $true) {
+            [string[]]$item_loops = 'ProcessingTemplates', 'Schedules', 'BusinessViews', 'Workspaces', 'ResultMappings', 'Approvals', 'ServerNodes', 'Agents', 'Endpoints', 'Resources', 'DataSources', 'Anomalies', 'Interfaces', 'NotificationGroups', 'NotificationChannels', 'NotificationTemplates', 'RuntimeActions', 'Dashboards', 'AdhocReports', 'UserReports', 'Tags', 'Folders'
+        }
+        Else {
+            [string[]]$item_loops = $itemType
+        }
+        [array]$repository_items = ForEach ($item in $item_loops) {
+            [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
+            If ($_.Id.Length -gt 0 ) {
+                $Body.'codeRepository' = $_.Id
+            }
+            Else {
+                $Body.'codeRepository' = $CodeRepository.Id
+            }
+            Switch ($item) {
+                "ProcessingTemplates" {
+                    $Body.'_constructor' = 'AdvancedCriteria'
+                    $Body.'operator' = 'and'
+                    $Body.'criteria1' = '{"fieldName":"processingType","operator":"notEqual","value":"TRIGGER"}'
+                    $domainClassName = 'ProcessingTemplate'
+                    [int32]$componentId = 0
+                }
+                "Schedules" {
+                    $Body.'_constructor' = 'AdvancedCriteria'
+                    $Body.'operator' = 'and'
+                    $Body.'criteria1' = '{"fieldName":"processingType","operator":"equals","value":"TRIGGER"}'
+                    $domainClassName = 'ProcessingTemplate'
+                    [int32]$componentId = 1
+                }
+                "BusinessViews" {
+                    $domainClassName = 'BusinessView'
+                    [int32]$componentId = 2
+                }
+                "Workspaces" {
+                    $domainClassName = 'Workspace'
+                    [int32]$componentId = 3
+                }
+                "ResultMappings" {
+                    $domainClassName = 'ResultMapping'
+                    [int32]$componentId = 4
+                }
+                "Approvals" {
+                    $domainClassName = 'ApprovalConfiguration'
+                    [int32]$componentId = 5
+                }
+                "ServerNodes" {
+                    $domainClassName = 'ServerNode'
+                    [int32]$componentId = 6
+                }
+                "Agents" {
+                    $domainClassName = 'Agent'
+                    [int32]$componentId = 7
+                }
+                "Endpoints" {
+                    $domainClassName = 'Endpoint'
+                    [int32]$componentId = 8
+                }
+                "Resources" {
+                    $domainClassName = 'Resource'
+                    [int32]$componentId = 9
+                }
+                "DataSources" {
+                    $domainClassName = 'DataSource'
+                    [int32]$componentId = 10
+                }
+                "Anomalies" {
+                    $domainClassName = 'Anomaly'
+                    [int32]$componentId = 11
+                }
+                "Interfaces" {
+                    $domainClassName = 'Integration'
+                    [int32]$componentId = 12
+                }
+                "NotificationGroups" {
+                    $domainClassName = 'NotificationGroup'
+                    [int32]$componentId = 13
+                }
+                "NotificationChannels" {
+                    $domainClassName = 'NotificationChannel'
+                    [int32]$componentId = 14
+                }
+                "NotificationTemplates" {
+                    $domainClassName = 'NotificationMessageTemplate'
+                    [int32]$componentId = 15
+                }
+                "RuntimeActions" {
+                    $Body.'_constructor' = 'AdvancedCriteria'
+                    $Body.'operator' = 'and'
+                    $Body.'criteria1' = '{"fieldName":"isRule","operator":"equals","value":true}'
+                    $domainClassName = 'ProcessingAction'
+                    [int32]$componentId = 16
+                }
+                "Dashboards" {
+                    $domainClassName = 'Dashboard'
+                    [int32]$componentId = 17
+                }
+                "AdhocReports" {
+                    $domainClassName = 'AdhocReport'
+                    [int32]$componentId = 18
+                }
+                "UserReports" {
+                    $domainClassName = 'UserReport'
+                    [int32]$componentId = 19
+                }
+                "Tags" {
+                    $domainClassName = 'Tag'
+                    [int32]$componentId = 20
+                }
+                "Folders" {
+                    $Body.'_constructor' = 'AdvancedCriteria'
+                    $Body.'operator' = 'and'
+                    $Body.'criteria1' = '{"fieldName":"parent","operator":"isNull"}'
+                    $domainClassName = 'Folder'
+                    [int32]$componentId = 21
+                }
+            }
+            $Body.'domainClassName' = $domainClassName
+            $Body.'_operationType' = 'fetch'
+            $Body.'_startRow' = $startRow
+            $Body.'_endRow' = $endRow
+            $Body.'_textMatchStyle' = 'exact'
+            $Body.'_componentId' = "isc_CodeRepositoryDomainClassList_$componentId"
+            $Body.'_dataSource' = 'CodeRepositoryObjectDataSource'
+            $Body.'isc_metaDataPrefix' = '_'
+            $Body.'isc_dataFormat' = 'json'
+            [string]$Body = ConvertTo-QueryString -InputObject $Body
+            [string]$command = ('/codeRepositoryObject/read?' + $Body)
+            If ($null -eq $parameters["Command"]) {
+                $parameters.Add('Command', $command)
+            }
+            Else {
+                $parameters.Command = $command
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
+                Break
+            }
+            If ($results.response.status -ne 0) {
+                If ($null -eq $results.response.status) {
+                    Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
+                    Break
+                }
+                Else {
+                    [int32]$status_code = $results.response.status
+                    [string]$results_response = $results.response
+                    Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
+                    Break
+                }
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject[]]$CodeRepositoryItems = $results.response.data
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Failed to parse the response into a series of [PSCustomObject] objects due to [$Message]."
+                Break
+            }
+            If ($CodeRepositoryItems.Count -gt 0) {
+                $CodeRepositoryItems
+            }
+        }
+        If ($repository_items.Count -gt 0) {
+            Return $repository_items
+        }
+    }
+    End {
+
+    }
+}
+
+Function Get-AutomateNOWCodeRepositoryOutOfSyncItem {
+
+    <#
+    .SYNOPSIS
+    Gets the out of sync items from a local Code Repository in an AutomateNOW! instance
+
+    .DESCRIPTION
+    Gets the out of sync from a local Code Repository in an AutomateNOW! instance
+
+    .PARAMETER CodeRepository
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
+
+    .PARAMETER itemId
+    Optional string to filter the results to a single Item instead of all of them.
+
+    .PARAMETER startRow
+    Integer to indicate the row to start from. This is intended for when you need to paginate the results. Default is 0.
+
+    .PARAMETER endRow
+    Integer to indicate the row to stop on. This is intended for when you need to paginate the results. Default is 100.
+
+    .INPUTS
+    You must present an [ANOWCodeRepository] object
+
+    .OUTPUTS
+    [ANOWCodeRepositoryOutOfSyncItem] objects representing the items in the Code Repository
+
+    .EXAMPLE
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [OutputType([ANOWCodeRepositoryOutOfSyncItem[]])]
+    [Cmdletbinding(DefaultParameterSetName = 'All')]
+    Param(
+        [Parameter(Mandatory = $true, ParameterSetName = 'All', ValueFromPipeline = $true)]
+        [Parameter(Mandatory = $true, ParameterSetName = 'Single', ValueFromPipeline = $true)]
+        [ANOWCodeRepository]$CodeRepository,
+        [Parameter(Mandatory = $true, ParameterSetName = 'Single')]
+        [string]$itemId,
+        [Parameter(Mandatory = $False, ParameterSetName = 'All')]
+        [int32]$startRow = 0,
+        [Parameter(Mandatory = $False, ParameterSetName = 'All')]
+        [int32]$endRow = 100
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        If ($endRow -le $startRow) {
+            Write-Warning -Message "The endRow must be greater than the startRow. Please try again."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'GET')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
+        If ($_.Id.Length -gt 0 ) {
+            [ANOWCodeRepository]$CodeRepository = $_
+        }
+        [string]$CodeRepository_Id = $CodeRepository.Id
+        $Body.'codeRepository' = $CodeRepository_id
+        $Body.'_operationType' = 'fetch'
+        $Body.'_startRow' = $startRow
+        $Body.'_endRow' = $endRow
+        $Body.'_textMatchStyle' = 'exact'
+        $Body.'_componentId' = 'OutOfSyncListWindow_list'
+        $Body.'_dataSource' = 'OutOfSyncObjectDataSource'
+        $Body.'isc_metaDataPrefix' = '_'
+        $Body.'isc_dataFormat' = 'json'
+        [string]$Body = ConvertTo-QueryString -InputObject $Body
+        [string]$command = ('/outOfSyncObject/read?' + $Body)
+        If ($null -eq $parameters["Command"]) {
+            $parameters.Add('Command', $command)
+        }
+        Else {
+            $parameters.Command = $command
+        }
+        $Error.Clear()
+        Try {
+            [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
+            Break
+        }
+        If ($results.response.status -ne 0) {
+            If ($null -eq $results.response.status) {
+                Write-Warning -Message "Received an empty response when invoking the [$command] CodeRepository. Please look into this."
+                Break
+            }
+            Else {
+                [int32]$status_code = $results.response.status
+                [string]$results_response = $results.response
+                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
+                Break
+            }
+        }
+        $Error.Clear()
+        Try {
+            [ANOWCodeRepositoryOutOfSyncItem[]]$CodeRepositoryOutOfSyncItems = $results.response.data
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Failed to parse the response into a series of [$CodeRepositoryOutOfSyncItems] objects due to [$Message]."
+            Break
+        }
+        If ($itemId.Length -gt 0) {
+            [ANOWCodeRepositoryOutOfSyncItem]$CodeRepositoryOutOfSyncItem = $CodeRepositoryOutOfSyncItems | Where-Object { $_.Id -eq $itemId } | Select-Object -First 1
+            Return $CodeRepositoryOutOfSyncItem
+        }
+        ElseIf ($itemId.Length -eq 0 -and $CodeRepositoryOutOfSyncItems.Count -gt 0) {
+            Return $CodeRepositoryOutOfSyncItems
+        }
+    }
+}
+
+Function Add-AutomateNOWCodeRepositoryItem {
+
+    <#
+    .SYNOPSIS
+    Adds an item to a local Code Repository in an AutomateNOW! instance
+
+    .DESCRIPTION
+    Adds an item to a local Code Repository in an AutomateNOW! instance
+
+    .PARAMETER CodeRepository
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWFolder to retrieve them)
+
+    .PARAMETER Item
+    Mandatory ANOW object to be added to the Code Repository. Valid ANOW object item types are: 'ProcessingTemplates', 'Schedules', 'BusinessViews', 'Workspaces', 'ResultMappings', 'Approvals', 'ServerNodes', 'Agents', 'Endpoints', 'Resources', 'DataSources', 'Anomalies', 'Interfaces', 'NotificationGroups', 'NotificationChannels', 'NotificationTemplates', 'RuntimeActions', 'Dashboards', 'AdhocReports', 'UserReports', 'Tags', 'Folders'
+
+    .PARAMETER Force
+    Force the addition of the object without confirmation. This is equivalent to -Confirm:$false
+
+    .PARAMETER Quiet
+    Optional switch to suppress the display of the results
+
+    .INPUTS
+    You must pass both the [ANOWCodeRepository] object and at least 1 ANOW object.
+
+    .OUTPUTS
+    The object that was added to the local Code Repository will be returned
+
+    .EXAMPLE
+    Uses the pipeline to forcibly and quietly add a Task Template to a local Code Repository
+
+    $repository = Get-AutomateNOWCodeRepository -Id 'Repository1'
+    $task_template = Get-AutomateNOWTaskTemplate -Id 'ShellTask1'
+    $task_template | Add-AutomateNOWCodeRepositoryItem -CodeRepository $repository -Force -Quiet
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    Anomalies, BusinessViews, Interfaces, NotificationGroups, NotificationChannels, NotificationTemplates, RuntimeActions, Dashboards & UserReports are not supported yet.
+
+    This function does yet have any safety check to ensure that the item is not already added. However, the ANOW API will not accept the request in this case and the error message indicating this will be displayed back.
+
+    #>
+    [OutputType([PSCustomObject])]
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [ANOWCodeRepository]$CodeRepository,
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [PSCustomObject]$Item,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
+        If ($_.Id.Length -gt 0 ) {
+            [PSCustomObject]$Item = $_
+        }
+        [string]$Item_id = $Item.Id
+        If ($Item_Id.Length -eq 0) {
+            Write-Warning -Message "Somehow the Item passed to Add-AutomateNOWCodeRepositoryItem does not have an Id. Please look into this."
+            Break
+        }
+        $Body.'id' = $Item_Id
+        [string]$CodeRepository_Id = $CodeRepository.Id
+        $Body.'codeRepository' = $CodeRepository_Id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Add $($Item_Id) to Code Repository $($CodeRepository_Id?)")) -eq $true) {
+            Switch ($Item) {
+                # ProcessingTemplates, Schedules
+                { $_ -is [ANOWTaskTemplate] -or $_ -is [ANOWWorkFlowTemplate] -or $_ -is [ANOWScheduleTemplate] } {
+                    [string]$domainClassName = 'ProcessingTemplate'
+                    [string]$dataSource = 'ProcessingTemplateDataSource'
+                    Break;
+                }
+                # Workspaces
+                { $_ -is [ANOWWorkspace] } {
+                    [string]$domainClassName = 'Workspace'
+                    [string]$dataSource = 'WorkspaceDataSource'
+                    Break;
+                }
+
+                # "Folders"
+                { $_ -is [ANOWFolder] } {
+                    [string]$domainClassName = 'Folder'
+                    [string]$dataSource = 'FolderDataSource'
+                    Break;
+                }
+
+                # Tags
+                { $_ -is [ANOWTag] } {
+                    [string]$domainClassName = 'Tag'
+                    [string]$dataSource = 'TagDataSource'
+                    Break;
+                }
+
+                # "ServerNodes"
+                { $_ -is [ANOWNode] } {
+                    [string]$domainClassName = 'ServerNode'
+                    [string]$dataSource = 'ServerNodeDataSource'
+                    Break;
+                }
+
+                # "Agents"
+                { $_ -is [ANOWAgent] } {
+                    [string]$domainClassName = 'Agent'
+                    [string]$dataSource = 'AgentDataSource'
+                    Break;
+                }
+
+                # "Endpoints"
+                { $_ -is [ANOWEndpoint] } {
+                    [string]$domainClassName = 'Endpoint'
+                    [string]$dataSource = 'EndpointDataSource'
+                    Break;
+                }
+
+                # "AdhocReports"
+                { $_ -is [ANOWAdhocReport] } {
+                    [string]$domainClassName = 'ANOWAdhocReport'
+                    [string]$dataSource = 'AdhocReportDataSource'
+                    Break;
+                }
+
+                # "Approvals"
+                { $_ -is [ANOWApproval] } {
+                    [string]$domainClassName = 'ApprovalConfiguration'
+                    [string]$dataSource = 'ApprovalConfigurationDataSource'
+                    Break;
+                }
+
+                # "DataSources"
+                { $_ -is [ANOWDataSource] } {
+                    [string]$domainClassName = 'DataSource'
+                    [string]$dataSource = 'DataSourceDataSource'
+                    Break;
+                }
+
+                # "Resources" - note that not all resouce types are supported yet
+                { $_ -is [ANOWCalendar] -or $_ -is [ANOWLock] -or $_ -is [ANOWSemaphore] -or $_ -is [ANOWStock] -or $_ -is [ANOWTimeWindow] -or $_ -is [ANOWVariable] } {
+                    [string]$domainClassName = 'Resource'
+                    [string]$dataSource = 'ResourceDataSource'
+                    Break;
+                }
+
+                # "ResultMappings"
+                { $_ -is [ANOWResultMapping] } {
+                    [string]$domainClassName = 'ResultMapping'
+                    [string]$dataSource = 'ResultMappingDataSource'
+                    Break;
+                }
+
+                # "Anomalies" not supported yet
+                # "BusinessViews" not supported yet
+                # "Interfaces" not supported yet
+                # "NotificationGroups" not supported yet
+                # "NotificationChannels" not supported yet
+                # "NotificationTemplates" not supported yet
+                # "RuntimeActions" not supported yet
+                # "Dashboards" not supported yet
+                # "UserReports" not supported yet
+
+            }
+            $Body.'domainClassName' = $domainClassName
+            $Body.'_operationType' = 'update'
+            $Body.'_operationId' = 'addToCodeRepository'
+            $Body.'_textMatchStyle' = 'exact'
+            $Body.'_dataSource' = $DataSource
+            $Body.'isc_metaDataPrefix' = '_'
+            $Body.'isc_dataFormat' = 'json'
+            [string]$Body = ConvertTo-QueryString -InputObject $Body
+            If ($null -eq $parameters["Body"]) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            If ($null -eq $parameters["Command"]) {
+                [string]$command = ('/codeRepository/addObject')
+                $parameters.Add('Command', $command)
+            }
+            Else {
+                $parameters.Command = $command
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
+                Break
+            }
+            If ($results.response.status -ne 0) {
+                If ($null -eq $results.response.status) {
+                    Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
+                    Break
+                }
+                Else {
+                    [int32]$status_code = $results.response.status
+                    [string]$results_response = $results.response
+                    Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
+                    Break
+                }
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$CodeRepositoryItem = $results.response.data
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Failed to parse the response [PSCustomObject] object due to [$Message]."
+                Break
+            }
+            If ($CodeRepositoryItem.Id.Length -gt 0) {
+                If ($Quiet -ne $true) {
+                    Return $CodeRepositoryItem
+                }
+            }
+            Else {
+                Write-Warning -Message "Somehow the returned Item ($Item_Id) didn't have an Id after being added to Code Repository $CodeRepository_Id. Something must be wrong. Please check into this further."
+                Break
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+Function Remove-AutomateNOWCodeRepositoryItem {
+
+    <#
+    .SYNOPSIS
+    Removes (deletes) an item from a local Code Repository in an AutomateNOW! instance
+
+    .DESCRIPTION
+    Removes (deletes) an item from a local Code Repository in an AutomateNOW! instance
+
+    .PARAMETER Item
+    Mandatory ANOW object to be removed from the Code Repository. Valid ANOW object item types are: 'ProcessingTemplates', 'Schedules', 'BusinessViews', 'Workspaces', 'ResultMappings', 'Approvals', 'ServerNodes', 'Agents', 'Endpoints', 'Resources', 'DataSources', 'Anomalies', 'Interfaces', 'NotificationGroups', 'NotificationChannels', 'NotificationTemplates', 'RuntimeActions', 'Dashboards', 'AdhocReports', 'UserReports', 'Tags', 'Folders'
+
+    .PARAMETER Force
+    Force the removal of the object without confirmation. This is equivalent to -Confirm:$false
+
+    .PARAMETER Quiet
+    Optional switch to suppress the display of the results
+
+    .INPUTS
+    You must pass both the [ANOWCodeRepository] object and at least 1 ANOW object.
+
+    .OUTPUTS
+    The object that was removed from the local Code Repository will be returned
+
+    .EXAMPLE
+    Removes a Task Template named 'TaskTemplate1' from a local Code Repository named 'Repository1'
+
+    .EXAMPLE
+    Forcibly and quietly uses the pipeline to remove two Task Templates from a local Code Repository named 'Repository1'
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    Anomalies, BusinessViews, Interfaces, NotificationGroups, NotificationChannels, NotificationTemplates, RuntimeActions, Dashboards & UserReports are not supported yet.
+
+    This function does yet have any safety check to ensure that the item is not already removed. However, the ANOW API will not accept the request in this case and the error message indicating this will be displayed back.
+
+    This API call does not require the name of the CodeRepository because every item is unique and no item can be added to more then 1 repository.
+    #>
+    [OutputType([PSCustomObject])]
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [PSCustomObject]$Item,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
+        If ($_.Id.Length -gt 0 ) {
+            [PSCustomObject]$Item = $_
+        }
+        [string]$Item_simpleId = $Item.simpleId
+        If ($Item_simpleId.Length -eq 0) {
+            Write-Warning -Message "Somehow the Item passed to Remove-AutomateNOWCodeRepositoryItem does not have a simpleId. Please look into this."
+            Break
+        }
+        [string]$Item_Domain = $Item.domain
+        If ($Item_Domain.Length -eq 0) {
+            Write-Warning -Message "Somehow the Item passed to Remove-AutomateNOWCodeRepositoryItem does not have a domain. Please look into this."
+            Break
+        }
+        [string]$DomainClassName = $Item.domainClassName
+        $Body.'domainClassName' = $domainClassName
+        [string]$Item_Id = ('[' + $Item_Domain + ']' + $Item_simpleId) #note that ANOWCodeRepository items do not contain the full id of the source object. Either this line of code is needed or an additional lookup would be needed to confirm the Id of the object.
+        $Body.'id' = $Item_id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Remove $($Item_Id) from its Code Repository?")) -eq $true) {
+            Switch ($Item) {
+                # ProcessingTemplates, Schedules
+                { $domainClassName -eq 'ProcessingTemplate' } {
+                    [string]$dataSource = 'ProcessingTemplateDataSource'
+                    Break;
+                }
+                # Workspaces
+                { $domainClassName -eq 'Workspace' } {
+                    [string]$dataSource = 'WorkspaceDataSource'
+                    Break;
+                }
+
+                # "Folders"
+                { $domainClassName -eq 'Folder' } {
+                    [string]$dataSource = 'FolderDataSource'
+                    Break;
+                }
+
+                # Tags
+                { $domainClassName -eq 'Tag' } {
+                    [string]$dataSource = 'TagDataSource'
+                    Break;
+                }
+
+                # "ServerNodes"
+                { $domainClassName -eq 'ServerNode' } {
+                    [string]$dataSource = 'ServerNodeDataSource'
+                    Break;
+                }
+
+                # "Agents"
+                { $domainClassName -eq 'Agent' } {
+                    [string]$dataSource = 'AgentDataSource'
+                    Break;
+                }
+
+                # "Endpoints"
+                { $domainClassName -eq 'Endpoint' } {
+                    [string]$dataSource = 'EndpointDataSource'
+                    Break;
+                }
+
+                # "AdhocReports"
+                { $domainClassName -eq 'ANOWAdhocReport' } {
+                    [string]$dataSource = 'AdhocReportDataSource'
+                    Break;
+                }
+
+                # "Approvals"
+                { $domainClassName -eq 'ApprovalConfiguration' } {
+                    [string]$dataSource = 'ApprovalConfigurationDataSource'
+                    Break;
+                }
+
+                # "DataSources"
+                { $domainClassName -eq 'DataSource' } {
+                    [string]$dataSource = 'DataSourceDataSource'
+                    Break;
+                }
+
+                # "Resources" - note that not all resouce types are supported yet
+                { $domainClassName -eq 'Resource' } {
+                    [string]$domainClassName = 'Resource'
+                    [string]$dataSource = 'ResourceDataSource'
+                    Break;
+                }
+
+                # "ResultMappings"
+                { $domainClassName -eq 'ResultMapping' } {
+                    [string]$domainClassName = 'ResultMapping'
+                    [string]$dataSource = 'ResultMappingDataSource'
+                    Break;
+                }
+
+                # "Anomalies" not supported yet
+                # "BusinessViews" not supported yet
+                # "Interfaces" not supported yet
+                # "NotificationGroups" not supported yet
+                # "NotificationChannels" not supported yet
+                # "NotificationTemplates" not supported yet
+                # "RuntimeActions" not supported yet
+                # "Dashboards" not supported yet
+                # "UserReports" not supported yet
+            }
+            $Body.'_operationType' = 'update'
+            $Body.'_operationId' = 'removeFromCodeRepository'
+            $Body.'_textMatchStyle' = 'exact'
+            $Body.'_dataSource' = $DataSource
+            $Body.'isc_metaDataPrefix' = '_'
+            $Body.'isc_dataFormat' = 'json'
+            [string]$Body = ConvertTo-QueryString -InputObject $Body
+            If ($null -eq $parameters["Body"]) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            If ($null -eq $parameters["Command"]) {
+                [string]$command = ('/codeRepository/removeObject')
+                $parameters.Add('Command', $command)
+            }
+            Else {
+                $parameters.Command = $command
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
+                Break
+            }
+            If ($results.response.status -ne 0) {
+                If ($null -eq $results.response.status) {
+                    Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
+                    Break
+                }
+                Else {
+                    [int32]$status_code = $results.response.status
+                    [string]$results_response = $results.response
+                    Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
+                    Break
+                }
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$CodeRepositoryItem = $results.response.data
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Failed to parse the response [PSCustomObject] object due to [$Message]."
+                Break
+            }
+            If ($CodeRepositoryItem.Id.Length -gt 0) {
+                If ($Quiet -ne $true) {
+                    Return $CodeRepositoryItem
+                }
+            }
+            Else {
+                Write-Warning -Message "Somehow the returned Item ($Item_Id) didn't have an Id after being removed from its Code Repository. Something must be wrong. Please check into this further."
+                Break
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+Function Compare-AutomateNOWCodeRepositoryOutOfSyncItem {
+    <#
+    .SYNOPSIS
+    Compares the the local branch and remote branch of an Out of Sync item in a Code Repository on an instance of AutomateNOW!
+
+    .DESCRIPTION
+    Compares the the local branch and remote branch of an Out of Sync item in a Code Repository on an instance of AutomateNOW!
+
+    .PARAMETER CodeRepository
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
+
+    .PARAMETER OutOfSyncItem
+    Mandatory [ANOWCodeRepositoryOutOfSyncItem] containing the Out of Sync item
+
+    .INPUTS
+    You must present both the [ANOWCodeRepository] object and the [ANOWCodeRepositoryOutOfSyncItem] object can be sent across the pipeline
+
+    .OUTPUTS
+    A comparison table
+
+    .EXAMPLE
+    Returns a custom comparison object showing the differences within an Out Of Sync item from a Code Repository named 'CodeRepository1'
+
+    $repository = Get-AutomateNOWCodeRepository -Id 'CodeRepository1'
+    Select-AutomateNOWCodeRepositoryBranch -CodeRepository $repository -Branch 'master' -Quiet -Force
+    $repository | Get-AutomateNOWCodeRepositoryOutOfSyncItem | Compare-AutomateNOWCodeRepositoryOutOfSyncItem -CodeRepository $repository
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    This function is the equivalent to what happens when selecting an Out of Sync item in a Code Repository.
+
+    This is the only Object function which uses Invoke-AutomateNOWAPI more than once.
+
+    The intention for this function is to send its results to Show-AutomateNOWCodeRepositoryOutOfSyncItemComparison which would help to decide whether to use the -AcceptYours or -AcceptTheirs parameter with Merge-AutomateNOWCodeRepositoryOutOfSyncItem.
+
+    #>
+    [Cmdletbinding()]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [ANOWCodeRepository]$CodeRepository,
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [ANOWCodeRepositoryOutOfSyncItem]$OutOfSyncItem
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [string]$CodeRepository_Id = $CodeRepository.Id
+    }
+    Process {
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+        If ($_.id.Length -gt 0) {
+            [ANOWCodeRepositoryOutOfSyncItem]$OutOfSyncItem = $_
+        }
+        [string]$OutOfSyncItem_Id = $OutOfSyncItem.id
+        If ($OutOfSyncItem_Id -notmatch '\[[0-9a-zA-Z._-]{1,}][0-9a-zA-Z._-]{1,}\|[0-9a-zA-Z._-]{1,}\|[0-9a-zA-Z._-]{1,}') {
+            Write-Warning -Message "Somehow the Id of the [ANOWCodeRepositoryOutOfSyncItem] object [$OutOfSyncItem_Id] did not match the expected format. Please look into this."
+            Break
+        }
+        $Error.Clear()
+        Try {
+            [ANOWCodeRepositoryOutOfSyncItem[]]$available_out_of_sync_items = Get-AutomateNOWCodeRepositoryOutOfSyncItem -CodeRepository $CodeRepository
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWCodeRepositoryOutOfSyncItem failed to retrieve the Out Of Sync items from $CodeRepository_id under Compare-AutomateNOWCodeRepositoryOutOfSyncItem due to [$Message]."
+            Break
+        }
+        If ($available_out_of_sync_items.Count -eq 0) {
+            Write-Warning -Message "There are no Out Of Sync items in the $CodeRepository_id. Nothing can be compared."
+            Break
+        }
+        If ($OutOfSyncItem_id -in $available_out_of_sync_items.id -and $OutOfSyncItem_id -cnotin $available_out_of_sync_items.id) {
+            [string]$available_out_of_sync_items_display = $available_out_of_sync_items.id | ConvertTo-Json -Compress
+            Write-Warning -Message "Item names are case-sensitive! Please choose from one of those Out Of Sync Items: $available_out_of_sync_items_display. Please check and try again."
+            Break
+        }
+        ElseIf ($OutOfSyncItem_id -notin $available_out_of_sync_items.id) {
+            [string]$available_out_of_sync_items_display = $available_out_of_sync_items.id | ConvertTo-Json -Compress
+            Write-Warning -Message "The Out Of Sync Item [$OutOfSyncItem_id] is not available in $CodeRepository_id which has the following Out Of Sync Items: $available_out_of_sync_items_display. Please check and try again."
+            Break
+        }
+        [string]$OutOfSyncItem_id = $OutOfSyncItem.itemId
+        [string]$domainClassName = $OutOfSyncItem.Id -split '\|' | Select-Object -Skip 1 -First 1
+        If ($domainClassName.Length -eq 0) {
+            Write-Warning "Somehow the domainClassName could not be extracted from the Out Of Sync item $($OutOfSyncItem.id). Please look into this."
+            Break
+        }
+        [string]$OutOfSyncItem_domain = $OutOfSyncItem.domain
+        # Getting "your" version
+        [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+        $BodyMetaData.Add('id', $OutOfSyncItem_id )
+        $BodyMetaData.Add('domainClassName', $domainClassName )
+        $BodyMetaData.Add('codeRepository', $CodeRepository_id )
+        $BodyMetaData.Add('_operationType', 'fetch')
+        $BodyMetaData.Add('_operationId', 'getCurrentVersion')
+        $BodyMetaData.Add('_textMatchStyle', 'exact')
+        $BodyMetaData.Add('_dataSource', 'CodeRepositoryObjectDataSource')
+        $BodyMetaData.Add('isc_metaDataPrefix', '_')
+        $BodyMetaData.Add('isc_dataFormat', 'json')
+        [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+        $parameters.Add('Body', $Body)
+        [string]$command = ('/codeRepositoryObject/getCurrentVersion')
+        $parameters.Add('Command', $command)
+        $Error.Clear()
+        Try {
+            [PSCustomObject]$your_results = Invoke-AutomateNOWAPI @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on $OutOfSyncItem_id due to [$Message]."
+            Break
+        }
+        [int32]$response_code = $your_results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $your_results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "The response code was [$response_code] instead of 0 while attempting to execute [$command] on $OutOfSyncItem_id. Please see the full response $full_response_display"
+            Break
+        }
+        # Getting "their" version
+        $parameters.Remove('Body')
+        [string]$Body = $Body -replace 'getCurrentVersion', 'getCurrentBranchVersion'
+        $parameters.Add('Body', $Body)
+        $parameters.Remove('Command')
+        [string]$command = ('/codeRepositoryObject/getCurrentBranchVersion')
+        $parameters.Add('Command', $command)
+        $Error.Clear()
+        Try {
+            [PSCustomObject]$their_results = Invoke-AutomateNOWAPI @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on $OutOfSyncItem_id due to [$Message]."
+            Break
+        }
+        [int32]$response_code = $their_results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $their_results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "The response code was [$response_code] instead of 0 while attempting to execute [$command] on $OutOfSyncItem_id. Please see the full response $full_response_display"
+        }
+        [string]$your_version = $your_results.response.data #| ConvertFrom-Json -Depth 10
+        [string]$their_version = $their_results.response.data #| ConvertFrom-Json -Depth 10
+        If ($your_version.Length -eq 0 -and $their_version.Length -eq 0) {
+            Write-Warning -Message "Both objects are somehow empty. There is nothing to compare."
+            Break
+        }
+        [PSCustomObject]$results = [PSCustomObject]@{item_id = $OutOfSyncItem_id; item_domain = $OutOfSyncItem_domain; domainClassName = $domainClassName; codeRepository = $CodeRepository_id; your_version = $your_version; their_version = $their_version; }
+        Return $results
+    }
+    End {
+
+    }
+}
+
+Function Show-AutomateNOWCodeRepositoryOutOfSyncItemComparison {
+
+    <#
+    .SYNOPSIS
+    Shows the comparison details of an out of sync item from a local Code Repository in an AutomateNOW! instance and allows a left/right decision to be made
+
+    .DESCRIPTION
+    Shows the comparison details of an out of sync item from a local Code Repository in an AutomateNOW! instance and allows a left/right decision to be made
+
+    .PARAMETER AutomateNOWCodeRepositoryOutOfSyncItemComparison
+    Mandatory results object [PSCustomObject] from Compare-AutomateNOWCodeRepositoryOutOfSyncItem
+
+    .PARAMETER header_color
+    Optional string to change the color of the git diff hunk header from the default blue.
+
+    .PARAMETER your_version_color
+    Optional string to change the color of 'your changes' (left side - database) in the git diff results from the default Red
+
+    .PARAMETER their_version_color
+    Optional string to change the color of 'their changes' (right side - repository) in the git diff results from the default Green
+
+    .PARAMETER same_version_color
+    Optional string to change the color of git diff results where there is no change from the default Gray
+
+    .PARAMETER DoNotSuppressCRLFWarning
+    Optional switch that will disregard trying to suppress the CRLF "safe warning". Use this if you are weary of this module changing your git global config and if you don't mind seeing the unneeded warning.
+
+    .PARAMETER DoNotFormatOutput
+    Optional switch that will show the formatted results of the git diff comparison but without colors.
+
+    .PARAMETER JustGiveMeTheRawGitDiff
+    Optional switch which skips all processing of the git diff results completely and returns the full results. Use this if you wish to interpret the results manually or with another tool.
+
+    .PARAMETER DoNotShowLegend
+    Optional switch which skips showing the legend after the git diff results are shown. Use this if you already know what the colors mean.
+
+    .INPUTS
+    Show-AutomateNOWCodeRepositoryOutOfSyncItemComparison accepts [PSCustomObject] results from Compare-AutomateNOWCodeRepositoryOutOfSyncItem on the pipeline
+
+    .OUTPUTS
+    Informational messages with the results.
+
+    .EXAMPLE
+    Quietly selects the 'master' branch of a Code Repository named 'CodeRepository1' and shows the results of the comparison of Out Of Sync Items with default formatting
+	
+    $repository = Get-AutomateNOWCodeRepository -Id 'CodeRepository1'
+    Select-AutomateNOWCodeRepositoryBranch -CodeRepository $repository -Branch 'master' -Quiet -Force
+    $results = $repository | Get-AutomateNOWCodeRepositoryOutOfSyncItem | Compare-AutomateNOWCodeRepositoryOutOfSyncItem -CodeRepository $repository
+    Show-AutomateNOWCodeRepositoryOutOfSyncItemComparison -AutomateNOWCodeRepositoryOutOfSyncItemComparison $results
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    Use the left/right results to help you determine whether to use the -AcceptYours or -AcceptTheirs parameter for Sync-AutomateNOWCodeRepositoryOutOfSyncItem
+
+    Alternate colors may be specified using any of the standard 16 colors available to Write-Host.
+
+    #>
+	
+    [Cmdletbinding()]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [PSCustomObject]$AutomateNOWCodeRepositoryOutOfSyncItemComparison,
+        [ValidateSet('Black', 'DarkBlue', 'DarkGreen', 'DarkCyan', 'DarkRed', 'DarkMagenta', 'DarkYellow', 'Gray', 'DarkGray', 'Blue', 'Green', 'Cyan', 'Red', 'Magenta', 'Yellow', 'White')]
+        [Parameter(Mandatory = $false)]
+        [string]$header_color = 'Blue',
+        [ValidateSet('Black', 'DarkBlue', 'DarkGreen', 'DarkCyan', 'DarkRed', 'DarkMagenta', 'DarkYellow', 'Gray', 'DarkGray', 'Blue', 'Green', 'Cyan', 'Red', 'Magenta', 'Yellow', 'White')]
+        [Parameter(Mandatory = $false)]
+        [string]$your_version_color = 'Red',
+        [ValidateSet('Black', 'DarkBlue', 'DarkGreen', 'DarkCyan', 'DarkRed', 'DarkMagenta', 'DarkYellow', 'Gray', 'DarkGray', 'Blue', 'Green', 'Cyan', 'Red', 'Magenta', 'Yellow', 'White')]
+        [Parameter(Mandatory = $false)]
+        [string]$their_version_color = 'Green',
+        [ValidateSet('Black', 'DarkBlue', 'DarkGreen', 'DarkCyan', 'DarkRed', 'DarkMagenta', 'DarkYellow', 'Gray', 'DarkGray', 'Blue', 'Green', 'Cyan', 'Red', 'Magenta', 'Yellow', 'White')]
+        [Parameter(Mandatory = $false)]
+        [string]$same_version_color = 'Gray',
+        [Parameter(Mandatory = $false)]
+        [switch]$DoNotSuppressCRLFWarning,
+        [Parameter(Mandatory = $false)]
+        [switch]$DoNotFormatOutput,
+        [Parameter(Mandatory = $false)]
+        [switch]$JustGiveMeTheRawGitDiff,
+        [Parameter(Mandatory = $false)]
+        [switch]$DoNotShowLegend
+    )
+    Begin {
+        $Error.Clear()
+        Try {
+            [string]$git_version = (git version)
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Failed to find the git executable due to [$Message]. Please note that this function requires the command line version of git to be available on the local path of this session."
+            Break
+        }
+        If ($git_version.Length -eq 0) {
+            Write-Warning -Message "Failed to detect the git executable. Please note that this function requires the command line version of git to be available on the local path of this session."
+            Break
+        }
+        Write-Debug -Message "Detected $git_version"
+        # Note: The below routine is needed to suppress the warning that typically happens on Windows systems when trying to diff local files. This warning cannot be suppressed on the command line directly so modifying the git config is the only way. Use the -DoNotSuppressCRLFWarning switch to include the warning.
+        If ($DoNotSuppressCRLFWarning -ne $true) {
+            $Error.Clear()
+            Try {
+                [string[]]$git_config = (git config -l)
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Failed to read the current git config due to [$Message]. Please note that this function requires the command line version of git to be available on the local path of this session."
+                Break
+            }
+            If ($git_config.count -eq 0) {
+                Write-Warning -Message "Failed to detect the current git config. Please note that this function requires the command line version of git to be available on the local path of this session."
+                Break
+            }
+            [string]$safecrlf = $git_config -match 'safecrlf'
+            If ($safecrlf -ne 'safecrlf = false') {
+                $Error.Clear()
+                Try {
+                    (git config --global core.safecrlf false) | Out-Null
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Failed to set the current git config to silence crlf warnings due to [$Message]. Please note that this function requires the command line version of git to be available on the local path of this session."
+                    Break
+                }
+            }
+        }
+    }
+    Process {
+        If ($_.Length -gt 0) {
+            [PSCustomObject]$AutomateNOWCodeRepositoryOutOfSyncItemComparison = $_
+        }
+        [string]$item_id = $AutomateNOWCodeRepositoryOutOfSyncItemComparison.item_id
+        [string]$item_domain = $AutomateNOWCodeRepositoryOutOfSyncItemComparison.item_domain
+        [string]$domainClassName = $AutomateNOWCodeRepositoryOutOfSyncItemComparison.domainClassName
+        [string]$codeRepository = $AutomateNOWCodeRepositoryOutOfSyncItemComparison.codeRepository
+        [string]$your_version = $AutomateNOWCodeRepositoryOutOfSyncItemComparison.your_version
+        [string]$their_version = $AutomateNOWCodeRepositoryOutOfSyncItemComparison.their_version
+        [string]$temp_path = $env:TEMP
+        If ($null -eq (Test-Path -Path "$temp_path")) {
+            Write-Warning -Message "Failed to detect the temporary path. Please note that this function requires to be able to write temporary files to the %TEMP% location to accomodate the git differencing utility."
+            Break
+        }
+        [string]$current_file_time = (Get-Date).ToUniversalTime().ToFileTime()
+        [string]$your_version_temp_filename = "AutomateNOWCodeRepositoryOutOfSyncItemComparison-$current_file_time-your-version.json"
+        [string]$their_version_temp_filename = "AutomateNOWCodeRepositoryOutOfSyncItemComparison-$current_file_time-their-version.json"
+        [string]$your_version_temp_filepath = ($temp_path + '\' + $your_version_temp_filename)
+        [string]$their_version_temp_filepath = ($temp_path + '\' + $their_version_temp_filename)    	
+        #Create a temporary text file - This is required by the git utility
+        $Error.Clear()
+        Try {
+            $your_version | Out-File -FilePath "$your_version_temp_filepath" -Force -Encoding utf8
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Out-File failed to write content of 'your version' to $your_version_temp_filepath under Show-AutomateNOWCodeRepositoryOutOfSyncItemComparison due to [$Message] related to $item_id in $item_domain of type $domainClassName residing in Code Repository $CodeRepository"
+            Break
+        }
+        If ($null -eq (Test-Path -Path "$your_version_temp_filepath")) {
+            Write-Warning -Message "Somehow the temporary file for 'your version' $your_version_temp_filepath under Show-AutomateNOWCodeRepositoryOutOfSyncItemComparison was not written to disk. Please look into this related to $item_id in $item_domain of type $domainClassName residing in Code Repository $CodeRepository"
+            Break
+        }
+        [System.IO.FileSystemInfo]$AutomateNOWCodeRepositoryOutOfSyncItemComparisonYourFileDetails = Get-Item -Path "$your_version_temp_filepath"
+        [int32]$AutomateNOWCodeRepositoryOutOfSyncItemComparisonYourFileLength = $AutomateNOWCodeRepositoryOutOfSyncItemComparisonYourFileDetails.Length
+        Write-Debug -Message "$your_version_temp_filepath was detected as $AutomateNOWCodeRepositoryOutOfSyncItemComparisonYourFileLength bytes in length"    	
+        #Create a temporary text file - This is required by the git utility
+        $Error.Clear()
+        Try {
+            $their_version | Out-File -FilePath "$their_version_temp_filepath" -Force -Encoding utf8
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Out-File failed to write content of 'their version' to $their_version_temp_filepath under Show-AutomateNOWCodeRepositoryOutOfSyncItemComparison due to [$Message]. Please look into this related to $item_id in $item_domain of type $domainClassName residing in Code Repository $CodeRepository"
+            Break
+        }
+        If ($null -eq (Test-Path -Path "$their_version_temp_filepath")) {
+            Write-Warning -Message "Somehow the temporary file for 'their version' $their_version_temp_filepath under Show-AutomateNOWCodeRepositoryOutOfSyncItemComparison was not written to disk. Please look into this related to $item_id in $item_domain of type $domainClassName residing in Code Repository $CodeRepository"
+            Break
+        }    	
+        [System.IO.FileSystemInfo]$AutomateNOWCodeRepositoryOutOfSyncItemComparisonTheirFileDetails = Get-Item -Path "$their_version_temp_filepath"
+        [int32]$AutomateNOWCodeRepositoryOutOfSyncItemComparisonTheirFileLength = $AutomateNOWCodeRepositoryOutOfSyncItemComparisonTheirFileDetails.Length
+        Write-Debug -Message "$their_version_temp_filepath was detected as $AutomateNOWCodeRepositoryOutOfSyncItemComparisonTheirFileLength bytes in length"
+        #Compare the two text files with the git utility
+        [string[]]$git_results = git diff "$your_version_temp_filepath" "$their_version_temp_filepath"
+        If ($git_results.count -eq 0) {
+            Write-Warning -Message "Somehow we made it this far but the initial git comparison results were empty!"
+            Break
+        }
+        #Remove the temporary text files - These files were required by the git utility
+        $Error.Clear()
+        Try {
+            "$their_version_temp_filepath" | Remove-Item -Force
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Remove-Item failed to delete the temporary file '$their_version_temp_filepath' under Show-AutomateNOWCodeRepositoryOutOfSyncItemComparison due to [$Message]. Please look into this related to $item_id in $item_domain of type $domainClassName residing in Code Repository $CodeRepository"
+            Break
+        }
+        $Error.Clear()
+        Try {
+            "$your_version_temp_filepath" | Remove-Item -Force
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Remove-Item failed to delete the temporary file '$your_version_temp_filepath' under Show-AutomateNOWCodeRepositoryOutOfSyncItemComparison due to [$Message]. Please look into this related to $item_id in $item_domain of type $domainClassName residing in Code Repository $CodeRepository"
+            Break
+        }    	
+        If ($JustGiveMeTheRawGitDiff -ne $true) {
+            [string[]]$git_results = $git_results | Where-Object { $_ -notmatch '^diff --git ' -and $_ -notmatch '^index ' -and $_ -notmatch '^--- ' -and $_ -notmatch '^\+\+\+' -and $_ -notmatch '\\ No newline at end of file' }
+            If ($git_results.count -eq 0) {
+                Write-Warning -Message "We made it so far but the git comparison results were empty after filtering!"
+                Break
+            }
+            ForEach ($result in $git_results) {
+                If ($DoNotFormatOutput -ne $true) {
+                    If ($result -match '^@@') {
+                        Write-Host $result -ForegroundColor $header_color
+                    }
+                    ElseIf ($result -match '^-') {
+                        Write-Host $result -ForegroundColor $your_version_color
+                    }
+                    ElseIf ($result -match '^\+') {
+                        Write-Host $result -ForegroundColor $their_version_color
+                    }
+                    Else {
+                        Write-Host $result -ForegroundColor $same_version_color
+                    }
+                }
+                Else {
+                    Write-Host $result
+                }
+            }
+            If ($DoNotFormatOutput -ne $true -and $DoNotShowLegend -ne $true) {
+                Write-Host ""
+                Write-Host "Legend:"
+                Write-Host ""
+                Write-Host "Entries in [" -NoNewLine
+                Write-Host $header_color -NoNewLine -ForegroundColor $header_color
+                Write-Host "] are the header for each git diff chunk"
+                Write-Host "Entries in [" -NoNewLine
+                Write-Host $your_version_color -NoNewLine -ForegroundColor $your_version_color
+                Write-Host "] are your different lines in the ANOW database (left side) [-AcceptYours]"
+                Write-Host "Entries in [" -NoNewLine
+                Write-Host $their_version_color -NoNewLine -ForegroundColor $their_version_color
+                Write-Host "] are their different lines in the repository branch (right side) [-AcceptTheirs]"
+                Write-Host "Entries in [" -NoNewLine
+                Write-Host $same_version_color -NoNewLine -ForegroundColor $same_version_color
+                Write-Host "] are identical on both sides"
+            }
+        }
+        Else {
+            Return $git_results
+        }
+    }
+    End {
+
+    }
+}
+
+Function Merge-AutomateNOWCodeRepositoryOutOfSyncItem {
+
+    <#
+    .SYNOPSIS
+    Merges an Out Of Sync Item in a local Code Repository in an AutomateNOW! instance between the database version (yours, left side) and the repository version (theirs, right side)
+
+    .DESCRIPTION
+    Merges an Out Of Sync Item in a local Code Repository in an AutomateNOW! instance between the database version (yours, left side) and the repository version (theirs, right side)
+
+    .PARAMETER CodeRepository
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWFolder to retrieve them)
+
+    .PARAMETER ANOWCodeRepositoryOutOfSyncItem
+    Mandatory [ANOWCodeRepositoryOutOfSyncItem] (Use Get-AutomateNOWCodeRepositoryOutOfSyncItem to retreive them)
+
+    .PARAMETER AcceptYours
+    1 of 2 mandatory switch parameters to determine which side is accepted. Use this if "your" side or the database/left side is what you want to accept and apply with the merger.
+
+    .PARAMETER AcceptYours
+    2 of 2 mandatory switch parameters to determine which side is accepted. Use this if "their" side or the repository/right side is what you want to accept and apply with the merger.
+
+    .PARAMETER Force
+    Force the merging of the object without confirmation. This is equivalent to -Confirm:$false
+
+    .PARAMETER Quiet
+    Optional switch to suppress the display of the results
+
+    .INPUTS
+    A [ANOWCodeRepository] object must be presented. [ANOWCodeRepositoryOutOfSyncItem] objects are also required and can be sent across the pipeline.
+
+    .OUTPUTS	
+    The [ANOWCodeRepositoryOutOfSyncItem] object that was Merged will be returned.
+
+    .EXAMPLE
+    Gets the Out Of Sync Items from a Code Repository named 'CodeRepository1' and then quietly and forcibly merges them with the acceptance on the left side.
+
+    $repository = Get-AutomateNOWCodeRepository -Id 'CodeRepository1'
+    $out_of_sync_items = Get-AutomateNOWCodeRepositoryOutOfSyncItem -CodeRepository $repository
+    $out_of_sync_items | Merge-AutomateNOWCodeRepositoryOutOfSyncItem -AcceptYours -CodeRepository $repository -Force -Quiet
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [OutputType([PSCustomObject])]
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [ANOWCodeRepository]$CodeRepository,
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [ANOWCodeRepositoryOutOfSyncItem]$ANOWCodeRepositoryOutOfSyncItem,
+        [Parameter(Mandatory = $true, ParameterSetName = 'AcceptYours')]
+        [switch]$AcceptYours,
+        [Parameter(Mandatory = $true, ParameterSetName = 'AcceptTheirs')]
+        [switch]$AcceptTheirs,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
+        If ($_.Id.Length -gt 0 ) {
+            [ANOWCodeRepositoryOutOfSyncItem]$ANOWCodeRepositoryOutOfSyncItem = $_
+        }
+        [string]$Item_id = $ANOWCodeRepositoryOutOfSyncItem.Id
+        If ($Item_Id.Length -eq 0) {
+            Write-Warning -Message "Somehow the Out Of Sync Item that was passed to Merge-AutomateNOWCodeRepositoryItem does not have an Id. Please look into this."
+            Break
+        }
+        [string]$CodeRepository_Id = $CodeRepository.Id
+        [string]$Item_Type = $Item_id -split '\|' | Select-Object -Skip 1 -First 1
+        [string]$Item_simpleId = $Item_id -split '\|' | Select-Object -Last 1
+        If ($Item_Type.Length -eq 0) {
+            Write-Warning -Message "Failed to extract the item type for item $Item_id under Merge-AutomateNOWCodeRepositoryItem. Please look into this."
+            Break
+        }
+        If ($Item_simpleId.Length -eq 0) {
+            Write-Warning -Message "Failed to extract the simpleId for item $Item_id under Merge-AutomateNOWCodeRepositoryItem. Please look into this."
+            Break
+        }
+        [string]$object_string = ('{"itemId":"' + $Item_simpleId + '","itemType":"' + $Item_Type + '"}')
+        If ($AcceptYours -eq $true) {
+            [string]$accept = 'acceptYours'
+        }
+        ElseIf ($AcceptTheirs -eq $true) {
+            [string]$accept = 'acceptTheirs'
+        }
+        Else {
+            Write-Warning -Message "Somehow it was not possible to determine if Merge-AutomateNOWCodeRepositoryItem is accepting yours (left side, database) or their changes (right side, repository). Please look into this."
+            Break
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Merge Out Of Sync Item $($Item_Id) with decision: $($accept)?")) -eq $true) {        	
+            $Body.'object' = $object_string
+            $Body.'codeRepository' = $CodeRepository_Id
+            $Body.'_operationType' = 'custom'
+            $Body.'_operationId' = $accept
+            $Body.'_textMatchStyle' = 'exact'
+            $Body.'_dataSource' = 'OutOfSyncObjectDataSource'
+            $Body.'isc_metaDataPrefix' = '_'
+            $Body.'isc_dataFormat' = 'json'
+            [string]$Body = ConvertTo-QueryString -InputObject $Body
+            If ($null -eq $parameters["Body"]) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            If ($null -eq $parameters["Command"]) {
+                [string]$command = ("/outOfSyncObject/$accept")
+                $parameters.Add('Command', $command)
+            }
+            Else {
+                $parameters.Command = $command
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
+                Break
+            }
+            If ($results.response.status -ne 0) {
+                If ($null -eq $results.response.status) {
+                    Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
+                    Break
+                }
+                Else {
+                    [int32]$status_code = $results.response.status
+                    [string]$results_response = $results.response
+                    Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
+                    Break
+                }
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$MergedCodeRepositoryItem = $results.response.data
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Failed to parse the response [PSCustomObject] object due to [$Message]."
+                Break
+            }
+            If ($MergedCodeRepositoryItem.Id.Length -gt 0) {
+                If ($Quiet -ne $true) {
+                    Return $MergedCodeRepositoryItem
+                }
+            }
+            Else {
+                Write-Warning -Message "Somehow the returned Item ($Item_Id) didn't have an Id after being added to Code Repository $CodeRepository_Id. Something must be wrong. Please check into this further."
+                Break
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+#endregion
+
+#Region - CodeRepository Merge Requests
+
+Function Get-AutomateNOWCodeRepositoryMergeRequest {
+
+    <#
+    .SYNOPSIS
+    Gets the merge requests from a local Code Repository in an AutomateNOW! instance
+
+    .DESCRIPTION
+    Gets the merge requests from a local Code Repository in an AutomateNOW! instance
+
+    .PARAMETER CodeRepository
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
+
+    .PARAMETER Id
+    Optional int64 to filter the results to a single merge request by name. Use this when you only want a specific merge request.
+
+    .PARAMETER startRow
+    Integer to indicate the row to start from. This is intended for when you need to paginate the results. Default is 0.
+
+    .PARAMETER endRow
+    Integer to indicate the row to stop on. This is intended for when you need to paginate the results. Default is 2000.
+
+    .INPUTS
+    You must present an [ANOWCodeRepository] object
+
+    .OUTPUTS
+    [ANOWCodeRepositoryMergeRequest] objects
+
+    .EXAMPLE
+    Gets all of the merge requests from a Code Repository named 'Repository1'
+
+    $repo = Get-AutomateNOWCodeRepository -Id 'Repository1'
+    $merge_requests = Get-AutomateNOWCodeRepositoryMergeRequest -CodeRepository $repo
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [OutputType([ANOWCodeRepositoryMergeRequest[]])]
+    [Cmdletbinding(DefaultParameterSetName = 'All')]
+    Param(
+        [Parameter(Mandatory = $true, ParameterSetName = 'All', ValueFromPipeline = $true)]
+        [Parameter(Mandatory = $true, ParameterSetName = 'Single', ValueFromPipeline = $true)]
+        [ANOWCodeRepository]$CodeRepository,
+        [Parameter(Mandatory = $true, ParameterSetName = 'Single')]
+        [int64]$Id,
+        [Parameter(Mandatory = $False, ParameterSetName = 'All')]
+        [int32]$startRow = 0,
+        [Parameter(Mandatory = $False, ParameterSetName = 'All')]
+        [int32]$endRow = 100,
+        [Parameter(Mandatory = $false, ParameterSetName = 'All')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Single')]
+        [switch]$StringOnly
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        If ($endRow -le $startRow) {
+            Write-Warning -Message "The endRow must be greater than the startRow. Please try again."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'GET')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
+        If ($_.Id.Length -gt 0 ) {
+            [ANOWCodeRepository]$CodeRepository = $_
+        }
+        [string]$CodeRepository_Id = $CodeRepository.Id
+        $Body.'codeRepository' = $CodeRepository_id
+        $Body.'criteria' = ('{"fieldName":"codeRepository","operator":"equals","value":"' + $CodeRepository_Id + '","_constructor":"AdvancedCriteria"}')
+        $Body.'_constructor' = 'AdvancedCriteria'
+        $Body.'operator' = 'and'
+        $Body.'_startRow' = $startRow
+        $Body.'_endRow' = $endRow
+        $Body.'_operationType' = 'fetch'
+        $Body.'_textMatchStyle' = 'exact'
+        $Body.'_componentId' = 'MergeRequestList'
+        $Body.'_dataSource' = 'MergeRequestDataSource'
+        $Body.'isc_metaDataPrefix' = '_'
+        $Body.'isc_dataFormat' = 'json'
+        [string]$Body = ConvertTo-QueryString -InputObject $Body
+        [string]$command = ('/mergeRequest/read?' + $Body)
+        If ($null -eq $parameters["Command"]) {
+            $parameters.Add('Command', $command)
+        }
+        Else {
+            $parameters.Command = $command
+        }
+        $Error.Clear()
+        Try {
+            [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
+            Break
+        }
+        If ($results.response.status -ne 0) {
+            If ($null -eq $results.response.status) {
+                Write-Warning -Message "Received an empty response when invoking the [$command] CodeRepository. Please look into this."
+                Break
+            }
+            Else {
+                [int32]$status_code = $results.response.status
+                [string]$results_response = $results.response
+                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
+                Break
+            }
+        }
+        $Error.Clear()
+        Try {
+            [ANOWCodeRepositoryMergeRequest[]]$CodeRepositoryMergeRequests = $results.response.data
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Failed to parse the response into a series of [ANOWCodeRepositoryMergeRequest] objects due to [$Message]."
+            Break
+        }
+        If ($Id -gt 0) {
+            [ANOWCodeRepositoryMergeRequest]$CodeRepositoryMergeRequest = $CodeRepositoryMergeRequests | Where-Object { $_.Id -eq $Id }
+            Return $CodeRepositoryMergeRequest
+        }
+        ElseIf ($Id -eq 0 -and $CodeRepositoryMergeRequests.Count -gt 0) {
+            Return $CodeRepositoryMergeRequests
+        }
+    }
+}
+
+Function Approve-AutomateNOWCodeRepositoryMergeRequest {
+
+    <#
+    .SYNOPSIS
+    Approves (accepts) a Merge Request on a local Code Repository in an AutomateNOW! instance
+
+    .DESCRIPTION
+    Approves (accepts) a Merge Request on a local Code Repository in an AutomateNOW! instance
+
+    .PARAMETER CodeRepository
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWFolder to retrieve them)
+
+    .PARAMETER MergeRequest
+    Mandatory [ANOWCodeRepositoryMergeRequest] object (Use Get-AutomateNOWMergeRequest to retrieve them)
+
+    .PARAMETER Force
+    Force the acceptance of the Merge Request without confirmation. This is equivalent to -Confirm:$false
+
+    .PARAMETER Quiet
+    Optional switch to suppress the display of the results
+
+    .INPUTS
+    You must pass both the [ANOWCodeRepository] object and a [ANOWCodeRepositoryMergeRequest] object.
+
+    .OUTPUTS
+    The denied [ANOWCodeRepositoryMergeRequest] object will be returned. Use -Quiet to suppress this.
+
+    .EXAMPLE
+    Accepts a Merge Request with the id of 9 on a Code Repository named 'Repository1'
+
+    $repository = Get-AutomateNOWCodeRepository -Id 'Repository1'
+    $merge_request = Get-AutomateNOWCodeRepositoryMergeRequest -CodeRepository $repository -Id 9
+    Approve-AutomateNOwCodeRepositoryMergeRequest -CodeRepository $repository -MergeRequest $merge_request
+
+    .EXAMPLE
+    Forcibly accepts a Merge Request with the id of 9 on a Code Repository named 'Repository1'
+
+    $repository = Get-AutomateNOWCodeRepository -Id 'Repository1'
+    $merge_request = Get-AutomateNOWCodeRepositoryMergeRequest -CodeRepository $repository -Id 9
+    $merge_request | Approve-AutomateNOwCodeRepositoryMergeRequest -CodeRepository $repository -Force
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [OutputType([ANOWCodeRepositoryMergeRequest])]
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [ANOWCodeRepository]$CodeRepository,
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [ANOWCodeRepositoryMergeRequest]$MergeRequest,
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.Id.Length -gt 0 ) {
+            [ANOWCodeRepositoryMergeRequest]$MergeRequest = $_
+        }
+        [int64]$MergeRequest_Id = $MergeRequest.Id
+        [string]$CodeRepository_id = $CodeRepository.Id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Proceed to accept the merge request `"$($MergeRequest_Id)`" on the Code Repository $($CodeRepository_id) ?")) -eq $true) {
+            [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
+            $Body.'id' = $MergeRequest_Id
+            $Body.'_operationType' = 'update'
+            $Body.'_operationId' = 'accept'
+            $Body.'_textMatchStyle' = 'exact'
+            $Body.'_dataSource' = 'MergeRequestDataSource'
+            $Body.'isc_metaDataPrefix' = '_'
+            $Body.'isc_dataFormat' = 'json'
+            [string]$Body = ConvertTo-QueryString -InputObject $Body
+            If ($null -eq $parameters["Body"]) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            If ($null -eq $parameters["Command"]) {
+                [string]$command = ('/mergeRequest/accept')
+                $parameters.Add('Command', $command)
+            }
+            Else {
+                $parameters.Command = $command
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
+                Break
+            }
+            If ($results.response.status -ne 0) {
+                If ($null -eq $results.response.status) {
+                    Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
+                    Break
+                }
+                Else {
+                    [int32]$status_code = $results.response.status
+                    [string]$results_response = $results.response
+                    Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
+                    Break
+                }
+            }
+            $Error.Clear()
+            Try {
+                [ANOWCodeRepositoryMergeRequest]$MergeRequest = $results.response.data
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Failed to parse the response into a [ANOWCodeRepositoryMergeRequest] object due to [$Message]."
+                Break
+            }
+            If ($MergeRequest.Id -gt 0) {
+                If ($Quiet -ne $true) {
+                    Return $MergeRequest
+                }
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+Function Deny-AutomateNOWCodeRepositoryMergeRequest {
+
+    <#
+    .SYNOPSIS
+    Denies (rejects) a Merge Request on a local Code Repository in an AutomateNOW! instance
+
+    .DESCRIPTION
+    Denies (rejects) a Merge Request on a local Code Repository in an AutomateNOW! instance
+
+    .PARAMETER CodeRepository
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWFolder to retrieve them)
+
+    .PARAMETER MergeRequest
+    Mandatory [ANOWCodeRepositoryMergeRequest] object (Use Get-AutomateNOWMergeRequest to retrieve them)
+
+    .PARAMETER Force
+    Force the rejection of the object without confirmation. This is equivalent to -Confirm:$false
+
+    .PARAMETER Quiet
+    Optional switch to suppress the display of the results
+
+    .INPUTS
+    You must pass both the [ANOWCodeRepository] object and a [ANOWCodeRepositoryMergeRequest] object.
+
+    .OUTPUTS
+    The denied [ANOWCodeRepositoryMergeRequest] object will be returned. Use -Quiet to suppress this.
+
+    .EXAMPLE
+    Denies (rejects) a Merge Request with the id of 9 on a Code Repository named 'Repository1'
+
+    $repository = Get-AutomateNOWCodeRepository -Id 'Repository1'
+    $merge_request = Get-AutomateNOWCodeRepositoryMergeRequest -CodeRepository $repository -Id 9
+    Deny-AutomateNOwCodeRepositoryMergeRequest -CodeRepository $repository -MergeRequest $merge_request
+
+    .EXAMPLE
+    Forcibly denies (rejects) a Merge Request with the id of 9 on a Code Repository named 'Repository1'
+
+    $repository = Get-AutomateNOWCodeRepository -Id 'Repository1'
+    $merge_request = Get-AutomateNOWCodeRepositoryMergeRequest -CodeRepository $repository -Id 9
+    $merge_request | Deny-AutomateNOwCodeRepositoryMergeRequest -CodeRepository $repository -Force
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [OutputType([ANOWCodeRepositoryMergeRequest])]
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [ANOWCodeRepository]$CodeRepository,
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [ANOWCodeRepositoryMergeRequest]$MergeRequest,
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.Id.Length -gt 0 ) {
+            [ANOWCodeRepositoryMergeRequest]$MergeRequest = $_
+        }
+        [int64]$MergeRequest_Id = $MergeRequest.Id
+        [string]$CodeRepository_id = $CodeRepository.Id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Proceed to deny/reject the merge request `"$($MergeRequest_Id)`" on the Code Repository $($CodeRepository_id) ?")) -eq $true) {
+            [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
+            $Body.'id' = $MergeRequest_Id
+            $Body.'_operationType' = 'update'
+            $Body.'_operationId' = 'reject'
+            $Body.'_textMatchStyle' = 'exact'
+            $Body.'_dataSource' = 'MergeRequestDataSource'
+            $Body.'isc_metaDataPrefix' = '_'
+            $Body.'isc_dataFormat' = 'json'
+            [string]$Body = ConvertTo-QueryString -InputObject $Body
+            If ($null -eq $parameters["Body"]) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            If ($null -eq $parameters["Command"]) {
+                [string]$command = ('/mergeRequest/reject')
+                $parameters.Add('Command', $command)
+            }
+            Else {
+                $parameters.Command = $command
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
+                Break
+            }
+            If ($results.response.status -ne 0) {
+                If ($null -eq $results.response.status) {
+                    Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
+                    Break
+                }
+                Else {
+                    [int32]$status_code = $results.response.status
+                    [string]$results_response = $results.response
+                    Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
+                    Break
+                }
+            }
+            $Error.Clear()
+            Try {
+                [ANOWCodeRepositoryMergeRequest]$MergeRequest = $results.response.data
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Failed to parse the response into a [ANOWCodeRepositoryMergeRequest] object due to [$Message]."
+                Break
+            }
+            If ($MergeRequest.Id -gt 0) {
+                If ($Quiet -ne $true) {
+                    Return $MergeRequest
+                }
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+#endregion
+
+#Region - CodeRepository Tags
+
+Function Get-AutomateNOWCodeRepositoryTag {
+
+    <#
+    .SYNOPSIS
+    Gets the git tags from a local Code Repository in an AutomateNOW! instance
+
+    .DESCRIPTION
+    Gets the git tags from a local Code Repository in an AutomateNOW! instance
+
+    .PARAMETER CodeRepository
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
+
+    .PARAMETER startRow
+    Integer to indicate the row to start from. This is intended for when you need to paginate the results. Default is 0.
+
+    .PARAMETER endRow
+    Integer to indicate the row to stop on. This is intended for when you need to paginate the results. Default is 2000.
+
+    .INPUTS
+    You must present an [ANOWCodeRepository] object
+
+    .OUTPUTS
+    An array of PSCustomObjects representing the git tags in the repository.
+
+    .EXAMPLE
+    Gets the names of the git tags from a Code Repository
+
+    $repo = Get-AutomateNOWCodeRepository -Id 'Repository1'
+    $branches = Get-AutomateNOWCodeRepositoryTag -CodeRepository $repo
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [OutputType([ANOWCodeRepository[]])]
+    [Cmdletbinding()]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [ANOWCodeRepository]$CodeRepository,
+        [Parameter(Mandatory = $False)]
+        [int32]$startRow = 0,
+        [Parameter(Mandatory = $False)]
+        [int32]$endRow = 100
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        If ($endRow -le $startRow) {
+            Write-Warning -Message "The endRow must be greater than the startRow. Please try again."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'GET')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
+        If ($_.Id.Length -gt 0 ) {
+            $Body.'codeRepository' = $_.Id
+        }
+        Else {
+            $Body.'codeRepository' = $CodeRepository.Id
+        }
+        $Body.'_operationType' = 'fetch'
+        $Body.'_startRow' = $startRow
+        $Body.'_endRow' = $endRow
+        $Body.'_textMatchStyle' = 'exact'
+        $Body.'_componentId' = 'CodeRepositoryTagList'
+        $Body.'_dataSource' = 'CodeRepositoryTagDataSource'
+        $Body.'isc_metaDataPrefix' = '_'
+        $Body.'isc_dataFormat' = 'json'
+        [string]$Body = ConvertTo-QueryString -InputObject $Body
+        [string]$command = ('/codeRepositoryTag/read?' + $Body)
+        If ($null -eq $parameters["Command"]) {
+            $parameters.Add('Command', $command)
+        }
+        Else {
+            $parameters.Command = $command
+        }
+        $Error.Clear()
+        Try {
+            [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
+            Break
+        }
+        If ($results.response.status -ne 0) {
+            If ($null -eq $results.response.status) {
+                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
+                Break
+            }
+            Else {
+                [int32]$status_code = $results.response.status
+                [string]$results_response = $results.response
+                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
+                Break
+            }
+        }
+        $Error.Clear()
+        Try {
+            [ANOWCodeRepositoryTag[]]$CodeRepositoryTags = $results.response.data
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Failed to parse the response into a series of [ANOWCodeRepositoryTag] objects due to [$Message]."
+            Break
+        }
+        If ($CodeRepositoryTags.Count -gt 0) {
+            Return $CodeRepositoryTags
+        }
+    }
+    End {
+
+    }
+}
+
+Function New-AutomateNOWCodeRepositoryTag {
+    <#
+    .SYNOPSIS
+    Creates a git tag on a local Code Repository in an AutomateNOW! instance
+
+    .DESCRIPTION
+    Creates a git tag on a local Code Repository in an AutomateNOW! instance
+
+    .PARAMETER CodeRepository
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWFolder to retrieve them)
+
+    .PARAMETER Tag
+    Mandatory string for the name of the git tag. The name of the git tag may consist only of alphanumeric characters and 3 special characters (._-) and not to exceed 128 characters in length.
+
+    .PARAMETER Description
+    Optional string for the description of the tag. The maximum length permitted for this string is unknown.
+
+    .PARAMETER Quiet
+    Optional switch to suppress the display of the results
+
+    .PARAMETER Force
+    Force the creation of the object without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    You must present [ANOWCodeRepository] objects
+
+    .OUTPUTS
+    An informational message indicating the results. Use -Quiet to suppress this.
+
+    .EXAMPLE
+    Creates a new tag named 'tag1' on a repository named 'CodeRepository1'.
+
+    $repo = Get-AutomateNOWCodeRepository -Id 'CodeRepository1'
+    New-AutomateNOWCodeRepositoryTag -CodeRepository $repo -Tag 'tag1'
+
+    .EXAMPLE
+    Uses the pipeline to quietly and forcibly create three tags on a repository named 'CodeRepository1'
+
+    $repo = Get-AutomateNOWCodeRepository -Id 'CodeRepository1'
+    @('tag1', 'tag2', 'tag3') | New-AutomateNOWCodeRepositoryTag -CodeRepository $repo -Force -Quiet
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [ANOWCodeRepository]$CodeRepository,
+        [ValidateScript({ $_.Length -gt 0 -and $_.Length -le 128 })]
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [string]$Tag,
+        [Parameter(Mandatory = $false)]
+        [string]$Description,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0 ) {
+            [string]$Tag = $_
+        }
+        [string]$CodeRepository_Id = $CodeRepository.Id
+        ## Do not tamper with this code. It ensures that we are not trying to add a git tag that already exists
+        [string[]]$existing_tag_names = (Get-AutomateNOWCodeRepositoryTag -CodeRepository $CodeRepository).name
+        If ($Tag -in $existing_tag_names) {
+            Write-Warning -Message "The git tag [$Tag] already exists in $CodeRepository_id. No action is required."
+            Break
+        }
+        ##
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Proceed to create the git tag `"$($Tag)`" on the Code Repository $($CodeRepository_id) ?")) -eq $true) {
+            [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
+            $Body.'codeRepository' = $CodeRepository_Id
+            $Body.'name' = $Tag
+            If ($Description.Length -gt 0) {
+                $Body.'description' = $Description
+            }
+            $Body.'_operationType' = 'add'
+            $Body.'_textMatchStyle' = 'exact'
+            $Body.'_oldValues' = ('{"codeRepository":"' + $CodeRepository_Id + '","name":"","description":""}')
+            $Body.'_componentId' = 'CodeRepositoryTagCreateWindow_form'
+            $Body.'_dataSource' = 'CodeRepositoryTagDataSource'
+            $Body.'isc_metaDataPrefix' = '_'
+            $Body.'isc_dataFormat' = 'json'
+            [string]$Body = ConvertTo-QueryString -InputObject $Body
+            If ($null -eq $parameters["Body"]) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            If ($null -eq $parameters["Command"]) {
+                [string]$command = ('/codeRepositoryTag/create')
+                $parameters.Add('Command', $command)
+            }
+            Else {
+                $parameters.Command = $command
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
+                Break
+            }
+            If ($results.response.status -ne 0) {
+                If ($null -eq $results.response.status) {
+                    Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
+                    Break
+                }
+                Else {
+                    [int32]$status_code = $results.response.status
+                    [string]$results_response = $results.response
+                    Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
+                    Break
+                }
+            }
+            If ($Quiet -ne $True) {
+                [string]$tag_id = $results.response.data.id
+                Write-Information -MessageData "New git tag $Tag ($tag_id) was created on Code Repository $CodeRepository_Id"
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+Function Remove-AutomateNOWCodeRepositoryTag {
+
+    <#
+    .SYNOPSIS
+    Deletes a git tag on a local Code Repository in an AutomateNOW! instance
+
+    .DESCRIPTION
+    Deletes a git tag on a local Code Repository in an AutomateNOW! instance
+
+    .PARAMETER CodeRepository
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWFolder to retrieve them)
+
+    .PARAMETER Tag
+    Mandatory [ANOWCodeRepositoryTag] object to be deleted from the Code Repository. Use Get-AutomateNOWCodeRepositoryTag to retrieve these.
+
+    .PARAMETER Quiet
+    Optional switch to suppress the display of the results
+
+    .PARAMETER Force
+    Force the removal without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    You must present a [ANOWCodeRepository] object along with [ANOWCodeRepositoryTag] objects
+
+    .OUTPUTS
+    An informational message indicating the results. Use -Quiet to suppress this.
+
+    .EXAMPLE
+    Deletes a git tag named 'Tag2' on a repository named 'CodeRepository1'.
+
+    $repo = Get-AutomateNOWCodeRepository -Id 'CodeRepository1'
+    $tag = Get-AutomateNOWCodeRepositoryTag -CodeRepository $repo | Where-Object { $_.name -eq 'Tag2' }
+    Remove-AutomateNOWCodeRepositoryTag -CodeRepository $repo -Tag $tag
+
+    .EXAMPLE
+    Uses the pipeline to quietly and forcibly delete three tags on a repository named 'CodeRepository1'
+
+    $repo = Get-AutomateNOWCodeRepository -Id 'CodeRepository1'
+    $tags = Get-AutomateNOWCodeRepositoryTag -CodeRepository $repo | Where-Object { $_.name -in @('Tag1', 'Tag2', 'Tag3') }
+    $tags | Remove-AutomateNOWCodeRepositoryTag -CodeRepository $repo -Force -Quiet
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [ANOWCodeRepository]$CodeRepository,
+        [ValidateScript({ $_.Length -gt 0 -and $_.Length -le 128 })]
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [ANOWCodeRepositoryTag]$Tag,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0 ) {
+            [ANOWCodeRepositoryTag]$Tag = $_
+        }
+        [string]$CodeRepository_Id = $CodeRepository.Id
+        ## Do not tamper with this code. It ensures that we are not trying to remove a git tag that doesn't exist
+        $Error.Clear()
+        Try {
+            [string[]]$existing_tag_ids = (Get-AutomateNOWCodeRepositoryTag -CodeRepository $CodeRepository).id
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWCodeRepositoryBranch failed to retrieve the git tags from $CodeRepository_Id under Remove-AutomateNOWCodeRepositoryTag due to [$Message]."
+            Break
+        }
+        [string]$Tag_id = $Tag.id
+        If ($Tag.id -notin $existing_tag_ids) {
+            Write-Warning -Message "The git tag [$Tag] does not exist in $CodeRepository_id. No action is required."
+            Break
+        }
+        ##
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Proceed to delete the git tag `"$($Tag)`" from the Code Repository $($CodeRepository_id) ?")) -eq $true) {
+            [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
+            $Body.'codeRepository' = $CodeRepository_Id
+            $Body.'id' = $Tag_id
+            $Body.'_operationType' = 'remove'
+            $Body.'_textMatchStyle' = 'exact'
+            $Body.'_dataSource' = 'CodeRepositoryTagDataSource'
+            $Body.'isc_metaDataPrefix' = '_'
+            $Body.'isc_dataFormat' = 'json'
+            [string]$Body = ConvertTo-QueryString -InputObject $Body
+            If ($null -eq $parameters["Body"]) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            [string]$command = ('/codeRepositoryTag/delete')
+            If ($null -eq $parameters["Command"]) {
+                $parameters.Add('Command', $command)
+            }
+            Else {
+                $parameters.Command = $command
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
+                Break
+            }
+            If ($results.response.status -ne 0) {
+                If ($null -eq $results.response.status) {
+                    Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
+                    Break
+                }
+                Else {
+                    [int32]$status_code = $results.response.status
+                    [string]$results_response = $results.response
+                    Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
+                    Break
+                }
+            }
+            If ($Quiet -ne $True) {
+                [string]$tag_name = $results.response.data.name
+                Write-Information -MessageData "The git tag $tag_name ($Tag_id) was deleted from Code Repository $CodeRepository_Id"
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+Function Select-AutomateNOWCodeRepositoryTag {
+    <#
+    .SYNOPSIS
+    Selects a git tag for usage from a Code Repository on an instance of AutomateNOW!
+
+    .DESCRIPTION
+    Selects a git tag for usage from a Code Repository on an instance of AutomateNOW!
+
+    .PARAMETER CodeRepository
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
+
+    .PARAMETER Tag
+    Mandatory [ANOWCodeRepositoryTag] object to be selected from the Code Repository. Use Get-AutomateNOWCodeRepositoryTag to retrieve these.
+
+    .PARAMETER Quiet
+    Optional switch to suppress the display of the results
+
+    .INPUTS
+    You must present both the [ANOWCodeRepository] object for the Code Repository and the [ANOWCodeRepositoryTag] object for the Tag object
+
+    .OUTPUTS
+    An informational message indicating that the tag was successfully selected. Use the -Quiet parameter to silence this notification.
+
+    .EXAMPLE
+    Selects a git tag named 'Tag2' from a Code Repository named 'Repository1'
+
+    $repo = Get-AutomateNOWCodeRepository -Id 'Repository1'
+    $tags = Get-AutomateNOWCodeRepositoryTag -CodeRepository $repo
+    $tag = $tags | Where-Object { $_.Name -eq 'Tag2'}
+    Select-AutomateNOWCodeRepositoryTag -CodeRepository $repo -Tag $tag
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    This function is the equivalent to the 'Select Tag' button when 1 git tag is selected in the Tags tab of a Code Repository.
+
+    This function will ensure that the git tag exists before attempting to select it.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [ANOWCodeRepository]$CodeRepository,
+        [Parameter(Mandatory = $true)]
+        [ANOWCodeRepositoryTag]$Tag,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        [string]$CodeRepository_id = $CodeRepository.id
+        [string]$tag_name = $Tag.name
+        ## Do not tamper with this code. It ensures that we are not trying to remove a git tag that doesn't exist
+        $Error.Clear()
+        [string[]]$existing_tag_ids = (Get-AutomateNOWCodeRepositoryTag -CodeRepository $CodeRepository).id
+        [string]$Tag_id = $Tag.id
+        If ($Tag_id -notin $existing_tag_ids) {
+            Write-Warning -Message "The git tag $tag_name ($Tag_id) does not exist in $CodeRepository_id. It cannot be selected."
+            Break
+        }
+        ##
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($CodeRepository_id)")) -eq $true) {
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.Add('name', $tag_name )
+            $BodyMetaData.Add('id', $CodeRepository_id )
+            $BodyMetaData.Add('_operationType', 'custom')
+            $BodyMetaData.Add('_operationId', 'selectTag')
+            $BodyMetaData.Add('_textMatchStyle', 'exact')
+            $BodyMetaData.Add('_dataSource', 'CodeRepositoryDataSource')
+            $BodyMetaData.Add('isc_metaDataPrefix', '_')
+            $BodyMetaData.Add('isc_dataFormat', 'json')
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            $parameters.Add('Body', $Body)
+            [string]$command = ('/codeRepository/selectTag')
+            $parameters.Add('Command', $command)
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on $CodeRepository_id due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                If ($Quiet -eq $true) {
+                    Return $false
+                }
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "The response code was [$response_code] instead of 0. The Code Repository $CodeRepository_id push (Upload) was not successful. Please see the full response $full_response_display"
+            }
+            Else {
+                If ($Quiet -ne $true) {
+                    $sync_table = $results.response.data
+                    $sync_table | Format-Table -Autosize -Wrap
+                    Write-Information -MessageData "The git tag $Tag_name ($Tag_id) has been selected for $CodeRepository_id"
+                }
+                Else {
+                    Write-Debug -Message "The git tag $Tag_name ($Tag_id) has been selected for $CodeRepository_id"
+                }
+            }
+        }
+    }
+    End {
+
     }
 }
 
@@ -6546,7 +11201,7 @@ Function New-AutomateNOWDataSource {
     Optional description of the DataSource (may not exceed 255 characters).
 
     .PARAMETER Tags
-    Optional string array containing the id's of the tags to assign to the new DataSource.
+    Optional string array containing the CASE-SENSITIVE id's of the tags to assign to the new DataSource.
 
     .PARAMETER Folder
     Optional name of the folder to place the DataSource into.
@@ -6806,13 +11461,10 @@ Function Set-AutomateNOWDataSource {
     A switch parameter that will move the Task Template out of its current folder.
 
     .PARAMETER Tags
-    Optional array of strings representing the Tags to include with this object.
+    Optional string array of CASE-SENSITIVE Tag Id's to include with this object.
 
     .PARAMETER UnsetTags
     A switch parameter that will the Tags from the Task Template
-
-    .PARAMETER CodeRepository
-    Optional name of the code repository to place the Stock into.
 
     .PARAMETER Force
     Force the change without confirmation. This is equivalent to -Confirm:$false
@@ -6845,13 +11497,13 @@ Function Set-AutomateNOWDataSource {
 
     $DataSource = Get-AutomateNOWDataSource -Id 'MyDataSource'
     Set-AutomateNOWDataSource -DataSource $DataSource -CodeRepository -Tags 'Tag1', 'Tag2' -Force
-    
+
     .EXAMPLE
     Changes the Folder of a Data Source
 
     $DataSource = Get-AutomateNOWDataSource -Id 'MyDataSource'
     Set-AutomateNOWDataSource -DataSource $DataSource -Folder 'Folder01'
-    
+
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
 
@@ -6882,8 +11534,6 @@ Function Set-AutomateNOWDataSource {
         [string]$Folder,
         [Parameter(Mandatory = $false)]
         [switch]$UnsetFolder,
-        [Parameter(Mandatory = $false)]
-        [string]$CodeRepository,
         [Parameter(Mandatory = $false)]
         [switch]$Force
     )
@@ -6985,11 +11635,16 @@ Function Set-AutomateNOWDataSource {
                     }
                     Catch {
                         [string]$Message = $_.Exception.Message
-                        Write-Warning -Message "Get-AutomateNOWTag had an error while retrieving the tag [$tag_id] running under New-AutomateNOWScheduleTemplate due to [$message]"
+                        Write-Warning -Message "Get-AutomateNOWTag had an error while retrieving the tag [$tag_id] running under Set-AutomateNOWDataSource due to [$message]"
                         Break
                     }
                     If ($tag_object.simpleId.length -eq 0) {
-                        Throw "New-AutomateNOWScheduleTemplate has detected that the tag [$tag_id] does not appear to exist. Please check again."
+                        Write-Warning -Message "Set-AutomateNOWDataSource has detected that the tag [$tag_id] does not appear to exist. Please check again."
+                        Break
+                    }
+                    ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
+                        [string]$tag_object_simpleId = $tag_object.simpleId
+                        Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                         Break
                     }
                     [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -7005,25 +11660,6 @@ Function Set-AutomateNOWDataSource {
                 Write-Verbose -Message "Removing tags [$tags_display] from $DataSource_id"
                 $BodyMetaData.'tags' = $null
                 $include_properties += 'tags'
-            }
-            If ($CodeRepository.Length -gt 0) {
-                $Error.Clear()
-                Try {
-                    [ANOWCodeRepository]$code_repository_object = Get-AutomateNOWCodeRepository -Id $CodeRepository
-                }
-                Catch {
-                    [string]$Message = $_.Exception.Message
-                    Write-Warning -Message "Get-AutomateNOWCodeRepository failed to confirm that the code repository [$CodeRepository] existed under Set-AutomateNOWDataSource due to [$Message]"
-                    Break
-                }
-                If ($code_repository_object.simpleId.Length -eq 0) {
-                    Throw "Get-AutomateNOWCodeRepository failed to locate the Code Repository [$CodeRepository] under Set-AutomateNOWDataSource. Please check again."
-                    Break
-                }
-                [string]$code_repository_display = $code_repository_object | ConvertTo-Json -Compress
-                Write-Verbose -Message "Adding code repository $code_repository_display to Data Source [$DataSource_id]"
-                $BodyMetaData.'codeRepository' = $CodeRepository
-                $include_properties += 'codeRepository'
             }
             If ($Validity.Length -gt 0) {
                 $BodyMetaData.'validity' = $Validity
@@ -7108,7 +11744,7 @@ Function Copy-AutomateNOWDataSource {
     Optional switch that will ensure that the newly created DataSource will not have any Tags set.
 
     .PARAMETER Tags
-    Optional strings to set a different set of Tags on the new DataSource object. If you do not set this, the new DataSource object will appy the same Tags of the source object.
+    Optional string array of CASE-SENSITIVE Tag Id's to set on the new DataSource object. If you do not set this, the new DataSource object will apply the same Tags of the source object.
 
     .INPUTS
     ONLY [ANOWDataSource] object is accepted. Pipeline support is intentionally unavailable.
@@ -8549,7 +13185,7 @@ Function Set-AutomateNOWEndpoint {
     Optional switch that will remove the Tags from the Endpoint object.
 
     .PARAMETER Tags
-    Optional strings to set a different set of Tags on the new Endpoint object.
+    Optional string array of CASE-SENSITIVE Tag Id's to set on the new Endpoint object.
 
     .PARAMETER Force
     Force the change without confirmation. This is equivalent to -Confirm:$false
@@ -8819,7 +13455,7 @@ Function New-AutomateNOWEndpoint {
     Optional description of the Endpoint (may not exceed 255 characters).
 
     .PARAMETER Tags
-    Optional string array containing the id's of the tags to assign to the new Endpoint. Do not pass [ANOWTag] objects here.
+    Optional string array containing the CASE-SENSITIVE id's of the tags to assign to the new Endpoint. Do not pass [ANOWTag] objects here.
 
     .PARAMETER Folder
     Optional name of the folder to place the Endpoint into.
@@ -8907,6 +13543,11 @@ Function New-AutomateNOWEndpoint {
             }
             If ($tag_object.simpleId.length -eq 0) {
                 Throw "New-AutomateNOWEndpoint has detected that the tag [$tag_id] does not appear to exist. Please check again."
+                Break
+            }
+            ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
+                [string]$tag_object_simpleId = $tag_object.simpleId
+                Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                 Break
             }
             [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -9042,7 +13683,7 @@ Function Copy-AutomateNOWEndpoint {
     Optional switch that will ensure that the newly created Endpoint will not have any Tags set.
 
     .PARAMETER Tags
-    Optional strings to set a different set of Tags on the new Endpoint object. If you do not set this, the new Endpoint object will appy the same Tags of the source object.
+    Optional string array of CASE-SENSITIVE Tag Id's to set on the new Endpoint object. If you do not set this, the new Endpoint object will apply the same Tags of the source object.
 
     .INPUTS
     ONLY [ANOWEndpoint] object is accepted. Pipeline support is intentionally unavailable.
@@ -10571,7 +15212,7 @@ Function Set-AutomateNOWLock {
     Optional switch that will remove the Tags from the Lock object.
 
     .PARAMETER Tags
-    Optional strings to set a different set of Tags on the new Lock object.
+    Optional string array of CASE-SENSITIVE Tag Id's to set on the new Lock object.
 
     .PARAMETER Force
     Force the change without confirmation. This is equivalent to -Confirm:$false
@@ -10832,7 +15473,7 @@ Function New-AutomateNOWLock {
     Optional description of the Lock (may not exceed 255 characters).
 
     .PARAMETER Tags
-    Optional string array containing the id's of the tags to assign to the new Lock. Do not pass [ANOWTag] objects here.
+    Optional string array containing the CASE-SENSITIVE id's of the tags to assign to the new Lock. Do not pass [ANOWTag] objects here.
 
     .PARAMETER Folder
     Optional name of the folder to place the Lock into.
@@ -10917,6 +15558,11 @@ Function New-AutomateNOWLock {
             }
             If ($tag_object.simpleId.length -eq 0) {
                 Throw "New-AutomateNOWLock has detected that the tag [$tag_id] does not appear to exist. Please check again."
+                Break
+            }
+            ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
+                [string]$tag_object_simpleId = $tag_object.simpleId
+                Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                 Break
             }
             [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -11156,7 +15802,7 @@ Function Copy-AutomateNOWLock {
     Optional switch that will ensure that the newly created Lock will not have any Tags set.
 
     .PARAMETER Tags
-    Optional strings to set a different set of Tags on the new Lock object. If you do not set this, the new Lock object will appy the same Tags of the source object.
+    Optional string array of CASE-SENSITIVE Tag Id's to set on the new Lock object. If you do not set this, the new Lock object will apply the same Tags of the source object.
 
     .INPUTS
     ONLY [ANOWLock] object is accepted. Pipeline support is intentionally unavailable.
@@ -11787,7 +16433,7 @@ Function New-AutomateNOWNode {
     Optional description of the node (may not exceed 255 characters).
 
     .PARAMETER Tags
-    Optional string array containing the id's of the tags to assign to the new node. Do not pass [ANOWTag] objects here.
+    Optional string array containing the CASE-SENSITIVE id's of the tags to assign to the new node. Do not pass [ANOWTag] objects here.
 
     .PARAMETER Folder
     Optional name of the folder to place the node into.
@@ -11882,6 +16528,11 @@ Function New-AutomateNOWNode {
             }
             If ($tag_object.simpleId.length -eq 0) {
                 Throw "New-AutomateNOWNode has detected that the tag [$tag_id] does not appear to exist. Please check again."
+                Break
+            }
+            ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
+                [string]$tag_object_simpleId = $tag_object.simpleId
+                Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                 Break
             }
             [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -12017,7 +16668,7 @@ Function Copy-AutomateNOWNode {
     Optional switch that will ensure that the newly created Node will not have any Tags set.
 
     .PARAMETER Tags
-    Optional strings to set a different set of Tags on the new Node object. If you do not set this, the new Node object will appy the same Tags of the source object.
+    Optional string array of CASE-SENSITIVE Tag Id's to set on the new Node object. If you do not set this, the new Node object will apply the same Tags of the source object.
 
     .INPUTS
     ONLY [ANOWNode] object is accepted. Pipeline support is intentionally unavailable.
@@ -13063,7 +17714,7 @@ Function New-AutomateNOWResultMapping {
     Optional description of the Result Mapping (may not exceed 255 characters).
 
     .PARAMETER Tags
-    Optional string array containing the id's of the tags to assign to the new Result Mapping. Do not pass [ANOWTag] objects here.
+    Optional string array containing the CASE-SENSITIVE id's of the tags to assign to the new Result Mapping. Do not pass [ANOWTag] objects here.
 
     .PARAMETER Folder
     Optional name of the folder to place the Result Mapping into.
@@ -13148,6 +17799,11 @@ Function New-AutomateNOWResultMapping {
             }
             If ($tag_object.simpleId.length -eq 0) {
                 Throw "New-AutomateNOWResultMapping has detected that the tag [$tag_id] does not appear to exist. Please check again."
+                Break
+            }
+            ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
+                [string]$tag_object_simpleId = $tag_object.simpleId
+                Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                 Break
             }
             [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -13283,7 +17939,7 @@ Function Copy-AutomateNOWResultMapping {
     Optional switch that will ensure that the newly created ResultMapping will not have any Tags set.
 
     .PARAMETER Tags
-    Optional strings to set a different set of Tags on the new ResultMapping object. If you do not set this, the new ResultMapping object will appy the same Tags of the source object.
+    Optional string array of CASE-SENSITIVE Tag Id's to set on the new ResultMapping object. If you do not set this, the new ResultMapping object will apply the same Tags of the source object.
 
     .INPUTS
     ONLY [ANOWResultMapping] object is accepted. Pipeline support is intentionally unavailable.
@@ -15250,6 +19906,9 @@ Function Set-AutomateNOWScheduleTemplate {
     .PARAMETER Description
     Optional description of the Schedule Template (may not exceed 255 characters).
 
+    .PARAMETER UnsetDescription
+    Optional switch that will remove the Description from the Schedule Template object.
+
     .PARAMETER Folder
     A string representing the name of the Folder to move the Schedule Template into.
 
@@ -15257,7 +19916,7 @@ Function Set-AutomateNOWScheduleTemplate {
     A switch parameter that will move the Schedule Template out of its current folder.
 
     .PARAMETER Tags
-    Optional array of strings representing the Tags to include with this object.
+    Optional string array of CASE-SENSITIVE Tag Id's to include with this object.
 
     .PARAMETER UnsetTags
     A switch parameter that will the Tags from the Schedule Template
@@ -15427,6 +20086,11 @@ Function Set-AutomateNOWScheduleTemplate {
                         Throw "New-AutomateNOWScheduleTemplate has detected that the tag [$tag_id] does not appear to exist. Please check again."
                         Break
                     }
+                    ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
+                        [string]$tag_object_simpleId = $tag_object.simpleId
+                        Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
+                        Break
+                    }
                     [string]$tag_display = $tag_object | ConvertTo-Json -Compress
                     Write-Verbose -Message "Adding tag $tag_display [$current_tag of $total_tags]"
                     [string]$tag_name_sequence = ('tags' + $current_tag)
@@ -15594,7 +20258,7 @@ Function New-AutomateNOWScheduleTemplate {
     Optional description of the Schedule Template (may not exceed 255 characters).
 
     .PARAMETER Tags
-    Optional array of strings representing the Tags to include with this object.
+    Optional string array of CASE-SENSITIVE Tag Id's to include with this object.
 
     .PARAMETER Folder
     Optional string representing the Folder to place this object into.
@@ -15706,6 +20370,11 @@ Function New-AutomateNOWScheduleTemplate {
             }
             If ($tag_object.simpleId.length -eq 0) {
                 Throw "New-AutomateNOWScheduleTemplate has detected that the tag [$tag_id] does not appear to exist. Please check again."
+                Break
+            }
+            ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
+                [string]$tag_object_simpleId = $tag_object.simpleId
+                Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                 Break
             }
             [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -15948,7 +20617,7 @@ Function Copy-AutomateNOWScheduleTemplate {
     Optional description of the Schedule Template (may not exceed 255 characters). You may send an empty string here to ensure that the description is blanked out. Do not use this parameter if your intention is to keep the description from the previous Schedule Template.
 
     .PARAMETER Tags
-    Optional string array containing the id's of the tags to assign to the new Schedule Template.
+    Optional string array containing the CASE-SENSITIVE id's of the tags to assign to the new Schedule Template.
 
     .PARAMETER Folder
     Optional name of the folder to place the Schedule Template into. The UnsetFolder parameter overrides this setting.
@@ -16283,7 +20952,7 @@ Function Start-AutomateNOWScheduleTemplate {
     Optional description of the executed Schedule (may not exceed 255 characters).
 
     .PARAMETER Tags
-    Optional string array containing the id's of the tags to assign to the new Schedule.
+    Optional string array containing the CASE-SENSITIVE id's of the tags to assign to the new Schedule.
 
     .PARAMETER Folder
     Optional name of the folder to place the executed Schedule into.
@@ -16387,6 +21056,11 @@ Function Start-AutomateNOWScheduleTemplate {
                 }
                 If ($tag_object.simpleId.length -eq 0) {
                     Throw "Start-AutomateNOWScheduleTemplate has detected that the tag [$tag_id] does not appear to exist. Please check again."
+                    Break
+                }
+                ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
+                    [string]$tag_object_simpleId = $tag_object.simpleId
+                    Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                     Break
                 }
                 [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -17090,7 +21764,7 @@ Function Add-AutomateNOWScheduleTemplateItem {
     Mandatory [ANOWScheduleTemplate] object representing the Schedule Template that will receive the new Processing Template.
 
     .Parameter ProcessingTemplate
-    Mandatory [PSObject] (either Task Template or Workflow Template) object representing the Processing Template that is being added to the Schedule Template.
+    Mandatory [ANOWProcessingTemplate] (either Task Template or Workflow Template) object representing the Processing Template Item that is being added to the Schedule Template.
 
     .PARAMETER sortOrder
     Optional int32 specifying the sort order. When not specified, the sort order will be LAST. If needed, use Read-AutomateNOWSchedule to obtain the current sort order of the items in the Schedule.
@@ -17112,6 +21786,11 @@ Function Add-AutomateNOWScheduleTemplateItem {
     $schedule_template1 = Get-AutomateNOWScheduleTemplate -Id 'ScheduleTemplate02'
 
     @($task_template1, $workflow_template1) | Add-AutomateNOWScheduleTemplateItem -ScheduleTemplate $schedule_template1 -Force
+
+    .EXAMPLE
+    Forcibly adds a Workflow to a Schedule Template in a single line
+
+    Get-AutomateNOWWorkflowTemplate -Id 'Workflow1' | Add-AutomateNOWScheduleTemplateItem -ScheduleTemplate (Get-AutomateNOWScheduleTemplate -Id 'Schedule1') -Force
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
@@ -17150,12 +21829,12 @@ Function Add-AutomateNOWScheduleTemplateItem {
             If ($_.id.Length -gt 0) {
                 [string]$ProcessingTemplate_id = $_.id
             }
-            ElseIf ($ProcessingTemplate.id.Length -gt 0) {
+            ElseIf ($ProcessingTemplateItem.id.Length -gt 0) {
                 [string]$ProcessingTemplate_id = $ProcessingTemplate.id
             }
             $Error.Clear()
             Try {
-                [PSCustomObject]$ScheduleTemplateItems = Read-AutomateNOWScheduleTemplateItem -ScheduleTemplate $ScheduleTemplate
+                [ANOWProcessingTemplateItem[]]$ScheduleTemplateItems = Read-AutomateNOWScheduleTemplateItem -ScheduleTemplate $ScheduleTemplate
             }
             Catch {
                 [string]$Message = $_.Exception.Message
@@ -17170,7 +21849,7 @@ Function Add-AutomateNOWScheduleTemplateItem {
             Else {
                 Write-Debug -Message "$ScheduleTemplate_id does not have any items yet. This will be the first item added to it."
                 [int32]$last_item_order = 0
-            }            
+            }
             [ANOWTaskTemplate_processingType]$processingType = $ProcessingTemplate.processingType
             # Note that the taskType property is still sent as an empty property when the Processing Template is a Workflow
             If ($null -ne $ProcessingTemplate.taskType) {
@@ -17182,7 +21861,7 @@ Function Add-AutomateNOWScheduleTemplateItem {
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
             $BodyMetaData.Add('workflow', $ScheduleTemplate_id )
             $BodyMetaData.Add('processingType', $processingType )
-            $BodyMetaData.Add('processingTemplate', $processingTemplate_id )
+            $BodyMetaData.Add('processingTemplate', $ProcessingTemplate_id )
             $BodyMetaData.Add('taskType', $taskType )
             $BodyMetaData.Add('sortOrder', $last_item_order )
             $BodyMetaData.Add('_operationType', 'add')
@@ -17212,7 +21891,157 @@ Function Add-AutomateNOWScheduleTemplateItem {
                 Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
                 Break
             }
-            Write-Debug -Message "Processing Template $ProcessingTemplate_id ($processingType) was added to $ScheduleTemplate_id (order $last_item_order)"
+            [string]$processing_template_item_id = $results.response.data.id
+            If ($processing_template_item_id -notmatch '^[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}$') {
+                Write-Warning -Message "Somehow the returned Id of the newly added Processing Template did not match the expected format of a Processing Template Item which is that of a 36-character GUID. Instead, [$processing_template_item_id] was received. Please look into this."
+            }
+            Write-Debug -Message "Processing Template $ProcessingTemplate_id ($processingType) was added to $ScheduleTemplate_id (as $processing_template_item_id)"
+        }
+    }
+    End {
+
+    }
+}
+
+Function Remove-AutomateNOWScheduleTemplateItem {
+    <#
+    .SYNOPSIS
+    Removes a Processing Template from a Schedule Template
+
+    .DESCRIPTION
+    Removes a Processing Template Item (i.e. Task, Workflow, Service Manager or Integration) from a Schedule Template
+
+    .PARAMETER ScheduleTemplate
+    Mandatory [ANOWScheduleTemplate] object representing the Schedule Template that will lose a Processing Template.
+
+    .Parameter ProcessingTemplateItem
+    Mandatory [ANOWProcessingTemplateItem] (i.e. Task, Workflow, Service Manager or Integration) object representing the Processing Template Item that is being removed from the Schedule Template. Use Read-AutomateNOWScheduleTemplate to retrieve the Processing Template Items from a Schedule Template.
+
+    .PARAMETER Force
+    Force the removal without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    You must present a [ANOWScheduleTemplate] object to the -ScheduleTemplate parameter along with [ANOWProcessingTemplateItem] objects to the -ProcessingTemplateItem parameter. The latter can be pipelined.
+
+    .OUTPUTS
+    None. The status will be written to the console with Write-Verbose.
+
+    .EXAMPLE
+    Removes a single Processing Template Item from a Schedule Template
+
+    $schedule_template = Get-AutomateNOWScheduleTemplate -Id 'ScheduleTemplate1'
+    $processing_template_item = Read-AutomateNOWScheduleTemplateItem -ScheduleTemplate $schedule_template | Where-Object { $_.Id -eq '3fc63622-5e87-468e-a71f-bd78450219e3'}
+    Remove-AutomateNOWScheduleTemplateItem -ScheduleTemplate $schedule_template -ProcessingTemplateItem $processing_template_item
+
+    .EXAMPLE
+    Forcibly removes all instances of a Workflow named 'Workflow1' that was added to a Schedule Template named 'ScheduleTemplate1'.
+
+    $schedule_template = Get-AutomateNOWScheduleTemplate -Id 'ScheduleTemplate1'
+    $workflow_items = Read-AutomateNOWScheduleTemplateItem -ScheduleTemplate $schedule_template | Where-Object { $_.processingTemplate -eq 'Workflow1'}
+    $workflow_items | Remove-AutomateNOWScheduleTemplateItem -ScheduleTemplate $schedule_template -Force
+
+    .EXAMPLE
+    Removes all Processing Template Items from a Schedule Template
+
+    Read-AutomateNOWScheduleTemplateItem -ScheduleTemplate (Get-AutomateNOWScheduleTemplate -Id 'ScheduleTemplate1') | Remove-AutomateNOWScheduleTemplateItem -ScheduleTemplate (Get-AutomateNOWScheduleTemplate -Id 'ScheduleTemplate1')
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    Only Task Templates and Workflow Templates are supported. Service Managers and Integrations are not supported yet.
+
+    Remember that once a Processing Template is added to a Workflow Template or Schedule Template it becomes a Processing Template Item which have a 36-character GUID for the Id.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [ANOWScheduleTemplate]$ScheduleTemplate,
+        [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
+        [ANOWProcessingTemplateItem]$ProcessingTemplateItem,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [string]$ScheduleTemplate_id = $ScheduleTemplate.Id
+        [string]$command = '/processingTemplateItem/delete'
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ScheduleTemplate.id)")) -eq $true) {
+            If ($_.id.Length -gt 0) {
+                [string]$ProcessingTemplateItem_id = $_.id
+            }
+            ElseIf ($ProcessingTemplateItem.id.Length -gt 0) {
+                [string]$ProcessingTemplateItem_id = $ProcessingTemplateItem.id
+            }
+            If ($ProcessingTemplateItem_id -notmatch '^[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}$') {
+                Write-Warning -Message "Was expecting the Id of the Processing Template Id to match a 36-character GUID, instead received [$ProcessingTemplateItem_id]. Please check into this."
+                Break
+            }
+            Else {
+                Write-Debug -Message "Received [$ProcessingTemplateItem_id] for the Id of the Processing Template Item to be removed"
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$ScheduleTemplateItems = Read-AutomateNOWScheduleTemplateItem -ScheduleTemplate $ScheduleTemplate
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Read-AutomateNOWScheduleTemplateItem failed to Read [$ScheduleTemplate_id] under Remove-AutomateNOWScheduleTemplateItem due to [$Message]."
+                Break
+            }
+            [int32]$ScheduleTemplateItems_Count = $ScheduleTemplateItems.Count
+            If ($ScheduleTemplateItems_Count -eq 0) {
+                Write-Debug -Message "$ScheduleTemplate_id does not have any Processing Template items added to it yet... Please check again."
+                Break
+            }
+            If ($ProcessingTemplateItem_id -notin ($ScheduleTemplateItems.Id) ) {
+                Write-Warning -Message "The Processing Template Item $ProcessingTemplateItem_id is not actually added to [$ScheduleTemplate_id]. Please check this."
+                Break
+            }
+            [string]$old_values = $ProcessingTemplateItem.CreateOldValues()
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.Add('id', $ProcessingTemplateItem_id )
+            $BodyMetaData.Add('_oldValues', $old_values )
+            $BodyMetaData.Add('_operationType', 'remove')
+            $BodyMetaData.Add('_textMatchStyle', 'exact')
+            $BodyMetaData.Add('_dataSource', 'ProcessingTemplateItemDataSource')
+            $BodyMetaData.Add('isc_metaDataPrefix', '_')
+            $BodyMetaData.Add('isc_dataFormat', 'json')
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            If ($null -eq $parameters.Body) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$ScheduleTemplate_id] due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
+            }
+            Write-Debug -Message "Processing Template $ProcessingTemplateItem_id ($processingType) was removed from $ScheduleTemplate_id"
         }
     }
     End {
@@ -17474,7 +22303,7 @@ Function Set-AutomateNOWSemaphore {
     Optional switch that will remove the Tags from the Semaphore object.
 
     .PARAMETER Tags
-    Optional strings to set a different set of Tags on the new Semaphore object.
+    Optional string array of CASE-SENSITIVE Tag Id's to set on the new Semaphore object.
 
     .PARAMETER Force
     Force the change without confirmation. This is equivalent to -Confirm:$false
@@ -17786,7 +22615,7 @@ Function New-AutomateNOWSemaphore {
     Optional description of the Semaphore (may not exceed 255 characters).
 
     .PARAMETER Tags
-    Optional string array containing the id's of the tags to assign to the new Semaphore. Do not pass [ANOWTag] objects here.
+    Optional string array containing the CASE-SENSITIVE id's of the tags to assign to the new Semaphore. Do not pass [ANOWTag] objects here.
 
     .PARAMETER Folder
     Optional name of the folder to place the Semaphore into.
@@ -17871,6 +22700,11 @@ Function New-AutomateNOWSemaphore {
             }
             If ($tag_object.simpleId.length -eq 0) {
                 Throw "New-AutomateNOWSemaphore has detected that the tag [$tag_id] does not appear to exist. Please check again."
+                Break
+            }
+            ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
+                [string]$tag_object_simpleId = $tag_object.simpleId
+                Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                 Break
             }
             [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -18115,7 +22949,7 @@ Function Copy-AutomateNOWSemaphore {
     Optional switch that will ensure that the newly created Semaphore will not have any Tags set.
 
     .PARAMETER Tags
-    Optional strings to set a different set of Tags on the new Semaphore object. If you do not set this, the new Semaphore object will appy the same Tags of the source object.
+    Optional string array of CASE-SENSITIVE Tag Id's to set on the new Semaphore object. If you do not set this, the new Semaphore object will apply the same Tags of the source object.
 
     .INPUTS
     ONLY [ANOWSemaphore] object is accepted. Pipeline support is intentionally unavailable.
@@ -18955,7 +23789,7 @@ Function Set-AutomateNOWStock {
     Optional switch that will remove the Tags from the Stock object.
 
     .PARAMETER Tags
-    Optional strings to set a different set of Tags on the new Stock object.
+    Optional string array of CASE-SENSITIVE Tag Id's to set on the new Stock object.
 
     .PARAMETER Force
     Force the change without confirmation. This is equivalent to -Confirm:$false
@@ -19249,7 +24083,7 @@ Function New-AutomateNOWStock {
     Optional description of the Stock (may not exceed 255 characters).
 
     .PARAMETER Tags
-    Optional string array containing the id's of the tags to assign to the new Stock. Do not pass [ANOWTag] objects here.
+    Optional string array containing the CASE-SENSITIVE id's of the tags to assign to the new Stock. Do not pass [ANOWTag] objects here.
 
     .PARAMETER Folder
     Optional name of the folder to place the Stock into.
@@ -19334,6 +24168,11 @@ Function New-AutomateNOWStock {
             }
             If ($tag_object.simpleId.length -eq 0) {
                 Throw "New-AutomateNOWStock has detected that the tag [$tag_id] does not appear to exist. Please check again."
+                Break
+            }
+            ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
+                [string]$tag_object_simpleId = $tag_object.simpleId
+                Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                 Break
             }
             [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -19573,7 +24412,7 @@ Function Copy-AutomateNOWStock {
     Optional switch that will ensure that the newly created Stock will not have any Tags set.
 
     .PARAMETER Tags
-    Optional strings to set a different set of Tags on the new Stock object. If you do not set this, the new Stock object will appy the same Tags of the source object.
+    Optional string array of CASE-SENSITIVE Tag Id's to set on the new Stock object. If you do not set this, the new Stock object will apply the same Tags of the source object.
 
     .INPUTS
     ONLY [ANOWStock] object is accepted. Pipeline support is intentionally unavailable.
@@ -20790,6 +25629,579 @@ Function Get-AutomateNOWTask {
     }
 }
 
+Function Set-AutomateNOWTask {
+    <#
+    .SYNOPSIS
+    Changes the settings of a Task on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Changes the settings of a Task on an AutomateNOW! instance. This is for executed Tasks in the Monitor tab. Please use Set-AutomateNOWTaskTemplate if you wish to modify a Task in the Designer tab.
+
+    .PARAMETER Task
+    An [ANOWTask] object representing the Task to be changed.
+
+    .PARAMETER Tags
+    Optional string array of CASE-SENSITIVE Tag Id's to include with this object.
+
+    .PARAMETER UnsetTags
+    A switch parameter that will the Tags from the Task
+
+    .PARAMETER Folder
+    A string representing the name of the Folder to move the Task into.
+
+    .PARAMETER UnsetFolder
+    A switch parameter that will move the Task out of its current folder.
+
+    .PARAMETER Title
+    A string representing the "alias" of the Task (this property needs a better explanation)
+
+    .PARAMETER UnsetTitle
+    Switch parameter that will remove the existing title
+
+    .PARAMETER Description
+    Optional description of the Task (may not exceed 255 characters).
+
+    .PARAMETER UnsetDescription
+    Switch parameter that will remove the existing description
+
+    .PARAMETER StatusCode
+    An int32 representing the 'Status Code' to be set on the Task.
+
+    .PARAMETER StatusMessage
+    A string representing the 'Status Message' to be set on the Task.
+
+    .PARAMETER UnsetStatusMessage
+    Switch parameter that will remove the existing Status Message
+
+    .PARAMETER ResultMapping
+    An [ResultMapping] object representing the Result Mapping object to set on the Task.
+
+    .PARAMETER UnsetResultMapping
+    A switch parameter that will remove the Result Mapping assignment from the Task.
+
+    .PARAMETER Approval
+    A [ANOWApproval] object representing the Approval object to set on the Task.
+
+    .PARAMETER UnsetApproval
+    A switch parameter that will remove the Approval assignment from the Task.
+
+    .PARAMETER Priority
+    An integer representing the items priority which determines the order when queuing for resources (Stock and Locks) and [for] being executed by Server Nodes. Default Priority is 0. Minimal Priority is 0.
+
+    .PARAMETER Weight
+    An integer representing a logical measure of resources required to process the item by the Server Node. Each Server Node has [a] maximum weight capacity[.] Weight determines [the] number of parallel processes that can run simultaneously. Default processing Weight is 1. Minimal Weight is 0.
+
+    .PARAMETER AutoArchive
+    A boolean setting that will cause the Task tobe archived immediately after execution. You must specify $true or $false here.
+
+    .PARAMETER RestoreOriginalCommand
+    A boolean setting that will [unknown, contact Beta Systems for more information on this]
+
+    .PARAMETER Force
+    Force the change without confirmation. This is equivalent to -Confirm:$false
+
+    .PARAMETER Quiet
+    Switch parameter to silence the extraneous output that this outputs by default
+
+    .INPUTS
+    ONLY [ANOWTask] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    The modified [ANOWTask] object will be returned
+
+    .EXAMPLE
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    To set the Hold/Resume status, use the functions Suspend-AutomateNOWTask and Resume-AutomateNOWTask.
+
+    To set the Skip status, use the function Skip-AutomateNOWTask.
+
+    To unset the Skip status, use the function Skip-AutomateNOWTask with the -UnsetSkip switch parameter.
+    #>
+    [Cmdletbinding(SupportsShouldProcess, DefaultParameterSetName = 'Default', ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
+        [ANOWTask]$Task,
+        [Parameter(Mandatory = $false)]
+        [string[]]$Tags,
+        [Parameter(Mandatory = $false)]
+        [switch]$UnsetTags,
+        [Parameter(Mandatory = $false)]
+        [string]$Folder,
+        [Parameter(Mandatory = $false)]
+        [switch]$UnsetFolder,
+        [ValidateScript({ $_.Length -le 255 })]
+        [Parameter(Mandatory = $false)]
+        [string]$Title,
+        [Parameter(Mandatory = $false)]
+        [switch]$UnsetTitle,
+        [Parameter(Mandatory = $false)]
+        [string]$Description,
+        [Parameter(Mandatory = $false)]
+        [switch]$UnsetDescription,
+        [Parameter(Mandatory = $false)]
+        [int32]$Statuscode,
+        [Parameter(Mandatory = $false)]
+        [string]$StatusMessage,
+        [Parameter(Mandatory = $false)]
+        [ANOWResultMapping]$ResultMapping,
+        [Parameter(Mandatory = $false)]
+        [switch]$UnsetResultMapping,
+        [Parameter(Mandatory = $false)]
+        [ANOWApproval]$Approval,
+        [Parameter(Mandatory = $false)]
+        [switch]$UnsetApproval,
+        [Parameter(Mandatory = $false)]
+        [int32]$Priority,
+        [Parameter(Mandatory = $false)]
+        [int32]$Weight,
+        [Parameter(Mandatory = $false)]
+        [boolean]$AutoArchive,
+        [Parameter(Mandatory = $false)]
+        [switch]$RestoreOriginalCommand,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        If ($UnsetFolder -eq $true -or $Folder.Length -gt 0) {
+            [string]$command = '/processingTemplate/setFolder'
+            [string]$operationId = 'setFolder'
+        }
+        Else {
+            [string]$command = '/processingTemplate/update'
+            [string]$componentId = 'ProcessingTemplateValuesManager'
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+        If ($Description.Length -gt 0 -and $UnsetDescription -eq $true) {
+            Write-Warning -Message 'You cannot set the Description and unset it at the same time. Please choose one or the other.'
+            Break
+        }
+        If ($Title.Length -gt 0 -and $UnsetTitle -eq $true) {
+            Write-Warning -Message 'You cannot set the Title and unset it at the same time. Please choose one or the other.'
+            Break
+        }
+        If ($EagerScriptExecution -eq $true -and $UseScripts -ne $true) {
+            Write-Warning -Message 'To use -EagerScriptExecution, you must include -UseScripts $true'
+            Break
+        }
+        If ($UnsetWorkspace -eq $true -and $Workspace.Length -gt 0) {
+            Write-Warning -Message "You cannot set the Workspace and unset it at the same time. Please choose one or the other."
+            Exit
+        }
+        If ($UnsetFolder -eq $true -and $Folder.Length -gt 0) {
+            Write-Warning -Message "You cannot set the Folder and unset it at the same time. Please choose one or the other."
+            Exit
+        }
+        If ($UnsetServerNode -eq $true -and $ServerNode.Id.Length -gt 0) {
+            Write-Warning -Message "You cannot set the Server Node and unset it at the same time. Please choose one or the other."
+            Exit
+        }
+        If ($Tags.count -gt 0 -and $UnsetTags -eq $true) {
+            Write-Warning -Message "You cannot set the tags and unset them at the same time. Please choose one or the other."
+        }
+        If ($UnsetEndpoint -eq $true -and $Endpoint.id.Length -gt 0) {
+            Write-Warning -Message "You cannot set the Endpoint and unset it at the same time. Please choose one or the other."
+            Exit
+        }
+        If ($UnsetApproval -eq $true -and $Approval.id.Length -gt 0) {
+            Write-Warning -Message "You cannot set the Approval and unset it at the same time. Please choose one or the other."
+            Exit
+        }
+    }
+    Process {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($TaskTemplate.id)")) -eq $true) {
+            If ($_.id.Length -gt 0) {
+                [string]$TaskTemplate_id = $_.id
+            }
+            ElseIf ($TaskTemplate.id.Length -gt 0) {
+                [string]$TaskTemplate_id = $TaskTemplate.id
+            }
+            Else {
+                [string]$TaskTemplate_id = $Id
+            }
+            ## Begin warning ##
+            ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
+            $Error.Clear()
+            Try {
+                [boolean]$Task_exists = ($null -eq (Get-AutomateNOWTask -Id $Task_id))
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Get-AutomateNOWTask failed to check if the Task [$Task_id] already existed due to [$Message]."
+                Break
+            }
+            If ($Task_exists -eq $true) {
+                [string]$current_domain = $anow_session.header.domain
+                Write-Warning -Message "There is not a Task named [$Task_id] in the [$current_domain]. Please check into this."
+                Break
+            }
+            ## End warning ##
+            [System.Collections.ArrayList]$include_properties = [System.Collections.ArrayList]@()
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.'id' = $Task_id
+            If ($Description.Length -gt 0) {
+                $BodyMetaData.'description' = $Description
+            }
+            ElseIf ($UnsetDescription -eq $true) {
+                $BodyMetaData.'description' = $null
+                $include_properties += 'description'
+            }
+            If ($Workspace.Length -gt 0) {
+                $Error.Clear()
+                Try {
+                    [ANOWWorkspace]$workspace_object = Get-AutomateNOWWorkspace -Id $Workspace
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Get-AutomateNOWWorkspace failed to confirm that the workspace [$Workspace] actually existed while running under Set-AutomateNOWTask due to [$Message]"
+                    Break
+                }
+                If ($workspace_object.simpleId.Length -eq 0) {
+                    Throw "Get-AutomateNOWWorkspace failed to locate the Workspace [$Workspace] running under Set-AutomateNOWTask. Please check again."
+                    Break
+                }
+                [string]$workspace_display = $workspace_object | ConvertTo-Json -Compress
+                Write-Verbose -Message "Adding workspace $workspace_display to [ANOWTask] [$Task_id]"
+                $BodyMetaData.'workspace' = $Workspace
+                $include_properties += 'workspace'
+            }
+            ElseIf ($UnsetWorkspace -eq $true) {
+                [string]$workspace_display = $workspace_object | ConvertTo-Json -Compress
+                Write-Verbose -Message "Removing [ANOWTask] [$Task_id] from Workspace $workspace_display"
+                $BodyMetaData.'workspace' = $null
+                $include_properties += 'workspace'
+            }
+            If ($Folder.Length -gt 0) {
+                $Error.Clear()
+                Try {
+                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Get-AutomateNOWFolder failed to confirm that the Folder [$Folder] actually existed while running under Set-AutomateNOWTask due to [$Message]"
+                    Break
+                }
+                If ($folder_object.simpleId.Length -eq 0) {
+                    Throw "Get-AutomateNOWFolder failed to locate the Folder [$Folder] running under Set-AutomateNOWTask. Please check again."
+                    Break
+                }
+                [string]$folder_display = $folder_object | ConvertTo-Json -Compress
+                Write-Verbose -Message "Adding Folder $folder_display to [ANOWTask] [$Task_id]"
+                $BodyMetaData.'folder' = $Folder
+                $include_properties += 'folder'
+            }
+            ElseIf ($UnsetFolder -eq $true) {
+                [string]$folder_display = $folder_object | ConvertTo-Json -Compress
+                Write-Verbose -Message "Removing [ANOWTask] [$Task_id] from Folder $folder_display"
+                $BodyMetaData.'folder' = $null
+                $include_properties += 'folder'
+            }
+            If ($Tags.Count -gt 0) {
+                [int32]$total_tags = $Tags.Count
+                [int32]$current_tag = 1
+                ForEach ($tag_id in $Tags) {
+                    $Error.Clear()
+                    Try {
+                        [ANOWTag]$tag_object = Get-AutomateNOWTag -Id $tag_id
+                    }
+                    Catch {
+                        [string]$Message = $_.Exception.Message
+                        Write-Warning -Message "Get-AutomateNOWTag had an error while retrieving the tag [$tag_id] running under New-AutomateNOWTask due to [$message]"
+                        Break
+                    }
+                    If ($tag_object.simpleId.length -eq 0) {
+                        Throw "New-AutomateNOWTask has detected that the tag [$tag_id] does not appear to exist. Please check again."
+                        Break
+                    }
+                    ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
+                        [string]$tag_object_simpleId = $tag_object.simpleId
+                        Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
+                        Break
+                    }
+                    [string]$tag_display = $tag_object | ConvertTo-Json -Compress
+                    Write-Verbose -Message "Adding tag $tag_display [$current_tag of $total_tags]"
+                    [string]$tag_name_sequence = ('tags' + $current_tag)
+                    $BodyMetaData.Add($tag_name_sequence, $tag_id)
+                    $include_properties += $tag_name_sequence
+                    $current_tag++
+                }
+            }
+            ElseIf ($UnsetTags -eq $true) {
+                [string]$tags_display = ($Calendar.tags) | ConvertTo-Json -Compress
+                Write-Verbose -Message "Removing tags [$tags_display] from [$Task_id]"
+                $BodyMetaData.'tags' = $null
+                $include_properties += 'tags'
+            }
+            If ($Title.Length -gt 0) {
+                $BodyMetaData.'title' = $Title
+            }
+            ElseIf ( $UnsetTitle -eq $true) {
+                $BodyMetaData.'title' = $null
+            }
+            If ($ServerNode.simpleId.Length -gt 0) {
+                [string]$ServerNode_id = $ServerNode.simpleId
+                $Error.Clear()
+                Try {
+                    [ANOWNode]$node_object = Get-AutomateNOWNode -Id $ServerNode_id
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Get-AutomateNOWNode failed to confirm that the Server Node [$ServerNode_id] actually existed while running under Set-AutomateNOWTask due to [$Message]"
+                    Break
+                }
+                If ($node_object.simpleId.Length -eq 0) {
+                    Throw "Get-AutomateNOWNode failed to locate the Server Node [$ServerNode_id] running under Set-AutomateNOWTask. Please check again."
+                    Break
+                }
+                [string]$TaskType = $Task.taskType
+                [string]$ServerNodeType = $ServerNode.serverNodeType
+                [string[]]$ValidServerNodeTypes = Resolve-AutomateNOWTaskType2ServerNodeType -TaskType $TaskType
+                [int32]$ValidServerNodeTypesCount = $ValidServerNodeTypes.Count
+                If ($ValidServerNodeTypesCount -eq 0) {
+                    Write-Warning -Message "Somehow the TaskType2ServerNodeType lookup table has failed"
+                    Break
+                }
+                Else {
+                    If ($ServerNodeType -notin $ValidServerNodeTypes) {
+                        [string]$ValidServerNodeTypesDisplay = $ValidServerNodeTypes -join ', '
+                        Write-Warning -Message "[$ServerNodeType] is not a valid server node type for a [$TaskType] task (which $Task_id is). Please use one of these instead: $ValidServerNodeTypesDisplay"
+                        Break
+                    }
+                }
+                [string]$node_display = $node_object | ConvertTo-Json -Compress
+                Write-Verbose -Message "Adding Server Node $node_display to [ANOWTask] [$Task_id]"
+                $BodyMetaData.'node' = ($ServerNode.id)
+                $include_properties += 'node'
+            }
+            ElseIf ($UnsetServerNode -eq $true) {
+                [string]$node_display = $node_object | ConvertTo-Json -Compress
+                Write-Verbose -Message "Removing [ANOWTask] [$Task_id] from Server Node $node_display"
+                $BodyMetaData.'node' = $null
+                $include_properties += 'node'
+            }
+            If ($Endpoint.simpleId.Length -gt 0) {
+                [string]$Endpoint_id = $Endpoint.simpleId
+                $Error.Clear()
+                Try {
+                    [ANOWEndpoint]$endpoint_object = Get-AutomateNOWEndpoint -Id $Endpoint_id
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Get-AutomateNOWEndpoint failed to confirm that the Endpoint [$Endpoint_id] actually existed while running under Set-AutomateNOWTask due to [$Message]"
+                    Break
+                }
+                If ($endpoint_object.simpleId.Length -eq 0) {
+                    Throw "Get-AutomateNOWendpoint failed to locate the Endpoint [$Endpoint_id] running under Set-AutomateNOWTask. Please check again."
+                    Break
+                }
+                [string]$endpoint_display = $endpoint_object | ConvertTo-Json -Compress
+                Write-Verbose -Message "Adding Endpoint $endpoint_display to [ANOWTask] [$Task_id]"
+                $BodyMetaData.'endpoint' = ($Endpoint.id)
+                $include_properties += 'endpoint'
+            }
+            ElseIf ($UnsetEndpoint -eq $true) {
+                $BodyMetaData.'endpoint' = $null
+                $include_properties += 'endpoint'
+            }
+            If ($ResultMapping.simpleId.Length -gt 0) {
+                [string]$ResultMapping_id = $ResultMapping.simpleId
+                $Error.Clear()
+                Try {
+                    [ANOWResultMapping]$rm_object = Get-AutomateNOWResultMapping -Id $ResultMapping_id
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Get-AutomateNOWResultMapping failed to confirm that the Result Mapping [$ResultMapping_id] actually existed while running under Set-AutomateNOWTask due to [$Message]"
+                    Break
+                }
+                If ($rm_object.simpleId.Length -eq 0) {
+                    Throw "Get-AutomateNOWResultMapping failed to locate the Result Mapping [$ResultMapping_id] running under Set-AutomateNOWTask. Please check again."
+                    Break
+                }
+                [string]$rm_display = $rm_object | ConvertTo-Json -Compress
+                Write-Verbose -Message "Adding Result Mapping $rm_display to [ANOWTask] [$Task_id]"
+                $BodyMetaData.'resultMapping' = $ResultMapping_id
+                $include_properties += 'resultMapping'
+            }
+            ElseIf ($UnsetResultMapping -eq $true) {
+                [string]$rm_display = $rm_object | ConvertTo-Json -Compress
+                Write-Verbose -Message "Removing [ANOWTask] [$ResultMapping_id] from Result Mapping $rm_display"
+                $BodyMetaData.'resultMapping' = $null
+                $include_properties += 'resultMapping'
+            }
+            If ($Calendar.Id.Length -gt 0) {
+                [string]$Calendar_id = $Calendar.simpleId
+                $Error.Clear()
+                Try {
+                    [ANOWCalendar]$Calendar_object = Get-AutomateNOWCalendar -Id $Calendar_id
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Get-AutomateNOWCalendar failed to confirm that the Calendar object [$Calendar_id] actually existed while running under Set-AutomateNOWTask due to [$Message]"
+                    Break
+                }
+                If ($Calendar_object.simpleId.Length -eq 0) {
+                    Throw "Get-AutomateNOWCalendar failed to locate the Calendar object [$Calendar_id] running under Set-AutomateNOWTask. Please check again."
+                    Break
+                }
+                Write-Verbose -Message "Adding Calendar object [$Calendar_id] to [ANOWTask] [$Task_id]"
+                $BodyMetaData.'calendar' = $Calendar_id
+                $include_properties += 'calendar'
+            }
+            ElseIf ($UnsetCalendar -eq $true) {
+                [string]$Calendar_id = $Calendar.simpleId
+                Write-Verbose -Message "Removing [ANOWCalendar] [$Calendar_id] from [ANOWTask] [$Task_id]"
+                $BodyMetaData.'calendar' = $null
+                $include_properties += 'calendar'
+            }
+            If ($Approval.Id.Length -gt 0) {
+                [string]$Approval_id = $Approval.simpleId
+                $Error.Clear()
+                Try {
+                    [ANOWApproval]$Approval_object = Get-AutomateNOWApproval -Id $Approval_id
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Get-AutomateNOWApproval failed to confirm that the Approval object [$Approval_id] actually existed while running under Set-AutomateNOWTask due to [$Message]"
+                    Break
+                }
+                If ($Approval_object.simpleId.Length -eq 0) {
+                    Throw "Get-AutomateNOWApproval failed to locate the Approval object [$Approval_id] running under Set-AutomateNOWTask. Please check again."
+                    Break
+                }
+                Write-Verbose -Message "Adding Approval object [$Approval_id] to [ANOWTask] [$WorkflowTemplate_id]"
+                $BodyMetaData.'approvalConfiguration' = $Approval_id
+                $include_properties += 'approvalConfiguration'
+            }
+            ElseIf ($UnsetApproval -eq $true) {
+                [string]$Approval_id = $Approval.simpleId
+                Write-Verbose -Message "Removing [ANOWApproval] [$Approval_id] from [ANOWTask] [$WorkflowTemplate_id]"
+                $BodyMetaData.'approvalConfiguration' = $null
+                $include_properties += 'approvalConfiguration'
+            }
+            If ($Weight -ge 0) {
+                $BodyMetaData.'weight' = $Weight
+            }
+            If ($Priority -ge 0) {
+                $BodyMetaData.'priority' = $Priority
+            }
+            If ($Owner.Length -gt 0) {
+                $BodyMetaData.'owner' = $Owner
+            }
+            If ($OnHold -eq $false) {
+                $BodyMetaData.'onHold' = 'false'
+            }
+            ElseIf ($OnHold -eq $true) {
+                $BodyMetaData.'onHold' = 'true'
+            }
+            If ($Skip -eq $false) {
+                $BodyMetaData.'passBy' = 'false'
+            }
+            ElseIf ($Skip -eq $true) {
+                $BodyMetaData.'passBy' = 'true'
+            }
+            If ($AutoArchive -eq $false) {
+                $BodyMetaData.'autoArchive' = 'false'
+            }
+            ElseIf ($Skip -eq $true) {
+                $BodyMetaData.'autoArchive' = 'true'
+            }
+            If ($KeepResources -eq $false) {
+                $BodyMetaData.'keepResourcesOnFailure' = 'false'
+            }
+            ElseIf ($KeepResources -eq $true) {
+                $BodyMetaData.'keepResourcesOnFailure' = 'true'
+            }
+            If ($UseScripts -eq $false) {
+                $BodyMetaData.'useScripts' = 'false'
+            }
+            ElseIf ($UseScripts -eq $true) {
+                $BodyMetaData.'useScripts' = 'true'
+            }
+            If ($EagerScriptExecution -eq $false) {
+                $BodyMetaData.'eagerScriptExecution' = 'false'
+            }
+            ElseIf ($EagerScriptExecution -eq $true) {
+                $BodyMetaData.'eagerScriptExecution' = 'true'
+            }
+            $BodyMetaData.'_operationType' = 'update'
+            $BodyMetaData.'_textMatchStyle' = 'exact'
+            #$BodyMetaData.'_oldValues' = '{}' # temp disabled $Task.CreateOldValues()
+            If ($componentId.Length -gt 0) {
+                $BodyMetaData.'_componentId' = $componentId
+            }
+            If ($operationId.Length -gt 0) {
+                $BodyMetaData.'_operationId' = $operationId
+            }
+            $BodyMetaData.'_dataSource' = 'ProcessingTemplateDataSource'
+            $BodyMetaData.'isc_metaDataPrefix' = '_'
+            $BodyMetaData.'isc_dataFormat' = 'json'
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties $include_properties
+            If ($null -eq $parameters.Body) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$Task_id] due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                If ($null -eq $results.response.status) {
+                    Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
+                    Break
+                }
+                Else {
+                    [string]$results_response = $results.response
+                    Write-Warning -Message "Received status code [$response_code] instead of 0. Something went wrong. Here's the full response: $results_response"
+                    Break
+                }
+            }
+            $Error.Clear()
+            Try {
+                [ANOWTask]$UpdatedTask = $results.response.data[0]
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Failed to parse the response into a [ANOWTask] object (under Set-AutomateNOWTask) due to [$Message]."
+                Break
+            }
+            If ($UpdatedTask.id -eq $Task_id) {
+                Write-Verbose -Message "Task $Task_id was successfully updated"
+                If ($Quiet -ne $true) {
+                    Return $UpdatedTask
+                }
+            }
+            Else {
+                Write-Warning -Message "Somehow the returned Task (under Set-AutomateNOWTask) has an error. Please look into this."
+            }
+        }
+    }
+    End {
+    }
+}
+
 Function Export-AutomateNOWTask {
     <#
     .SYNOPSIS
@@ -21874,8 +27286,14 @@ Function Set-AutomateNOWTaskTemplate {
     .PARAMETER TaskTemplate
     An [ANOWTaskTemplate] object representing the Task Template to be changed.
 
+    .PARAMETER ProcessingCommand
+    (Experimental) An optional hashtable containing the new ProcessingCommand (see examples)
+
     .PARAMETER Description
     Optional description of the Task Template (may not exceed 255 characters).
+
+    .PARAMETER UnsetDescription
+    Optional switch that will remove the Description from the Task Template object.
 
     .PARAMETER Workspace
     A string representing the name of the Workspace you wish to move this Task Template into.
@@ -21890,7 +27308,7 @@ Function Set-AutomateNOWTaskTemplate {
     A switch parameter that will move the Task Template out of its current folder.
 
     .PARAMETER Tags
-    Optional array of strings representing the Tags to include with this object.
+    Optional string array of CASE-SENSITIVE Tag Id's to include with this object.
 
     .PARAMETER UnsetTags
     A switch parameter that will the Tags from the Task Template
@@ -21969,7 +27387,7 @@ Function Set-AutomateNOWTaskTemplate {
 
     .EXAMPLE
     Forcefully moves a Task Template to a different Workspace
-    Set-AutomateNOWTaskTemplate -TaskTemplate $task_template -Workspace 'MJS_Workspace' -Force
+    Set-AutomateNOWTaskTemplate -TaskTemplate $task_template -Workspace 'Workspace1' -Force
 
     .EXAMPLE
     Removes a Task Template from a Workspace
@@ -21981,7 +27399,7 @@ Function Set-AutomateNOWTaskTemplate {
 
     .EXAMPLE
     Places a Task Template into a Folder
-    Set-AutomateNOWTaskTemplate -TaskTemplate $task_template -Force -Folder 'MJS'
+    Set-AutomateNOWTaskTemplate -TaskTemplate $task_template -Force -Folder 'Workspace1'
 
     .EXAMPLE
     Sets all of the minor properties
@@ -22003,13 +27421,25 @@ Function Set-AutomateNOWTaskTemplate {
     Removes the Result Mapping from the Task Template
     Set-AutomateNOWTaskTemplate -TaskTemplate $task_template -UnsetResultMapping
 
+    .EXAMPLE
+    Forcibly modifies the script (processingCommand) of a Shell Task
+
+    $task = Get-AutomateNOWTaskTemplate -Id 'ShellTask1'
+    $script = @{'script' = 'echo "Hello, World!"';}
+    Set-AutomateNOWTaskTemplate -TaskTemplate $task -processingCommand $script -Force
+
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    When using the -processingCommand parameter there is no need to convert any strings to JSON as that will happen automatically.
+
     #>
     [Cmdletbinding(SupportsShouldProcess, DefaultParameterSetName = 'Default', ConfirmImpact = 'High')]
     Param(
         [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
         [ANOWTaskTemplate]$TaskTemplate,
+        [Parameter(Mandatory = $false, ParameterSetName = 'SetProcessingCommand')]
+        [hashtable]$ProcessingCommand,
         [ValidateScript({ $_.Length -le 255 })]
         [Parameter(Mandatory = $false, ParameterSetName = 'SetDescription')]
         [string]$Description,
@@ -22056,17 +27486,17 @@ Function Set-AutomateNOWTaskTemplate {
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [int32]$Weight,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
-        [boolean]$OnHold,
+        [Nullable[boolean]]$OnHold = $null,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
-        [boolean]$Skip,
+        [Nullable[boolean]]$Skip = $null,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
-        [boolean]$AutoArchive,
+        [Nullable[boolean]]$AutoArchive = $null,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
-        [boolean]$KeepResources,
+        [Nullable[boolean]]$KeepResources = $null,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
-        [boolean]$UseScripts,
+        [Nullable[boolean]]$UseScripts = $null,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
-        [boolean]$EagerScriptExecution,
+        [Nullable[boolean]]$EagerScriptExecution = $null,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [string]$Owner,
         [switch]$Force,
@@ -22083,7 +27513,7 @@ Function Set-AutomateNOWTaskTemplate {
         }
         Else {
             [string]$command = '/processingTemplate/update'
-            #[string]$componentId = 'ProcessingTemplateValuesManager'
+            [string]$componentId = 'ProcessingTemplateValuesManager'
         }
         [hashtable]$parameters = @{}
         $parameters.Add('Command', $command)
@@ -22159,6 +27589,11 @@ Function Set-AutomateNOWTaskTemplate {
             [System.Collections.ArrayList]$include_properties = [System.Collections.ArrayList]@()
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
             $BodyMetaData.'id' = $TaskTemplate_id
+            If ($ProcessingCommand.Keys.count -gt 0) {
+                [string]$ProcessingCommand_json = $ProcessingCommand | ConvertTo-JSON -Compress
+                $BodyMetaData.'processingCommand' = $ProcessingCommand_json
+                $include_properties += 'processingCommand'
+            }
             If ($Description.Length -gt 0) {
                 $BodyMetaData.'description' = $Description
             }
@@ -22226,11 +27661,16 @@ Function Set-AutomateNOWTaskTemplate {
                     }
                     Catch {
                         [string]$Message = $_.Exception.Message
-                        Write-Warning -Message "Get-AutomateNOWTag had an error while retrieving the tag [$tag_id] running under New-AutomateNOWTaskTemplate due to [$message]"
+                        Write-Warning -Message "Get-AutomateNOWTag had an error while retrieving the tag [$tag_id] running under Set-AutomateNOWTaskTemplate due to [$message]"
                         Break
                     }
                     If ($tag_object.simpleId.length -eq 0) {
-                        Throw "New-AutomateNOWTaskTemplate has detected that the tag [$tag_id] does not appear to exist. Please check again."
+                        Throw "Set-AutomateNOWTaskTemplate has detected that the tag [$tag_id] does not appear to exist. Please check again."
+                        Break
+                    }
+                    ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
+                        [string]$tag_object_simpleId = $tag_object.simpleId
+                        Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                         Break
                     }
                     [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -22394,54 +27834,66 @@ Function Set-AutomateNOWTaskTemplate {
                 $BodyMetaData.'approvalConfiguration' = $null
                 $include_properties += 'approvalConfiguration'
             }
-            If ($Weight -ge 0) {
+            If ($Weight -gt 0) {
                 $BodyMetaData.'weight' = $Weight
             }
-            If ($Priority -ge 0) {
+            If ($Priority -gt 0) {
                 $BodyMetaData.'priority' = $Priority
             }
             If ($Owner.Length -gt 0) {
                 $BodyMetaData.'owner' = $Owner
             }
-            If ($OnHold -eq $false) {
-                $BodyMetaData.'onHold' = 'false'
+            If ($Null -ne $OnHold) {
+                If ($OnHold -eq $false) {
+                    $BodyMetaData.'onHold' = 'false'
+                }
+                Else {
+                    $BodyMetaData.'onHold' = 'true'
+                }
             }
-            ElseIf ($OnHold -eq $true) {
-                $BodyMetaData.'onHold' = 'true'
+            If ($Null -ne $Skip) {
+                If ($Skip -eq $false) {
+                    $BodyMetaData.'passBy' = 'false'
+                }
+                Else {
+                    $BodyMetaData.'passBy' = 'true'
+                }
             }
-            If ($Skip -eq $false) {
-                $BodyMetaData.'passBy' = 'false'
+            If ($Null -ne $AutoArchive) {
+                If ($AutoArchive -eq $false) {
+                    $BodyMetaData.'autoArchive' = 'false'
+                }
+                Else {
+                    $BodyMetaData.'autoArchive' = 'true'
+                }
             }
-            ElseIf ($Skip -eq $true) {
-                $BodyMetaData.'passBy' = 'true'
+            If ($Null -ne $KeepResources) {
+                If ($KeepResources -eq $false) {
+                    $BodyMetaData.'keepResourcesOnFailure' = 'false'
+                }
+                Else {
+                    $BodyMetaData.'keepResourcesOnFailure' = 'true'
+                }
             }
-            If ($AutoArchive -eq $false) {
-                $BodyMetaData.'autoArchive' = 'false'
+            If ($Null -ne $UseScripts) {
+                If ($UseScripts -eq $false) {
+                    $BodyMetaData.'useScripts' = 'false'
+                }
+                Else {
+                    $BodyMetaData.'useScripts' = 'true'
+                }
             }
-            ElseIf ($Skip -eq $true) {
-                $BodyMetaData.'autoArchive' = 'true'
-            }
-            If ($KeepResources -eq $false) {
-                $BodyMetaData.'keepResourcesOnFailure' = 'false'
-            }
-            ElseIf ($KeepResources -eq $true) {
-                $BodyMetaData.'keepResourcesOnFailure' = 'true'
-            }
-            If ($UseScripts -eq $false) {
-                $BodyMetaData.'useScripts' = 'false'
-            }
-            ElseIf ($UseScripts -eq $true) {
-                $BodyMetaData.'useScripts' = 'true'
-            }
-            If ($EagerScriptExecution -eq $false) {
-                $BodyMetaData.'eagerScriptExecution' = 'false'
-            }
-            ElseIf ($EagerScriptExecution -eq $true) {
-                $BodyMetaData.'eagerScriptExecution' = 'true'
+            If ($Null -ne $EagerScriptExecution) {
+                If ($EagerScriptExecution -eq $false) {
+                    $BodyMetaData.'eagerScriptExecution' = 'false'
+                }
+                Else {
+                    $BodyMetaData.'eagerScriptExecution' = 'true'
+                }
             }
             $BodyMetaData.'_operationType' = 'update'
             $BodyMetaData.'_textMatchStyle' = 'exact'
-            #$BodyMetaData.'_oldValues' = '{}' # temp disabled $TaskTemplate.CreateOldValues()
+            $BodyMetaData.'_oldValues' = $TaskTemplate.CreateOldValues()
             If ($componentId.Length -gt 0) {
                 $BodyMetaData.'_componentId' = $componentId
             }
@@ -22601,7 +28053,7 @@ Function New-AutomateNOWTaskTemplate {
     Optional description of the Task Template (may not exceed 255 characters).
 
     .PARAMETER Tags
-    Optional array of strings representing the Tags to include with this object.
+    Optional string array of CASE-SENSITIVE Tag Id's to include with this object.
 
     .PARAMETER Folder
     Optional string representing the Folder to place this object into.
@@ -22753,6 +28205,11 @@ Function New-AutomateNOWTaskTemplate {
             }
             If ($tag_object.simpleId.length -eq 0) {
                 Throw "New-AutomateNOWTaskTemplate has detected that the tag [$tag_id] does not appear to exist. Please check again."
+                Break
+            }
+            ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
+                [string]$tag_object_simpleId = $tag_object.simpleId
+                Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                 Break
             }
             [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -23022,7 +28479,7 @@ Function Copy-AutomateNOWTaskTemplate {
     Optional description of the Task Template (may not exceed 255 characters). You may send an empty string here to ensure that the description is blanked out. Do not use this parameter if your intention is to keep the description from the previous Task Template.
 
     .PARAMETER Tags
-    Optional string array containing the id's of the tags to assign to the new Task Template.
+    Optional string array containing the CASE-SENSITIVE id's of the tags to assign to the new Task Template.
 
     .PARAMETER Folder
     Optional name of the folder to place the Task Template into. The UnsetFolder parameter overrides this setting.
@@ -23393,7 +28850,7 @@ Function Start-AutomateNOWTaskTemplate {
     Optional description of the executed task (may not exceed 255 characters).
 
     .PARAMETER Tags
-    Optional string array containing the id's of the tags to assign to the new task.
+    Optional string array containing the CASE-SENSITIVE id's of the tags to assign to the new task.
 
     .PARAMETER Folder
     Optional name of the folder to place the executed task into.
@@ -23511,6 +28968,11 @@ Function Start-AutomateNOWTaskTemplate {
                 }
                 If ($tag_object.simpleId.length -eq 0) {
                     Throw "Start-AutomateNOWTaskTemplate has detected that the tag [$tag_id] does not appear to exist. Please check again."
+                    Break
+                }
+                ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
+                    [string]$tag_object_simpleId = $tag_object.simpleId
+                    Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                     Break
                 }
                 [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -24348,7 +29810,7 @@ Function Add-AutomateNOWProcessingTimeTrigger {
     Adds a Processing TimeTrigger to a Schedule Template within an AutomateNOW! instance and returns back the newly created [ANOWTimeTrigger]
 
     .PARAMETER ScheduleTemplate
-    Mandatory [ANOWScheduleTemplate] object. Use Get-AutomateNOWSchedule Template to get this object.
+    Mandatory [ANOWScheduleTemplate] object. Use Get-AutomateNOWScheduleTemplate to get this object.
 
     .PARAMETER Quiet
     Optional switch to suppress the return of the newly created object
@@ -25033,7 +30495,7 @@ Function Set-AutomateNOWTimeWindow {
     Optional switch that will remove the Tags from the Time Window object.
 
     .PARAMETER Tags
-    Optional strings to set a different set of Tags on the new Time Window object.
+    Optional string array of CASE-SENSITIVE Tag Id's to set on the new Time Window object.
 
     .PARAMETER Force
     Force the change without confirmation. This is equivalent to -Confirm:$false
@@ -25345,7 +30807,7 @@ Function New-AutomateNOWTimeWindow {
     Optional description of the Time Window (may not exceed 255 characters).
 
     .PARAMETER Tags
-    Optional string array containing the id's of the tags to assign to the new Time Window. Do not pass [ANOWTag] objects here.
+    Optional string array containing the CASE-SENSITIVE id's of the tags to assign to the new Time Window. Do not pass [ANOWTag] objects here.
 
     .PARAMETER Folder
     Optional name of the folder to place the Time Window into.
@@ -25430,6 +30892,11 @@ Function New-AutomateNOWTimeWindow {
             }
             If ($tag_object.simpleId.length -eq 0) {
                 Throw "New-AutomateNOWTimeWindow has detected that the tag [$tag_id] does not appear to exist. Please check again."
+                Break
+            }
+            ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
+                [string]$tag_object_simpleId = $tag_object.simpleId
+                Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                 Break
             }
             [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -25674,7 +31141,7 @@ Function Copy-AutomateNOWTimeWindow {
     Optional switch that will ensure that the newly created Time Window will not have any Tags set.
 
     .PARAMETER Tags
-    Optional strings to set a different set of Tags on the new Time Window object. If you do not set this, the new Time Window object will appy the same Tags of the source object.
+    Optional string array of CASE-SENSITIVE Tag Id's to set on the new Time Window object. If you do not set this, the new Time Window object will apply the same Tags of the source object.
 
     .INPUTS
     ONLY [ANOWTimeWindow] object is accepted. Pipeline support is intentionally unavailable.
@@ -27720,7 +33187,7 @@ Function Set-AutomateNOWVariable {
     Optional switch that will remove the Tags from the Variable object.
 
     .PARAMETER Tags
-    Optional strings to set a different set of Tags on the new Variable object.
+    Optional string array of CASE-SENSITIVE Tag Id's to set on the new Variable object.
 
     .PARAMETER Force
     Force the change without confirmation. This is equivalent to -Confirm:$false
@@ -28019,7 +33486,7 @@ Function New-AutomateNOWVariable {
     Optional description of the Variable (may not exceed 255 characters).
 
     .PARAMETER Tags
-    Optional string array containing the id's of the tags to assign to the new Variable. Do not pass [ANOWTag] objects here.
+    Optional string array containing the CASE-SENSITIVE id's of the tags to assign to the new Variable. Do not pass [ANOWTag] objects here.
 
     .PARAMETER Folder
     Optional name of the folder to place the Variable into.
@@ -28104,6 +33571,11 @@ Function New-AutomateNOWVariable {
             }
             If ($tag_object.simpleId.length -eq 0) {
                 Throw "New-AutomateNOWVariable has detected that the tag [$tag_id] does not appear to exist. Please check again."
+                Break
+            }
+            ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
+                [string]$tag_object_simpleId = $tag_object.simpleId
+                Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                 Break
             }
             [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -28343,7 +33815,7 @@ Function Copy-AutomateNOWVariable {
     Optional switch that will ensure that the newly created Variable will not have any Tags set.
 
     .PARAMETER Tags
-    Optional strings to set a different set of Tags on the new Variable object. If you do not set this, the new Variable object will appy the same Tags of the source object.
+    Optional string array of CASE-SENSITIVE Tag Id's to set on the new Variable object. If you do not set this, the new Variable object will apply the same Tags of the source object.
 
     .INPUTS
     ONLY [ANOWVariable] object is accepted. Pipeline support is intentionally unavailable.
@@ -30311,6 +35783,9 @@ Function Set-AutomateNOWWorkflowTemplate {
     .PARAMETER Description
     Optional description of the Workflow Template (may not exceed 255 characters).
 
+    .PARAMETER UnsetDescription
+    Optional switch that will remove the Description from the Workflow Template object.
+
     .PARAMETER Workspace
     A string representing the name of the Workspace you wish to move this Workflow Template into.
 
@@ -30324,7 +35799,7 @@ Function Set-AutomateNOWWorkflowTemplate {
     A switch parameter that will move the Workflow Template out of its current folder.
 
     .PARAMETER Tags
-    Optional array of strings representing the Tags to include with this object.
+    Optional string array of CASE-SENSITIVE Tag Id's to include with this object.
 
     .PARAMETER UnsetTags
     A switch parameter that will the Tags from the Workflow Template
@@ -30461,26 +35936,24 @@ Function Set-AutomateNOWWorkflowTemplate {
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [int32]$Weight,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
-        [boolean]$LazyLoad,
+        [Nullable[boolean]]$LazyLoad,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
-        [boolean]$OnHold,
+        [Nullable[boolean]]$OnHold = $null,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
-        [boolean]$Skip,
+        [Nullable[boolean]]$Skip = $null,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
-        [boolean]$AutoArchive,
+        [Nullable[boolean]]$AutoArchive = $null,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
-        [boolean]$PassResources,
+        [Nullable[boolean]]$KeepResources = $null,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
-        [boolean]$PassActions,
+        [Nullable[boolean]]$UseScripts = $null,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
-        [boolean]$KeepResources,
-        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
-        [boolean]$UseScripts,
-        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
-        [boolean]$EagerScriptExecution,
+        [Nullable[boolean]]$EagerScriptExecution = $null,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [string]$Owner,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [switch]$Force,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [switch]$Quiet
     )
     Begin {
@@ -30575,9 +36048,7 @@ Function Set-AutomateNOWWorkflowTemplate {
                     [ANOWWorkspace]$workspace_object = Get-AutomateNOWWorkspace -Id $Workspace
                 }
                 Catch {
-                    [string]$Message = $_.Exception.Message
-                    [string]$Workspace_id = $Workspace.Id
-                    Write-Warning -Message "Get-AutomateNOWWorkspace failed to confirm that the workspace [$Workspace_id] actually existed while running under Set-AutomateNOWWorkflowTemplate due to [$Message]"
+                    Write-Warning -Message "Get-AutomateNOWWorkspace failed to confirm that the workspace [$Workspace] actually existed while running under Set-AutomateNOWWorkflowTemplate due to [$Message]"
                     Break
                 }
                 If ($workspace_object.simpleId.Length -eq 0) {
@@ -30586,7 +36057,7 @@ Function Set-AutomateNOWWorkflowTemplate {
                 }
                 [string]$workspace_display = $workspace_object | ConvertTo-Json -Compress
                 Write-Verbose -Message "Adding workspace $workspace_display to [ANOWWorkflowTemplate] [$WorkflowTemplate_id]"
-                $BodyMetaData.'workspace' = $Workspace_id
+                $BodyMetaData.'workspace' = $Workspace
                 $include_properties += 'workspace'
             }
             ElseIf ($UnsetWorkspace -eq $true) {
@@ -30635,6 +36106,11 @@ Function Set-AutomateNOWWorkflowTemplate {
                     }
                     If ($tag_object.simpleId.length -eq 0) {
                         Throw "New-AutomateNOWWorkflowTemplate has detected that the tag [$tag_id] does not appear to exist. Please check again."
+                        Break
+                    }
+                    ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
+                        [string]$tag_object_simpleId = $tag_object.simpleId
+                        Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                         Break
                     }
                     [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -30961,7 +36437,7 @@ Function New-AutomateNOWWorkflowTemplate {
     Optional description of the Workflow Template (may not exceed 255 characters).
 
     .PARAMETER Tags
-    Optional array of strings representing the Tags to include with this object.
+    Optional string array of CASE-SENSITIVE Tag Id's to include with this object.
 
     .PARAMETER Folder
     Optional string representing the Folder to place this object into.
@@ -31063,6 +36539,11 @@ Function New-AutomateNOWWorkflowTemplate {
             }
             If ($tag_object.simpleId.length -eq 0) {
                 Throw "New-AutomateNOWWorkflowTemplate has detected that the tag [$tag_id] does not appear to exist. Please check again."
+                Break
+            }
+            ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
+                [string]$tag_object_simpleId = $tag_object.simpleId
+                Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                 Break
             }
             [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -31332,7 +36813,7 @@ Function Copy-AutomateNOWWorkflowTemplate {
     Optional description of the Workflow Template (may not exceed 255 characters). You may send an empty string here to ensure that the description is blanked out. Do not use this parameter if your intention is to keep the description from the previous Workflow Template.
 
     .PARAMETER Tags
-    Optional string array containing the id's of the tags to assign to the new Workflow Template. The UnsetTags DOES NOT influence this parameter.
+    Optional string array containing the CASE-SENSITIVE id's of the tags to assign to the new Workflow Template. The UnsetTags DOES NOT influence this parameter.
 
     .PARAMETER Folder
     Optional name of the folder to place the Workflow Template into. The UnsetFolder parameter overrides this setting.
@@ -31670,7 +37151,7 @@ Function Start-AutomateNOWWorkflowTemplate {
     Optional description of the executed workflow (may not exceed 255 characters).
 
     .PARAMETER Tags
-    Optional string array containing the id's of the tags to assign to the new workflow.
+    Optional string array containing the CASE-SENSITIVE id's of the tags to assign to the new workflow.
 
     .PARAMETER Folder
     Optional name of the folder to place the executed workflow into.
@@ -31793,9 +37274,13 @@ Function Start-AutomateNOWWorkflowTemplate {
                     Throw "Start-AutomateNOWWorkflowTemplate has detected that the tag [$tag_id] does not appear to exist. Please check again."
                     Break
                 }
+                ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
+                    [string]$tag_object_simpleId = $tag_object.simpleId
+                    Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
+                    Break
+                }
                 [string]$tag_display = $tag_object | ConvertTo-Json -Compress
                 Write-Verbose -Message "Adding tag $tag_display [$current_tag of $total_tags]"
-                #>
                 [string]$tag_name_sequence = ('tags' + $current_tag)
                 $ANOWWorkflowTemplate.Add($tag_name_sequence, $tag_id)
                 $include_properties += $tag_name_sequence
@@ -32887,7 +38372,7 @@ Function Set-AutomateNOWWorkspace {
 
     .EXAMPLE
     Sets the folder configuration for a Workspace (example 3) note the -Folder parameter
-    Set-AutomateNOWWorkspace -Workspace $workspace -SetFolderType SET_SPECIFIC_FOLDER -Folder 'MJS'
+    Set-AutomateNOWWorkspace -Workspace $workspace -SetFolderType SET_SPECIFIC_FOLDER -Folder 'Folder1'
 
     .EXAMPLE
     Unsets the tag configuration for a Workspace
@@ -33141,7 +38626,12 @@ Function Set-AutomateNOWWorkspace {
                             Break
                         }
                         If ($tag_object.simpleId.length -eq 0) {
-                            Throw "New-AutomateNOWTaskTemplate has detected that the tag [$tag_id] does not appear to exist running under Set-AutomateNOWWorkspace. Please check again."
+                            Throw "Get-AutomateNOWTag has detected that the tag [$tag_id] does not appear to exist running under Set-AutomateNOWWorkspace. Please check again."
+                            Break
+                        }
+                        ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
+                            [string]$tag_object_simpleId = $tag_object.simpleId
+                            Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                             Break
                         }
                         [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -33318,7 +38808,7 @@ Function New-AutomateNOWWorkspace {
     Optional description of the Workspace (may not exceed 255 characters).
 
     .PARAMETER Tags
-    Optional string array containing the id's of the tags to assign to the new DataSource.
+    Optional string array containing the CASE-SENSITIVE id's of the tags to assign to the new DataSource.
 
     .PARAMETER Folder
     Optional name of the folder to place the DataSource into.
@@ -33422,6 +38912,11 @@ Function New-AutomateNOWWorkspace {
             }
             If ($tag_object.simpleId.length -eq 0) {
                 Throw "New-AutomateNOWWorkspace has detected that the tag [$tag_id] does not appear to exist. Please check again."
+                Break
+            }
+            ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
+                [string]$tag_object_simpleId = $tag_object.simpleId
+                Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                 Break
             }
             [string]$tag_display = $tag_object | ConvertTo-Json -Compress
