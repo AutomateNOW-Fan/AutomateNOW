@@ -12,7 +12,7 @@ Created by AutomateNOW-Fan
 ```
 ## Efficacy 🧪
 
-Compatible with AutomateNOW! version 3.3.1.78 HF3
+Compatible with AutomateNOW! version 3.3.1.79 HF2
 <br/><br/>
 ## Installation 🏗
 
@@ -35,6 +35,19 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 - Integration with the git app for showing out of sync item that require manual merging
 <br/><br/>
 ## Change Log 📝
+
+## 1.0.22
+- Added new functions: `Clear-AutomateNOWDomain`, `Copy-AutomateNOWDomain`, `Copy-AutomateNOWWorkspace`, `New-AutomateNOWDomain`, `Remove-AutomateNOWDomain`, `Rename-AutomateNOWCalendar`, `Rename-AutomateNOWDomain`, `Rename-AutomateNOWEndpoint`, `Rename-AutomateNOWResultMapping`, `Rename-AutomateNOWSemaphore`, `Rename-AutomateNOWWorkspace`, `Resolve-AutomateNOWMonitorType2ServerNodeType`, `Resolve-AutomateNOWSensorType2ServerNodeType`, `Resume-AutomateNOWDomain`, `Set-AutomateNOWDomain`, `Suspend-AutomateNOWDomain`, `Sync-AutomateNOWDomainResource`, `Sync-AutomateNOWDomainServerNode`
+- Removed functions: `Add-AutomateNOWProcessingTimeTrigger`, `Copy-AutomateNOWUser`
+- Bump compatibility to ANOW version 3.3.1.79 HF2
+- Fixed a parameter issue with `Start-AutomateNOWWorkflowTemplate` around the naming of the executed Workflow
+- Added automatic recognition for API users (see APIUser in the $anow_session variable)
+- Added support for 10 digit expiration dates to `Connect-AutomateNOW`
+- Added High Impact status and the `-Force` parameter to all Copy-* and Add-* functions.
+- Added the `-Quiet` parameter to all Copy-AutomateNOW* functions.
+- Improved how `Invoke-AutomateNOWAPI` handles binary payloads.
+- Renamed the ProcessingTimeTrigger functions to TimeTrigger
+- Added small improvements to `Get-AutomateNOWTimeTrigger`
 
 ## 1.0.21
 - Added new functions: `Add-AutomateNOWCodeRepositoryItem`,  `Approve-AutomateNOWCodeRepositoryMergeRequest`,  `Compare-AutomateNOWCodeRepositoryOutOfSyncItem`,  `Confirm-AutomateNOWCodeRepository`,  `Deny-AutomateNOWCodeRepositoryMergeRequest`,  `Get-AutomateNOWCodeRepositoryBranch`,  `Get-AutomateNOWCodeRepositoryItem`,  `Get-AutomateNOWCodeRepositoryMergeRequest`,  `Get-AutomateNOWCodeRepositoryOutOfSyncItem`,  `Get-AutomateNOWCodeRepositoryTag`,  `Merge-AutomateNOWCodeRepositoryBranch`,  `Merge-AutomateNOWCodeRepositoryOutOfSyncItem`,  `New-AutomateNOWCodeRepository`,  `New-AutomateNOWCodeRepositoryBranch`,  `New-AutomateNOWCodeRepositoryTag`,  `Publish-AutomateNOWCodeRepository`,  `Receive-AutomateNOWCodeRepository`,  `Remove-AutomateNOWCodeRepository`,  `Remove-AutomateNOWCodeRepositoryBranch`,  `Remove-AutomateNOWCodeRepositoryItem`,  `Remove-AutomateNOWCodeRepositoryTag`,  `Remove-AutomateNOWScheduleTemplateItem`,  `Select-AutomateNOWCodeRepositoryBranch`,  `Select-AutomateNOWCodeRepositoryTag`,  `Send-AutomateNOWCodeRepository`,  `Set-AutomateNOWCodeRepository`,  `Set-AutomateNOWTask`,  `Show-AutomateNOWCodeRepositoryOutOfSyncItemComparison`,  `Sync-AutomateNOWCodeRepository`,  `UnPublish-AutomateNOWCodeRepository`
@@ -313,8 +326,6 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Add-AutomateNOWDataSourceItem`
 
-`Add-AutomateNOWProcessingTimeTrigger`
-
 `Add-AutomateNOWResultMappingRule`
 
 `Add-AutomateNOWScheduleTemplateItem`
@@ -322,6 +333,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Add-AutomateNOWWorkflowTemplateItem`
 
 `Approve-AutomateNOWCodeRepositoryMergeRequest`
+
+`Clear-AutomateNOWDomain`
 
 `Compare-AutomateNOWCodeRepositoryOutOfSyncItem`
 
@@ -351,6 +364,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Copy-AutomateNOWDataSource`
 
+`Copy-AutomateNOWDomain`
+
 `Copy-AutomateNOWEndpoint`
 
 `Copy-AutomateNOWLock`
@@ -369,11 +384,11 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Copy-AutomateNOWTimeWindow`
 
-`Copy-AutomateNOWUser`
-
 `Copy-AutomateNOWVariable`
 
 `Copy-AutomateNOWWorkflowTemplate`
+
+`Copy-AutomateNOWWorkspace`
 
 `Deny-AutomateNOWCodeRepositoryMergeRequest`
 
@@ -407,8 +422,6 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Export-AutomateNOWNode`
 
-`Export-AutomateNOWProcessingTimeTrigger`
-
 `Export-AutomateNOWResultMapping`
 
 `Export-AutomateNOWSchedule`
@@ -424,6 +437,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Export-AutomateNOWTask`
 
 `Export-AutomateNOWTaskTemplate`
+
+`Export-AutomateNOWTimeTrigger`
 
 `Export-AutomateNOWTimeWindow`
 
@@ -477,8 +492,6 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Get-AutomateNOWNode`
 
-`Get-AutomateNOWProcessingTimeTrigger`
-
 `Get-AutomateNOWResultMapping`
 
 `Get-AutomateNOWSchedule`
@@ -496,6 +509,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Get-AutomateNOWTask`
 
 `Get-AutomateNOWTaskTemplate`
+
+`Get-AutomateNOWTimeTrigger`
 
 `Get-AutomateNOWTimeWindow`
 
@@ -548,6 +563,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `New-AutomateNOWDataSource`
 
 `New-AutomateNOWDefaultProcessingTitle`
+
+`New-AutomateNOWDomain`
 
 `New-AutomateNOWEndpoint`
 
@@ -621,6 +638,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Remove-AutomateNOWDataSourceItem`
 
+`Remove-AutomateNOWDomain`
+
 `Remove-AutomateNOWEndpoint`
 
 `Remove-AutomateNOWFolder`
@@ -628,8 +647,6 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Remove-AutomateNOWLock`
 
 `Remove-AutomateNOWNode`
-
-`Remove-AutomateNOWProcessingTimeTrigger`
 
 `Remove-AutomateNOWResultMapping`
 
@@ -649,6 +666,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Remove-AutomateNOWTaskTemplate`
 
+`Remove-AutomateNOWTimeTrigger`
+
 `Remove-AutomateNOWTimeWindow`
 
 `Remove-AutomateNOWUser`
@@ -661,9 +680,19 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Remove-AutomateNOWWorkspace`
 
+`Rename-AutomateNOWCalendar`
+
+`Rename-AutomateNOWDomain`
+
+`Rename-AutomateNOWEndpoint`
+
 `Rename-AutomateNOWLock`
 
+`Rename-AutomateNOWResultMapping`
+
 `Rename-AutomateNOWScheduleTemplate`
+
+`Rename-AutomateNOWSemaphore`
 
 `Rename-AutomateNOWStock`
 
@@ -675,6 +704,12 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Rename-AutomateNOWWorkflowTemplate`
 
+`Rename-AutomateNOWWorkspace`
+
+`Resolve-AutomateNOWMonitorType2ServerNodeType`
+
+`Resolve-AutomateNOWSensorType2ServerNodeType`
+
 `Resolve-AutomateNOWTaskType2ServerNodeType`
 
 `Restart-AutomateNOWSchedule`
@@ -682,6 +717,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Restart-AutomateNOWTask`
 
 `Restart-AutomateNOWWorkflow`
+
+`Resume-AutomateNOWDomain`
 
 `Resume-AutomateNOWSchedule`
 
@@ -710,6 +747,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Set-AutomateNOWCodeRepository`
 
 `Set-AutomateNOWDataSource`
+
+`Set-AutomateNOWDomain`
 
 `Set-AutomateNOWEndpoint`
 
@@ -779,6 +818,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Stop-AutomateNOWWorkflow`
 
+`Suspend-AutomateNOWDomain`
+
 `Suspend-AutomateNOWSchedule`
 
 `Suspend-AutomateNOWScheduleTemplate`
@@ -794,6 +835,10 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Switch-AutomateNOWDomain`
 
 `Sync-AutomateNOWCodeRepository`
+
+`Sync-AutomateNOWDomainResource`
+
+`Sync-AutomateNOWDomainServerNode`
 
 `Test-AutomateNOWUserPassword`
 
