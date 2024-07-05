@@ -1,5 +1,5 @@
 ﻿<#	
-Developed against AutomateNOW! version 3.3.1.78 HF3
+Developed against AutomateNOW! version 3.3.1.79 HF2
 
 Be warned: this version *is not likely* to work correctly with any version below 3.3.1.78 HF3
 
