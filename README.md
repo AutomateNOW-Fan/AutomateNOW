@@ -12,7 +12,7 @@ Created by AutomateNOW-Fan
 ```
 ## Efficacy 🧪
 
-Compatible with AutomateNOW! version 3.3.1.79 HF2
+Compatible with AutomateNOW! version 3.3.1.80 HF0
 <br/><br/>
 ## Installation 🏗
 
@@ -35,6 +35,18 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 - Integration with the git app for showing out of sync item that require manual merging
 <br/><br/>
 ## Change Log 📝
+
+## 1.0.23
+- Added new functions: `Dismount-AutomateNOWNode`, `Export-AutomateNOWContextVariable`, `Export-AutomateNOWProcessingEventLog`, `Get-AutomateNOWContextVariable`, `Get-AutomateNOWProcessingEventLog`, `Rename-AutomateNOWAdhocReport`, `Rename-AutomateNOWAgent`, `Rename-AutomateNOWApproval`, `Rename-AutomateNOWDataSource`, `Rename-AutomateNOWNode`, `Resume-AutomateNOWNode`, `Skip-AutomateNOWNode`, `Suspend-AutomateNOWNode`
+- Bump compatibility to ANOW version 3.3.1.80 HF0
+- Added the `-defaultDomain` parameter to `Set-AutomateNOWUser`
+- Added support for "Sensor", "Monitor" and "Service Manager" Task types in `New-AutomateNOWTaskTemplate`
+- Fixed an issue with `Stop-AutomateNOWNode` and promoted it to high impact and added the `-Force` parameter
+- Fixed a fatal typo within `New-AutomateNOWNode`
+- Fixed multiple issues in `Get-AutomateNOWWorkflow`
+- Improved the warning from `Connect-AutomateNOW` when the existing session has expired
+- Removed experimental status from `Write-AutomateNOWIconData`
+- Removed references to WorkSpaces in all functions except for `New-AutomateNOWTaskTemplate` and `New-AutomateNOWWorkflowTemplate`
 
 ## 1.0.22
 - Added new functions: `Clear-AutomateNOWDomain`, `Copy-AutomateNOWDomain`, `Copy-AutomateNOWWorkspace`, `New-AutomateNOWDomain`, `Remove-AutomateNOWDomain`, `Rename-AutomateNOWCalendar`, `Rename-AutomateNOWDomain`, `Rename-AutomateNOWEndpoint`, `Rename-AutomateNOWResultMapping`, `Rename-AutomateNOWSemaphore`, `Rename-AutomateNOWWorkspace`, `Resolve-AutomateNOWMonitorType2ServerNodeType`, `Resolve-AutomateNOWSensorType2ServerNodeType`, `Resume-AutomateNOWDomain`, `Set-AutomateNOWDomain`, `Suspend-AutomateNOWDomain`, `Sync-AutomateNOWDomainResource`, `Sync-AutomateNOWDomainServerNode`
@@ -224,19 +236,19 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 - Enrich the sorting options for all Get functions
 - Export diagrams to PNG
 - Automatic binary file MIME type detection (for Add-AutomateNOWDataSourceItem)
-- Refactor redundant code
+- Refactor the redundant code
 - Export functions should convert objects containing an object type to JSON strings
 - Ability to action individual items in a code repository instead of applying the action to all items
+- Support for multiple simultaneous sessions to different domains or ANOW servers
 
 ## Cheats* 🎰
 
 - Execute Adhoc Reports where you may not have permission to in the UI
 - List & apply tags, folders etc. on an instance that you may not have permission to in the UI
-- (Psuedo) Rename Task Templates & Workflow Templates
+- (Psuedo) Rename many object types including Workflow Templates and Task Templates
 - Automatic text file MIME type detection (for Add-AutomateNOWDataSourceItem)
 - Specify the theme and ui density at the time of user creation
-- Retrieve all items inside a Code Repository with a single command
-~~- Move items freely into and out of Workspaces~~ (this has been recently disabled by InfiniteDATA)
+- Retrieve all of the items from within a Code Repository using a single command
 
 <sub>* things the console does not allow</sub>
 
@@ -318,6 +330,9 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 > Step 3 - Synchronize the local and remote repositories - Do not forget this step! 😅
 > `Sync-AutomateNOWCodeRepository` -CodeRepository $repository -Force
 
+### How do I get all 5 types of Processing Event Logs and where exactly are they located in the ANOW UI?
+>Use `Get-Help Get-AutomateNOWProcessingEventLog -Full` to see the detailed help and examples.
+
 ## Functions 🛠
 
 `Add-AutomateNOWApprovalRule`
@@ -394,6 +409,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Disconnect-AutomateNOW`
 
+`Dismount-AutomateNOWNode`
+
 `Export-AutomateNOWAdhocReport`
 
 `Export-AutomateNOWAgent`
@@ -405,6 +422,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Export-AutomateNOWCalendar`
 
 `Export-AutomateNOWCodeRepository`
+
+`Export-AutomateNOWContextVariable`
 
 `Export-AutomateNOWDataSource`
 
@@ -421,6 +440,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Export-AutomateNOWLock`
 
 `Export-AutomateNOWNode`
+
+`Export-AutomateNOWProcessingEventLog`
 
 `Export-AutomateNOWResultMapping`
 
@@ -478,6 +499,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Get-AutomateNOWCodeRepositoryTag`
 
+`Get-AutomateNOWContextVariable`
+
 `Get-AutomateNOWDataSource`
 
 `Get-AutomateNOWDataSourceItem`
@@ -491,6 +514,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Get-AutomateNOWLock`
 
 `Get-AutomateNOWNode`
+
+`Get-AutomateNOWProcessingEventLog`
 
 `Get-AutomateNOWResultMapping`
 
@@ -680,13 +705,23 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Remove-AutomateNOWWorkspace`
 
+`Rename-AutomateNOWAdhocReport`
+
+`Rename-AutomateNOWAgent`
+
+`Rename-AutomateNOWApproval`
+
 `Rename-AutomateNOWCalendar`
+
+`Rename-AutomateNOWDataSource`
 
 `Rename-AutomateNOWDomain`
 
 `Rename-AutomateNOWEndpoint`
 
 `Rename-AutomateNOWLock`
+
+`Rename-AutomateNOWNode`
 
 `Rename-AutomateNOWResultMapping`
 
@@ -719,6 +754,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Restart-AutomateNOWWorkflow`
 
 `Resume-AutomateNOWDomain`
+
+`Resume-AutomateNOWNode`
 
 `Resume-AutomateNOWSchedule`
 
@@ -790,6 +827,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Show-AutomateNOWTaskTemplateType`
 
+`Skip-AutomateNOWNode`
+
 `Skip-AutomateNOWSchedule`
 
 `Skip-AutomateNOWScheduleTemplate`
@@ -819,6 +858,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Stop-AutomateNOWWorkflow`
 
 `Suspend-AutomateNOWDomain`
+
+`Suspend-AutomateNOWNode`
 
 `Suspend-AutomateNOWSchedule`
 

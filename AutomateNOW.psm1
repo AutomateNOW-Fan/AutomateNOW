@@ -1058,7 +1058,22 @@ Function Connect-AutomateNOW {
             Break
         }
         Else {
-            Write-Warning -Message "The current token expired at $expiration_date ($SecondsRemaining seconds ago). Removing the session variable..."
+            If ($SecondsRemaining -lt 120) {
+                [int32]$SecondsRemaining = $SecondsRemaining * -1
+                Write-Warning -Message "Your previous token expired $SecondsRemaining seconds ago at $expiration_date. Cleaning up the previous session..."
+            }
+            ElseIf ($SecondsRemaining -lt 7200) {
+                [int32]$MinutesRemaining = ($SecondsRemaining * -1) / 60
+                Write-Warning -Message "Your previous token expired $MinutesRemaining minutes ago at $expiration_date. Cleaning up the previous session..."
+            }
+            ElseIf ($SecondsRemaining -lt 86400) {
+                [int32]$HoursRemaining = ($SecondsRemaining * -1) / 3600
+                Write-Warning -Message "Your previous token expired about $HoursRemaining hours ago at $expiration_date. Cleaning up the previous session..."
+            }
+            Else {
+                [int32]$DaysRemaining = ($SecondsRemaining * -1) / 86400
+                Write-Warning -Message "Your previous token expired about $DaysRemaining days ago at $expiration_date. Cleaning up the previous session..."
+            }
             $Error.Clear()
             Try {
                 Remove-Variable -Name anow_session -Scope Global -Force
@@ -2415,7 +2430,7 @@ Function New-AutomateNOWAdhocReport {
             }
             ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
                 [string]$tag_object_simpleId = $tag_object.simpleId
-                Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
+                Throw "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                 Break
             }
             [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -2739,6 +2754,136 @@ Function Copy-AutomateNOWAdhocReport {
     }
     End {
 
+    }
+}
+
+Function Rename-AutomateNOWAdhocReport {
+    <#
+    .SYNOPSIS
+    Renames an Adhoc Report on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Performs a psuedo-rename operations of an Adhoc Report from an AutomateNOW! instance by copying it first and then deleting the source. This function merely combines Copy-AutomateNOWAdhocReport and Remove-AutomateNOWAdhocReport therefore it is to be considered destructive.
+
+    .PARAMETER AdhocReport
+    An [ANOWAdhocReport] object representing the Adhoc Report to be renamed.
+
+    .PARAMETER NewId
+    Mandatory string indicating the new id or name of the Adhoc Report. Please remember that the Id is the same as a primary key, it must be unique. The console will provide the old Id + '_COPY' in the UI when making a copy. The Id is limited to 1024 characters.
+
+    .PARAMETER Force
+    Force the renaming without confirmation. This is equivalent to -Confirm:$false
+
+    .PARAMETER Quiet
+    Optional switch to suppress the return of the newly renamed object.
+
+    .INPUTS
+    ONLY [ANOWAdhocReport] objects are accepted. There is intentionally no support for the pipeline.
+
+    .OUTPUTS
+    The newly renamed [ANOWAdhocReport] object will be returned.
+
+    .EXAMPLE
+    $AdhocReport = Get-AutomateNOWAdhocReport -Id 'AdhocReport01'
+    Rename-AutomateNOWAdhocReport -AdhocReport $AdhocReport -NewId 'AdhocReport_01'
+
+    .EXAMPLE
+    Rename-AutomateNOWAdhocReport -AdhocReport (Get-AutomateNOWAdhocReport -Id 'AdhocReport01') -NewId 'AdhocReport_01'
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global AdhocReport.
+
+    When renaming, you may only specify a different Id (name).
+
+    This action will be blocked if any existing referrals are found on the object.
+    #>
+    [OutputType([ANOWAdhocReport])]
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [ANOWAdhocReport]$AdhocReport,
+        [Parameter(Mandatory = $true)]
+        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [string]$NewId,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        ## Begin standard warning ##
+        ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
+        $Error.Clear()
+        Try {
+            [boolean]$new_AdhocReport_exists = ($null -ne (Get-AutomateNOWAdhocReport -Id $NewId))
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWAdhocReport failed to check if the Adhoc Report [$NewId] already existed due to [$Message]."
+            Break
+        }
+        If ($new_AdhocReport_exists -eq $true) {
+            [string]$current_domain = $anow_session.header.domain
+            Write-Warning -Message "There is already an Adhoc Report named [$NewId] in [$current_domain]. You may not proceed."
+            [boolean]$PermissionToProceed = $false
+        }
+        [string]$AdhocReport_id = $AdhocReport.simpleId
+        $Error.Clear()
+        Try {
+            [boolean]$old_AdhocReport_exists = ($null -ne (Get-AutomateNOWAdhocReport -Id $AdhocReport_id))
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWAdhocReport failed to check if the AdhocReport [$AdhocReport_id] already existed due to [$Message]."
+            Break
+        }
+        If ($old_AdhocReport_exists -eq $false) {
+            [string]$current_domain = $anow_session.header.domain
+            Write-Warning -Message "There is not a AdhocReport named [$AdhocReport_id] in [$current_domain]. You may not proceed."
+            [boolean]$PermissionToProceed = $false
+        }
+        ## End standard warning ##
+    }
+    Process {
+        If ($PermissionToProceed -ne $false) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($AdhocReport_id)")) -eq $true) {
+                $Error.Clear()
+                Try {
+                    [ANOWAdhocReport]$new_AdhocReport = Copy-AutomateNOWAdhocReport -AdhocReport $AdhocReport -NewId $NewId -Force
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Copy-AutomateNOWAdhocReport failed to create a new AdhocReport [$NewId] as Part 1 of the renaming process due to [$Message]."
+                    Break
+                }
+                If ($new_AdhocReport.simpleId -eq $NewId) {
+                    Write-Verbose -Message "Part 1: AdhocReport [$AdhocReport_id] successfully copied to [$NewId]"
+                }
+                $Error.Clear()
+                Try {
+                    Remove-AutomateNOWAdhocReport -AdhocReport $AdhocReport -Force
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Remove-AutomateNOWAdhocReport failed to remove [$AdhocReport_id] as Part 2 of the renaming process due to [$Message]."
+                    Break
+                }
+                Write-Verbose -Message "Part 2: AdhocReport [$AdhocReport_id] removed"
+                Write-Verbose -Message "Task [$AdhocReport_id] successfully renamed to [$NewId]"
+                If ($Quiet -ne $true) {
+                    Return $new_AdhocReport
+                }
+            }
+        }
+        Else {
+            Write-Warning -Message "No action was taken because either the source object didn't exist or the new object already existed"
+        }
+    }
+    End {
     }
 }
 
@@ -3656,7 +3801,7 @@ Function New-AutomateNOWAgent {
             }
             ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
                 [string]$tag_object_simpleId = $tag_object.simpleId
-                Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
+                Throw "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                 Break
             }
             [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -4078,6 +4223,136 @@ Function Copy-AutomateNOWAgent {
     }
     End {
 
+    }
+}
+
+Function Rename-AutomateNOWAgent {
+    <#
+    .SYNOPSIS
+    Renames an Agent on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Performs a psuedo-rename operations of an Agent from an AutomateNOW! instance by copying it first and then deleting the source. This function merely combines Copy-AutomateNOWAgent and Remove-AutomateNOWAgent therefore it is to be considered destructive.
+
+    .PARAMETER Agent
+    An [ANOWAgent] object representing the Agent to be renamed.
+
+    .PARAMETER NewId
+    Mandatory string indicating the new id or name of the Agent. Please remember that the Id is the same as a primary key, it must be unique. The console will provide the old Id + '_COPY' in the UI when making a copy. The Id is limited to 1024 characters.
+
+    .PARAMETER Force
+    Force the renaming without confirmation. This is equivalent to -Confirm:$false
+
+    .PARAMETER Quiet
+    Optional switch to suppress the return of the newly renamed object.
+
+    .INPUTS
+    ONLY [ANOWAgent] objects are accepted. There is intentionally no support for the pipeline.
+
+    .OUTPUTS
+    The newly renamed [ANOWAgent] object will be returned.
+
+    .EXAMPLE
+    $Agent = Get-AutomateNOWAgent -Id 'Agent01'
+    Rename-AutomateNOWAgent -Agent $Agent -NewId 'Agent_02'
+
+    .EXAMPLE
+    Rename-AutomateNOWAgent -Agent (Get-AutomateNOWAgent -Id 'Agent01') -NewId 'Agent_02'
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    When renaming, you may only specify a different Id (name).
+
+    This action will be denied if any existing referrals are found on the object.
+    #>
+    [OutputType([ANOWAgent])]
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [ANOWAgent]$Agent,
+        [Parameter(Mandatory = $true)]
+        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [string]$NewId,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        ## Begin standard warning ##
+        ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
+        $Error.Clear()
+        Try {
+            [boolean]$new_Agent_exists = ($null -ne (Get-AutomateNOWAgent -Id $NewId))
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWAgent failed to check if the Agent [$NewId] already existed due to [$Message]."
+            Break
+        }
+        If ($new_Agent_exists -eq $true) {
+            [string]$current_domain = $anow_session.header.domain
+            Write-Warning -Message "There is already a Agent named [$NewId] in [$current_domain]. You may not proceed."
+            [boolean]$PermissionToProceed = $false
+        }
+        [string]$Agent_id = $Agent.simpleId
+        $Error.Clear()
+        Try {
+            [boolean]$old_Agent_exists = ($null -ne (Get-AutomateNOWAgent -Id $Agent_id))
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWAgent failed to check if the Agent [$Agent_id] already existed due to [$Message]."
+            Break
+        }
+        If ($old_Agent_exists -eq $false) {
+            [string]$current_domain = $anow_session.header.domain
+            Write-Warning -Message "There is not a Agent named [$Agent_id] in [$current_domain]. You may not proceed."
+            [boolean]$PermissionToProceed = $false
+        }
+        ## End standard warning ##
+    }
+    Process {
+        If ($PermissionToProceed -ne $false) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Agent_id)")) -eq $true) {
+                $Error.Clear()
+                Try {
+                    [ANOWAgent]$new_Agent = Copy-AutomateNOWAgent -Agent $Agent -NewId $NewId -Force
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Copy-AutomateNOWAgent failed to create a new Agent [$NewId] as Part 1 of the renaming process due to [$Message]."
+                    Break
+                }
+                If ($new_Agent.simpleId -eq $NewId) {
+                    Write-Verbose -Message "Part 1: Agent [$Agent_id] successfully copied to [$NewId]"
+                }
+                $Error.Clear()
+                Try {
+                    Remove-AutomateNOWAgent -Agent $Agent -Force
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Remove-AutomateNOWAgent failed to remove [$Agent_id] as Part 2 of the renaming process due to [$Message]."
+                    Break
+                }
+                Write-Verbose -Message "Part 2: Agent [$Agent_id] removed"
+                Write-Verbose -Message "Task [$Agent_id] successfully renamed to [$NewId]"
+                If ($Quiet -ne $true) {
+                    Return $new_Agent
+                }
+            }
+        }
+        Else {
+            Write-Warning -Message "No action was taken because either the source object didn't exist or the new object already existed"
+        }
+    }
+    End {
     }
 }
 
@@ -5083,6 +5358,159 @@ Function Add-AutomateNOWApprovalRule {
     }
 }
 
+Function Rename-AutomateNOWApproval {
+    <#
+    .SYNOPSIS
+    Renames an Approval on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Performs a psuedo-rename operations of an Approval from an AutomateNOW! instance by copying it first and then deleting the source. This function merely combines Copy-AutomateNOWApproval and Remove-AutomateNOWApproval therefore it is to be considered destructive.
+
+    .PARAMETER Approval
+    An [ANOWApproval] object representing the Approval to be renamed.
+
+    .PARAMETER NewId
+    Mandatory string indicating the new id or name of the Approval. Please remember that the Id is the same as a primary key, it must be unique. The console will provide the old Id + '_COPY' in the UI when making a copy. The Id is limited to 1024 characters.
+
+    .PARAMETER Force
+    Force the renaming without confirmation. This is equivalent to -Confirm:$false
+
+    .PARAMETER Quiet
+    Optional switch to suppress the return of the newly renamed object.
+
+    .INPUTS
+    ONLY [ANOWApproval] objects are accepted. There is intentionally no support for the pipeline.
+
+    .OUTPUTS
+    The newly renamed [ANOWApproval] object will be returned.
+
+    .EXAMPLE
+    Renames an approval in 2 lines of code
+
+    $Approval = Get-AutomateNOWApproval -Id 'Approval01'
+    Rename-AutomateNOWApproval -Approval $Approval -NewId 'Approval_02'
+
+    .EXAMPLE
+    Renames an approval in 1 line of code
+
+    Rename-AutomateNOWApproval -Approval (Get-AutomateNOWApproval -Id 'Approval01') -NewId 'Approval_02'
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    When renaming, you may only specify a different Id (name).
+
+    This action will be blocked if any existing referrals are found on the object.
+    #>
+    [OutputType([ANOWApproval])]
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [ANOWApproval]$Approval,
+        [Parameter(Mandatory = $true)]
+        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [string]$NewId,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        ## Begin standard warning ##
+        ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
+        $Error.Clear()
+        Try {
+            [boolean]$new_Approval_exists = ($null -ne (Get-AutomateNOWApproval -Id $NewId))
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWApproval failed to check if the Approval [$NewId] already existed due to [$Message]."
+            Break
+        }
+        If ($new_Approval_exists -eq $true) {
+            [string]$current_domain = $anow_session.header.domain
+            Write-Warning -Message "There is already a Approval named [$NewId] in [$current_domain]. You may not proceed."
+            [boolean]$PermissionToProceed = $false
+        }
+        #[string]$Approval_id = $Approval.id
+        [string]$Approval_id = $Approval.simpleId
+        $Error.Clear()
+        Try {
+            [boolean]$old_Approval_exists = ($null -ne (Get-AutomateNOWApproval -Id $Approval_id))
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWApproval failed to check if the Approval [$Approval_id] already existed due to [$Message]."
+            Break
+        }
+        If ($old_Approval_exists -eq $false) {
+            [string]$current_domain = $anow_session.header.domain
+            Write-Warning -Message "There is not a Approval named [$Approval_id] in [$current_domain]. You may not proceed."
+            [boolean]$PermissionToProceed = $false
+        }
+        ## End standard warning ##
+        ## Begin referrals warning ##
+        ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
+        $Error.Clear()
+        Try {
+            [int32]$referrals_count = Find-AutomateNOWObjectReferral -Approval $Approval -Count | Select-Object -Expandproperty referrals
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Find-AutomateNOWObjectReferral failed to extract the referrals on Approval [$Approval_id] due to [$Message]."
+            Break
+        }
+        If ($referrals_count -gt 0) {
+            Write-Warning -Message "Unfortunately, you cannot rename a Approval that has referrals. This is because the rename is not actually renaming but copying anew and deleting the old. Please, use the Find-AutomateNOWObjectReferral function to identify referrals and remove them."
+            Break
+        }
+        Else {
+            Write-Verbose -Message "The Approval [$Approval_id] does not have any referrals. It is safe to proceed."
+        }
+    }
+    Process {
+        If ($PermissionToProceed -ne $false) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Approval_id)")) -eq $true) {
+                $Error.Clear()
+                Try {
+                    [ANOWApproval]$new_Approval = Copy-AutomateNOWApproval -Approval $Approval -NewId $NewId -Force
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Copy-AutomateNOWApproval failed to create a new Approval [$NewId] as Part 1 of the renaming process due to [$Message]."
+                    Break
+                }
+                If ($new_Approval.simpleId -eq $NewId) {
+                    Write-Verbose -Message "Part 1: Approval [$Approval_id] successfully copied to [$NewId]"
+                }
+                $Error.Clear()
+                Try {
+                    Remove-AutomateNOWApproval -Approval $Approval -Force
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Remove-AutomateNOWApproval failed to remove [$Approval_id] as Part 2 of the renaming process due to [$Message]."
+                    Break
+                }
+                Write-Verbose -Message "Part 2: Approval [$Approval_id] removed"
+                Write-Verbose -Message "Task [$Approval_id] successfully renamed to [$NewId]"
+                If ($Quiet -ne $true) {
+                    Return $Approval
+                }
+            }
+        }
+        Else {
+            Write-Warning -Message "No action was taken because either the source object didn't exist or the new object already existed"
+        }
+    }
+    End {
+    }
+}
+
 #endregion
 
 #Region - AuditLogs
@@ -5764,7 +6192,7 @@ Function New-AutomateNOWCalendar {
             }
             ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
                 [string]$tag_object_simpleId = $tag_object.simpleId
-                Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
+                Throw "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                 Break
             }
             [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -6779,7 +7207,7 @@ Function Set-AutomateNOWCodeRepository {
                     }
                     ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
                         [string]$tag_object_simpleId = $tag_object.simpleId
-                        Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
+                        Throw "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                         Break
                     }
                     [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -7084,7 +7512,7 @@ Function New-AutomateNOWCodeRepository {
                     }
                     ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
                         [string]$tag_object_simpleId = $tag_object.simpleId
-                        Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
+                        Throw "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                         Break
                     }
                     [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -8897,23 +9325,21 @@ Function Get-AutomateNOWCodeRepositoryItem {
         [array]$repository_items = ForEach ($item in $item_loops) {
             [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
             If ($_.Id.Length -gt 0 ) {
-                $Body.'codeRepository' = $_.Id
+                [ANOWCodeRepository]$CodeRepository = $_
             }
-            Else {
-                $Body.'codeRepository' = $CodeRepository.Id
-            }
+            [string]$CodeRepository_Id = $CodeRepository.Id
+            $Body.'codeRepository' = $CodeRepository_Id
+            $Body.'_constructor' = 'AdvancedCriteria'
+            $Body.'operator' = 'and'
+            $Body.'criteria1' = ('{"fieldName":"codeRepository","operator":"equals","value":"' + $CodeRepository_Id + '"}')
             Switch ($item) {
                 "ProcessingTemplates" {
-                    $Body.'_constructor' = 'AdvancedCriteria'
-                    $Body.'operator' = 'and'
-                    $Body.'criteria1' = '{"fieldName":"processingType","operator":"notEqual","value":"TRIGGER"}'
+                    $Body.'criteria2' = '{"fieldName":"processingType","operator":"notEqual","value":"TRIGGER"}'
                     $domainClassName = 'ProcessingTemplate'
                     [int32]$componentId = 0
                 }
                 "Schedules" {
-                    $Body.'_constructor' = 'AdvancedCriteria'
-                    $Body.'operator' = 'and'
-                    $Body.'criteria1' = '{"fieldName":"processingType","operator":"equals","value":"TRIGGER"}'
+                    $Body.'criteria2' = '{"fieldName":"processingType","operator":"equals","value":"TRIGGER"}'
                     $domainClassName = 'ProcessingTemplate'
                     [int32]$componentId = 1
                 }
@@ -8974,9 +9400,7 @@ Function Get-AutomateNOWCodeRepositoryItem {
                     [int32]$componentId = 15
                 }
                 "RuntimeActions" {
-                    $Body.'_constructor' = 'AdvancedCriteria'
-                    $Body.'operator' = 'and'
-                    $Body.'criteria1' = '{"fieldName":"isRule","operator":"equals","value":true}'
+                    $Body.'criteria2' = '{"fieldName":"isRule","operator":"equals","value":true}'
                     $domainClassName = 'ProcessingAction'
                     [int32]$componentId = 16
                 }
@@ -8999,7 +9423,7 @@ Function Get-AutomateNOWCodeRepositoryItem {
                 "Folders" {
                     $Body.'_constructor' = 'AdvancedCriteria'
                     $Body.'operator' = 'and'
-                    $Body.'criteria1' = '{"fieldName":"parent","operator":"isNull"}'
+                    $Body.'criteria2' = '{"fieldName":"parent","operator":"isNull"}'
                     $domainClassName = 'Folder'
                     [int32]$componentId = 21
                 }
@@ -11206,6 +11630,241 @@ Function Select-AutomateNOWCodeRepositoryTag {
 
 #endregion
 
+#Region - Context Variables
+Function Get-AutomateNOWContextVariable {
+    <#
+    .SYNOPSIS
+    Gets the Context Variables from a Task or Workflow from an instance of AutomateNOW!
+
+    .DESCRIPTION
+    Gets the Context Variables from a Task or Workflow from an instance of AutomateNOW!
+
+    .PARAMETER RunId
+    Mandatory int64 array of the "Run Id"'s of the Tasks or Workflows from which to retrieve the Context Variables. Use Get-AutomateNOWTask and Get-AutomateNOWWorkFlow to retrieve these.
+
+    .PARAMETER startRow
+    An optional int32 representing what row to start the download from. This is intended for multi-page transfers.
+
+    .PARAMETER endRow
+    An optional int32 representing how many rows of data to receive. The default is 100. This is ideal for testing when you only want a few items.
+
+    .PARAMETER sortBy
+    Optional string representing the property by which to sort the results by. Valid choices are: id, dateCreated, lastUpdated, name, value
+
+    .PARAMETER Ascending
+    Optional switch that will reverse the sort results
+
+    .INPUTS
+    The RunId numbers may be sent across the pipeline
+
+    .OUTPUTS
+    An array of [ANOWContextVariable] objects
+
+    .EXAMPLE
+    Uses the pipe to retrieve the context variables from a set of RunIDs
+    1913730, 1924427 | Get-AutomateNOWContextVariable | Export-AutomateNOWContextVariable
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    Context Variables are considered part of the Processing class.
+
+    Investigate if this can be sorted?
+
+    THIS FUNCTION OUTPUT DOES NOT YET INCLUDE THE SCOPE OF THE VARIABLE! (i.e. root, parent or self)
+
+    #>
+    [OutputType([ANOWContextVariable[]])]
+    [Cmdletbinding()]
+    Param(
+        [ValidateScript({ $_ -gt 0 })]
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true)]
+        [int64]$RunId,
+        [Parameter(Mandatory = $False)]
+        [int32]$startRow = 0,
+        [Parameter(Mandatory = $False)]
+        [int32]$endRow = 100,
+        [ValidateSet('name', 'value', 'dateCreated', 'lastUpdated', 'id')]
+        [Parameter(Mandatory = $false)]
+        [string]$sortBy,
+        [Parameter(Mandatory = $False)]
+        [switch]$Ascending
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        If ($endRow -lt $startRow) {
+            Write-Warning -Message "The end row must be higher then the start row"
+            Break
+        }
+        [System.Collections.ArrayList]$RunIdCollection = New-Object -TypeName System.Collections.ArrayList
+        [System.Collections.Specialized.OrderedDictionary]$BodyObject = [System.Collections.Specialized.OrderedDictionary]@{}
+    }
+    Process {
+        If ($_ -gt 0) {
+            [int64]$RunId = $_
+        }
+        [string]$RunIdString = $RunId
+        [void]$RunIdCollection.Add($RunIdString)
+    }
+    End {
+        If ($RunIdCollection.Count -eq 1) {
+            [string]$RunIdStringCollection = ('["' + $RunIdCollection + '"]')
+        }
+        Else {
+            $Error.Clear()
+            Try {
+                [string]$RunIdStringCollection = $RunIdCollection | ConvertTo-Json -Compress
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "ConvertTo-Json failed due to convert the collection of Run Id's due to [$Message]."
+                Break
+            }
+        }
+        $BodyObject.Add('_constructor', 'AdvancedCriteria')
+        $BodyObject.Add('operator', 'and')
+        $BodyObject.Add('criteria', ('{"fieldName":"processing","operator":"inSet","value":' + $RunIdStringCollection + '}') )
+        $BodyObject.Add('_operationType', 'fetch')
+        $BodyObject.Add('_startRow', $startRow)
+        $BodyObject.Add('_endRow', $endRow)
+        If ($Ascending -ne $true) {
+            $BodyObject.Add('_sortBy', $sortBy)
+        }
+        Else {
+            $BodyObject.Add('_sortBy', ('-' + $sortBy))
+        }
+        $BodyObject.Add('_textMatchStyle', 'substring')
+        $BodyObject.Add('_componentId', 'ProcessingContextVariableList')
+        $BodyObject.Add('_dataSource', 'ProcessingContextVariableDataSource')
+        $BodyObject.Add('isc_metaDataPrefix', '_')
+        $BodyObject.Add('isc_dataFormat', 'json')
+        [string]$Body = ConvertTo-QueryString -InputObject $BodyObject
+        [string]$command = ('/processingContextVariable/read?' + $Body)
+        [string]$Instance = $anow_session.Instance
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'GET')
+        If ($Verbose -eq $true) {
+            $parameters.Add('Verbose', $True)
+        }
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        $parameters.Add('Instance', $Instance)
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+        $Error.Clear()
+        Try {
+            [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Invoke-AutomateNOWAPI failed due to execute [$command] due to [$Message]."
+            Break
+        }
+        If ($results.response.status -ne 0) {
+            If ($null -eq $results.response.status) {
+                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
+                Break
+            }
+            Else {
+                [int32]$status_code = $results.response.status
+                [string]$results_response = $results.response
+                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
+                Break
+            }
+        }
+        [int32]$ContextVariables_count = $results.response.data.Count
+        If ($ContextVariables_count -eq 0 -and $startRow -gt 0) {
+            Write-Warning -Message "There are not any more rows of data past this point. Please try different -startRow value."
+            Break
+        }
+        If ($ContextVariables_count -gt 0) {
+            $Error.Clear()
+            Try {
+                [ANOWContextVariable[]]$ContextVariables = $results.response.data
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Failed to parse the returned results into [ANOWContextVariable] objects under Get-AutomateNOWContextVariable due to [$Message]."
+                Break
+            }
+            Return $ContextVariables
+        }
+    }
+}
+
+Function Export-AutomateNOWContextVariable {
+    <#
+    .SYNOPSIS
+    Exports the Context Variables from a Task or Workflow from an instance of AutomateNOW!
+
+    .DESCRIPTION
+    Exports the Context Variables from a Task or Workflow from an instance of AutomateNOW!
+
+    .PARAMETER ContextVariable
+    Mandatory [ANOWContextVariable] object (Use Get-AutomateNOWContextVariable to retrieve them)
+
+    .INPUTS
+    ONLY [ANOWContextVariable] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    The [ANOWContextVariable] objects are exported to the local disk in CSV format
+
+    .EXAMPLE
+    Exports the Context Variables from two Workflow RunId's
+    1913730, 1924427 | Get-AutomateNOWContextVariable | Export-AutomateNOWContextVariable
+
+    .NOTES
+	You must present [ANOWContextVariable] objects to the pipeline to use this function.
+    #>
+
+    [Cmdletbinding(DefaultParameterSetName = 'Pipeline')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true, ParameterSetName = 'Pipeline')]
+        [ANOWContextVariable]$ContextVariable
+    )
+    Begin {
+        [string]$current_time = Get-Date -Format 'yyyyMMddHHmmssfff'
+        [string]$ExportFileName = 'Export-AutomateNOW-ContextVariables-' + $current_time + '.csv'
+        [string]$ExportFilePath = ((Get-Location | Select-Object -ExpandProperty Path) + '\' + $ExportFileName)
+        [hashtable]$parameters = @{}
+        $parameters.Add('Path', $ExportFilePath)
+        $parameters.Add('Append', $true)
+        $parameters.Add('Delimiter', "`t")
+        If ($PSVersionTable.PSVersion.Major -eq 5) {
+            $parameters.Add('NoTypeInformation', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [ANOWContextVariable]$ContextVariable = $_
+        }
+        $Error.Clear()
+        Try {
+            $ContextVariable | Export-CSV @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Export-CSV failed to export the [ANOWContextVariable] object on the pipeline due to [$Message]"
+            Break
+        }
+    }
+    End {
+        $Error.Clear()
+        If ((Test-Path -Path $ExportFilePath) -eq $true) {
+            [System.IO.FileInfo]$fileinfo = Get-Item -Path "$ExportFilePath"
+            [int32]$filelength = $fileinfo.Length
+            [string]$filelength_display = "{0:N0}" -f $filelength
+            Write-Information -MessageData "Created file $ExportFileName ($filelength_display bytes)"
+        }
+    }
+}
+
+#endregion
+
 #Region - DataSources
 
 Function Get-AutomateNOWDataSource {
@@ -11888,7 +12547,7 @@ Function Set-AutomateNOWDataSource {
                     }
                     ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
                         [string]$tag_object_simpleId = $tag_object.simpleId
-                        Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
+                        Throw "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                         Break
                     }
                     [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -11961,10 +12620,10 @@ Function Set-AutomateNOWDataSource {
 Function Copy-AutomateNOWDataSource {
     <#
     .SYNOPSIS
-    Copies an DataSource from an AutomateNOW! instance
+    Copies a DataSource from an AutomateNOW! instance
 
     .DESCRIPTION
-    Copies an DataSource from an AutomateNOW! instance. AutomateNOW object id can never be changed, but we can copy the object to a new id and it will include all of the items therein.
+    Copies a DataSource from an AutomateNOW! instance. AutomateNOW object id can never be changed, but we can copy the object to a new id and it will include all of the items therein.
 
     .PARAMETER DataSource
     Mandatory [ANOWDataSource] object to be copied.
@@ -12178,6 +12837,138 @@ Function Copy-AutomateNOWDataSource {
     }
     End {
 
+    }
+}
+
+Function Rename-AutomateNOWDataSource {
+    <#
+    .SYNOPSIS
+    Renames a DataSource on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Performs a psuedo-rename operations of a DataSource from an AutomateNOW! instance by copying it first and then deleting the source. This function merely combines Copy-AutomateNOWDataSource and Remove-AutomateNOWDataSource therefore it is to be considered destructive.
+
+    .PARAMETER DataSource
+    An [ANOWDataSource] object representing the DataSource to be renamed.
+
+    .PARAMETER NewId
+    Mandatory string indicating the new id or name of the DataSource. Please remember that the Id is the same as a primary key, it must be unique. The console will provide the old Id + '_COPY' in the UI when making a copy. The Id is limited to 1024 characters.
+
+    .PARAMETER Force
+    Force the renaming without confirmation. This is equivalent to -Confirm:$false
+
+    .PARAMETER Quiet
+    Optional switch to suppress the return of the newly renamed object.
+
+    .INPUTS
+    ONLY [ANOWDataSource] objects are accepted. There is intentionally no support for the pipeline.
+
+    .OUTPUTS
+    The newly renamed [ANOWDataSource] object will be returned.
+
+    .EXAMPLE
+    $DataSource = Get-AutomateNOWDataSource -Id 'DataSource01'
+    Rename-AutomateNOWDataSource -DataSource $DataSource -NewId 'DataSource_02'
+
+    .EXAMPLE
+    Rename-AutomateNOWDataSource -DataSource (Get-AutomateNOWDataSource -Id 'DataSource01') -NewId 'DataSource_02'
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    When renaming, you may only specify a different Id (name).
+
+    Referrals do not exist on this object type.
+
+    If at first glance the newly renamed Data Source is empty of objects when it should not be, try using the refresh data button and they will appear.
+    #>
+    [OutputType([ANOWDataSource])]
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [ANOWDataSource]$DataSource,
+        [Parameter(Mandatory = $true)]
+        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [string]$NewId,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        ## Begin standard warning ##
+        ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
+        $Error.Clear()
+        Try {
+            [boolean]$new_DataSource_exists = ($null -ne (Get-AutomateNOWDataSource -Id $NewId))
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWDataSource failed to check if the DataSource [$NewId] already existed due to [$Message]."
+            Break
+        }
+        If ($new_DataSource_exists -eq $true) {
+            [string]$current_domain = $anow_session.header.domain
+            Write-Warning -Message "There is already a DataSource named [$NewId] in [$current_domain]. You may not proceed."
+            [boolean]$PermissionToProceed = $false
+        }
+        [string]$DataSource_id = $DataSource.simpleId
+        $Error.Clear()
+        Try {
+            [boolean]$old_DataSource_exists = ($null -ne (Get-AutomateNOWDataSource -Id $DataSource_id))
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWDataSource failed to check if the DataSource [$DataSource_id] already existed due to [$Message]."
+            Break
+        }
+        If ($old_DataSource_exists -eq $false) {
+            [string]$current_domain = $anow_session.header.domain
+            Write-Warning -Message "There is not a DataSource named [$DataSource_id] in [$current_domain]. You may not proceed."
+            [boolean]$PermissionToProceed = $false
+        }
+        ## End standard warning ##
+    }
+    Process {
+        If ($PermissionToProceed -ne $false) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($DataSource_id)")) -eq $true) {
+                $Error.Clear()
+                Try {
+                    [ANOWDataSource]$new_DataSource = Copy-AutomateNOWDataSource -DataSource $DataSource -NewId $NewId -Force
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Copy-AutomateNOWDataSource failed to create a new DataSource [$NewId] as Part 1 of the renaming process due to [$Message]."
+                    Break
+                }
+                If ($new_DataSource.simpleId -eq $NewId) {
+                    Write-Verbose -Message "Part 1: DataSource [$DataSource_id] successfully copied to [$NewId]"
+                }
+                $Error.Clear()
+                Try {
+                    Remove-AutomateNOWDataSource -DataSource $DataSource -Force
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Remove-AutomateNOWDataSource failed to remove [$DataSource_id] as Part 2 of the renaming process due to [$Message]."
+                    Break
+                }
+                Write-Verbose -Message "Part 2: DataSource [$DataSource_id] removed"
+                Write-Verbose -Message "Task [$DataSource_id] successfully renamed to [$NewId]"
+                If ($Quiet -ne $true) {
+                    Return $new_DataSource
+                }
+            }
+        }
+        Else {
+            Write-Warning -Message "No action was taken because either the source object didn't exist or the new object already existed"
+        }
+    }
+    End {
     }
 }
 
@@ -13110,7 +13901,7 @@ Function Get-AutomateNOWDomain {
                     }
                     Catch {
                         [string]$Message = $_.Exception.Message
-                        Write-Warning -Message "Failed to parse the response into a [ANOWDomain] object (under Get-AutomateNOWAdhocReport while retrieving the in-line AdhocReport object under Set-AutomateNOWDomain) due to [$Message]."
+                        Write-Warning -Message "Failed to parse the response into a [ANOWEndpoint] object under Get-AutomateNOWDomain due to [$Message]."
                         Break
                     }
                     $Domain.adhocReportEndpoint = $AdhocReportEndpoint
@@ -13186,6 +13977,12 @@ Function Set-AutomateNOWDomain {
     .PARAMETER Domain
     An [ANOWDomain] object representing the Domain to be changed.
 
+    .PARAMETER logoFile
+    Optional file object of the organization's distinctive image or graphic file into the application. Use Get-Item to retrieve the logo image file. The filename extension must match the format. Only the following formats are supported: jpg, jpeg, png, gif
+
+    .PARAMETER unsetLogoFile
+    Optional [boolean] to unset the logo file.
+
     .PARAMETER Description
     Optional description of the Domain (may not exceed 255 characters).
 
@@ -13228,12 +14025,6 @@ Function Set-AutomateNOWDomain {
     .PARAMETER iconCode
     The name of the icon which matches the chosen library.
 
-    .PARAMETER logoFile
-    Optional file object of the organization's distinctive image or graphic file into the application. Use Get-Item to retrieve the logo image file. The filename extension must match the format. Only the following formats are supported: jpg, jpeg, png, gif
-
-    .PARAMETER unsetLogoFile
-    Optional [boolean] to unset the logo file.
-
     .PARAMETER Force
     Force the change without confirmation. This is equivalent to -Confirm:$false
 
@@ -13257,17 +14048,17 @@ Function Set-AutomateNOWDomain {
     Get-AutomateNOWDomain -Id 'Domain1' | Set-AutomateNOWDomain -Description "Description!" -unsetAdhocReportEndpoint -processingRegistryDayLimit 23 -defaultTimeZone (Get-AutomateNOWTimeZone -Id 'America/New_York') -processingTemplatePrefixEnabled -processingTemplatePrefixList 'Prefix_1', 'Prefix_2' -LabelTextColor '#FFFFFF' -LabelBackgroundColor '#000000' -ToolbarBackgroundColor '#888888' -iconSet FAT_COW -iconCode 'abacus'
 
     .NOTES
-    You must use Connect-AutomateNOW to establish the token by way of global variable.
+    Constraint: You must use Connect-AutomateNOW to establish the token by way of global variable.
 
-    In the 'New Domain' dialog the 'Label Text Color' and 'Label Text Background Color' properties are labeled as 'Text Color' and 'Background'. Within the Settings of the domain the correct names are used.
+    Constraint: The Label Text and Label Text Background colors cannot be unset.
 
-    It is not possible to unset either the Label Text Color or Label Text Background Color but the Toolbar Background Color can be unset.
+    Constraint: The 2 parameters related to the icon setting are restricted to a parameter set. Also, if you specify an icon library then you must also specify an icon.
 
-    The 2 parameters related to the icon setting are a parameter set. You cannot specify an icon library without also specifying an icon.
+    Constraint: The 2 parameters related to the domain logo file are restricted to a parameter set.
 
-    The -adhocReportEndpoint parameter is calling for an Endpoint object, not an Adhoc Report object.
+    Info: In the 'New Domain' dialog the 'Label Text Color' and 'Label Text Background Color' properties are labeled as 'Text Color' and 'Background'. Within the Settings of the domain the correct names are used.
 
-    The -logoFile parameter has its own very limited parameter set. This is because it requires a binary body.
+    Warning: The -adhocReportEndpoint parameter is calling for an Endpoint object, not an Adhoc Report object!
 
     #>
     [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High', DefaultParameterSetName = 'Default')]
@@ -13276,6 +14067,11 @@ Function Set-AutomateNOWDomain {
         [Parameter(Mandatory = $true, ValueFromPipeline = $True, ParameterSetName = 'WithIcon')]
         [Parameter(Mandatory = $true, ValueFromPipeline = $True, ParameterSetName = 'LogoFile')]
         [ANOWDomain]$Domain,
+        [ValidateScript({ (Test-Path -Path $_.FullName) -eq $true })]
+        [Parameter(Mandatory = $false, ParameterSetName = 'LogoFile')]
+        [System.IO.FileSystemInfo]$logoFile,
+        [Parameter(Mandatory = $false, ParameterSetName = 'LogoFile')]
+        [switch]$unsetLogoFile,
         [ValidateScript({ $_.Length -le 255 })]
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [Parameter(Mandatory = $false, ParameterSetName = 'WithIcon')]
@@ -13327,12 +14123,6 @@ Function Set-AutomateNOWDomain {
         [ANOWIconSet]$iconSet,
         [Parameter(Mandatory = $true, ParameterSetName = 'WithIcon')]
         [string]$iconCode,
-        [ValidateScript({ (Test-Path -Path $_.FullName) -eq $true })]
-        [Parameter(Mandatory = $true, ParameterSetName = 'LogoFile')]
-        [System.IO.FileSystemInfo]$logoFile,
-        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
-        [Parameter(Mandatory = $false, ParameterSetName = 'WithIcon')]
-        [switch]$unsetLogoFile,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [Parameter(Mandatory = $false, ParameterSetName = 'WithIcon')]
         [Parameter(Mandatory = $false, ParameterSetName = 'LogoFile')]
@@ -13487,7 +14277,6 @@ Function Set-AutomateNOWDomain {
                 $BodyMetaData.'iconCode' = $iconCode
             }
             If ($logofile.count -gt 0) {
-
                 [hashtable]$get_file_parameters = @{}
                 If ($PSVersionTable.PSVersion.Major -eq 5) {
                     $get_file_parameters.Add('Encoding', 'Byte')
@@ -14382,11 +15171,11 @@ Function Suspend-AutomateNOWDomain {
             }
             Catch {
                 [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Get-AutomateNOWDomain failed to check if the Domain [$Domain_id] existed under Resume-AutomateNOWDomain due to [$Message]."
+                Write-Warning -Message "Get-AutomateNOWDomain failed to check if the Domain [$Domain_id] existed under Suspend-AutomateNOWDomain due to [$Message]."
                 Break
             }
             If ($current_Domain.id.length -eq 0) {
-                Write-Warning -Message "The Domain you specified does not seem to exist (Resume-AutomateNOWDomain)"
+                Write-Warning -Message "The Domain you specified does not seem to exist (Suspend-AutomateNOWDomain)"
                 Break
             }
             [boolean]$current_Domain_hold_status = $current_Domain.globalHold
@@ -15397,7 +16186,7 @@ Function New-AutomateNOWEndpoint {
             }
             ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
                 [string]$tag_object_simpleId = $tag_object.simpleId
-                Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
+                Throw "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                 Break
             }
             [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -16009,6 +16798,301 @@ Function Show-AutomateNOWEndpointType {
 
 #endregion
 
+#Region - Resource Event Log
+
+Function Get-AutomateNOWProcessingEventLog {
+    <#
+    .SYNOPSIS
+    Gets the Processing Event Log entries from an AutomateNOW! instance
+
+    .DESCRIPTION
+    Gets the Processing Event Log entries from an AutomateNOW! instance
+
+    .PARAMETER Category
+    Mandatory type of Event Log. Valid choices are: PROCESSING; SERVER_NODE; RESOURCE; AGENT; DOMAIN
+
+    .PARAMETER Agent
+    Mandatory (ONLY IF AGENT CATEGORY IS SELECTED) [ANOWAgent] object that corresponds to the Agent logs you wish to retrieve.
+    
+    .PARAMETER Agent
+    Optional (ONLY IF NODE CATEGORY IS SELECTED) [ANOWNode] object that corresponds to the Node logs you wish to retrieve.
+    
+    .PARAMETER sortBy
+    Optional string parameter to sort the results by. Valid choices are: 'dateCreated', 'timestamp', 'parentProcessingId', 'processingId', 'rootProcessingId'
+
+    .PARAMETER Ascending
+    Optional switch parameter to sort in ascending order (oldest to newest)
+
+    .PARAMETER startRow
+    Optional integer to indicate the row to start from. This is intended for when you need to paginate the results. Default is 0.
+
+    .PARAMETER endRow
+    Optional integer to indicate the row to stop on. This is intended for when you need to paginate the results. Default is 100. The console default hard limit is 10,000.
+
+    .INPUTS
+    You cannot pipe input to `Get-AutomateNOWResourceEventLog`
+
+    .OUTPUTS
+    An array of one or more [ANOWProcessingEvent] objects
+
+    .EXAMPLE
+    Gets the first 100 Server Node Processing Events (i.e. log entries) for all nodes in the domaim
+
+    Get-AutomateNOWProcessingEventLog -category SERVER_NODE
+
+     .EXAMPLE
+    Gets the first 100 Server Node Processing Events (i.e. log entries) for a specied node named Node1
+
+    Get-AutomateNOWProcessingEventLog -category SERVER_NODE -Node (Get-AutomateNOWNode -Id 'Node1')
+    
+    .EXAMPLE
+    Gets the first 100 Resource Processing Events (i.e. log entries) in the domaim
+
+    Get-AutomateNOWProcessingEventLog -category RESOURCE
+
+    .EXAMPLE
+    Gets the first 100 Design Processing Events (i.e. log entries) in the domaim
+
+    Get-AutomateNOWProcessingEventLog -category PROCESSING
+
+    .EXAMPLE
+    Gets the first 100 Domain Processing Events (i.e. log entries) for the current domain.
+
+    Get-AutomateNOWProcessingEventLog -category DOMAIN
+
+    .EXAMPLE
+    Gets the first 100 Processing Events (i.e. log entries) for an Agent named Agent1 in the domaim
+
+    Get-AutomateNOWProcessingEventLog -category AGENT -Agent (Get-AutomateNOWAgent -Id 'Agent1')
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    The PROCESSING category is available in the UI by selecting the Monitor tab followed by Event Log.
+
+    The SERVER_NODE category is available in the UI by selecting the Nodes tab followed by Event Log.
+
+    The RESOURCE category is available in the UI by selecting the Resources tab followed by Event Log.
+    
+    The AGENT category is available in the UI when an Agent object has been opened for editing. Click the heartbeat icon in the upper right to view the log. This category is limited to only events from this particular Agent.
+
+    The DOMAIN category is available in the UI when a Domain object has been opened for editing. Click the heartbeat icon in the upper right to view the log. This category is limited to only events from this particular Domain. If you want to retrieve the log from other domains you'll need to switch domains with Switch-AutomateNOWDomain.
+
+    #>
+    [OutputType([ANOWProcessingEvent[]])]
+    [Cmdletbinding()]
+    Param(
+        [Parameter(Mandatory = $True)]
+        [ANOWProcessingEvent_eventCategory]$category,
+        [Parameter(Mandatory = $False)]
+        [ANOWAgent]$Agent,
+        [Parameter(Mandatory = $False)]
+        [ANOWNode]$Node,
+        [ValidateSet('dateCreated', 'timestamp', 'parentProcessingId', 'processingId', 'rootProcessingId')]
+        [Parameter(Mandatory = $False)]
+        [string]$sortBy = 'dateCreated',
+        [Parameter(Mandatory = $False)]
+        [switch]$Ascending,
+        [Parameter(Mandatory = $False)]
+        [int32]$startRow = 0,
+        [Parameter(Mandatory = $False)]
+        [int32]$endRow = 100
+    )
+    If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+        Write-Warning -Message "Somehow there is not a valid token confirmed."
+        Break
+    }
+    If ($endRow -le $startRow) {
+        Write-Warning -Message "The endRow must be greater than the startRow. Please try again."
+        Break
+    }
+    If ($Agent.Id.Length -gt 0) {
+        If ($category -eq 'AGENT') {
+            [string]$agent_id = $Agent.id
+        }
+        Else {
+            Write-Warning -Message "Please do not pass an [ANOWAgent] object to this function unless you are also selecting the AGENT category."
+            Break
+        }
+    }
+    Else {
+        If ($category -eq 'AGENT') {
+            Write-Warning -Message "You must use the -Agent parameter to include an [ANOWAgent] object if the AGENT category is selected. Use Get-AutomateNOWAgent to retrieve one of these."
+            Break
+        }
+    }
+    If ($Node.Id.Length -gt 0) {
+        If ($category -eq 'SERVER_NODE') {
+            [string]$node_id = $Node.id
+        }
+        Else {
+            Write-Warning -Message "Please do not pass an [ANOWNode] object to this function unless you are also selecting the SERVER_NODE category."
+            Break
+        }
+    }
+    [hashtable]$parameters = @{}
+    $parameters.Add('Method', 'POST')
+    If ($anow_session.NotSecure -eq $true) {
+        $parameters.Add('NotSecure', $true)
+    }
+    [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
+    $Body.'operator' = 'and'
+    $Body.'_constructor' = 'AdvancedCriteria'
+    $Body.'criteria1' = '{"fieldName":"archived","operator":"equals","value":false}'
+    $Body.'criteria2' = ('{"fieldName":"eventCategory","operator":"equals","value":"' + $category + '"}')
+    If ($category -eq 'PROCESSING') {
+        [string]$componentId = 'ProcessingEventList'
+    }
+    ElseIf ($category -eq 'SERVER_NODE') {
+        [string]$componentId = 'ServerNodeEventList'
+        If ($node_id.Length -gt 0) {
+            $Body.'criteria3' = ('{"fieldName":"serverNode","operator":"equals","value":"' + $node_id + '"}')
+        }
+    }
+    ElseIf ($category -eq 'RESOURCE') {
+        [string]$componentId = 'ResourceEventLog'
+    }
+    ElseIf ($category -eq 'AGENT') {
+        [string]$componentId = 'EventListWindow_list'
+        [string]$agent_id = $Agent.Id
+        $Body.'criteria3' = ('{"fieldName":"agent","operator":"equals","value":"' + $agent_id + '"}')
+    }
+    ElseIf ($category -eq 'DOMAIN') {
+        [string]$componentId = 'EventListWindow_list'
+        [string]$current_domain = $anow_session.current_domain
+        If ($current_domain.Length -eq 0) {
+            Write-Warning -Message "Somehow the current domain could not be confirmed. Please look into this."
+            Break
+        }
+        $Body.'criteria3' = ('{"fieldName":"domain","operator":"equals","value":"' + $current_domain + '"}')
+    }
+    Else {
+        Write-Warning -Message "Somehow was unable to determine the category of Processing Event log. Please look into this."
+        Break
+    }
+    $Body.'_componentId' = $componentId
+    $Body.'_textMatchStyle' = 'exact'
+    $Body.'_dataSource' = 'ProcessingEventDataSource'
+    $Body.'_startRow' = $startRow
+    $Body.'_endRow' = $endRow
+    If ($Ascending -eq $true) {
+        $Body.'_sortBy' = $sortBy
+    }
+    Else {
+        $Body.'_sortBy' = '-' + $sortBy
+    }
+    $Body.'_operationType' = 'fetch'
+    $Body.'isc_metaDataPrefix' = '_'
+    $Body.'isc_dataFormat' = 'json'
+    [string]$Body = ConvertTo-QueryString -InputObject $Body
+    [string]$command = ('/processingEvent/read?' + $Body)
+    If ($null -eq $parameters["Command"]) {
+        $parameters.Add('Command', $command)
+    }
+    Else {
+        $parameters.Command = $command
+    }
+    $Error.Clear()
+    Try {
+        [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+    }
+    Catch {
+        [string]$Message = $_.Exception.Message
+        Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
+        Break
+    }
+    If ($results.response.status -ne 0) {
+        If ($null -eq $results.response.status) {
+            Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
+            Break
+        }
+        Else {
+            [int32]$status_code = $results.response.status
+            [string]$results_response = $results.response
+            Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
+            Break
+        }
+    }
+    $Error.Clear()
+    Try {
+        [ANOWProcessingEvent[]]$ProcessingEvents = $results.response.data
+    }
+    Catch {
+        [string]$Message = $_.Exception.Message
+        Write-Warning -Message "Failed to parse the response into a series of [ANOWProcessingEvent] objects due to [$Message]."
+        Break
+    }
+    If ($ProcessingEvents.Count -gt 0) {
+        Return $ProcessingEvents
+    }
+}
+
+Function Export-AutomateNOWProcessingEventLog {
+    <#
+    .SYNOPSIS
+    Exports the Processing Events (log entries) from an instance of AutomateNOW!
+
+    .DESCRIPTION
+    Exports the Processing Events (log entries) from an instance of AutomateNOW! to a local .csv file
+
+    .PARAMETER ProcessingEvent
+    Mandatory [ANOWProcessingEvent] object (Use Get-AutomateNOWFolder to retrieve them)
+
+    .INPUTS
+    ONLY [ANOWProcessingEvent] objects from the pipeline are accepted
+
+    .OUTPUTS
+    The [ANOWProcessingEvent] objects are exported to the local disk in CSV format
+
+    .EXAMPLE
+    Get-AutomateNOWProcessingEvent | Export-AutomateNOWProcessingEvent
+
+    .NOTES
+	You must present [ANOWProcessingEvent] objects to the pipeline to use this function.
+    #>
+
+    [Cmdletbinding(DefaultParameterSetName = 'Pipeline')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true, ParameterSetName = 'Pipeline')]
+        [ANOWProcessingEvent]$ProcessingEvent
+    )
+    Begin {
+        [string]$current_time = Get-Date -Format 'yyyyMMddHHmmssfff'
+        [string]$ExportFileName = 'Export-AutomateNOW-ProcessingEvents-' + $current_time + '.csv'
+        [string]$ExportFilePath = ((Get-Location | Select-Object -ExpandProperty Path) + '\' + $ExportFileName)
+        [hashtable]$parameters = @{}
+        $parameters.Add('Path', $ExportFilePath)
+        $parameters.Add('Append', $true)
+        If ($PSVersionTable.PSVersion.Major -eq 5) {
+            $parameters.Add('NoTypeInformation', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [ANOWProcessingEvent]$ProcessingEvent = $_
+        }
+        $Error.Clear()
+        Try {
+            $ProcessingEvent | Export-CSV @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Export-CSV failed to export the [ANOWProcessingEvent] object on the pipeline due to [$Message]"
+            Break
+        }
+    }
+    End {
+        $Error.Clear()
+        If ((Test-Path -Path $ExportFilePath) -eq $true) {
+            [System.IO.FileInfo]$fileinfo = Get-Item -Path "$ExportFilePath"
+            [int32]$filelength = $fileinfo.Length
+            [string]$filelength_display = "{0:N0}" -f $filelength
+            Write-Information -MessageData "Created file $ExportFileName ($filelength_display bytes)"
+        }
+    }
+}
+
+#endregion
 #Region - Folders
 
 Function Get-AutomateNOWFolder {
@@ -16849,10 +17933,32 @@ Function Read-AutomateNOWIcon {
 
 Function Write-AutomateNOWIconData {
     <#
+   .SYNOPSIS
+    Gets the Lock objects from an AutomateNOW! instance
 
-    This is experimental
+    .DESCRIPTION
+    Gets the Lock objects from an AutomateNOW! instance
 
-    Write-AutomateNOWIconDate -iconSet 'FUGUE' -filepath 'c:\temp\icons'
+    .PARAMETER iconSet
+    Mandatory name of the icon set to export. Valid choices are FAT_COW and FUGUE
+
+    .PARAMETER filepath
+    Mandatory path where the icons will be exported to. Note that a sub-directory will be created based on the name of the iconSet. See the example.
+
+    .PARAMETER pause_delay
+    Optional int32 to indicate the delay in milliseconds between each .png file download. The default is 50.
+
+    .INPUTS
+    You cannot pipe any inputs to `Write-AutomateNOWIconData`
+
+    .OUTPUTS
+    .png files will be written to disk
+
+    .EXAMPLE
+    Writes the FUGUE icon set to disk in .png format to the folder 'c:\temp\AutomateNOW\Icons\FUGUE'
+
+    Import-AutomateNOWIcon -Instance $anow_session.instance
+    Write-AutomateNOWIconData -iconSet 'FUGUE' -filepath 'C:\temp\AutomateNOW\Icons'
 
     #>
     Param(
@@ -17575,7 +18681,7 @@ Function New-AutomateNOWLock {
             }
             ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
                 [string]$tag_object_simpleId = $tag_object.simpleId
-                Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
+                Throw "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                 Break
             }
             [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -18487,7 +19593,9 @@ Function New-AutomateNOWNode {
     An [ANOWNode] object representing the newly created node
 
     .EXAMPLE
-    New-AutomateNOWNode
+    Creats a new REST WEB node named 'NameOfNOde' that is assigned a tag 'Tag1' and placed into a folder 'Folder1'
+
+    New-AutomateNOWNode -Id 'NameOfNode' -Type REST_WEB_SERVICE -Tags 'Tag1' -Folder 'Folder1'
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
@@ -18502,7 +19610,7 @@ Function New-AutomateNOWNode {
         [Parameter(Mandatory = $true)]
         [string]$Id,
         [Parameter(Mandatory = $true)]
-        [ANOWserverNode_type]$Type,
+        [ANOWserverNode_serverNodeType]$Type,
         [Parameter(Mandatory = $false)]
         [int32]$WeightCapacity = 50,
         [Parameter(Mandatory = $false, HelpMessage = "Enter a descriptive string between 0 and 255 characters in length. UTF8 characters are accepted.")]
@@ -18565,7 +19673,7 @@ Function New-AutomateNOWNode {
             }
             ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
                 [string]$tag_object_simpleId = $tag_object.simpleId
-                Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
+                Throw "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                 Break
             }
             [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -18950,7 +20058,7 @@ Function Remove-AutomateNOWNode {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Node.id)")) -eq $true) {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Remove Node $($Node.id)")) -eq $true) {
             If ($_.id.Length -gt 0) {
                 [string]$node_id = $_.id
             }
@@ -18986,6 +20094,154 @@ Function Remove-AutomateNOWNode {
     }
     End {
 
+    }
+}
+
+Function Rename-AutomateNOWNode {
+    <#
+    .SYNOPSIS
+    Renames a Node on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Performs a psuedo-rename operations of a Node from an AutomateNOW! instance by copying it first and then deleting the source. This function merely combines Copy-AutomateNOWNode and Remove-AutomateNOWNode therefore it is to be considered destructive.
+
+    .PARAMETER Node
+    An [ANOWNode] object representing the Node to be renamed.
+
+    .PARAMETER NewId
+    Mandatory string indicating the new id or name of the Node. Please remember that the Id is the same as a primary key, it must be unique. The console will provide the old Id + '_COPY' in the UI when making a copy. The Id is limited to 1024 characters.
+
+    .PARAMETER Force
+    Force the renaming without confirmation. This is equivalent to -Confirm:$false
+
+    .PARAMETER Quiet
+    Optional switch to suppress the return of the newly renamed object.
+
+    .INPUTS
+    ONLY [ANOWNode] objects are accepted. There is intentionally no support for the pipeline.
+
+    .OUTPUTS
+    The newly renamed [ANOWNode] object will be returned.
+
+    .EXAMPLE
+    $Node = Get-AutomateNOWNode -Id 'Node01'
+    Rename-AutomateNOWNode -Node $Node -NewId 'Node_02'
+
+    .EXAMPLE
+    Rename-AutomateNOWNode -Node (Get-AutomateNOWNode -Id 'Node01') -NewId 'Node_02'
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    When renaming, you may only specify a different Id (name).
+
+    This action will be denied if any existing referrals are found on the object.
+    #>
+    [OutputType([ANOWNode])]
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [ANOWNode]$Node,
+        [Parameter(Mandatory = $true)]
+        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [string]$NewId,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        ## Begin standard warning ##
+        ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
+        $Error.Clear()
+        Try {
+            [boolean]$new_Node_exists = ($null -ne (Get-AutomateNOWNode -Id $NewId))
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWNode failed to check if the Node [$NewId] already existed due to [$Message]."
+            Break
+        }
+        If ($new_Node_exists -eq $true) {
+            [string]$current_domain = $anow_session.header.domain
+            Write-Warning -Message "There is already a Node named [$NewId] in [$current_domain]. You may not proceed."
+            [boolean]$PermissionToProceed = $false
+        }
+        [string]$Node_id = $Node.simpleId
+        $Error.Clear()
+        Try {
+            [boolean]$old_Node_exists = ($null -ne (Get-AutomateNOWNode -Id $Node_id))
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWNode failed to check if the Node [$Node_id] already existed due to [$Message]."
+            Break
+        }
+        If ($old_Node_exists -eq $false) {
+            [string]$current_domain = $anow_session.header.domain
+            Write-Warning -Message "There is not a Node named [$Node_id] in [$current_domain]. You may not proceed."
+            [boolean]$PermissionToProceed = $false
+        }
+        ## End standard warning ##
+        ## Begin referrals warning ##
+        ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
+        $Error.Clear()
+        Try {
+            [int32]$referrals_count = Find-AutomateNOWObjectReferral -Node $Node -Count | Select-Object -Expandproperty referrals
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Find-AutomateNOWObjectReferral failed to extract the referrals on Node [$Node_id] due to [$Message]."
+            Break
+        }
+        If ($referrals_count -gt 0) {
+            Write-Warning -Message "Unfortunately, you cannot rename a Node that has referrals. This is because the rename is not actually renaming but copying anew and deleting the old. Please, use the Find-AutomateNOWObjectReferral function to identify referrals and remove them."
+            Break
+        }
+        Else {
+            Write-Verbose -Message "The Node [$Node_id] does not have any referrals. It is safe to proceed."
+        }
+    }
+    Process {
+        If ($PermissionToProceed -ne $false) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Node_id)")) -eq $true) {
+                $Error.Clear()
+                Try {
+                    [ANOWNode]$new_Node = Copy-AutomateNOWNode -Node $Node -NewId $NewId -Force
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Copy-AutomateNOWNode failed to create a new Node [$NewId] as Part 1 of the renaming process due to [$Message]."
+                    Break
+                }
+                If ($new_Node.simpleId -eq $NewId) {
+                    Write-Verbose -Message "Part 1: Node [$Node_id] successfully copied to [$NewId]"
+                }
+                $Error.Clear()
+                Try {
+                    Remove-AutomateNOWNode -Node $Node -Force
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Remove-AutomateNOWNode failed to remove [$Node_id] as Part 2 of the renaming process due to [$Message]."
+                    Break
+                }
+                Write-Verbose -Message "Part 2: Node [$Node_id] removed"
+                Write-Verbose -Message "Task [$Node_id] successfully renamed to [$NewId]"
+                If ($Quiet -ne $true) {
+                    Return $new_Node
+                }
+            }
+        }
+        Else {
+            Write-Warning -Message "No action was taken because either the source object didn't exist or the new object already existed"
+        }
+    }
+    End {
     }
 }
 
@@ -19126,6 +20382,9 @@ Function Stop-AutomateNOWNode {
     .PARAMETER Quiet
     Switch parameter to silence the returned [ANOWNode] object
 
+    .PARAMETER Force
+    Force the stop action without confirmation. This is equivalent to -Confirm:$false
+
     .INPUTS
     ONLY [ANOWNode] objects are accepted (including from the pipeline)
 
@@ -19153,18 +20412,24 @@ Function Stop-AutomateNOWNode {
     The default behavior of this function is the 'Stop' option 'Wait for executing tasks to complete'. Use -Kill or -Abort to use one or the other of the two stop options. (Stop executing tasks is not added yet)
 
     #>
-    [Cmdletbinding(DefaultParameterSetName = 'Default')]
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High', DefaultParameterSetName = 'Default')]
     Param(
         [Parameter(Mandatory = $true, ParameterSetName = 'Default', ValueFromPipeline = $True)]
-        [Parameter(Mandatory = $true, ParameterSetName = 'Kill')]
-        [Parameter(Mandatory = $true, ParameterSetName = 'Abort')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'Kill', ValueFromPipeline = $True)]
+        [Parameter(Mandatory = $true, ParameterSetName = 'Abort', ValueFromPipeline = $True)]
         [ANOWNode]$Node,
         [Parameter(Mandatory = $true, ParameterSetName = 'Kill')]
         [switch]$Kill,
         [Parameter(Mandatory = $true, ParameterSetName = 'Abort')]
         [switch]$Abort,
-        [Parameter(Mandatory = $false)]
-        [switch]$Quiet
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Kill')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Abort')]
+        [switch]$Quiet,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Kill')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Abort')]
+        [switch]$Force
     )
     Begin {
         If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
@@ -19201,47 +20466,526 @@ Function Stop-AutomateNOWNode {
             [string]$Node_id = $Node.id
             [string]$Node_simpleId = $Node.simpleId
         }
-        [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
-        $BodyMetaData.Add('id', $Node_id )
-        $BodyMetaData.Add('_operationType', 'custom')
-        $BodyMetaData.Add('_operationId', $operation_id)
-        $BodyMetaData.Add('_textMatchStyle', 'exact')
-        $BodyMetaData.Add('_dataSource', 'ServerNodeDataSource')
-        $BodyMetaData.Add('isc_metaDataPrefix', '_')
-        $BodyMetaData.Add('isc_dataFormat', 'json')
-        [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
-        If ($null -eq $parameters.Body) {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Node.id)")) -eq $true) {
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.Add('id', $Node_id )
+            $BodyMetaData.Add('_operationType', 'custom')
+            $BodyMetaData.Add('_operationId', $operation_id)
+            $BodyMetaData.Add('_textMatchStyle', 'exact')
+            $BodyMetaData.Add('_dataSource', 'ServerNodeDataSource')
+            $BodyMetaData.Add('isc_metaDataPrefix', '_')
+            $BodyMetaData.Add('isc_dataFormat', 'json')
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            If ($null -eq $parameters.Body) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$Node_id] due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            }
+            Write-Verbose -Message "Task $Node_id successfully $stop_message"
+            $Error.Clear()
+            Try {
+                [ANOWNode]$ANOWNode = $results.response.data[0]
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Unable to create the [ANOWNode] object under Stop-AutomateNOWNode (performing $operation_id) from the response due to [$Message]."
+                Break
+            }
+            If ($Quiet -ne $true) {
+                Return $ANOWNode
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+Function Dismount-AutomateNOWNode {
+    <#
+    .SYNOPSIS
+    Dismounts (detaches) a Node from an Agent on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Dismounts (detaches) a Node from an Agent on an AutomateNOW! instance
+
+    .PARAMETER Node
+    An [ANOWNode] object representing the Node to be detached from an Agent.
+
+    .PARAMETER Agent
+    An [ANOWAgent] object representing the Agent from which the Node will be dismounted (detached).
+
+    .PARAMETER Quiet
+    Switch parameter to silence the returned [ANOWNode] object
+
+    .PARAMETER Force
+    Force the dismounting without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    One [ANOWAgent] object must be presented along with at least one [AnowNode] object. Nodes can be sent along the pipeline.
+
+    .OUTPUTS
+    Informational message that the Node was detached from the Agent.
+
+    .EXAMPLE
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
+        [ANOWNode]$Node,
+        [Parameter(Mandatory = $true)]
+        [ANOWAgent]$Agent,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [string]$command = ('/serverNode/deleteAgentNode')
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [ANOWNode]$Node = $_
+        }
+        [string]$Node_id = $Node.id
+        [string]$Agent_Id = $Agent.Id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Node_id) from $Agent_Id")) -eq $true) {
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.Add('agent', $Agent_Id )
+            $BodyMetaData.Add('id', $Node_id )
+            $BodyMetaData.Add('_operationType', 'remove')
+            $BodyMetaData.Add('_operationId', 'deleteAgentNode')
+            $BodyMetaData.Add('_componentId', 'AgentServerNodeList')
+            $BodyMetaData.Add('_textMatchStyle', 'exact')
+            $BodyMetaData.Add('_dataSource', 'ServerNodeDataSource')
+            $BodyMetaData.Add('isc_metaDataPrefix', '_')
+            $BodyMetaData.Add('isc_dataFormat', 'json')
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            If ($null -eq $parameters.Body) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$Node_id] due to [$Message]."
+                Break
+            }
+            If ($results.response.status -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            }
+            If ($Quiet -ne $true) {
+                Write-Information -MessageData "Node $Node_id was dismounted (detached) from $Agent_Id"
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+Function Suspend-AutomateNOWNode {
+    <#
+    .SYNOPSIS
+    Suspends (holds) all activities within a specific Node on an AutomateNOW! instance.
+
+    .DESCRIPTION
+    Suspends (holds) all activities within a specific Node on an AutomateNOW! instance, ensuring a temporary freeze on all automated processes and workflows until further action is taken.
+
+    .PARAMETER Node
+    An [ANOWNode] object representing the Node to be suspended (placed on hold)
+
+    .PARAMETER Force
+    Force the change without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    ONLY [ANOWNode] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    A verbose information message will be sent indicating success
+
+    .EXAMPLE
+    Get-AutomateNOWNode -Id 'MyCoolNode' | Suspend-AutomateNOWNode -Force
+
+    .EXAMPLE
+    @( 'Node1', 'Node2' ) | Get-AutomateNOWNode | Suspend-AutomateNOWNode
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    This function is equivalent to the "Hold" button.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
+        [ANOWNode]$Node,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [string]$command = '/serverNode/hold'
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Suspend the Node $($Node.id)?")) -eq $true) {
+            If ($_.id.Length -gt 0) {
+                [string]$Node_id = $_.id
+            }
+            ElseIf ($Node.id.Length -gt 0) {
+                [string]$Node_id = $Node.id
+            }
+            Else {
+                [string]$Node_id = $Id
+            }
+            ## Begin warning ##
+            ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
+            $Error.Clear()
+            Try {
+                [ANOWNode]$current_Node = Get-AutomateNOWNode -Id $Node_id
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Get-AutomateNOWNode failed to check if the Node [$Node_id] existed under Resume-AutomateNOWNode due to [$Message]."
+                Break
+            }
+            If ($current_Node.id.length -eq 0) {
+                Write-Warning -Message "The Node you specified does not seem to exist (Resume-AutomateNOWNode)"
+                Break
+            }
+            [boolean]$current_Node_hold_status = $current_Node.onHold
+            If ($current_Node_hold_status -eq $true) {
+                Write-Warning -Message "[$Node_id] cannot be suspended (placed on hold) as it is already suspended (on hold)"
+                Break
+            }
+            ## End warning ##
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.Add('id', $Node_id )
+            $BodyMetaData.Add('_operationType', 'update')
+            $BodyMetaData.Add('_operationId', 'hold')
+            $BodyMetaData.Add('_textMatchStyle', 'exact')
+            $BodyMetaData.Add('_dataSource', 'ServerNodeDataSource')
+            $BodyMetaData.Add('isc_metaDataPrefix', '_')
+            $BodyMetaData.Add('isc_dataFormat', 'json')
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
             $parameters.Add('Body', $Body)
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$Node_id] due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            }
+            Write-Verbose -Message "Node $Node_id was successfully suspended (placed on hold)"
+        }
+    }
+    End {
+
+    }
+}
+
+Function Resume-AutomateNOWNode {
+    <#
+    .SYNOPSIS
+    Removes the temporary freeze placed on a specific Node on an AutomateNOW! instance and allows it to resume.
+
+    .DESCRIPTION
+    Removes the temporary freeze placed on a specific Node on an AutomateNOW! instance and allows it to resume.
+
+    .PARAMETER Node
+    An [ANOWNode] object representing the Node to be resumed
+
+    .PARAMETER Force
+    Force the change without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    ONLY [ANOWNode] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    A verbose information message will be sent indicating success
+
+    .EXAMPLE
+    Get-AutomateNOWNode -Id 'MyCoolNode' | Resume-AutomateNOWNode -Force
+
+    .EXAMPLE
+    @( 'Node1', 'Node2' ) | Get-AutomateNOWNode | Resume-AutomateNOWNode
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
+        [ANOWNode]$Node,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [string]$command = '/serverNode/resume'
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Resume the Node $($Node.id)?")) -eq $true) {
+            If ($_.id.Length -gt 0) {
+                [string]$Node_id = $_.id
+            }
+            ElseIf ($Node.id.Length -gt 0) {
+                [string]$Node_id = $Node.id
+            }
+            Else {
+                [string]$Node_id = $Id
+            }
+            ## Begin warning ##
+            ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
+            $Error.Clear()
+            Try {
+                [ANOWNode]$current_Node = Get-AutomateNOWNode -Id $Node_id
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Get-AutomateNOWNode failed to check if the Node [$Node_id] existed under Resume-AutomateNOWNode due to [$Message]."
+                Break
+            }
+            If ($current_Node.id.length -eq 0) {
+                Write-Warning -Message "The Node you specified does not seem to exist (Resume-AutomateNOWNode)"
+                Break
+            }
+            [boolean]$current_Node_hold_status = $current_Node.onHold
+            If ($current_Node_hold_status -eq $false) {
+                Write-Warning -Message "[$Node_id] cannot be resumed because it is not currently suspended (on hold)"
+                Break
+            }
+            ## End warning ##
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.Add('id', $Node_id )
+            $BodyMetaData.Add('_operationType', 'update')
+            $BodyMetaData.Add('_operationId', 'resume')
+            $BodyMetaData.Add('_textMatchStyle', 'exact')
+            $BodyMetaData.Add('_dataSource', 'NodeDataSource')
+            $BodyMetaData.Add('isc_metaDataPrefix', '_')
+            $BodyMetaData.Add('isc_dataFormat', 'json')
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            $parameters.Add('Body', $Body)
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$Node_id] due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            }
+            Write-Verbose -Message "Node $Node_id was successfully resumed (removed from hold)"
+        }
+    }
+    End {
+
+    }
+}
+
+Function Skip-AutomateNOWNode {
+    <#
+    .SYNOPSIS
+    Sets or unsets the Skip flag on a Node on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Sets or unsets the Skip flag on a Node on an AutomateNOW! instance
+
+    .PARAMETER Node
+    An [ANOWNode] object representing the Node to be set to skipped or unskipped
+
+    .PARAMETER UnSkip
+    Removes the skip flag from a [ANOWNode] object. This is the opposite of the default behavior.
+
+    .PARAMETER Force
+    Force the change without confirmation. This is equivalent to -Confirm:$false
+
+    .PARAMETER Quiet
+    Switch parameter to silence the emitted [ANOWNode] object
+
+    .INPUTS
+    ONLY [ANOWNode] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    The skipped/unskipped [ANOWNode] object will be returned
+
+    .EXAMPLE
+    Sets a Node to Skip (bypass)
+
+    Get-AutomateNOWNode -Id 'Node01' | Skip-AutomateNOWNode -Force
+
+    .EXAMPLE
+    Unsets the Skip (bypass) flag on a Node
+
+    Get-AutomateNOWNode | Skip-AutomateNOWNode -UnSkip
+
+    .EXAMPLE
+    Sets an array of Node to Skip (bypass)
+
+    @( 'Task1', 'Task2', 'Task3') | Skip-AutomateNOWNode
+
+    .EXAMPLE
+    Forcibly and quietly sets all Linux
+    Get-AutomateNOWNode | ? { $_.serverNodeType -eq 'LINUX' } | Skip-AutomateNOWNode -UnSkip -Force -Quiet
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $false, ValueFromPipeline = $True)]
+        [ANOWNode]$Node,
+        [Parameter(Mandatory = $false)]
+        [switch]$UnSkip,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        If ($UnSkip -ne $True) {
+            [string]$skip_flag_status = 'On'
+            [string]$operation_id = 'passBy'
+            [string]$ProcessDescription = 'Add the Skip flag'
         }
         Else {
-            $parameters.Body = $Body
+            [string]$skip_flag_status = 'Off'
+            [string]$operation_id = 'passByOff'
+            [string]$ProcessDescription = 'Remove the Skip flag'
         }
-        $Error.Clear()
-        Try {
-            [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+        [string]$command = ('/serverNode/' + $operation_id)
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
         }
-        Catch {
-            [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$Node_id] due to [$Message]."
-            Break
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [string]$Node_id = $_.id
         }
-        [int32]$response_code = $results.response.status
-        If ($response_code -ne 0) {
-            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
-            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+        ElseIf ($Node.id.Length -gt 0) {
+            [string]$Node_id = $Node.id
         }
-        Write-Verbose -Message "Task $Node_id successfully $stop_message"
-        $Error.Clear()
-        Try {
-            [ANOWNode]$ANOWNode = $results.response.data[0]
+        Else {
+            [string]$Node_id = $Id
         }
-        Catch {
-            [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Unable to create the [ANOWNode] object under Stop-AutomateNOWNode (performing $operation_id) from the response due to [$Message]."
-            Break
-        }
-        If ($Quiet -ne $true) {
-            Return $ANOWNode
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess($Node_id, $ProcessDescription)) -eq $true) {
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.Add('id', $Node_id )
+            $BodyMetaData.Add('_operationType', 'update')
+            $BodyMetaData.Add('_operationId', $operation_id)
+            $BodyMetaData.Add('_textMatchStyle', 'exact')
+            $BodyMetaData.Add('_dataSource', 'ServerNodeDataSource')
+            $BodyMetaData.Add('isc_metaDataPrefix', '_')
+            $BodyMetaData.Add('isc_dataFormat', 'json')
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            $parameters.Add('Body', $Body)
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$Node_id] due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            }
+            $Error.Clear()
+            Try {
+                [ANOWNode]$skipped_task_template = $results.response.data[0]
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Failed to create the [ANOWNode] object after setting the skip flag to [$skip_flag_status] on [$Node_id] due to [$Message]."
+                Break
+            }
+            Write-Verbose -Message "Successfully set the skip flag to [$skip_flag_status] on [$Node_id]"
+            If ($Quiet -ne $true) {
+                Return $skipped_task_template
+            }
         }
     }
     End {
@@ -19374,7 +21118,9 @@ Function Find-AutomateNOWObjectReferral {
         [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'Endpoint')]
         [ANOWEndpoint]$Endpoint,
         [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'ResultMapping')]
-        [ANOWResultMapping]$ResultMapping
+        [ANOWResultMapping]$ResultMapping,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'Approval')]
+        [ANOWApproval]$Approval
     )
     Begin {
         If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
@@ -19505,6 +21251,15 @@ Function Find-AutomateNOWObjectReferral {
             [string]$domainClass = 'ResultMapping'
             If ($ResultMapping.id.Length -gt 0) {
                 $Body.'id' = $ResultMapping.id
+            }
+            Else {
+                $Body.'id' = $_.'id'
+            }
+        }
+        ElseIf ($_ -is [ANOWApproval] -or $Approval.Id.Length -gt 0) {
+            [string]$domainClass = 'ApprovalConfiguration'
+            If ($Approval.id.Length -gt 0) {
+                $Body.'id' = $Approval.id
             }
             Else {
                 $Body.'id' = $_.'id'
@@ -19920,7 +21675,7 @@ Function New-AutomateNOWResultMapping {
             }
             ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
                 [string]$tag_object_simpleId = $tag_object.simpleId
-                Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
+                Throw "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                 Break
             }
             [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -21010,6 +22765,7 @@ Function Get-AutomateNOWSchedule {
         [ANOWSchedule_processingType]$processingType,
         [Parameter(Mandatory = $False)]
         [ANOWSchedule_processingStatus]$processingStatus,
+        [ValidateSet('id', 'firstStartTime', 'startTime', 'endTime')]
         [Parameter(Mandatory = $False)]
         [string]$sortBy = 'id',
         [Parameter(Mandatory = $False)]
@@ -22163,7 +23919,7 @@ Function Get-AutomateNOWScheduleTemplate {
                 If ($processingType -eq 'WORKFLOW') {
                     Write-Warning -Message "$Id is actually a Workflow Template. Please use Get-AutomateNOWWorkflowTemplate instead."
                 }
-                ElseIf ($processingType -eq 'TASK') {
+                ElseIf ($processingType -in @('TASK', 'SERVICE')) {
                     Write-Warning -Message "$Id is actually a Task Template. Please use Get-AutomateNOWTaskTemplate instead."
                 }
                 Else {
@@ -22375,7 +24131,7 @@ Function Set-AutomateNOWScheduleTemplate {
                     }
                     ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
                         [string]$tag_object_simpleId = $tag_object.simpleId
-                        Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
+                        Throw "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                         Break
                     }
                     [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -22661,7 +24417,7 @@ Function New-AutomateNOWScheduleTemplate {
             }
             ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
                 [string]$tag_object_simpleId = $tag_object.simpleId
-                Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
+                Throw "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                 Break
             }
             [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -23365,7 +25121,7 @@ Function Start-AutomateNOWScheduleTemplate {
                 }
                 ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
                     [string]$tag_object_simpleId = $tag_object.simpleId
-                    Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
+                    Throw "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                     Break
                 }
                 [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -25009,7 +26765,7 @@ Function New-AutomateNOWSemaphore {
             }
             ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
                 [string]$tag_object_simpleId = $tag_object.simpleId
-                Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
+                Throw "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                 Break
             }
             [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -26639,7 +28395,7 @@ Function New-AutomateNOWStock {
             }
             ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
                 [string]$tag_object_simpleId = $tag_object.simpleId
-                Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
+                Throw "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                 Break
             }
             [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -27342,7 +29098,7 @@ Function Set-AutomateNOWTag {
     Changes the settings of a Tag from an AutomateNOW! instance
 
     .PARAMETER Tag
-    An [ANOWWorkspace] object representing the Tag to be changed.
+    An [ANOWTag] object representing the Tag to be changed.
 
     .PARAMETER description
     Optional description of the tag (may not exceed 255 characters).
@@ -27641,6 +29397,8 @@ Function New-AutomateNOWTag {
     Note that transparent is an available option for either background or foreground color.
 
     The name (id) of the tag must be unique (per domain). It may consist only of letters, numbers, underscore, dot or hypen.
+
+    The showIconOnly property is defined in the class object but has been deprecated.
 
     #>
     [OutputType([ANOWTag])]
@@ -27983,6 +29741,7 @@ Function Get-AutomateNOWTask {
         [ANOWTaskTemplate_monitorType]$monitorType,
         [Parameter(Mandatory = $True, ParameterSetName = 'sensorType')]
         [ANOWTaskTemplate_sensorType]$sensorType,
+        [ValidateSet('id', 'firstStartTime', 'startTime', 'endTime')]
         [Parameter(Mandatory = $False, ParameterSetName = 'taskType')]
         [Parameter(Mandatory = $False, ParameterSetName = 'monitorType')]
         [Parameter(Mandatory = $False, ParameterSetName = 'sensorType')]
@@ -28285,10 +30044,6 @@ Function Set-AutomateNOWTask {
             Write-Warning -Message 'To use -EagerScriptExecution, you must include -UseScripts $true'
             Break
         }
-        If ($UnsetWorkspace -eq $true -and $Workspace.Length -gt 0) {
-            Write-Warning -Message "You cannot set the Workspace and unset it at the same time. Please choose one or the other."
-            Exit
-        }
         If ($UnsetFolder -eq $true -and $Folder.Length -gt 0) {
             Write-Warning -Message "You cannot set the Folder and unset it at the same time. Please choose one or the other."
             Exit
@@ -28347,31 +30102,6 @@ Function Set-AutomateNOWTask {
                 $BodyMetaData.'description' = $null
                 $include_properties += 'description'
             }
-            If ($Workspace.Length -gt 0) {
-                $Error.Clear()
-                Try {
-                    [ANOWWorkspace]$workspace_object = Get-AutomateNOWWorkspace -Id $Workspace
-                }
-                Catch {
-                    [string]$Message = $_.Exception.Message
-                    Write-Warning -Message "Get-AutomateNOWWorkspace failed to confirm that the workspace [$Workspace] actually existed while running under Set-AutomateNOWTask due to [$Message]"
-                    Break
-                }
-                If ($workspace_object.simpleId.Length -eq 0) {
-                    Throw "Get-AutomateNOWWorkspace failed to locate the Workspace [$Workspace] running under Set-AutomateNOWTask. Please check again."
-                    Break
-                }
-                [string]$workspace_display = $workspace_object | ConvertTo-Json -Compress
-                Write-Verbose -Message "Adding workspace $workspace_display to [ANOWTask] [$Task_id]"
-                $BodyMetaData.'workspace' = $Workspace
-                $include_properties += 'workspace'
-            }
-            ElseIf ($UnsetWorkspace -eq $true) {
-                [string]$workspace_display = $workspace_object | ConvertTo-Json -Compress
-                Write-Verbose -Message "Removing [ANOWTask] [$Task_id] from Workspace $workspace_display"
-                $BodyMetaData.'workspace' = $null
-                $include_properties += 'workspace'
-            }
             If ($Folder.Length -gt 0) {
                 $Error.Clear()
                 Try {
@@ -28416,7 +30146,7 @@ Function Set-AutomateNOWTask {
                     }
                     ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
                         [string]$tag_object_simpleId = $tag_object.simpleId
-                        Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
+                        Throw "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                         Break
                     }
                     [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -29676,7 +31406,7 @@ Function Get-AutomateNOWTaskTemplate {
             Break
         }
         If ($TaskTemplates.Count -gt 0) {
-            If ($TaskTemplates.Count -eq 1 -and $TaskTemplates.processingType -ne 'TASK') {
+            If ($TaskTemplates.Count -eq 1 -and $TaskTemplates.processingType -notin @('TASK', 'SERVICE')) {
                 [string]$processingType = $TaskTemplates.processingType
                 If ($processingType -eq 'WORKFLOW') {
                     Write-Warning -Message "$Id is actually a Workflow Template. Please use Get-AutomateNOWWorkflowTemplate to retrieve this item."
@@ -29716,12 +31446,6 @@ Function Set-AutomateNOWTaskTemplate {
 
     .PARAMETER UnsetDescription
     Optional switch that will remove the Description from the Task Template object.
-
-    .PARAMETER Workspace
-    A string representing the name of the Workspace you wish to move this Task Template into.
-
-    .PARAMETER UnsetWorkspace
-    A switch parameter that will move the Task Template out of its current Workspace.
 
     .PARAMETER Folder
     A string representing the name of the Folder to move the Task Template into.
@@ -29808,24 +31532,16 @@ Function Set-AutomateNOWTaskTemplate {
     The modified [ANOWTaskTemplate] object will be returned
 
     .EXAMPLE
-    Forcefully moves a Task Template to a different Workspace
-    Set-AutomateNOWTaskTemplate -TaskTemplate $task_template -Workspace 'Workspace1' -Force
-
-    .EXAMPLE
-    Removes a Task Template from a Workspace
-    Set-AutomateNOWTaskTemplate -TaskTemplate $task_template -UnsetWorkspace
-
-    .EXAMPLE
     Removes a Task Template from its current Folder
     Set-AutomateNOWTaskTemplate -TaskTemplate $task_template -Force -UnsetFolder
 
     .EXAMPLE
     Places a Task Template into a Folder
-    Set-AutomateNOWTaskTemplate -TaskTemplate $task_template -Force -Folder 'Workspace1'
+    Set-AutomateNOWTaskTemplate -TaskTemplate $task_template -Force -Folder 'Folder1'
 
     .EXAMPLE
     Sets all of the minor properties
-    Set-AutomateNOWTaskTemplate -TaskTemplate $task_template -Description 'description' -Title 'title' -Workspace 'Workspace1' -Weight 15 -Priority 5 -Owner 'the_owner' -OnHold $true -Skip $false -AutoArchive $true -KeepResources $false -UseScripts $true -EagerScriptExecution $true -Force
+    Set-AutomateNOWTaskTemplate -TaskTemplate $task_template -Description 'description' -Title 'title' -Weight 15 -Priority 5 -Owner 'the_owner' -OnHold $true -Skip $false -AutoArchive $true -KeepResources $false -UseScripts $true -EagerScriptExecution $true -Force
 
     .EXAMPLE
     Forcefully sets a Server Node on the Task Template
@@ -29867,10 +31583,6 @@ Function Set-AutomateNOWTaskTemplate {
         [string]$Description,
         [Parameter(Mandatory = $false, ParameterSetName = 'SetDescription')]
         [switch]$UnsetDescription,
-        [Parameter(Mandatory = $false, ParameterSetName = 'SetWorkspace')]
-        [string]$Workspace,
-        [Parameter(Mandatory = $false, ParameterSetName = 'SetWorkspace')]
-        [switch]$UnsetWorkspace,
         [Parameter(Mandatory = $false, ParameterSetName = 'SetFolder')]
         [string]$Folder,
         [Parameter(Mandatory = $false, ParameterSetName = 'SetFolder')]
@@ -29956,10 +31668,6 @@ Function Set-AutomateNOWTaskTemplate {
             Write-Warning -Message 'To use -EagerScriptExecution, you must include -UseScripts $true'
             Break
         }
-        If ($UnsetWorkspace -eq $true -and $Workspace.Length -gt 0) {
-            Write-Warning -Message "You cannot set the Workspace and unset it at the same time. Please choose one or the other."
-            Exit
-        }
         If ($UnsetFolder -eq $true -and $Folder.Length -gt 0) {
             Write-Warning -Message "You cannot set the Folder and unset it at the same time. Please choose one or the other."
             Exit
@@ -30023,31 +31731,6 @@ Function Set-AutomateNOWTaskTemplate {
                 $BodyMetaData.'description' = $null
                 $include_properties += 'description'
             }
-            If ($Workspace.Length -gt 0) {
-                $Error.Clear()
-                Try {
-                    [ANOWWorkspace]$workspace_object = Get-AutomateNOWWorkspace -Id $Workspace
-                }
-                Catch {
-                    [string]$Message = $_.Exception.Message
-                    Write-Warning -Message "Get-AutomateNOWWorkspace failed to confirm that the workspace [$Workspace] actually existed while running under Set-AutomateNOWTaskTemplate due to [$Message]"
-                    Break
-                }
-                If ($workspace_object.simpleId.Length -eq 0) {
-                    Throw "Get-AutomateNOWWorkspace failed to locate the Workspace [$Workspace] running under Set-AutomateNOWTaskTemplate. Please check again."
-                    Break
-                }
-                [string]$workspace_display = $workspace_object | ConvertTo-Json -Compress
-                Write-Verbose -Message "Adding workspace $workspace_display to [ANOWTaskTemplate] [$TaskTemplate_id]"
-                $BodyMetaData.'workspace' = $Workspace
-                $include_properties += 'workspace'
-            }
-            ElseIf ($UnsetWorkspace -eq $true) {
-                [string]$workspace_display = $workspace_object | ConvertTo-Json -Compress
-                Write-Verbose -Message "Removing [ANOWTaskTemplate] [$TaskTemplate_id] from Workspace $workspace_display"
-                $BodyMetaData.'workspace' = $null
-                $include_properties += 'workspace'
-            }
             If ($Folder.Length -gt 0) {
                 $Error.Clear()
                 Try {
@@ -30092,7 +31775,7 @@ Function Set-AutomateNOWTaskTemplate {
                     }
                     ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
                         [string]$tag_object_simpleId = $tag_object.simpleId
-                        Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
+                        Throw "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                         Break
                     }
                     [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -30465,8 +32148,17 @@ Function New-AutomateNOWTaskTemplate {
     .PARAMETER TaskType
     Type of the Task Template. Valid options are: AE_SHELL_SCRIPT, AMQP_SEND, ANSIBLE_PLAYBOOK, ANSIBLE_PLAYBOOK_PATH, APACHE_AIRFLOW_RUN_DAG, ARANGO_DB_INSERT, AS400_BATCH_JOB, AS400_COMMAND_CALL, AS400_PROGRAM_CALL, AUTOMATE_NOW_RUN_JOB, AUTOMATE_NOW_TRIGGER_EVENT, AUTOMATION_ANYWHERE, AUTOMATION_ANYWHERE_DEPLOY_ROBOT, AUTOMATION_ANYWHERE_START_ROBOT, AUTOMATION_ANYWHERE_STOP_ROBOT, AUTOMATION_ANYWHERE_UNDEPLOY_ROBOT, AUTOMIC_WLA_RUN_JOB, AWS_BATCH_JOB, AWS_EC2_DELETE_VOLUME, AWS_EC2_START_INSTANCE, AWS_EC2_STOP_INSTANCE, AWS_EC2_TERMINATE_INSTANCE, AWS_EMR_ADD_STEPS, AWS_EMR_API_COMMAND, AWS_EMR_CANCEL_STEPS, AWS_EMR_GET, AWS_EMR_PUT, AWS_EMR_START_NOTEBOOK_EXECUTION, AWS_EMR_STOP_NOTEBOOK_EXECUTION, AWS_EMR_TERMINATE_JOB_FLOW, AWS_EMR_WORKFLOW, AWS_GLUE_CRAWLER, AWS_GLUE_JOB, AWS_GLUE_TRIGGER, AWS_GLUE_WORKFLOW, AWS_LAMBDA_CREATE_FUNCTION, AWS_LAMBDA_DELETE_FUNCTION, AWS_LAMBDA_INVOKE, AWS_S3_COPY_OBJECT, AWS_S3_DELETE_OBJECT, AWS_S3_MOVE_OBJECT, AWS_S3_RENAME_OBJECT, AWS_SAGE_MAKER_ADD_MODEL, AWS_SAGE_MAKER_API_COMMAND, AWS_SAGE_MAKER_DELETE_MODEL, AWS_SAGE_MAKER_PROCESSING, AWS_SAGE_MAKER_TRAINING, AWS_SAGE_MAKER_TRANSFORM, AWS_SAGE_MAKER_TUNING, AWS_START_STEP_FUNCTION_STATE_MACHINE, AZURE_BATCH_JOB, AZURE_DATA_FACTORY_PIPELINE, AZURE_DATA_FACTORY_TRIGGER, AZURE_DATA_LAKE_JOB, AZURE_DATABRICKS_DELETE_CLUSTER, AZURE_DATABRICKS_JOB, AZURE_DATABRICKS_LIST_CLUSTERS, AZURE_DATABRICKS_START_CLUSTER, AZURE_DATABRICKS_TERMINATE_CLUSTER, AZURE_RUN_LOGIC_APP, BLUE_PRISM, BLUE_PRISM_DEPLOY_ROBOT, BLUE_PRISM_START_ROBOT, BLUE_PRISM_STOP_ROBOT, BLUE_PRISM_UNDEPLOY_ROBOT, BMC_REMEDY_INCIDENT, C, CA_SERVICE_MANAGEMENT_INCIDENT, CA_WLA_RUN_JOB, CASSANDRA_CQL_SCRIPT, CHECK_BARRIER_AVAILABLE_PERMITS, CHECK_BARRIER_TOTAL_PERMITS, CHECK_CALENDAR, CHECK_LOCK_STATE, CHECK_METRIC, CHECK_PHYSICAL_RESOURCE, CHECK_QUEUE, CHECK_SEMAPHORE_STATE, CHECK_STOCK_AVAILABLE_PERMITS, CHECK_STOCK_TOTAL_PERMITS, CHECK_TIME_WINDOW_STATE, CHECK_VARIABLE_VALUE, CLEAR_QUEUE, CONTROL_M_RUN_JOB, COUCH_BASE_INSERT, COUCH_DB_INSERT, CPP, CTRLM_ADD_CONDITION, CTRLM_CREATE_JOB, CTRLM_DELETE_CONDITION, CTRLM_ORDER_JOB, CTRLM_RESOURCE_TABLE_ADD, CTRLM_RESOURCE_TABLE_DELETE, CTRLM_RESOURCE_TABLE_UPDATE, DATASOURCE_DELETE_FILE, DATASOURCE_DOWNLOAD_FILE, DATASOURCE_UPLOAD_FILE, DBT_JOB, DYNAMO_DB_INSERT, EMAIL_CONFIRMATION, EMAIL_INPUT, EMAIL_SEND, FACEBOOK_POST, FILE_CHECK, FILE_TRANSFER, FILE_WATCHER, FLINK_JAR_DELETE, FLINK_JAR_UPLOAD, FLINK_RUN_JOB, GO, GOOGLE_DATA_FLOW_JOB, GROOVY, HDFS_APPEND_FILE, HDFS_CREATE_DIRECTORY, HDFS_DELETE_DIRECTORY, HDFS_DELETE_FILE, HDFS_DOWNLOAD_FILE, HDFS_RENAME, HDFS_UPLOAD_FILE, HP_OPEN_VIEW_SERVICE_MANAGER_INCIDENT, HTTP_REQUEST, IBM_CONTROL_DESK_INCIDENT, IBM_DATASTAGE, IBM_MQ_SEND, IBM_WLA_RUN_JOB, INFORMATICA_ASSIGNMENT, INFORMATICA_CLOUD_TASKFLOW, INFORMATICA_COMMAND, INFORMATICA_CONTROL, INFORMATICA_EMAIL, INFORMATICA_EVENT_RAISE, INFORMATICA_EVENT_WAIT, INFORMATICA_SESSION, INFORMATICA_START, INFORMATICA_TIMER, INFORMATICA_WORKFLOW, INFORMATICA_WS_WORKFLOW, INSTAGRAM_POST, JAVA, JAVASCRIPT, JIRA_ADD_ISSUE, JMS_SEND, KAFKA_SEND, KOTLIN, LINKED_IN_POST, MICROSOFT_POWER_BI_DATAFLOW_REFRESH, MICROSOFT_POWER_BI_DATASET_REFRESH, MONGO_DB_INSERT, MQTT_SEND, MS_SSIS, NEO4J_INSERT, ODI_LOAD_PLAN, ODI_SESSION, OPENTEXT_DYNAMIC_JCL, OPENTEXT_STORED_JCL, ORACLE_EBS_EXECUTE_PROGRAM, ORACLE_EBS_EXECUTE_REQUEST_SET, ORACLE_EBS_PROGRAM, ORACLE_EBS_REQUEST_SET, ORACLE_SERVICE_CENTER_CASE, PEGA_DEPLOY_ROBOT, PEGA_START_ROBOT, PEGA_STOP_ROBOT, PEGA_UNDEPLOY_ROBOT, PEOPLESOFT_APPLICATION_ENGINE_TASK, PEOPLESOFT_COBOL_SQL_TASK, PEOPLESOFT_CRW_ONLINE_TASK, PEOPLESOFT_CRYSTAL_REPORTS_TASK, PEOPLESOFT_CUBE_BUILDER_TASK, PEOPLESOFT_JOB_TASK, PEOPLESOFT_NVISION_TASK, PEOPLESOFT_SQR_PROCESS_TASK, PEOPLESOFT_SQR_REPORT_TASK, PEOPLESOFT_WINWORD_TASK, PERL, POP_FROM_QUEUE, POWERSHELL, PROCESSING_OBSERVER, PUSH_TO_QUEUE, PYTHON, RABBIT_MQ_SEND, RAINCODE_DYNAMIC_JCL, RAINCODE_STORED_JCL, RDBMS_SQL, RDBMS_SQL_STATEMENT, RDBMS_STORED_PROCEDURE, REDDIT_POST, REDIS_CLI, REDIS_DELETE, REDIS_GET, REDIS_SET, REST_WEB_SERVICE_CALL, RETRY, ROBOT_FRAMEWORK_DEPLOY_ROBOT, ROBOT_FRAMEWORK_START_ROBOT, ROBOT_FRAMEWORK_STOP_ROBOT, ROBOT_FRAMEWORK_UNDEPLOY_ROBOT, RUBY, RUST, SAP_4H_ARCHIVE, SAP_4H_BW_PROCESS_CHAIN, SAP_4H_CM_PROFILE_ACTIVATE, SAP_4H_CM_PROFILE_DEACTIVATE, SAP_4H_COPY_EXISTING_JOB, SAP_4H_EXPORT_CALENDAR, SAP_4H_EXPORT_JOB, SAP_4H_FUNCTION_MODULE_CALL, SAP_4H_GET_APPLICATION_LOG, SAP_4H_JOB, SAP_4H_JOB_INTERCEPTOR, SAP_4H_MODIFY_INTERCEPTION_CRITERIA, SAP_4H_MONITOR_EXISTING_JOB, SAP_4H_RAISE_EVENT, SAP_4H_READ_TABLE, SAP_4H_RELEASE_EXISTING_JOB, SAP_4H_START_SCHEDULED_JOB, SAP_4H_SWITCH_OPERATION_MODE, SAP_4H_VARIANT_COPY, SAP_4H_VARIANT_CREATE, SAP_4H_VARIANT_DELETE, SAP_4H_VARIANT_UPDATE, SAP_ARCHIVE, SAP_BW_PROCESS_CHAIN, SAP_CM_PROFILE_ACTIVATE, SAP_CM_PROFILE_DEACTIVATE, SAP_EXPORT_CALENDAR, SAP_EXPORT_JOB, SAP_FUNCTION_MODULE_CALL, SAP_GET_APPLICATION_LOG, SAP_IBP_CREATE_PROCESS, SAP_IBP_DELETE_PROCESS, SAP_IBP_JOB, SAP_IBP_SET_PROCESS_STEP_STATUS, SAP_MODIFY_INTERCEPTION_CRITERIA, SAP_ODATA_API_CALL, SAP_R3_COPY_EXISTING_JOB, SAP_R3_JOB, SAP_R3_JOB_INTERCEPTOR, SAP_R3_MONITOR_EXISTING_JOB, SAP_R3_RAISE_EVENT, SAP_R3_RELEASE_EXISTING_JOB, SAP_R3_START_SCHEDULED_JOB, SAP_R3_VARIANT_COPY, SAP_R3_VARIANT_CREATE, SAP_R3_VARIANT_DELETE, SAP_R3_VARIANT_UPDATE, SAP_READ_TABLE, SAP_SOLUTION_MANAGER_TICKET, SAP_SWITCH_OPERATION_MODE, SAS_4GL, SAS_DI, SAS_JOB, SAS_VIYA_JOB, SCALA, SERVER_NODE_SET_CONNECTION, SERVER_NODE_SET_PARAMETERS, SERVICE_NOW_CLOSE_INCIDENT, SERVICE_NOW_CREATE_INCIDENT, SERVICE_NOW_INCIDENT_STATUS_SENSOR, SERVICE_NOW_RESOLVE_INCIDENT, SERVICE_NOW_UPDATE_INCIDENT, SET_BARRIER_TOTAL_PERMITS, SET_METRIC, SET_PHYSICAL_RESOURCE, SET_PROCESSING_STATUS, SET_RESOURCES, SET_SEMAPHORE_STATE, SET_SEMAPHORE_TIMESTAMP_STATE, SET_SERVER_NODE, SET_STOCK_TOTAL_PERMITS, SET_TIME_WINDOW_STATE, SET_VARIABLE_TIMESTAMP_VALUE, SET_VARIABLE_VALUE, SH, SOAP_WEB_SERVICE_CALL, SPARK_JAVA, SPARK_PYTHON, SPARK_R, SPARK_RUN_JOB, SPARK_SCALA, SPARK_SQL, STOMP_SEND, STONEBRANCH_RUN_JOB, SWIFT, TALEND_JOB, TCL, TELEGRAM_MESSAGE, TERMA_RUN_JOB, TIDAL_RUN_JOB, TIKTOK_POST, TITAN_INSERT, TRIGGER_EVENT, TRIGGER_ITEM, TUMBLR_POST, TWITTER_POST, TYPESCRIPT, UI_PATH, UI_PATH_DEPLOY_ROBOT, UI_PATH_START_ROBOT, UI_PATH_STOP_ROBOT, UI_PATH_UNDEPLOY_ROBOT, VBSCRIPT, WHATSAPP_MESSAGE, WORK_FUSION_DEPLOY_ROBOT, WORK_FUSION_START_ROBOT, WORK_FUSION_STOP_ROBOT, WORK_FUSION_UNDEPLOY_ROBOT, XFTP_COMMAND, XMPP_SEND, YOUTUBE_POST, Z_OS_COMMAND, Z_OS_DYNAMIC_JCL, Z_OS_STORED_JCL
 
+    .PARAMETER MonitorType
+    Type of the Monitor Template. Valid options are: SYSTEM_MONITOR, SYSTEM_PROCESS_MONITOR, PROCESSING_MONITOR, PROCESSING_DEADLINE_MONITOR, PROCESSING_BASELINE_DEVIATION_MONITOR, SERVER_NODE_MONITOR, PING_MONITOR, HTTP_MONITOR, SH_MONITOR, PYTHON_MONITOR, PERL_MONITOR, POWERSHELL_MONITOR, TCL_MONITOR, RUBY_MONITOR, GROOVY_MONITOR, SAP_R3_JOB_MONITOR, SAP_IBP_JOB_MONITOR, SAP_IBP_PROCESS_MONITOR, SAP_IBP_PROCESS_FILTER_MONITOR, SAP_R3_INTERCEPTED_JOB_MONITOR, SAP_4H_JOB_MONITOR, SAP_4H_IBP_JOB_MONITOR, SAP_4H_IBP_PROCESS_MONITOR, SAP_4H_IBP_PROCESS_FILTER_MONITOR, SAP_4H_INTERCEPTED_JOB_MONITOR, AWS_EMR_CONTAINER_MONITOR, AWS_EMR_JOB_FLOW_MONITOR, AWS_EMR_STEP_MONITOR, AWS_EMR_NOTEBOOK_MONITOR, AZURE_DATABRICKS_CLUSTER_MONITOR
+
+    .PARAMETER SensorType
+    Type of the Sensor Template. Valid options are: FILE_SENSOR, SQL_SENSOR, EMAIL_SENSOR, JMS_SENSOR, AMQP_SENSOR, RABBIT_MQ_SENSOR, KAFKA_SENSOR, JIRA_ISSUE_SENSOR, MQTT_SENSOR, IBM_MQ_SENSOR, HTTP_SENSOR, SNMP_SENSOR, Z_OS_JES_JOB_SENSOR, SAP_R3_INTERCEPTED_JOB_SENSOR, SAP_R3_EVENT_SENSOR, SAP_IBP_PROCESS_SENSOR, SAP_4H_EVENT_SENSOR, SAP_4H_INTERCEPTED_JOB_SENSOR, SAP_4H_IBP_PROCESS_SENSOR, SERVICE_NOW_INCIDENT_STATUS_SENSOR
+
     .PARAMETER ServiceManagerTaskType
     Type of the Task Template. Valid options are: SLA_SERVICE_MANAGER, PROCESSING_DEADLINE_MONITOR
+
+    .PARAMETER ServiceType
+    Type of the Service of the Task Template. Only applies to Task Sensors and Task Monitors! Valid options are: MONITOR, SENSOR.
 
     .PARAMETER Id
     Mandatory "name" of the Task Template. For example: 'LinuxTaskTemplate1'. This value may not contain the domain in brackets. This is the unique key of this object.
@@ -30505,16 +32197,36 @@ Function New-AutomateNOWTaskTemplate {
     An [ANOWTaskTemplate] object representing the newly created Task Template. Use the -Quiet parameter to suppress this.
 
     .EXAMPLE
-    Creates a new Shell Task Template
+    Quietly creates a new Shell Task Template with optional description, tags, folder, workspace and code repository set.
 
-    New-AutomateNOWTaskTemplate -TaskType SH -ServerNodeType 'LINUX' -Id 'TaskTemplate01' -Description 'Description text' -Tags 'Tag01', 'Tag01' -Folder 'Folder01' -Workspace 'Workspace01' -CodeRepository 'CodeRepository01'
+    New-AutomateNOWTaskTemplate -TaskType SH -ServerNodeType 'LINUX' -Id 'sh_task_template_01'   -Description 'Description text' -Tags 'Tag1', 'Tag2' -Folder 'Folder1' -Workspace 'Workspace1' -CodeRepository 'Repository1' -Quiet
+
+    .EXAMPLE
+    Quietly creates a new (internal) Wait Task Template with optional description, tags, folder, workspace and code repository set.
+
+    New-AutomateNOWTaskTemplate -InternalTaskType 'WAIT' -Id 'wait_task_template_02' -Description 'Description text' -Tags 'Tag1', 'Tag2' -Folder 'Folder1' -Workspace 'Workspace1' -CodeRepository 'Repository1' -Quiet
+
+    .EXAMPLE
+    Quietly creates a new (monitor) PowerShell Monitor Task Template with optional description, tags, folder, workspace and code repository set.
+
+    New-AutomateNOWTaskTemplate -MonitorType POWERSHELL_MONITOR -ServerNodeType 'WINDOWS' -Id 'powershell_monitor_03' -Description 'Description text' -Tags 'Tag1', 'Tag2' -Folder 'Folder1' -Workspace 'Workspace1' -CodeRepository 'Repository1' -Quiet
+
+    .EXAMPLE
+    Quietly creates a new (sensor) Email Sensor Task Template with optional description, tags, folder, workspace and code repository set.
+
+    New-AutomateNOWTaskTemplate -SensorType 'EMAIL_SENSOR' -ServerNodeType 'EMAIL' -Id 'email_sensor_04' -Description 'Description text' -Tags 'Tag1', 'Tag2' -Folder 'Folder1' -Workspace 'Workspace1' -CodeRepository 'Repository1' -Quiet
+
+    .EXAMPLE
+    Creates a new (service manager) SLA Service Manager Task Template with optional description, tags, folder, workspace and code repository set.
+
+    New-AutomateNOWTaskTemplate -ServiceManagerTaskType SLA_SERVICE_MANAGER -Id 'sla_service_manager_05' -Description 'Description text' -Tags 'Tag1', 'Tag2' -Folder 'Folder1' -Workspace 'Workspace1' -CodeRepository 'Repository1'
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
 
     The name (id) of the Task Template must be unique (per domain). It may consist only of letters, numbers, underscore, dot or hypen.
 
-    You must specify one of the three following parameters: -TaskType, -InternalTaskType or -ServiceManagerTaskType
+    You must specify one of the three following parameters: (-TaskType, -MonitorType, -SensorType) or -InternalTaskType or -ServiceManagerTaskType
 
     #>
     [OutputType([ANOWTaskTemplate])]
@@ -30524,8 +32236,12 @@ Function New-AutomateNOWTaskTemplate {
         [ANOWTaskTemplateCustom_InternalTasks]$InternalTaskType,
         [Parameter(Mandatory = $true, ParameterSetName = 'NodeTask')]
         [ANOWTaskTemplateCustom_Tasks]$TaskType,
+        [Parameter(Mandatory = $true, ParameterSetName = 'MonitorTask')]
+        [ANOWTaskTemplate_monitorType]$MonitorType,
+        [Parameter(Mandatory = $true, ParameterSetName = 'SensorTask')]
+        [ANOWTaskTemplate_sensorType]$SensorType,
         [Parameter(Mandatory = $true, ParameterSetName = 'ServiceManagerTask')]
-        [ANOWTaskTemplateCustom_ServiceManagers]$ServiceManagerTaskType,
+        [ANOWTaskTemplate_serviceManagerType]$ServiceManagerTaskType,
         [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
         [Parameter(Mandatory = $true)]
         [string]$Id,
@@ -30543,6 +32259,8 @@ Function New-AutomateNOWTaskTemplate {
         [Parameter(Mandatory = $false)]
         [string]$CodeRepository,
         [Parameter(Mandatory = $true, ParameterSetName = 'NodeTask')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'MonitorTask')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'SensorTask')]
         [ANOWTaskTemplate_serverNodeType]$ServerNodeType,
         [Parameter(Mandatory = $false)]
         [switch]$Quiet
@@ -30550,31 +32268,6 @@ Function New-AutomateNOWTaskTemplate {
     If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
         Write-Warning -Message "Somehow there is not a valid token confirmed."
         Break
-    }
-    [string]$processingType = 'TASK'
-    If ($InternalTaskType.Length -gt 0 -or $ServiceManagerTaskType.Length -gt 0) {
-        [string]$ServerNodeType = 'INTERNAL'
-        If ($InternalTaskType.Length -gt 0) {
-            [string]$TaskType = $InternalTaskType
-        }
-        Else {
-            [string]$processingType = 'SERVICE'
-        }
-    }
-    Else {
-        [string[]]$ValidServerNodeTypes = Resolve-AutomateNOWTaskType2ServerNodeType -TaskType $TaskType
-        [int32]$ValidServerNodeTypesCount = $ValidServerNodeTypes.Count
-        If ($ValidServerNodeTypesCount -eq 0) {
-            Write-Warning -Message "Somehow the TaskType2ServerNodeType lookup table has failed"
-            Break
-        }
-        Else {
-            If ($ServerNodeType -notin $ValidServerNodeTypes) {
-                [string]$ValidServerNodeTypesDisplay = $ValidServerNodeTypes -join ', '
-                Write-Warning -Message "[$ServerNodeType] is not a valid server node type for a [$TaskType] task. Please use one of these instead: $ValidServerNodeTypesDisplay"
-                Break
-            }
-        }
     }
     ## Begin warning ##
     ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
@@ -30595,19 +32288,60 @@ Function New-AutomateNOWTaskTemplate {
     ## End warning ##
     [System.Collections.Specialized.OrderedDictionary]$ANOWTaskTemplate = [System.Collections.Specialized.OrderedDictionary]@{}
     $ANOWTaskTemplate.Add('id', $Id)
-    $ANOWTaskTemplate.Add('processingType', $processingType)
-    If ($ServiceManagerTaskType.Length -eq 0) {
-        $ANOWTaskTemplate.Add('taskType', $TaskType)
-        [string]$old_values = ('{"processingType":"TASK","taskType":"' + $TaskType + '","serverNodeType":"' + $ServerNodeType + '"}')
+    If ($MonitorType.Length -gt 0) {
+        [string[]]$ValidServerNodeTypes = Resolve-AutomateNOWMonitorType2ServerNodeType -MonitorType $MonitorType
+        [string]$TaskType = $MonitorType
+        [string]$processingType = 'SERVICE'
+        [string]$old_values = ('{"processingType":"' + $processingType + '","monitorType":"' + $MonitorType + '","serverNodeType":"' + $ServerNodeType + '"}')
+        $ANOWTaskTemplate.Add('serviceType', 'MONITOR')
+        $ANOWTaskTemplate.Add('monitorType', $MonitorType)
+    }
+    ElseIf ($SensorType.Length -gt 0) {
+        [string[]]$ValidServerNodeTypes = Resolve-AutomateNOWSensorType2ServerNodeType -SensorType $SensorType
+        [string]$TaskType = $SensorType
+        [string]$processingType = 'SERVICE'
+        [string]$old_values = ('{"processingType":"' + $processingType + '","sensorType":"' + $SensorType + '","serverNodeType":"' + $ServerNodeType + '"}')
+        $ANOWTaskTemplate.Add('serviceType', 'SENSOR')
+        $ANOWTaskTemplate.Add('sensorType', $SensorType)
     }
     Else {
-        $ANOWTaskTemplate.Add('serviceType', 'SERVICE_MANAGER')
-        $ANOWTaskTemplate.Add('serviceManagerType', $ServiceManagerTaskType)
-        [string]$old_values = '{"processingType":"SERVICE","serviceType":"SERVICE_MANAGER","serviceManagerType":"' + $ServiceManagerTaskType + '","workspace":null,"serverNodeType":"INTERNAL"}'
+        If ($InternalTaskType.Length -gt 0 -or $ServiceManagerTaskType.Length -gt 0) {
+            If ($ServiceManagerTaskType.Length -gt 0) {
+                [string]$processingType = 'SERVICE'
+                $ANOWTaskTemplate.Add('serviceType', 'SERVICE_MANAGER')
+                [string]$old_values = ('{"processingType":"' + $processingType + '","serviceType":"SERVICE_MANAGER","serviceManagerType":"' + $ServiceManagerTaskType + '","workspace":null,"serverNodeType":"INTERNAL"}')
+                $ANOWTaskTemplate.Add('serviceManagerType', $ServiceManagerTaskType)
+            }
+            Else {
+                [string]$TaskType = $InternalTaskType
+                [string]$processingType = 'TASK'
+                [string]$old_values = ('{"processingType":"' + $processingType + '","taskType":"' + $TaskType + '","serverNodeType":"' + $ServerNodeType + '"}')
+                $ANOWTaskTemplate.Add('taskType', $TaskType)
+            }
+            [string]$ServerNodeType = 'INTERNAL'
+            [string[]]$ValidServerNodeTypes = @($ServerNodeType)
+        }
+        Else {
+            [string]$TaskType = $TaskType
+            [string[]]$ValidServerNodeTypes = Resolve-AutomateNOWTaskType2ServerNodeType -TaskType $TaskType
+            $ANOWTaskTemplate.Add('taskType', $TaskType)
+        }
     }
+    [int32]$ValidServerNodeTypesCount = $ValidServerNodeTypes.Count
+    If ($ValidServerNodeTypesCount -eq 0) {
+        Write-Warning -Message "Somehow the ServerNodeType lookup failed!"
+        Break
+    }
+    Else {
+        If ($ServerNodeType -notin $ValidServerNodeTypes -and $InternalTaskType.Length -eq 0 -and $ServiceManagerTaskType.Length -eq 0) {
+            [string]$ValidServerNodeTypesDisplay = $ValidServerNodeTypes -join ', '
+            Write-Warning -Message "[$ServerNodeType] is not a valid server node type for a [$TaskType] task. Please use one of these instead: $ValidServerNodeTypesDisplay"
+            Break
+        }
+    }
+    $ANOWTaskTemplate.Add('processingType', $processingType)
     $ANOWTaskTemplate.Add('serverNodeType', $ServerNodeType)
-    $ANOWTaskTemplate.Add('_oldValues', $old_values)
-    [string[]]$include_properties = 'id', 'processingType', 'taskType', 'serverNodeType'
+    [string[]]$include_properties = 'id', 'processingType', 'serverNodeType'
     If ($Description.Length -gt 0) {
         $ANOWTaskTemplate.Add('description', $Description)
         $include_properties += 'description'
@@ -30631,7 +32365,7 @@ Function New-AutomateNOWTaskTemplate {
             }
             ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
                 [string]$tag_object_simpleId = $tag_object.simpleId
-                Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
+                Throw "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                 Break
             }
             [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -30906,12 +32640,6 @@ Function Copy-AutomateNOWTaskTemplate {
     .PARAMETER Folder
     Optional name of the folder to place the Task Template into. The UnsetFolder parameter overrides this setting.
 
-    .PARAMETER Workspace
-    Optional string representing the Workspace to place this object into.
-
-    .PARAMETER UnsetWorkspace
-    Optional switch that will ensure the newly created object is not placed into a Workspace
-
     .PARAMETER Force
     Force the copy without confirmation. This is equivalent to -Confirm:$false
 
@@ -30965,10 +32693,6 @@ Function Copy-AutomateNOWTaskTemplate {
         [switch]$UnsetDescription,
         [Parameter(Mandatory = $false)]
         [switch]$UnsetFolder,
-        [Parameter(Mandatory = $false)]
-        [string]$Workspace,
-        [Parameter(Mandatory = $false)]
-        [switch]$UnsetWorkspace,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
         [Parameter(Mandatory = $false)]
@@ -31048,36 +32772,13 @@ Function Copy-AutomateNOWTaskTemplate {
                         }
                     }
                 }
-                If ($Workspace.Length -gt 0) {
-                    $Error.Clear()
-                    Try {
-                        [ANOWWorkspace]$workspace_object = Get-AutomateNOWWorkspace -Id $Workspace
-                    }
-                    Catch {
-                        [string]$Message = $_.Exception.Message
-                        Write-Warning -Message "Get-AutomateNOWWorkspace failed to confirm that the workspace [$Workspace] actually existed while running under Copy-AutomateNOWTaskTemplate due to [$Message]"
-                        Break
-                    }
-                    If ($workspace_object.simpleId.Length -eq 0) {
-                        Throw "Get-AutomateNOWWorkspace failed to locate the Workspace [$Workspace] running under Copy-AutomateNOWTaskTemplate. Please check again."
-                        Break
-                    }
-                    [string]$workspace_display = $workspace_object | ConvertTo-Json -Compress
-                    Write-Verbose -Message "Adding workspace $workspace_display to [ANOWTaskTemplate] [$NewId]"
-                    $BodyMetaData.Add('workspace', $Workspace)
-                    $include_properties += 'workspace'
-                }
-                ElseIf ($UnsetWorkspace -eq $true) {
-                    $BodyMetaData.Add('workspace', '')
-                    $include_properties += 'workspace'
-                }
                 $BodyMetaData.'_operationType' = 'add'
                 $BodyMetaData.'_operationId' = 'copy'
                 $BodyMetaData.'_textMatchStyle' = 'exact'
                 $BodyMetaData.'_dataSource' = 'ProcessingTemplateDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, workspace
+                $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder
                 $Body = $Body -replace '&tags[0-9]{1,}', '&tags'
                 $parameters.Body = $Body
                 $Error.Clear()
@@ -31412,7 +33113,7 @@ Function Start-AutomateNOWTaskTemplate {
                 }
                 ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
                     [string]$tag_object_simpleId = $tag_object.simpleId
-                    Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
+                    Throw "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                     Break
                 }
                 [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -32983,7 +34684,7 @@ Function New-AutomateNOWTimeWindow {
             }
             ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
                 [string]$tag_object_simpleId = $tag_object.simpleId
-                Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
+                Throw "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                 Break
             }
             [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -34155,6 +35856,12 @@ Function Set-AutomateNOWUser {
     .PARAMETER ResetDefaultTimeZone
     Switch parameter that will blank out the user accounts default timezone.
 
+    .PARAMETER defaultDomain
+    String that will be set as the user's default domain. Note that this function will check to ensure that the domain exists before trying to set it.
+
+    .PARAMETER unsetDefaultDomain
+    Unsets the user's default domain.
+
     .PARAMETER Force
     Force the change without confirmation. This is equivalent to -Confirm:$false
 
@@ -34216,6 +35923,10 @@ Function Set-AutomateNOWUser {
         [Parameter(Mandatory = $false, HelpMessage = 'Set this to true to promote the user to full admin privileges')]
         [boolean]$admin,
         [Parameter(Mandatory = $false)]
+        [string]$defaultDomain,
+        [Parameter(Mandatory = $false)]
+        [boolean]$unsetDefaultDomain,
+        [Parameter(Mandatory = $false)]
         [switch]$Force,
         [Parameter(Mandatory = $false)]
         [switch]$Quiet,
@@ -34225,6 +35936,10 @@ Function Set-AutomateNOWUser {
     Begin {
         If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
             Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        If ($defaultDomain.Length -gt 0 -and $unsetDefaultDomain -eq $true) {
+            Write-Warning -Message "You cannot both set and unset the default domain. Please choose one or the other."
             Break
         }
         [string]$command = '/secUser/update'
@@ -34267,7 +35982,7 @@ Function Set-AutomateNOWUser {
             ## End warning ##
             [boolean]$account_has_changed = $false
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
-            $BodyMetaData.'id' = $User.id
+            $BodyMetaData.'id' = $User_id
             If ($FirstName.Length -gt 0) {
                 $BodyMetaData.'firstName' = $FirstName
                 $BodyMetaData.'firstLastName' = ($FirstName + ' ' + $User.LastName)
@@ -34301,21 +36016,44 @@ Function Set-AutomateNOWUser {
                 $BodyMetaData.'accountValidUntil' = Get-Date -Date $AccountValidUntil -Format 'yyyy-MM-ddTHH:mm:ss.fff'
                 [boolean]$account_has_changed = $true
             }
-
             If ($null -ne $DefaultTimeZone) {
                 $BodyMetaData.'defaultTimeZone' = ($DefaultTimeZone.Id)
                 [boolean]$account_has_changed = $true
             }
-            If ($ResetDefaultTimeZone -eq $true) {
+            ElseIf ($ResetDefaultTimeZone -eq $true) {
                 $BodyMetaData.'defaultTimeZone' = ''
                 [boolean]$account_has_changed = $true
             }
-
+            If ($defaultDomain.Length -gt 0) {
+                $Error.Clear()
+                Try {
+                    [ANOWDomain]$domain_object = Get-AutomateNOWDomain -Id $defaultDomain
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Get-AutomateNOWDomain failed to confirm that the Domain [$defaultDomain] actually existed while running under Set-AutomateNOWUser due to [$Message]"
+                    Break
+                }
+                If ($domain_object.Id.Length -eq 0) {
+                    Throw "Get-AutomateNOWDomain failed to locate the Domain [$Domain] running under Set-AutomateNOWUser. Please check again."
+                    Break
+                }
+                Write-Verbose -Message "Setting $defaultDomain as the default domain for [$User_id]"
+                $BodyMetaData.'defaultDomain' = $defaultDomain
+                $include_properties += 'defaultDomain'
+                [boolean]$account_has_changed = $true
+            }
+            ElseIf ($unsetDefaultDomain -eq $true) {
+                Write-Verbose -Message "Unsetting the default domain for [$User_id]"
+                $BodyMetaData.'defaultDomain' = $null
+                $include_properties += 'defaultDomain'
+                [boolean]$account_has_changed = $true
+            }
             If ($skinThemetype.Length -gt 0) {
                 $BodyMetaData.'skinThemeType' = $skinThemeType
                 [boolean]$account_has_changed = $true
             }
-            If ($skinThemetype.Length -gt 0) {
+            If ($skinDensityType.Length -gt 0) {
                 $BodyMetaData.'skinDensityType' = $skinDensityType
                 [boolean]$account_has_changed = $true
             }
@@ -34324,7 +36062,12 @@ Function Set-AutomateNOWUser {
                 Break
             }
             $BodyMetaData.'createdBy' = $User.createdBy
-            $BodyMetaData.'lastAccountExpired' = $User.lastAccountExpired
+            If (-not ($User.lastAccountExpired -gt (Get-Date -Date '1970/1/1')) -eq $true) {
+                $BodyMetaData.'lastAccountExpired' = $null
+            }
+            Else {
+                $BodyMetaData.'lastAccountExpired' = $User.lastAccountExpired
+            }
             $BodyMetaData.'languageCode' = $User.languageCode
             $BodyMetaData.'_operationType' = 'update'
             $BodyMetaData.'_oldValues' = $User.CreateOldValues()
@@ -35513,7 +37256,7 @@ Function New-AutomateNOWVariable {
             }
             ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
                 [string]$tag_object_simpleId = $tag_object.simpleId
-                Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
+                Throw "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                 Break
             }
             [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -36513,7 +38256,7 @@ Function Get-AutomateNOWWorkflow {
     Mandatory (if you are getting only 1 Workflow) int64 containing the Run Id of the Workflow to fetch or you can pipeline a series of int64 Run Id's. You may not enter an array here.
 
     .PARAMETER ItemsOnly
-    Optional switch parameter that modifies the -Id parameter set to provide the executed Items within the Workflow. This switch completely changes the output of this function and may only be used in conjuntion with the -Id parameter.
+    Optional switch parameter that modifies the -Id parameter set to provide the executed child Items within the Workflow. This switch completely changes the output of this function and may only be used in conjuntion with the -Id parameter.
 
     .PARAMETER Type
     Optional string containing the type of workflow. Valid choices are STANDARD, BROADCAST, FOR_EACH, TIME_SERIES, SWITCH, CYCLE, INFORMATICA
@@ -36560,19 +38303,22 @@ Function Get-AutomateNOWWorkflow {
     [Cmdletbinding(DefaultParameterSetName = 'All')]
     Param(
         [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
-        [Parameter(Mandatory = $True, ParameterSetName = 'Item', ValueFromPipeline = $true)]
-        [in64]$Id,
+        [Parameter(Mandatory = $True, ParameterSetName = 'Id', ValueFromPipeline = $true)]
+        [int64]$Id,
         [Parameter(Mandatory = $False, ParameterSetName = 'All')]
         [ANOWWorkflow_workflowType]$Type,
         [Parameter(Mandatory = $False, ParameterSetName = 'All')]
         [ANOWTask_processingStatus]$ProcessingStatus,
         [Parameter(Mandatory = $False, ParameterSetName = 'All')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Id')]
         [int32]$startRow = 0,
         [Parameter(Mandatory = $False, ParameterSetName = 'All')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Id')]
         [int32]$endRow = 100,
+        [ValidateSet('id', 'firstStartTime', 'startTime', 'endTime')]
         [Parameter(Mandatory = $False, ParameterSetName = 'All')]
         [string]$sortBy = 'id',
-        [Parameter(Mandatory = $false, ParameterSetName = 'Item')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Id')]
         [switch]$ItemsOnly
     )
     Begin {
@@ -36595,19 +38341,20 @@ Function Get-AutomateNOWWorkflow {
             [string]$Id = $_
         }
         [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
-        $Body.'_constructor' = 'AdvancedCriteria'
-        $Body.'operator' = 'and'
-        If ($Id.Length -gt 0) {
+        If ($Id -gt 0 -and $ItemsOnly -ne $true) {
             $Body.'id' = $Id
-            $Body.'_operationId' = 'ProcessingDataSource_fetch'
-            $Body.'criteria1' = '{"__normalized":true,"fieldName":"archived","operator":"equals","value":false}'
-            $Body.'criteria2' = '{"fieldName":"parent","value":"' + $Id + '","operator":"equals"}'
+            $Body.'operationId' = 'read'
+            [string]$textMatchStyle = 'exactCase'
         }
         Else {
-            $Body.'criteria1' = '{"fieldName":"archived","operator":"equals","value":false}'
-            $Body.'criteria2' = '{"fieldName":"isProcessing","operator":"equals","value":true}'
+            $Body.'_constructor' = 'AdvancedCriteria'
+            $Body.'operator' = 'and'
+            $Body.'criteria1' = '{"__normalized":true,"fieldName":"archived","operator":"equals","value":false}'
             If (($Type.Length -gt 0)) {
-                $Body.'criteria3' = '{"fieldName":"itemType","operator":"equals","value":"' + $Type + '"}'
+                $Body.'criteria2' = '{"fieldName":"itemType","operator":"equals","value":"' + $Type + '"}'
+            }
+            ElseIf ($ItemsOnly -eq $true -and $Id -gt 0) {
+                $Body.'criteria2' = '{"fieldName":"parent","value":"' + $Id + '","operator":"equals"}'
             }
             Else {
                 $Error.Clear()
@@ -36619,19 +38366,21 @@ Function Get-AutomateNOWWorkflow {
                     Write-Warning -Message "Get-AutomateNOWWorkflow was unable to enumerate the object class [ANOWWorkflow_workflowType] due to [$Message]."
                     Break
                 }
-                $Body.'criteria3' = '{"fieldName":"itemType","operator":"inSet","value":[' + $all_workflow_types + ']}'
-                If ($null -ne $ProcessingStatus) {
+                $Body.'criteria2' = '{"fieldName":"itemType","operator":"inSet","value":[' + $all_workflow_types + ']}'
+                If ($ProcessingStatus.Length -gt 0) {
                     [string]$ProcessingStatus = $ProcessingStatus.ToString()
-                    $Body.'criteria4' = ('{"fieldName":"processingStatus","operator":"inSet","value":["' + $ProcessingStatus + '"]}')
+                    $Body.'criteria3' = ('{"fieldName":"processingStatus","operator":"inSet","value":["' + $ProcessingStatus + '"]}')
                 }
             }
+            $Body.'_componentId' = 'ProcessingList'
+            $Body.'_operationId' = 'ProcessingDataSource_fetch'
             $Body.'_startRow' = $startRow
             $Body.'_endRow' = $endRow
             $Body.'_sortBy' = $sortBy
+            [string]$textMatchStyle = 'substring'
         }
         $Body.'_operationType' = 'fetch'
-        $Body.'_textMatchStyle' = 'substring'
-        $Body.'_componentId' = 'ProcessingList'
+        $Body.'_textMatchStyle' = $textMatchStyle
         $Body.'_dataSource' = 'ProcessingDataSource'
         $Body.'isc_metaDataPrefix' = '_'
         $Body.'isc_dataFormat' = 'json'
@@ -37713,7 +39462,7 @@ Function Get-AutomateNOWWorkflowTemplate {
         If ($WorkflowTemplates.Count -gt 0) {
             If ($WorkflowTemplates.Count -eq 1 -and $WorkflowTemplates.processingType -ne 'WORKFLOW') {
                 [string]$processingType = $WorkflowTemplates.processingType
-                If ($processingType -eq 'TASK') {
+                If ($processingType -in @('TASK', 'SERVICE')) {
                     Write-Warning -Message "$Id is actually a Task Template. Please use Get-AutomateNOWTaskTemplate to retrieve this item."
                 }
                 ElseIf ($processingType -eq 'TRIGGER') {
@@ -37748,12 +39497,6 @@ Function Set-AutomateNOWWorkflowTemplate {
 
     .PARAMETER UnsetDescription
     Optional switch that will remove the Description from the Workflow Template object.
-
-    .PARAMETER Workspace
-    A string representing the name of the Workspace you wish to move this Workflow Template into.
-
-    .PARAMETER UnsetWorkspace
-    A switch parameter that will move the Workflow Template out of its current Workspace.
 
     .PARAMETER Folder
     A string representing the name of the Folder to move the Workflow Template into.
@@ -37866,10 +39609,6 @@ Function Set-AutomateNOWWorkflowTemplate {
         [string]$Description,
         [Parameter(Mandatory = $false, ParameterSetName = 'SetDescription')]
         [switch]$UnsetDescription,
-        [Parameter(Mandatory = $false, ParameterSetName = 'SetWorkspace')]
-        [string]$Workspace,
-        [Parameter(Mandatory = $false, ParameterSetName = 'SetWorkspace')]
-        [switch]$UnsetWorkspace,
         [Parameter(Mandatory = $false, ParameterSetName = 'SetFolder')]
         [string]$Folder,
         [Parameter(Mandatory = $false, ParameterSetName = 'SetFolder')]
@@ -37951,10 +39690,6 @@ Function Set-AutomateNOWWorkflowTemplate {
             Write-Warning -Message 'To use -EagerScriptExecution, you must include -UseScripts $true'
             Break
         }
-        If ($UnsetWorkspace -eq $true -and $Workspace.Length -gt 0) {
-            Write-Warning -Message "You cannot set the Workspace and unset it at the same time. Please choose one or the other."
-            Exit
-        }
         If ($UnsetFolder -eq $true -and $Folder.Length -gt 0) {
             Write-Warning -Message "You cannot set the Folder and unset it at the same time. Please choose one or the other."
             Exit
@@ -38005,30 +39740,6 @@ Function Set-AutomateNOWWorkflowTemplate {
                 $BodyMetaData.'description' = $null
                 $include_properties += 'description'
             }
-            If ($Workspace.Length -gt 0) {
-                $Error.Clear()
-                Try {
-                    [ANOWWorkspace]$workspace_object = Get-AutomateNOWWorkspace -Id $Workspace
-                }
-                Catch {
-                    Write-Warning -Message "Get-AutomateNOWWorkspace failed to confirm that the workspace [$Workspace] actually existed while running under Set-AutomateNOWWorkflowTemplate due to [$Message]"
-                    Break
-                }
-                If ($workspace_object.simpleId.Length -eq 0) {
-                    Throw "Get-AutomateNOWWorkspace failed to locate the Workspace [$Workspace] running under Set-AutomateNOWWorkflowTemplate. Please check again."
-                    Break
-                }
-                [string]$workspace_display = $workspace_object | ConvertTo-Json -Compress
-                Write-Verbose -Message "Adding workspace $workspace_display to [ANOWWorkflowTemplate] [$WorkflowTemplate_id]"
-                $BodyMetaData.'workspace' = $Workspace
-                $include_properties += 'workspace'
-            }
-            ElseIf ($UnsetWorkspace -eq $true) {
-                [string]$workspace_display = $workspace_object | ConvertTo-Json -Compress
-                Write-Verbose -Message "Removing [ANOWWorkflowTemplate] [$WorkflowTemplate_id] from Workspace $workspace_display"
-                $BodyMetaData.'workspace' = $null
-                $include_properties += 'workspace'
-            }
             If ($Folder.Length -gt 0) {
                 $Error.Clear()
                 Try {
@@ -38073,7 +39784,7 @@ Function Set-AutomateNOWWorkflowTemplate {
                     }
                     ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
                         [string]$tag_object_simpleId = $tag_object.simpleId
-                        Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
+                        Throw "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                         Break
                     }
                     [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -38506,7 +40217,7 @@ Function New-AutomateNOWWorkflowTemplate {
             }
             ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
                 [string]$tag_object_simpleId = $tag_object.simpleId
-                Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
+                Throw "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                 Break
             }
             [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -38763,29 +40474,29 @@ Function Copy-AutomateNOWWorkflowTemplate {
     .PARAMETER NewId
     Mandatory string indicating the new id or name of the Workflow Template. Please remember that the Id is the same as a primary key, it must be unique. The console will provide the old Id + '_COPY' in the UI when making a copy. The Id is limited to 1024 characters.
 
-    .PARAMETER UnsetTags
-    Optional switch that will purposely omit the previously existing tags on the new copy of the Workflow Template. You can still specify new tags with -Tags but the old previous ones will not be carried over. In the UI, this is accomplished by clicking the existing tags off.
-
-    .PARAMETER UnsetFolder
-    Optional switch that will ensure that the newly created Workflow Template will not be placed in a folder.
+    .PARAMETER Description
+    Optional description of the Workflow Template (may not exceed 255 characters). You may send an empty string here to ensure that the description is blanked out. Do not use this parameter if your intention is to keep the description from the previous Workflow Template.
 
     .PARAMETER UnsetDescription
     Optional switch that will ensure that the newly created Workflow Template will not carry over its previous description.
 
-    .PARAMETER Description
-    Optional description of the Workflow Template (may not exceed 255 characters). You may send an empty string here to ensure that the description is blanked out. Do not use this parameter if your intention is to keep the description from the previous Workflow Template.
-
     .PARAMETER Tags
     Optional string array containing the CASE-SENSITIVE id's of the tags to assign to the new Workflow Template. The UnsetTags DOES NOT influence this parameter.
+
+    .PARAMETER UnsetTags
+    Optional switch that will purposely omit the previously existing tags on the new copy of the Workflow Template. You can still specify new tags with -Tags but the old previous ones will not be carried over. In the UI, this is accomplished by clicking the existing tags off.
 
     .PARAMETER Folder
     Optional name of the folder to place the Workflow Template into. The UnsetFolder parameter overrides this setting.
 
-    .PARAMETER Force
-    Force the copy without confirmation. This is equivalent to -Confirm:$false
+    .PARAMETER UnsetFolder
+    Optional switch that will ensure that the newly created Workflow Template will not be placed in a folder.
 
     .PARAMETER Quiet
     Optional switch to suppress the return of the newly created object.
+
+    .PARAMETER Force
+    Force the copy without confirmation. This is equivalent to -Confirm:$false
 
     .INPUTS
     ONLY [ANOWWorkflowTemplate] objects are accepted. Pipeline support is intentionally unavailable.
@@ -38835,9 +40546,9 @@ Function Copy-AutomateNOWWorkflowTemplate {
         [Parameter(Mandatory = $false)]
         [switch]$UnsetFolder,
         [Parameter(Mandatory = $false)]
-        [switch]$Force,
+        [switch]$Quiet,
         [Parameter(Mandatory = $false)]
-        [switch]$Quiet
+        [switch]$Force
     )
     Begin {
         If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
@@ -38919,7 +40630,7 @@ Function Copy-AutomateNOWWorkflowTemplate {
                 $BodyMetaData.'_dataSource' = 'ProcessingTemplateDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder
+                $Body = ConvertTo-QueryString -InputObject $BodyMetaData #-IncludeProperties oldId, domain, NewId, description, folder
                 $Body = $Body -replace '&tags[0-9]{1,}', '&tags'
                 $parameters.Body = $Body
                 $Error.Clear()
@@ -39261,7 +40972,7 @@ Function Start-AutomateNOWWorkflowTemplate {
                 }
                 ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
                     [string]$tag_object_simpleId = $tag_object.simpleId
-                    Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
+                    Throw "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                     Break
                 }
                 [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -39861,6 +41572,12 @@ Function Read-AutomateNOWWorkflowTemplateItem {
     .PARAMETER WorkflowTemplate
     An [ANOWWorkflowTemplate] object representing the Workflow Template to be read.
 
+    .PARAMETER startRow
+    Optional integer to indicate the row to start from. This is intended for when you need to paginate the results. Default is 0.
+
+    .PARAMETER endRow
+    Optional integer to indicate the row to stop on. This is intended for when you need to paginate the results. Default is 2000.
+
     .INPUTS
     ONLY [ANOWWorkflowTemplate] objects are accepted (including from the pipeline)
 
@@ -39887,9 +41604,7 @@ Function Read-AutomateNOWWorkflowTemplateItem {
         [Parameter(Mandatory = $False)]
         [int32]$startRow = 0,
         [Parameter(Mandatory = $False)]
-        [int32]$endRow = 100,
-        [Parameter(Mandatory = $false)]
-        [switch]$Force
+        [int32]$endRow = 100
     )
     Begin {
         If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
@@ -40616,7 +42331,7 @@ Function Set-AutomateNOWWorkspace {
                         }
                         ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
                             [string]$tag_object_simpleId = $tag_object.simpleId
-                            Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
+                            Throw "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                             Break
                         }
                         [string]$tag_display = $tag_object | ConvertTo-Json -Compress
@@ -40900,7 +42615,7 @@ Function New-AutomateNOWWorkspace {
             }
             ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
                 [string]$tag_object_simpleId = $tag_object.simpleId
-                Write-Warning -Message "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
+                Throw "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
                 Break
             }
             [string]$tag_display = $tag_object | ConvertTo-Json -Compress
