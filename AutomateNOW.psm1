@@ -10398,7 +10398,7 @@ Function Show-AutomateNOWCodeRepositoryOutOfSyncItemComparison {
         #Create a temporary text file - This is required by the git utility
         $Error.Clear()
         Try {
-            $your_version | Out-File -FilePath "$your_version_temp_filepath" -Force -Encoding utf8
+            $your_version | Out-File -FilePath "$your_version_temp_filepath" -Force -Encoding UTF8
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -10415,7 +10415,7 @@ Function Show-AutomateNOWCodeRepositoryOutOfSyncItemComparison {
         #Create a temporary text file - This is required by the git utility
         $Error.Clear()
         Try {
-            $their_version | Out-File -FilePath "$their_version_temp_filepath" -Force -Encoding utf8
+            $their_version | Out-File -FilePath "$their_version_temp_filepath" -Force -Encoding UTF8
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -11619,7 +11619,7 @@ Function Edit-AutomateNOWCodeRepositoryObjectSource {
         }
         $Error.Clear()
         Try {
-            $new_fileinfo | Set-Content -Value $sourceCode
+            $new_fileinfo | Set-Content -Value $sourceCode -Encoding UTF8
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -11656,7 +11656,7 @@ Function Edit-AutomateNOWCodeRepositoryObjectSource {
         }
         If ($newly_modified_time_utc.Ticks -gt $initial_modified_time_utc.Ticks) {
             If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Are you sure you want to apply the changes you've made to $($ObjectSource_rootFullId)?")) -eq $true) {
-                [string]$newSourceCode = Get-Content -Path "$temp_filename"
+                [string]$newSourceCode = Get-Content -Path "$temp_filename" -Encoding UTF8
                 If ($newSourceCode.Length -eq 0) {
                     Write-Warning -Message "Somehow (while editing the source code of $ObjectSource_rootFullId) the temporary file ($temp_filename) containing the source code being edited was empty. Please look into this."
                     Break
