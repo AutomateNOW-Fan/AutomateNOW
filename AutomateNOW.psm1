@@ -11468,7 +11468,7 @@ Function Update-AutomateNOWCodeRepositoryObjectSource {
     }
     $Error.Clear()
     Try {
-        [string]$sourceCode = $newSourceCode | ConvertFrom-Json -Depth 100 | ConvertTo-Json
+        [string]$sourceCode = $newSourceCode | ConvertFrom-Json | ConvertTo-Json
     }
     Catch {
         [string]$Message = $_.Exception.Message
@@ -11610,7 +11610,7 @@ Function Edit-AutomateNOWCodeRepositoryObjectSource {
         [string]$temp_filename = "$temp_dir\Edit-AutomateNOWCodeRepositoryObjectSource-$current_unixtime.txt"
         $Error.Clear()
         Try {
-            [System.IO.FileSystemInfo]$temp_fileinfo = New-Item -Path "$temp_filename"
+            [System.IO.FileSystemInfo]$new_fileinfo = New-Item -Path "$temp_filename" -Force
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -11619,7 +11619,7 @@ Function Edit-AutomateNOWCodeRepositoryObjectSource {
         }
         $Error.Clear()
         Try {
-            $temp_fileinfo | Set-Content -Value $sourceCode
+            $new_fileinfo | Set-Content -Value $sourceCode
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -11628,7 +11628,7 @@ Function Edit-AutomateNOWCodeRepositoryObjectSource {
         }
         $Error.Clear()
         Try {
-            [System.IO.FileSystemInfo]$temp_fileinfo = Get-Item -Path "$temp_filename"
+            [datetime]$initial_modified_time_utc = Get-Item -Path "$temp_filename" -Force | Select-Object -ExpandProperty LastWriteTimeUtc
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -11647,16 +11647,16 @@ Function Edit-AutomateNOWCodeRepositoryObjectSource {
         }
         $Error.Clear()
         Try {
-            [System.IO.FileSystemInfo]$modified_temp_fileinfo = Get-Item -Path "$temp_filename"
+            [datetime]$newly_modified_time_utc = Get-Item -Path "$temp_filename" -Force | Select-Object -ExpandProperty LastWriteTimeUtc
         }
         Catch {
             [string]$Message = $_.Exception.Message
             Write-Warning -Message "New-Item failed to create the temporary file [$temp_filename] (while editing the source code of $ObjectSource_rootFullId) due to [$Message]."
             Break
         }
-        If ($modified_temp_fileinfo.LastWriteTimeUtc -gt $temp_fileinfo.LastWriteTimeUtc) {
-            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Are you sure you want to apply the changes you've made to $($ObjectSource_rootFullId?)")) -eq $true) {
-                [string]$newSourceCode = $modified_temp_fileinfo | Get-Content
+        If ($newly_modified_time_utc.Ticks -gt $initial_modified_time_utc.Ticks) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Are you sure you want to apply the changes you've made to $($ObjectSource_rootFullId)?")) -eq $true) {
+                [string]$newSourceCode = Get-Content -Path "$temp_filename"
                 If ($newSourceCode.Length -eq 0) {
                     Write-Warning -Message "Somehow (while editing the source code of $ObjectSource_rootFullId) the temporary file ($temp_filename) containing the source code being edited was empty. Please look into this."
                     Break
@@ -11677,7 +11677,7 @@ Function Edit-AutomateNOWCodeRepositoryObjectSource {
         }
         $Error.Clear()
         Try {
-            $temp_fileinfo | Remove-Item -Force
+            Remove-Item -Path "$temp_filename" -Force
         }
         Catch {
             [string]$Message = $_.Exception.Message
