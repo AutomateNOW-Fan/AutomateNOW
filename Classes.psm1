@@ -2647,6 +2647,45 @@ Class ANOWCalendar : ANOW {
 
 #endregion
 
+#region Class - [ANOWCodeRepositoryObjectSourceCode]
+
+Class ANOWCodeRepositoryObjectSourceCode : ANOW {
+    [Nullable[ANOWAgent_agentOperatingSystemType]]$agentOperatingSystemType
+    [Nullable[ANOWProcessingTemplateItem_endpointType]]$endpointType
+    [Nullable[ANOWProcessingTemplateItem_MonitorType]]$monitorType
+    [Nullable[ANOWProcessingTemplateItem_processingType]]$processingType
+    [Nullable[ANOWserverNode_resourceType]]$resourceType
+    [Nullable[ANOWProcessingTemplateItem_sensorType]]$sensorType
+    [Nullable[ANOWProcessingTemplateItem_serverNodeType]]$serverNodeType
+    [Nullable[ANOWProcessingTemplateItem_serviceManagerType]]$serviceManagerType
+    [Nullable[ANOWProcessingTemplateItem_serviceType]]$serviceType
+    [Nullable[ANOWProcessingTemplateItem_taskType]]$taskType
+    [Nullable[ANOWProcessingTemplateItem_triggerType]]$triggerType
+    [Nullable[ANOWProcessingTemplateItem_workflowType]]$workflowType
+    [boolean]$checkedOut
+    [string]$checkoutBy
+    [Nullable[datetime]]$checkoutDate
+    [string]$domainClassName # there needs to be an ENUM for this object
+    [string]$sourceCode
+    [string[]]$tags
+    # Default constructor
+    ANOWCodeRepositoryObjectSourceCode() { $this.Init(@{}) }
+
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = ''
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
+    }
+}
+
+
+#endregion
+
 #region Class - [ANOWDataSource]
 Class ANOWDataSource : ANOW {
     [Nullable[ANOWiconSet]]$iconSet

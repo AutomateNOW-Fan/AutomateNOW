@@ -33,8 +33,14 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 - PSScriptAnalyzer compliant / Approved verbs only
 - Alternate encryption key bytes can be supplied (let's hope it is never needed 🤞)
 - Integration with the git app for showing out of sync item that require manual merging
+- Edit source code objects with NotePad (Windows only for now)
 <br/><br/>
 ## Change Log 📝
+
+## 1.0.24
+- Added new functions: `Get-AutomateNOWCodeRepositoryObjectSource`, `Edit-AutomateNOWCodeRepositoryObjectSource`, `Update-AutomateNOWCodeRepositoryObjectSource`
+- Added the `-template` parameter to `Get-AutomateNOWWorkflow`
+- Added the `-folder` parameter to `Get-AutomateNOWTaskTemplate`
 
 ## 1.0.23
 - Added new functions: `Dismount-AutomateNOWNode`, `Export-AutomateNOWContextVariable`, `Export-AutomateNOWProcessingEventLog`, `Get-AutomateNOWContextVariable`, `Get-AutomateNOWProcessingEventLog`, `Rename-AutomateNOWAdhocReport`, `Rename-AutomateNOWAgent`, `Rename-AutomateNOWApproval`, `Rename-AutomateNOWDataSource`, `Rename-AutomateNOWNode`, `Resume-AutomateNOWNode`, `Skip-AutomateNOWNode`, `Suspend-AutomateNOWNode`
@@ -249,6 +255,7 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 - Automatic text file MIME type detection (for Add-AutomateNOWDataSourceItem)
 - Specify the theme and ui density at the time of user creation
 - Retrieve all of the items from within a Code Repository using a single command
+- Modify the source code of certain objects that the UI does not offer (e.g. Stocks)
 
 <sub>* things the console does not allow</sub>
 
@@ -411,6 +418,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Dismount-AutomateNOWNode`
 
+`Edit-AutomateNOWCodeRepositoryObjectSource`
+
 `Export-AutomateNOWAdhocReport`
 
 `Export-AutomateNOWAgent`
@@ -494,6 +503,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Get-AutomateNOWCodeRepositoryItem`
 
 `Get-AutomateNOWCodeRepositoryMergeRequest`
+
+`Get-AutomateNOWCodeRepositoryObjectSource`
 
 `Get-AutomateNOWCodeRepositoryOutOfSyncItem`
 
@@ -886,6 +897,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Unprotect-AutomateNOWEncryptedString`
 
 `UnPublish-AutomateNOWCodeRepository`
+
+`Update-AutomateNOWCodeRepositoryObjectSource`
 
 `Update-AutomateNOWToken`
 

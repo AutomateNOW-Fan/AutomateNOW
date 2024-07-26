@@ -1,7 +1,7 @@
 ﻿Using Module .\Classes.psm1
 $InformationPreference = 'Continue'
 
-#Region - Utility Functions
+#Region = Utility Functions =
 
 Function Compare-ObjectProperty {
     <#
@@ -213,6 +213,7 @@ Function New-WebkitBoundaryString {
     }
     Return $webkit_boundary
 }
+
 Function Protect-AutomateNOWEncryptedString {
     <#
     .SYNOPSIS
@@ -354,7 +355,7 @@ Function Unprotect-AutomateNOWEncryptedString {
 
 #EndRegion
 
-#Region - API Functions
+#Region = API Functions =
 
 Function Invoke-AutomateNOWAPI {
     <#
@@ -632,7 +633,7 @@ Function Invoke-AutomateNOWAPI {
 }
 #EndRegion
 
-#Region - Authentication Functions
+#Region = Authentication Functions =
 
 Function Confirm-AutomateNOWSession {
     <#
@@ -765,19 +766,19 @@ Function Connect-AutomateNOW {
     Specifies the name of the AutomateNOW! instance. For example: s2.infinitedata.com
 
     .PARAMETER Domain
-    Optional string to set the AutomateNOW domain manually. If you do not specify, then you will (likely) need to use Switch-AutomateNOWDomain
+    Optional string to set the AutomateNOW domain. Omit this parameter if you do not know what the available domains are and they will be shown to you. You can then run this function again with the -Domain parameter. This function does not support recognition of users with a default domain configured yet.
 
     .PARAMETER AccessToken
-    Optionally specify the access token manually. This is normally copy/pasted from your web browser. This is intended for use when development testing. For best results, combine with -RefreshToken and -ExpirationDate
+    Optionally specify the access token manually for API users or manual testing. This parameter is required for API users.
 
     .PARAMETER RefreshToken
-    Optionally specify the refresh token manually. This is normally copy/pasted from your web browser. You don't need to include this if you use -AccessToken but it helps.
+    Optionally specify the refresh token manually for API users or manual testing. This parameter is never required but this module will complain about it for non-API users since the token can't be refreshed.
 
     .PARAMETER ExpirationDate
-    Int64 representing the current date in UNIX time milliseconds. You don't need to include this if you use -AccessToken but it helps.
+    Int64 representing the current date in UNIX time milliseconds. You don't need to include this if you use -AccessToken but it's nice to have. This module will complain about it for non-API users since the expiration of the current session token is unknown.
 
     .PARAMETER ReadJSONFromClipboard
-    Switch parameter that will enable reading the JSON payload from the clipboard. You must have a valid authentication JSON payload in your clipboard for this to work (hint: You can copy it from your web browser after you've logged in). This parameter is useful for one-off usages where entering the password into the PowerShell prompt is undesireable.
+    Switch parameter that will enable reading the JSON payload from the clipboard. You must have a valid authentication JSON payload in your clipboard for this to work (hint: You can copy it from your web browser after you've logged in). This parameter is useful for one-off scenarios where typing a password into the PowerShell prompt is undesireable.
 
     .PARAMETER User
     Specifies the user connecting to the API only if you want to enter it on the command line manually. If you do not specify this, you will be prompted for it.
@@ -792,10 +793,10 @@ Function Connect-AutomateNOW {
     Switch parameter to silence the output of the access token (note that this parameter overrides -SkipMOTD)
 
     .PARAMETER SkipMOTD
-    Switch parameter to silence the "message of the day". This parameter is ignored if -Quiet is set.
+    Switch parameter to suppress the "message of the day". This parameter is ignored if -Quiet is set.
 
     .PARAMETER SkipPreviousSessionCheck
-    Switch parameter to override the requirement to disconnect from a previous session before starting a new session on a different instance
+    Switch parameter to override the requirement to disconnect from a previous session before starting a new session on a different instance.
 
     .PARAMETER Key
     Optional 16-byte array for when InfiniteDATA has changed their encryption key. Let's hope we don't need to use this :-)
@@ -1953,7 +1954,7 @@ Function New-AutomateNOWServerDayTimestamp {
 }
 #EndRegion
 
-#Region - Object Functions
+#Region = Object Functions =
 
 #Region - AdhocReports
 
@@ -11094,6 +11095,604 @@ Function Deny-AutomateNOWCodeRepositoryMergeRequest {
 
 #endregion
 
+#Region - CodeRepository Object Source Code
+
+Function Get-AutomateNOWCodeRepositoryObjectSource {
+    <#
+    .SYNOPSIS
+    Gets the source code for an object from an AutomateNOW! instance
+
+    .DESCRIPTION
+    Gets the source code for an object from an AutomateNOW! instance. This is equivalent to clicking the 'Source Code' button in the UI for the objects which support source code modification.
+
+    .PARAMETER ScheduleTemplate
+    [ANOWScheduleTemplate] object to find referrals to. Use Get-AutomateNOWScheduleTemplate to obtain these objects. Note: The console refers to these as 'Schedules'.
+
+    .PARAMETER TaskTemplate
+    [ANOWTaskTemplate] object to find referrals to. Use Get-AutomateNOWTaskTemplate to obtain these objects.
+
+    .PARAMETER WorkflowTemplate
+    [ANOWWorkflowTemplate] object to find referrals to. Use Get-AutomateNOWWorkflowTemplate to obtain these objects.
+
+    .PARAMETER Calendar
+    [ANOWCalendar] object to find referrals to. Use Get-AutomateNOWCalendar to obtain these objects.
+
+    .PARAMETER Node
+    [ANOWNode] object to find referrals to. Use Get-AutomateNOWNode to obtain these objects.
+
+    .PARAMETER Stock
+    [ANOWStock] object to find referrals to. Use Get-AutomateNOWStock to obtain these objects.
+
+    .PARAMETER Lock
+    [ANOWLock] object to find referrals to. Use Get-AutomateNOWLock to obtain these objects.
+
+    .PARAMETER TimeWindow
+    [ANOWTimeWindow] object to find referrals to. Use Get-AutomateNOWTimeWindow to obtain these objects.
+
+    .PARAMETER Semaphore
+    [ANOWSemaphore] object to find referrals to. Use Get-AutomateNOWSemaphore to obtain these objects.
+
+    .PARAMETER Variable
+    [ANOWVariable] object to find referrals to. Use Get-AutomateNOWVariable to obtain these objects.
+
+    .PARAMETER Workspace
+    [ANOWWorkspace] object to find referrals to. Use Get-AutomateNOWWorkspace to obtain these objects.
+
+    .PARAMETER Endpoint
+    [ANOWEndpoint] object to find referrals to. Use Get-AutomateNOWEndpoint to obtain these objects.
+
+    .PARAMETER ResultMapping
+    [ANOWResultMapping] object to find referrals to. Use Get-AutomateNOWResultMapping to obtain these objects.
+
+    .INPUTS
+    Accepts many types of [ANOW] objects including TaskTemplate, WorkflowTemplate, Nodes, Stocks, Locks & Variables across the pipeline
+
+    .OUTPUTS
+    A single [ANOWCodeRepositoryObjectSourceCode] object will be returned containing the source code of the object.
+
+    .EXAMPLE
+    Gets the source code of a Task Template
+
+    $task_template = Get-AutomateNOWTaskTemplate -Id 'Template1'
+    Get-AutomateNOWCodeRepositoryObjectSource -TaskTemplate $task_template
+
+    .EXAMPLE
+    Gets the source code of a Task Template in one line of code
+
+    Get-AutomateNOWCodeRepositoryObjectSource -TaskTemplate (Get-AutomateNOWTaskTemplate -Id 'Template1')
+
+    .EXAMPLE
+    Uses the pipeline to get the source code for the first 100 Task Templates
+
+    Get-AutomateNOWTaskTemplate | Get-AutomateNOWCodeRepositoryObjectSource
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    This function is very far from complete as there are other object types which need to be added.
+
+    #>
+    [OutputType([ANOWCodeRepositoryObjectSourceCode])]
+    [Cmdletbinding()]
+    Param(
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'ScheduleTemplate')]
+        [ANOWScheduleTemplate]$ScheduleTemplate,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'TaskTemplate')]
+        [ANOWTaskTemplate]$TaskTemplate,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'WorkflowTemplate')]
+        [ANOWWorkflowTemplate]$WorkflowTemplate,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'Node')]
+        [ANOWNode]$Node,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'Calendar')]
+        [ANOWCalendar]$Calendar,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'Stock')]
+        [ANOWStock]$Stock,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'Lock')]
+        [ANOWLock]$Lock,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'TimeWindow')]
+        [ANOWTimeWindow]$TimeWindow,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'Semaphore')]
+        [ANOWSemaphore]$Semaphore,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'Variable')]
+        [ANOWVariable]$Variable,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'Workspace')]
+        [ANOWWorkspace]$Workspace,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'Endpoint')]
+        [ANOWEndpoint]$Endpoint,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'ResultMapping')]
+        [ANOWResultMapping]$ResultMapping,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'Approval')]
+        [ANOWApproval]$Approval
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'GET')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
+        If ($_ -is [ANOWTaskTemplate] -or $TaskTemplate.Id.Length -gt 0) {
+            [string]$domainClassName = 'ProcessingTemplate'
+            If ($TaskTemplate.Id.Length -gt 0) {
+                $Body.'id' = $TaskTemplate.Id
+            }
+            Else {
+                $Body.'id' = $_.'id'
+            }
+        }
+        ElseIf ($_ -is [ANOWWorkflowTemplate] -or $WorkflowTemplate.Id.Length -gt 0) {
+            [string]$domainClassName = 'ProcessingTemplate'
+            If ($WorkflowTemplate.Id.Length -gt 0) {
+                $Body.'id' = $WorkflowTemplate.Id
+            }
+            Else {
+                $Body.'id' = $_.'id'
+            }
+        }
+        ElseIf ($_ -is [ANOWScheduleTemplate] -or $ScheduleTemplate.Id.Length -gt 0) {
+            [string]$domainClassName = 'ProcessingTemplate'
+            If ($ScheduleTemplate.Id.Length -gt 0) {
+                $Body.'id' = $ScheduleTemplate.Id
+            }
+            Else {
+                $Body.'id' = $_.'id'
+            }
+        }
+        ElseIf ($_ -is [ANOWNode] -or $Node.Id.Length -gt 0) {
+            [string]$domainClassName = 'ServerNode'
+            If ($Node.id.Length -gt 0) {
+                $Body.'id' = $Node.id
+            }
+            Else {
+                $Body.'id' = $_.'id'
+            }
+        }
+        ElseIf ($_ -is [ANOWCalendar] -or $Calendar.Id.Length -gt 0) {
+            [string]$domainClassName = 'Resource'
+            If ($Calendar.id.Length -gt 0) {
+                $Body.'id' = $Calendar.id
+            }
+            Else {
+                $Body.'id' = $_.'id'
+            }
+        }
+        ElseIf ($_ -is [ANOWStock] -or $Stock.Id.Length -gt 0) {
+            [string]$domainClassName = 'Resource'
+            If ($Stock.id.Length -gt 0) {
+                $Body.'id' = $Stock.id
+            }
+            Else {
+                $Body.'id' = $_.'id'
+            }
+        }
+        ElseIf ($_ -is [ANOWLock] -or $Lock.Id.Length -gt 0) {
+            [string]$domainClassName = 'Resource'
+            If ($Lock.id.Length -gt 0) {
+                $Body.'id' = $Stock.id
+            }
+            Else {
+                $Body.'id' = $_.'id'
+            }
+        }
+        ElseIf ($_ -is [ANOWTimeWindow] -or $TimeWindow.Id.Length -gt 0) {
+            [string]$domainClassName = 'Resource'
+            If ($TimeWindow.id.Length -gt 0) {
+                $Body.'id' = $TimeWindow.id
+            }
+            Else {
+                $Body.'id' = $_.'id'
+            }
+        }
+        ElseIf ($_ -is [ANOWSemaphore] -or $Semaphore.Id.Length -gt 0) {
+            [string]$domainClassName = 'Resource'
+            If ($Variable.id.Length -gt 0) {
+                $Body.'id' = $Variable.id
+            }
+            Else {
+                $Body.'id' = $_.'id'
+            }
+        }
+        ElseIf ($_ -is [ANOWVariable] -or $Variable.Id.Length -gt 0) {
+            [string]$domainClassName = 'Resource'
+            If ($Variable.id.Length -gt 0) {
+                $Body.'id' = $Variable.id
+            }
+            Else {
+                $Body.'id' = $_.'id'
+            }
+        }
+        ElseIf ($_ -is [ANOWWorkspace] -or $Workspace.Id.Length -gt 0) {
+            [string]$domainClassName = 'Workspace'
+            If ($Workspace.id.Length -gt 0) {
+                $Body.'id' = $Workspace.id
+            }
+            Else {
+                $Body.'id' = $_.'id'
+            }
+        }
+        ElseIf ($_ -is [ANOWEndpoint] -or $Endpoint.Id.Length -gt 0) {
+            [string]$domainClassName = 'Endpoint'
+            If ($Endpoint.id.Length -gt 0) {
+                $Body.'id' = $Endpoint.id
+            }
+            Else {
+                $Body.'id' = $_.'id'
+            }
+        }
+        ElseIf ($_ -is [ANOWResultMapping] -or $ResultMapping.Id.Length -gt 0) {
+            [string]$domainClassName = 'ResultMapping'
+            If ($ResultMapping.id.Length -gt 0) {
+                $Body.'id' = $ResultMapping.id
+            }
+            Else {
+                $Body.'id' = $_.'id'
+            }
+        }
+        ElseIf ($_ -is [ANOWApproval] -or $Approval.Id.Length -gt 0) {
+            [string]$domainClassName = 'ApprovalConfiguration'
+            If ($Approval.id.Length -gt 0) {
+                $Body.'id' = $Approval.id
+            }
+            Else {
+                $Body.'id' = $_.'id'
+            }
+        }
+        Else {
+            Write-Warning -Message "Unable to determine input object. Please specify an object of [ANOW] base class type."
+            Break
+        }
+        $Body.'domainClassName' = $domainClassName
+        $Body.'_operationType' = 'fetch'
+        $Body.'_textMatchStyle' = 'exactCase'
+        $Body.'_dataSource' = 'CodeRepositoryObjectDataSource'
+        $Body.'isc_metaDataPrefix' = '_'
+        $Body.'isc_dataFormat' = 'json'
+        [string]$Body = ConvertTo-QueryString -InputObject $Body
+        [string]$command = ('/codeRepositoryObject/read?' + $Body)
+        If ($null -eq $parameters["Command"]) {
+            $parameters.Add('Command', $command)
+        }
+        Else {
+            $parameters.Command = $command
+        }
+        $Error.Clear()
+        Try {
+            [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] while running Find-AutomateNOWObjectReferral due to [$Message]."
+            Break
+        }
+        If ($results.response.status -ne 0) {
+            If ($null -eq $results.response.status) {
+                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
+                Break
+            }
+            Else {
+                [int32]$status_code = $results.response.status
+                [string]$results_response = $results.response
+                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
+                Break
+            }
+        }
+        $Error.Clear()
+        Try {
+            [ANOWCodeRepositoryObjectSourceCode]$ObjectSourceCode = $results.response.data[0]
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Failed to parse the response into a [ANOWCodeRepositoryObjectSourceCode] object under Get-AutomateNOWCodeRepositoryObjectSource due to [$Message]."
+            Break
+        }
+        If ($ObjectSourceCode.id.Length -eq 0) {
+            Write-Warning -Message "Somehow the response to Get-AutomateNOWCodeRepositoryObjectSource resulted in an empty object. Please look into this."
+            Break
+        }
+        Else {
+            Return $ObjectSourceCode
+        }
+    }
+    End {
+
+    }
+}
+
+Function Update-AutomateNOWCodeRepositoryObjectSource {
+    <#
+    .SYNOPSIS
+    Updates the source code with your changes for an object from an AutomateNOW! instance.
+
+    .DESCRIPTION
+    Updates the source code with your changes for an object from an AutomateNOW! instance. This is equivalent to clicking the 'Source Code' button in the UI for the objects which support source code modification.
+
+    .PARAMETER ObjectSource
+    The [ANOWCodeRepositoryObjectSourceCode] object containin the source code you wish to update. Use Get-AutomateNOWCodeRepositoryObjectSource to retrieve this.
+
+    .PARAMETER newSourceCode
+    Mandatory string containing the updated source code. Note that this *must* be a valid JSON. You *may* pass single-json string which will then be formatted to "pretty mode" which is what ANOW prefers. See example below.
+
+    .PARAMETER Force
+    Force the change without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    ONLY [ANOWCodeRepositoryObjectSourceCode] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    A verbose message indicating success otherwise there is no output.
+
+    .EXAMPLE
+    Replaces a string inside the source code of a Stock object
+
+    $stock = Get-AutomateNOWStock -Id 'Stock1'
+    $stock_source = Get-AutomateNOWCodeRepositoryObjectSource -Stock $stock
+    $source_code = $stock_source.sourceCode
+    $source_code = $source_code -replace 'MyString', 'MyString!'
+    Update-AutomateNOWCodeRepositoryObjectSource -ObjectSource $stock_source -newSourceCode $source_code -Force
+
+    .EXAMPLE
+    Updates the source code of a Stock object using a manually crafted compressed JSON string
+
+    $stock = Get-AutomateNOWStock -Id 'Stock1'
+    $stock_source = Get-AutomateNOWCodeRepositoryObjectSource -Stock $stock
+    $source_code = '{"codeRepository":"Repository1","description":"My description","resourceType":"STOCK","tags":["Tag1"],"totalPermits":100}'
+    Update-AutomateNOWCodeRepositoryObjectSource -ObjectSource $stock_source -newSourceCode $source_code -Force
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    This is the equivalent to clicking the 'Save' button after making changes to an object using the 'Source Code' button.
+
+    Not all objects are supported yet.
+
+    #>
+
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [ANOWCodeRepositoryObjectSourceCode]$ObjectSource,
+        [Parameter(Mandatory = $true)]
+        [string]$newSourceCode,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force
+    )
+    If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+        Write-Warning -Message "Somehow there is not a valid token confirmed."
+        Break
+    }
+    $Error.Clear()
+    Try {
+        [string]$sourceCode = $newSourceCode | ConvertFrom-Json -Depth 100 | ConvertTo-Json
+    }
+    Catch {
+        [string]$Message = $_.Exception.Message
+        Write-Warning -Message "ConvertFrom-Json/ConvertTo-Json failed to validate the provided source code string ($newSourceCode) due to [$Message]."
+        Break
+    }
+    [string]$command = '/codeRepositoryObject/updateSourceCode'
+    [hashtable]$parameters = @{}
+    $parameters.Add('Command', $command)
+    $parameters.Add('Method', 'POST')
+    $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+    If ($anow_session.NotSecure -eq $true) {
+        $parameters.Add('NotSecure', $true)
+    }
+    [string]$ObjectSource_id = $ObjectSource.id
+    [string]$ObjectSource_domain = $ObjectSource.domain
+    [string]$ObjectSource_rootId = $ObjectSource_id -split '\|' | Select-Object -Last 1
+    If ($ObjectSource_rootId.Length -eq 0) {
+        Write-Warning -Message "Somehow the root Id of the source code's object could not be determined. Please look into this."
+        Break
+    }
+    [string]$ObjectSource_rootFullId = ('[' + $ObjectSource_domain + ']' + $ObjectSource_rootId)
+    Write-Verbose -Message "Derived the full root id of the source code object as $ObjectSource_rootFullId"
+    If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ObjectSource_rootId)")) -eq $true) {
+        ## Begin warning ##
+        ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
+        <#
+            $Error.Clear()
+            Try {
+                [boolean]$object_exists = ($null -eq ())
+            }
+            Catch {
+            }
+            If ($object_exists -ne $true) {
+                Write-Warning -Message "The object couldn't be verified. Please check into this."
+                Break
+            }
+            #>
+        ## End warning ##
+        [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+        $BodyMetaData.'id' = $ObjectSource_rootFullId
+        $BodyMetaData.'domainClassName' = $ObjectSource.domainClassName
+        $BodyMetaData.'sourceCode' = $sourceCode
+        $BodyMetaData.'_operationType' = 'custom'
+        $BodyMetaData.'_operationId' = 'updateSourceCode'
+        $BodyMetaData.'_textMatchStyle' = 'exact'
+        $BodyMetaData.'_dataSource' = 'CodeRepositoryObjectDataSource'
+        $BodyMetaData.'isc_metaDataPrefix' = '_'
+        $BodyMetaData.'isc_dataFormat' = 'json'
+        [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+        If ($null -eq $parameters.Body) {
+            $parameters.Add('Body', $Body)
+        }
+        Else {
+            $parameters.Body = $Body
+        }
+        $Error.Clear()
+        Try {
+            [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$ObjectSource_rootId] due to [$Message]."
+            Break
+        }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+        }
+        Write-Verbose -Message "The source code for [$ObjectSource_rootId] was updated"
+    }
+}
+
+Function Edit-AutomateNOWCodeRepositoryObjectSource {
+    <#
+    .SYNOPSIS
+    (Windows-only for now) - Acts as a front-end to other functions for editing the source code with your changes for an object from an AutomateNOW! instance.
+
+    .DESCRIPTION
+    (Windows-only for now) - Acts as a front-end to other functions for editing the source code with your changes for an object from an AutomateNOW! instance.
+
+    .PARAMETER ObjectSource
+    The [ANOWCodeRepositoryObjectSourceCode] object containin the source code you wish to update. Use Get-AutomateNOWCodeRepositoryObjectSource to retrieve this.
+
+    .INPUTS
+    ONLY [ANOWCodeRepositoryObjectSourceCode] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    A verbose message indicating success otherwise there is no output.
+
+    .EXAMPLE
+    Edits the source code of a Stock object
+
+    $stock = Get-AutomateNOWStock -Id 'Stock1'
+    $stock_source = Get-AutomateNOWCodeRepositoryObjectSource -Stock $stock
+    $stock_source | Edit-AutomateNOWCodeRepositoryObjectSource
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    This function only works with Windows and uses Notepad (for now). You will need to confirm your changes AFTER you close the text editor.
+
+    Not all objects are supported yet.
+
+    #>
+
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [ANOWCodeRepositoryObjectSourceCode]$ObjectSource
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+    }
+    Process {
+        If ($_.Id.Length -gt 0) {
+            [ANOWCodeRepositoryObjectSourceCode]$ObjectSource = $_
+        }
+        [string]$ObjectSource_id = $ObjectSource.id
+        [string]$ObjectSource_domain = $ObjectSource.domain
+        [string]$ObjectSource_rootId = $ObjectSource_id -split '\|' | Select-Object -Last 1
+        If ($ObjectSource_rootId.Length -eq 0) {
+            Write-Warning -Message "Somehow the root Id of the source code's object could not be determined. Please look into this."
+            Break
+        }
+        [string]$ObjectSource_rootFullId = ('[' + $ObjectSource_domain + ']' + $ObjectSource_rootId)
+        Write-Verbose -Message "Derived the full root id of the source code object as $ObjectSource_rootFullId"
+        [string]$sourceCode = $ObjectSource.sourceCode
+        If ($sourceCode.Length -eq 0) {
+            Write-Warning -Message "Somehow the source code is empty (while editing the source code of $ObjectSource_rootFullId). Please look into this."
+            Break
+        }
+        [string]$temp_dir = $env:TEMP
+        [int64]$current_unixtime = [int64](((Get-Date).ToUniversalTime() - (Get-Date -Date '1970/1/1')) | Select-Object -ExpandProperty TotalMilliseconds)
+        [string]$temp_filename = "$temp_dir\Edit-AutomateNOWCodeRepositoryObjectSource-$current_unixtime.txt"
+        $Error.Clear()
+        Try {
+            [System.IO.FileSystemInfo]$temp_fileinfo = New-Item -Path "$temp_filename"
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "New-Item failed to create the temporary file [$temp_filename] (while editing the source code of $ObjectSource_rootFullId) due to [$Message]."
+            Break
+        }
+        $Error.Clear()
+        Try {
+            $temp_fileinfo | Set-Content -Value $sourceCode
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Set-Content failed (on the first pass) to modify the temporary file [$temp_filename] (while editing the source code of $ObjectSource_rootFullId) due to [$Message]."
+            Break
+        }
+        $Error.Clear()
+        Try {
+            [System.IO.FileSystemInfo]$temp_fileinfo = Get-Item -Path "$temp_filename"
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-Item failed to read the newly modified temporary file [$temp_filename] (while editing the source code of $ObjectSource_rootFullId) due to [$Message]."
+            Break
+        }
+        [string]$textEditorPath = "$env:windir\notepad.exe"
+        $Error.Clear()
+        Try {
+            Start-Process -FilePath "$textEditorPath" -ArgumentList $temp_filename -Wait
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Start-Process failed to open the temporary file [$temp_filename] (while editing the source code of $ObjectSource_rootFullId) due to [$Message]."
+            Break
+        }
+        $Error.Clear()
+        Try {
+            [System.IO.FileSystemInfo]$modified_temp_fileinfo = Get-Item -Path "$temp_filename"
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "New-Item failed to create the temporary file [$temp_filename] (while editing the source code of $ObjectSource_rootFullId) due to [$Message]."
+            Break
+        }
+        If ($modified_temp_fileinfo.LastWriteTimeUtc -gt $temp_fileinfo.LastWriteTimeUtc) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Are you sure you want to apply the changes you've made to $($ObjectSource_rootFullId?)")) -eq $true) {
+                [string]$newSourceCode = $modified_temp_fileinfo | Get-Content
+                If ($newSourceCode.Length -eq 0) {
+                    Write-Warning -Message "Somehow (while editing the source code of $ObjectSource_rootFullId) the temporary file ($temp_filename) containing the source code being edited was empty. Please look into this."
+                    Break
+                }
+                $Error.Clear()
+                Try {
+                    Update-AutomateNOWCodeRepositoryObjectSource -ObjectSource $ObjectSource -newSourceCode $newSourceCode -Force
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Update-AutomateNOWCodeRepositoryObjectSource failed to update the source code of $ObjectSource_rootFullId using the file [$temp_filename] due to [$Message]."
+                    Break
+                }
+            }
+        }
+        Else {
+            Write-Warning -Message "The source code file was not modified for $ObjectSource_rootFullId"
+        }
+        $Error.Clear()
+        Try {
+            $temp_fileinfo | Remove-Item -Force
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Remove-Item failed to remove the temporary file [$temp_filename] (while editing the source code of $ObjectSource_rootFullId) due to [$Message]."
+            Break
+        }
+        Write-Debug -Message "Successfully deleted the temporary file [$temp_filename]"
+    }
+    End {
+
+    }
+}
+
+#endregion
+
 #Region - CodeRepository Tags
 
 Function Get-AutomateNOWCodeRepositoryTag {
@@ -11663,6 +12262,11 @@ Function Get-AutomateNOWContextVariable {
     .EXAMPLE
     Uses the pipe to retrieve the context variables from a set of RunIDs
     1913730, 1924427 | Get-AutomateNOWContextVariable | Export-AutomateNOWContextVariable
+
+    .EXAMPLE
+    Advanced one-liner that, executes a Workflow Template named 'Workflow01' and then reads the Context Variables from the first dependent Workflow that was executed from it. Note carefully the use of the -ItemsOnly parameter and the exitCode property. You will need to experiment with this to suit your specific scenario.
+
+    Get-AutomateNOWWorkflowTemplate -Id 'Workflow01' | Start-AutomateNOWWorkflowTemplate -TaskParameters @{"parameter123" = 'abc'} -UseAutomaticName | Select-Object -ExpandProperty Id | Get-AutomateNOWWorkflow -ItemsOnly | Select-Object -ExpandProperty exitCode | Get-AutomateNOWWorkflow -ItemsOnly | Select-Object -ExpandProperty Id | Get-AutomateNOWContextVariable | Select-Object -ExpandProperty value | ConvertFrom-Json | Select-Object -ExpandProperty result
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
@@ -16798,7 +17402,7 @@ Function Show-AutomateNOWEndpointType {
 
 #endregion
 
-#Region - Resource Event Log
+#Region - Event Log (Processing)
 
 Function Get-AutomateNOWProcessingEventLog {
     <#
@@ -16813,10 +17417,10 @@ Function Get-AutomateNOWProcessingEventLog {
 
     .PARAMETER Agent
     Mandatory (ONLY IF AGENT CATEGORY IS SELECTED) [ANOWAgent] object that corresponds to the Agent logs you wish to retrieve.
-    
+
     .PARAMETER Agent
     Optional (ONLY IF NODE CATEGORY IS SELECTED) [ANOWNode] object that corresponds to the Node logs you wish to retrieve.
-    
+
     .PARAMETER sortBy
     Optional string parameter to sort the results by. Valid choices are: 'dateCreated', 'timestamp', 'parentProcessingId', 'processingId', 'rootProcessingId'
 
@@ -16844,7 +17448,7 @@ Function Get-AutomateNOWProcessingEventLog {
     Gets the first 100 Server Node Processing Events (i.e. log entries) for a specied node named Node1
 
     Get-AutomateNOWProcessingEventLog -category SERVER_NODE -Node (Get-AutomateNOWNode -Id 'Node1')
-    
+
     .EXAMPLE
     Gets the first 100 Resource Processing Events (i.e. log entries) in the domaim
 
@@ -16873,7 +17477,7 @@ Function Get-AutomateNOWProcessingEventLog {
     The SERVER_NODE category is available in the UI by selecting the Nodes tab followed by Event Log.
 
     The RESOURCE category is available in the UI by selecting the Resources tab followed by Event Log.
-    
+
     The AGENT category is available in the UI when an Agent object has been opened for editing. Click the heartbeat icon in the upper right to view the log. This category is limited to only events from this particular Agent.
 
     The DOMAIN category is available in the UI when a Domain object has been opened for editing. Click the heartbeat icon in the upper right to view the log. This category is limited to only events from this particular Domain. If you want to retrieve the log from other domains you'll need to switch domains with Switch-AutomateNOWDomain.
@@ -17093,6 +17697,7 @@ Function Export-AutomateNOWProcessingEventLog {
 }
 
 #endregion
+
 #Region - Folders
 
 Function Get-AutomateNOWFolder {
@@ -31231,6 +31836,9 @@ Function Get-AutomateNOWTaskTemplate {
     .PARAMETER Tags
     Optional string array of tags to filter by. Note that for now operator is 'containsAny', not 'containsAll'.
 
+    .PARAMETER Folder
+    Optional string to filter by Folder name.
+
     .INPUTS
     Accepts a string representing the simple id of the Task Template from the pipeline or individually (but not an array).
 
@@ -31301,7 +31909,12 @@ Function Get-AutomateNOWTaskTemplate {
         [Parameter(Mandatory = $False, ParameterSetName = 'taskType')]
         [Parameter(Mandatory = $False, ParameterSetName = 'monitorType')]
         [Parameter(Mandatory = $False, ParameterSetName = 'sensorType')]
-        [string[]]$Tags
+        [string[]]$Tags,
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $False, ParameterSetName = 'taskType')]
+        [Parameter(Mandatory = $False, ParameterSetName = 'monitorType')]
+        [Parameter(Mandatory = $False, ParameterSetName = 'sensorType')]
+        [string]$Folder
     )
     Begin {
         If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
@@ -31351,11 +31964,28 @@ Function Get-AutomateNOWTaskTemplate {
             }
             $Body.'criteria2' = '{"fieldName":"serverNodeType","operator":"notNull"}'
             If ($Tags.count -eq 1) {
-                $Body.'criteria3' = ('{"fieldName":"tags","operator":"containsAny","value":"' + $tags + '"}')
+                If ($null -eq (Get-AutomateNOWTag -Id $Tags)) {
+                    Write-Warning -Message "The tag [$Tags] does not appear to exist. Please only use existing Tags when filtering."
+                    Break
+                }
+                $Body.'criteria3' = ('{"fieldName":"tags","operator":"containsAny","value":"' + $Tags + '"}')
             }
             ElseIf ($Tags.count -gt 1) {
-                [string]$tags_json = $tags | Sort-Object -Unique | ConvertTo-JSON -Compress
+                ForEach ($tag in $Tags) {
+                    If ($null -eq (Get-AutomateNOWTag -Id $tag)) {
+                        Write-Warning -Message "The tag [$tag] does not appear to exist. Please only use existing Tags when filtering."
+                        Break
+                    }
+                }
+                [string]$tags_json = $Tags | Sort-Object -Unique | ConvertTo-JSON -Compress
                 $Body.'criteria3' = ('{"fieldName":"tags","operator":"containsAny","value":' + $tags_json + '}')
+            }
+            If ($Folder.Length -gt 0) {
+                If ($null -eq (Get-AutomateNOWFolder -Id $Folder)) {
+                    Write-Warning -Message "The folder [$Folder] does not appear to exist. Please only use existing Folders when filtering."
+                    Break
+                }
+                $Body.'criteria4' = ('{"fieldName":"folder","operator":"equals","value":"' + $folder + '"}')
             }
         }
         $Body.'_dataSource' = 'ProcessingTemplateDataSource'
@@ -38264,6 +38894,9 @@ Function Get-AutomateNOWWorkflow {
     .PARAMETER processingStatus
     Optional string to apply advanced criteria for filtering based on the status of the Task. Valid choices are: WAITING, READY, EXECUTING, COMPLETED, FAILED. Note: This function is limited in that you can only filter by one processing status whereas in the console you can specify an array.
 
+    .PARAMETER template
+    Optional string to apply advanced criteria for filtering based on the name of the Processing Template from which this Workflow was launched.
+
     .PARAMETER startRow
     Integer to indicate the row to start from. This is intended for when you need to paginate the results. Default is 0.
 
@@ -38292,6 +38925,10 @@ Function Get-AutomateNOWWorkflow {
     Gets the first 1000 workflows (or less) that are executing
     Get-AutomateNOWWorkFlow -startRow 0 -endRow 1000 -processingStatus EXECUTING
 
+    .EXAMPLE
+    Gets the first 1000 workflows that were launched from a Workflow Template named 'Workflow_Template1 from the Acme domain'
+    Get-AutomateNOWWorkflow -template '[Acme]Workflow_Template1' -startRow 0 -endRow 1000
+
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
 
@@ -38309,6 +38946,9 @@ Function Get-AutomateNOWWorkflow {
         [ANOWWorkflow_workflowType]$Type,
         [Parameter(Mandatory = $False, ParameterSetName = 'All')]
         [ANOWTask_processingStatus]$ProcessingStatus,
+        [Parameter(Mandatory = $False, ParameterSetName = 'All', HelpMessage = "Enter the name of the processing template with the domain prefixed (e.g. [Domain]Template)")]
+        [ValidateScript({ $_ -match '\[.{1,}]{1,}' })]
+        [string]$template,
         [Parameter(Mandatory = $False, ParameterSetName = 'All')]
         [Parameter(Mandatory = $false, ParameterSetName = 'Id')]
         [int32]$startRow = 0,
@@ -38355,6 +38995,9 @@ Function Get-AutomateNOWWorkflow {
             }
             ElseIf ($ItemsOnly -eq $true -and $Id -gt 0) {
                 $Body.'criteria2' = '{"fieldName":"parent","value":"' + $Id + '","operator":"equals"}'
+            }
+            ElseIf ($template.Length -gt 0) {
+                $Body.'criteria2' = ('{"fieldName":"template","operator":"equals","value":"' + $template + '"}')
             }
             Else {
                 $Error.Clear()
@@ -43194,7 +43837,7 @@ Function Rename-AutomateNOWWorkspace {
 
 #EndRegion
 
-#Region Lookup Tables
+#Region = Lookup Tables =
 
 Function Resolve-AutomateNOWTaskType2ServerNodeType {
     [OutputType([string[]])]
