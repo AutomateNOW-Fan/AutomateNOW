@@ -37,6 +37,11 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 <br/><br/>
 ## Change Log 📝
 
+## 1.0.25
+- Added new functions: `Copy-AutomateNOWEvent`, `Copy-AutomateNOWMetric`, `Copy-AutomateNOWPhysicalResource`, `Export-AutomateNOWCodeRepositoryObjectSource`, `Export-AutomateNOWEvent`, `Export-AutomateNOWMetric`, `Export-AutomateNOWPhysicalResource`, `Get-AutomateNOWEvent`, `Get-AutomateNOWMetric`, `Get-AutomateNOWPhysicalResource`, `New-AutomateNOWEvent`, `New-AutomateNOWMetric`, `New-AutomateNOWPhysicalResource`, `Pop-AutomateNOWLoadBalancerNode`, `Push-AutomateNOWLoadBalancerNode`, `Remove-AutomateNOWEvent`, `Remove-AutomateNOWMetric`, `Remove-AutomateNOWPhysicalResource`, `Rename-AutomateNOWEvent`, `Rename-AutomateNOWMetric`, `Rename-AutomateNOWPhysicalResource`, `Set-AutomateNOWEvent`, `Set-AutomateNOWMetric`, `Set-AutomateNOWPhysicalResource`
+- Optimized the classes and enums reducing the Classes.psm1 file by 33% 😲
+- Fixed a typo in `Set-AutomateNOWTaskTemplate` (occurred when setting the Node)
+
 ## 1.0.24
 - Added new functions: `Get-AutomateNOWCodeRepositoryObjectSource`, `Edit-AutomateNOWCodeRepositoryObjectSource`, `Update-AutomateNOWCodeRepositoryObjectSource`
 - Added the `-template` parameter to `Get-AutomateNOWWorkflow`
@@ -267,24 +272,24 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 ![image](feature-chart.png)
 
 ### Where are the connection details stored in my PowerShell session after successfully authenticating?
->All of the information about your session will be in the global variable `$anow_session`
+>Check the global variable `$anow_session`
 
 ### Which version of PowerShell do I need?
 >This module is compatible with both `Windows PowerShell 5.1` and `PowerShell Core 7.x`
 
 ### Do the functions in this module utilize the PowerShell pipeline?
->Yes, except for the `Rename` commands (functions).
+>Yes, except where it doesn't make sense. Otherwise, this module is designed to take advantage of the pipeline.
 
 ### I imported the AutomateNOW module into my PowerShell session. What's next?
 >Try `Connect-AutomateNOW -?`. Also try `Get-Command -Module AutomateNOW`.
 
 ### How can I specify the domain with `Connect-AutomateNOW` if I don't know what the available domains are?
->Use `Connect-AutomateNOW` without the -Domain parameter to discover available domains to your account. Then run it again with the -Domain parameter.
+>Use `Connect-AutomateNOW` without the `-Domain` parameter to discover available domains to your account. Then run it again with the -Domain parameter.
 
 ### How do I use a particular command? Where's the help?
 >Type the name of the command followed by -?.
 
-### Why don't the functions use the same exact verbs as the ANOW console? (e.g. Send-AutomateNOWCodeRepository instead of Push-AutomateNOWCodeRepository)
+### Why don't these functions share the identical verbs as the ANOW UI? (e.g. "Suspend" instead of "Hold")
 >As a best practice this module uses only approved verbs that means sometimes the verbs won't match. See https://learn.microsoft.com/en-us/powershell/scripting/developer/cmdlet/approved-verbs-for-windows-powershell-commands for more information.
 
 ### Why do I only receive 100 results when using the Get commands? I should be getting more results...
@@ -302,10 +307,10 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 ### Why are some of the columns in the export .csv containing `[System.Object]`?
 >All of the Export functions are preliminary. Each export function in this module needs to be fine-tuned to ensure each column is property exported. This is on the wish list.
 
-### How to add a Task Template to a Workflow?
+### How do I add a Task Template to a Workflow Template?
 >Use Add-AutomateNOWWorkflowTemplateItem
 
-### How to change domain?
+### How do I change my domain?
 >Use `Switch-AutomateNOWDomain`
 
 ### How to retrieve Tasks and Workflows by their RunId?
@@ -337,8 +342,23 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 > Step 3 - Synchronize the local and remote repositories - Do not forget this step! 😅
 > `Sync-AutomateNOWCodeRepository` -CodeRepository $repository -Force
 
-### How do I get all 5 types of Processing Event Logs and where exactly are they located in the ANOW UI?
+### Where are all 5 types of Processing Event Logs in the ANOW UI? I can't find all of them in the UI.
 >Use `Get-Help Get-AutomateNOWProcessingEventLog -Full` to see the detailed help and examples.
+
+### I want to set all values in my Metric to null (i.e. to reset them). How can I do this?
+>It's a two-step process. In any order:
+>1) Run `Set-AutomateNOWMetric` with the `-UnsetValue` parameter
+>2) Run `Set-AutomateNOWMetric` with these parameters: `-UnsetValueUnit` `-UnsetMinValue` `-UnsetVeryLowThreshold` `-UnsetLowThreshold` `-UnsetHighThreshold` `-UnsetVeryHighThreshold` `-UnsetMaxValue`
+
+### What does the -Detailed parameter provide? Why should I use that?
+> Calendars will include: calculatedDates
+> Locks will include: lockState
+> Stocks will include: (unknown)
+> Time Windows will include: (unknown)
+> Variables will include: historicalValues
+
+### How do I rearrange the sort orders of the child nodes in my load balancer node?
+> Refer to `Push-AutomateNOWLoadBalancerNode` and `Push-AutomateNOWLoadBalancerNode`
 
 ## Functions 🛠
 
@@ -390,9 +410,15 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Copy-AutomateNOWEndpoint`
 
+`Copy-AutomateNOWEvent`
+
 `Copy-AutomateNOWLock`
 
+`Copy-AutomateNOWMetric`
+
 `Copy-AutomateNOWNode`
+
+`Copy-AutomateNOWPhysicalResource`
 
 `Copy-AutomateNOWResultMapping`
 
@@ -432,6 +458,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Export-AutomateNOWCodeRepository`
 
+`Export-AutomateNOWCodeRepositoryObjectSource`
+
 `Export-AutomateNOWContextVariable`
 
 `Export-AutomateNOWDataSource`
@@ -442,13 +470,19 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Export-AutomateNOWEndpoint`
 
+`Export-AutomateNOWEvent`
+
 `Export-AutomateNOWFolder`
 
 `Export-AutomateNOWIcon`
 
 `Export-AutomateNOWLock`
 
+`Export-AutomateNOWMetric`
+
 `Export-AutomateNOWNode`
+
+`Export-AutomateNOWPhysicalResource`
 
 `Export-AutomateNOWProcessingEventLog`
 
@@ -520,11 +554,17 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Get-AutomateNOWEndpoint`
 
+`Get-AutomateNOWEvent`
+
 `Get-AutomateNOWFolder`
 
 `Get-AutomateNOWLock`
 
+`Get-AutomateNOWMetric`
+
 `Get-AutomateNOWNode`
+
+`Get-AutomateNOWPhysicalResource`
 
 `Get-AutomateNOWProcessingEventLog`
 
@@ -604,11 +644,17 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `New-AutomateNOWEndpoint`
 
+`New-AutomateNOWEvent`
+
 `New-AutomateNOWFolder`
 
 `New-AutomateNOWLock`
 
+`New-AutomateNOWMetric`
+
 `New-AutomateNOWNode`
+
+`New-AutomateNOWPhysicalResource`
 
 `New-AutomateNOWResultMapping`
 
@@ -642,9 +688,13 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `New-WebkitBoundaryString`
 
+`Pop-AutomateNOWLoadBalancerNode`
+
 `Protect-AutomateNOWEncryptedString`
 
 `Publish-AutomateNOWCodeRepository`
+
+`Push-AutomateNOWLoadBalancerNode`
 
 `Read-AutomateNOWIcon`
 
@@ -678,11 +728,17 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Remove-AutomateNOWEndpoint`
 
+`Remove-AutomateNOWEvent`
+
 `Remove-AutomateNOWFolder`
 
 `Remove-AutomateNOWLock`
 
+`Remove-AutomateNOWMetric`
+
 `Remove-AutomateNOWNode`
+
+`Remove-AutomateNOWPhysicalResource`
 
 `Remove-AutomateNOWResultMapping`
 
@@ -730,9 +786,15 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Rename-AutomateNOWEndpoint`
 
+`Rename-AutomateNOWEvent`
+
 `Rename-AutomateNOWLock`
 
+`Rename-AutomateNOWMetric`
+
 `Rename-AutomateNOWNode`
+
+`Rename-AutomateNOWPhysicalResource`
 
 `Rename-AutomateNOWResultMapping`
 
@@ -800,11 +862,17 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Set-AutomateNOWEndpoint`
 
+`Set-AutomateNOWEvent`
+
 `Set-AutomateNOWFolder`
 
 `Set-AutomateNOWLock`
 
+`Set-AutomateNOWMetric`
+
 `Set-AutomateNOWPassword`
+
+`Set-AutomateNOWPhysicalResource`
 
 `Set-AutomateNOWScheduleTemplate`
 
@@ -851,6 +919,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Skip-AutomateNOWWorkflow`
 
 `Skip-AutomateNOWWorkflowTemplate`
+
+`Start-AutomateNOWEvent`
 
 `Start-AutomateNOWNode`
 
