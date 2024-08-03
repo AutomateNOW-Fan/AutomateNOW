@@ -358,7 +358,7 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 > Variables will include: historicalValues
 
 ### How do I rearrange the sort orders of the child nodes in my load balancer node?
-> Refer to `Push-AutomateNOWLoadBalancerNode` and `Push-AutomateNOWLoadBalancerNode`
+> Refer to `Push-AutomateNOWLoadBalancerNode` and `Pop-AutomateNOWLoadBalancerNode`
 
 ## Functions 🛠
 
