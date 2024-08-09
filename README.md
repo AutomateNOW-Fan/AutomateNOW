@@ -38,19 +38,19 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 ## Change Log 📝
 
 ## 1.0.26
-- Bump compatibility to ANOW version 3.3.1.81 HF0
+- Bump compatibility to _ANOW version 3.3.1.81 HF0_
 - Added new functions: `Add-AutomateNOWNotificationGroupMember`, `Copy-AutomateNOWNotificationChannel`, `Copy-AutomateNOWNotificationGroup`, `Export-AutomateNOWNotificationChannel`, `Export-AutomateNOWNotificationGroupMember`, `Export-AutomateNOWNotificationGroup`, `Export-AutomateNOWNotification`, `Get-AutomateNOWNotificationChannel`, `Get-AutomateNOWNotificationGroupMember`, `Get-AutomateNOWNotificationGroup`, `Get-AutomateNOWNotification`, `New-AutomateNOWNotificationChannel`, `New-AutomateNOWNotificationGroup`, `Remove-AutomateNOWNotificationChannel`, `Remove-AutomateNOWNotificationGroupMember`, `Remove-AutomateNOWNotificationGroup`, `Remove-AutomateNOWNotification`, `Remove-AutomateNOWWorkflowTemplateItem`, `Rename-AutomateNOWNotificationChannel`, `Rename-AutomateNOWNotificationGroup`, `Set-AutomateNOWNotificationChannel`, `Set-AutomateNOWNotificationGroupMember`, `Set-AutomateNOWNotificationGroup`
-- Removed functions: `Set-AutomateNOWTask`
-- Fixed a missing class property (delayedStartTime) that prevented the reading of ScheduleTemplate and WorkflowTemplate items.
+- Removed function: `Set-AutomateNOWTask`
+- Restored missing class property _delayedStartTime which impacted `Read-AutomateNOWScheduleTemplateItem` and `Read-AutomateNOWWorkflowTemplateItem`
 - Fixed pipeline capability with `Read-AutomateNOWScheduleTemplateItem` and `Read-AutomateNOWWorkflowTemplateItem`
 - Fixed an issue with `Get-AutomateNOWContextVariable`
-- Repaired the -Folder and -Tags parameter for `Start-AutomateNOWScheduleTemplate`
-- Fixed an issue with `Connect-AutomateNOW` that only manifested if -User was used alone without -Pass
-- Restricted `Connect-AutomateNOW` to use only secure strings for passwords
-- Ensured that all functions stop whenever a non-zero status from the ANOW API is received
+- Repaired the `-Folder` and `-Tags` parameter on `Start-AutomateNOWScheduleTemplate`
+- Fixed an issue with `Connect-AutomateNOW` that only manifested if `-User` was used without `-Pass`
+- Enforced `Connect-AutomateNOW` to use only secure strings for passwords
+- Ensured that all functions stop 🛑 whenever a non-zero status from the ANOW API is received
 - Added the `-Force` parameter to `Edit-AutomateNOWCodeRepositoryObjectSource`
 - Added the `-VerboseMode` parameter to `Set-AutomateNOWTaskTemplate`, `Set-AutomateNOWWorkflowTemplate` ...?
-- Added the `-InactiveUsers` parameter to `Get-AutomateNOWUser` (Experimental)
+- Added the `-InactiveUsers` parameter to `Get-AutomateNOWUser` (Experimental 🧪)
 - Added the `-TaskTemplateId` parameter to `Start-AutomateNOWTaskTemplate` (allows specifying the Task Template by name instead of object)
 - Added the `-ScheduleTemplateId` parameter to `Start-AutomateNOWScheduleTemplate` (allows specifying the Schedule Template by name instead of object)
 - Added the `-WorkflowTemplateId` parameter to `Start-AutomateNOWWorkflowTemplate` (allows specifying the Workflow Template by name instead of object)
@@ -67,7 +67,7 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 - Added the `-folder` parameter to `Get-AutomateNOWTaskTemplate`
 
 ## 1.0.23
-- Bump compatibility to ANOW version 3.3.1.80 HF0
+- Bump compatibility to _ANOW version 3.3.1.80 HF0_
 - Added new functions: `Dismount-AutomateNOWNode`, `Export-AutomateNOWContextVariable`, `Export-AutomateNOWProcessingEventLog`, `Get-AutomateNOWContextVariable`, `Get-AutomateNOWProcessingEventLog`, `Rename-AutomateNOWAdhocReport`, `Rename-AutomateNOWAgent`, `Rename-AutomateNOWApproval`, `Rename-AutomateNOWDataSource`, `Rename-AutomateNOWNode`, `Resume-AutomateNOWNode`, `Skip-AutomateNOWNode`, `Suspend-AutomateNOWNode`
 - Added the `-defaultDomain` parameter to `Set-AutomateNOWUser`
 - Added support for "Sensor", "Monitor" and "Service Manager" Task types in `New-AutomateNOWTaskTemplate`
@@ -79,7 +79,7 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 - Removed references to WorkSpaces in all functions except for `New-AutomateNOWTaskTemplate` and `New-AutomateNOWWorkflowTemplate`
 
 ## 1.0.22
-- Bump compatibility to ANOW version 3.3.1.79 HF2
+- Bump compatibility to _ANOW version 3.3.1.79 HF2_
 - Added new functions: `Clear-AutomateNOWDomain`, `Copy-AutomateNOWDomain`, `Copy-AutomateNOWWorkspace`, `New-AutomateNOWDomain`, `Remove-AutomateNOWDomain`, `Rename-AutomateNOWCalendar`, `Rename-AutomateNOWDomain`, `Rename-AutomateNOWEndpoint`, `Rename-AutomateNOWResultMapping`, `Rename-AutomateNOWSemaphore`, `Rename-AutomateNOWWorkspace`, `Resolve-AutomateNOWMonitorType2ServerNodeType`, `Resolve-AutomateNOWSensorType2ServerNodeType`, `Resume-AutomateNOWDomain`, `Set-AutomateNOWDomain`, `Suspend-AutomateNOWDomain`, `Sync-AutomateNOWDomainResource`, `Sync-AutomateNOWDomainServerNode`
 - Removed functions: `Add-AutomateNOWProcessingTimeTrigger`, `Copy-AutomateNOWUser`
 - Fixed a parameter issue with `Start-AutomateNOWWorkflowTemplate` around the naming of the executed Workflow
@@ -119,7 +119,7 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 - Added new functions: `Copy-AutomateNOWNode`, `Copy-AutomateNOWResultMapping`, `Copy-AutomateNOWUser`, `Get-AutomateNOWSemaphoreTimestamp`, `New-AutomateNOWServerDayTimestamp`, `New-AutomateNOWUser`, `Remove-AutomateNOWUser`, `Set-AutomateNOWSemaphoreTimestamp`, `Test-AutomateNOWUserPassword`
 
 ## 1.0.17
-- Bump compatibility to ANOW version 3.3.1.78 HF2
+- Bump compatibility to _ANOW version 3.3.1.78 HF2_
 - Added new functions: `Add-AutomateNOWProcessingTimeTrigger`, `Copy-AutomateNOWAdhocReport`, `Copy-AutomateNOWAgent`, `Copy-AutomateNOWCalendar`, `Copy-AutomateNOWScheduleTemplate`, `Copy-AutomateNOWSemaphore`, `Export-AutomateNOWAdhocReport`, `Export-AutomateNOWAgent`, `Export-AutomateNOWProcessingTimeTrigger`, `Export-AutomateNOWSchedule`, `Export-AutomateNOWScheduleTemplate`, `Export-AutomateNOWSemaphore`, `Get-AutomateNOWAdhocReport`, `Get-AutomateNOWAgent`, `Get-AutomateNOWProcessingTimeTrigger`, `Get-AutomateNOWSchedule`, `Get-AutomateNOWScheduleTemplate`, `Get-AutomateNOWSemaphore`, `Import-AutomateNOWLocalTimeZone`, `Invoke-AutomateNOWAdhocReport`, `New-AutomateNOWAdhocReport`, `New-AutomateNOWAgent`, `New-AutomateNOWScheduleTemplate`, `New-AutomateNOWSemaphore`, `Remove-AutomateNOWAdhocReport`, `Remove-AutomateNOWAgent`, `Remove-AutomateNOWProcessingTimeTrigger`, `Remove-AutomateNOWSchedule`, `Remove-AutomateNOWScheduleTemplate`, `Remove-AutomateNOWSemaphore`, `Rename-AutomateNOWScheduleTemplate`, `Restart-AutomateNOWSchedule`, `Resume-AutomateNOWSchedule`, `Resume-AutomateNOWScheduleTemplate`, `Set-AutomateNOWAdhocReport`, `Set-AutomateNOWAgent`, `Set-AutomateNOWScheduleTemplate`, `Set-AutomateNOWSemaphore`, `Skip-AutomateNOWSchedule`, `Skip-AutomateNOWScheduleTemplate`, `Start-AutomateNOWScheduleTemplate`, `Stop-AutomateNOWSchedule`, `Suspend-AutomateNOWSchedule`, `Suspend-AutomateNOWScheduleTemplate`
 - Added new filtering parameter -processingStatus to `Get-AutomateNOWTask` and `Get-AutomateNOWWorkflow`
 - Added new filtering parameter -Tags to `Get-AutomateNOWTaskTemplate`
@@ -127,7 +127,7 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 - Renamed `Protect-AutomateNOWAuthenticationString` to `Protect-AutomateNOWEncryptedString`
 
 ## 1.0.16
-- Bump compatibility to ANOW version 3.3.1.76 HF2
+- Bump compatibility to _ANOW version 3.3.1.76 HF2_
 - Added new functions: `Copy-AutomateNOWDataSource`
 - Added preliminary support for the new Notes feature
 - Added experimental parameter `-All` to `Get-AutomateNOWDataSourceItem`
@@ -151,7 +151,7 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 - `New-AutomateNOWAuthenticationEncryptedString` was renamed to `Protect-AutomateNOWAuthenticationString`
 
 ## 1.0.14
-- Bump compatibility to ANOW version 3.3.1.75 HF3
+- Bump compatibility to _ANOW version 3.3.1.75 HF3_
 - Added new functions: `Add-AutomateNOWResultMappingRule` `Export-AutomateNOWResultMapping` `Get-AutomateNOWResultMapping` `New-AutomateNOWResultMapping` `New-AutomateNOWResultMappingRule` `New-AutomateNOWResultMappingRuleCondition` `New-AutomateNOWResultMappingRuleConditionCriteria` `Remove-AutomateNOWResultMapping` `Remove-AutomateNOWTask` `Remove-AutomateNOWWorkflow` `Restart-AutomateNOWTask` `Restart-AutomateNOWWorkflow` `Resume-AutomateNOWTask` `Resume-AutomateNOWWorkflow` `Set-AutomateNOWDataSource` `Set-AutomateNOWTaskTemplate` `Skip-AutomateNOWTask` `Skip-AutomateNOWWorkflow` `Stop-AutomateNOWTask` `Stop-AutomateNOWWorkflow` `Suspend-AutomateNOWTask` `Suspend-AutomateNOWWorkflow`
 - Fixed an issue with JSON depth and `Get-AutomateNOWAuditlog`
 - `New-AutomateNOWTaskTemplate` will now differentiate between Internal Tasks, Service Manager Tasks and Standard Tasks
@@ -170,7 +170,7 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 - `Get-AutomateNOWUser` is now capable of retrieving all users (if permissions exist)
 
 ## 1.0.11
-- Bump compatibility to ANOW version 3.3.1.75 HF1
+- Bump compatibility to _ANOW version 3.3.1.75 HF1_
 - Added new functions: `Confirm-AutomateNOWTaskTemplate`, `Confirm-AutomateNOWWorkflowTemplate`, `Copy-AutomateNOWTaskTemplate`, `Export-AutomateNOWCodeRepository`, `Get-AutomateNOWCodeRepository`, `Rename-AutomateNOWTaskTemplate`, `Resolve-AutomateNOWTaskType2ServerNodeType`,`Resume-AutomateNOWTaskTemplate`, `Resume-AutomateNOWWorkflowTemplate`, `Skip-AutomateNOWTaskTemplate`, `Skip-AutomateNOWWorkflowTemplate`, `Start-AutomateNOWNode`, `Start-AutomateNOWTaskTemplate`, `Start-AutomateNOWWorkflowTemplate`, `Stop-AutomateNOWNode`, `Suspend-AutomateNOWTaskTemplate`, `Suspend-AutomateNOWWorkflowTemplate`
 - Improved the global session variable to use class objects (e.g. [ANOWTimeZone], [ANOWUser])
 - Enhanced the `Get-AutomatenowUser` function to fetch the full user details. If you don't know the username (e.g. using an access token) then use the -LoggedOnUser parameter.
@@ -206,7 +206,7 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 - Removed base class (this will be back after fine-tuning): [_ANOWAuditLogEntry_]
 
 ### 1.0.8
-- Bump compatibility to ANOW version 3.3.1.75 HF0
+- Bump compatibility to _ANOW version 3.3.1.75 HF0_
 - Added new functions: `Get-AutomateNOWAdhocReport`, `Get-AutomateNOWAuditLog`, `Get-AutomateNOWCalendar`, `Get-AutomateNOWOverview`, `Read-AutomateNOWTimeZone`
 - Replaced hard-coded query strings with properly defined URL parameter hashtables with the help of `ConvertTo-QueryString`
 - Fixed an issue with `Import-AutomateNOWIcon` exporting the .csv to the wrong location
@@ -255,7 +255,7 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 
 ### 1.0.0
 - Initial release (feedback requested)
-- Compatibile with ANOW version 3.2.1.69
+- Compatibile with _ANOW version 3.2.1.69_
 <br/><br/>
 ## Caution 🚸
 
