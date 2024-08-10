@@ -41,10 +41,10 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 - Bump compatibility to _ANOW version 3.3.1.81 HF0_
 - Added new functions: `Add-AutomateNOWNotificationGroupMember`, `Copy-AutomateNOWNotificationChannel`, `Copy-AutomateNOWNotificationGroup`, `Export-AutomateNOWNotificationChannel`, `Export-AutomateNOWNotificationGroupMember`, `Export-AutomateNOWNotificationGroup`, `Export-AutomateNOWNotification`, `Get-AutomateNOWNotificationChannel`, `Get-AutomateNOWNotificationGroupMember`, `Get-AutomateNOWNotificationGroup`, `Get-AutomateNOWNotification`, `New-AutomateNOWNotificationChannel`, `New-AutomateNOWNotificationGroup`, `Remove-AutomateNOWNotificationChannel`, `Remove-AutomateNOWNotificationGroupMember`, `Remove-AutomateNOWNotificationGroup`, `Remove-AutomateNOWNotification`, `Remove-AutomateNOWWorkflowTemplateItem`, `Rename-AutomateNOWNotificationChannel`, `Rename-AutomateNOWNotificationGroup`, `Set-AutomateNOWNotificationChannel`, `Set-AutomateNOWNotificationGroupMember`, `Set-AutomateNOWNotificationGroup`
 - Removed function: `Set-AutomateNOWTask`
-- Restored missing class property _delayedStartTime which impacted `Read-AutomateNOWScheduleTemplateItem` and `Read-AutomateNOWWorkflowTemplateItem`
+- Restored missing class property _delayedStartTime_ which impacted `Read-AutomateNOWScheduleTemplateItem` and `Read-AutomateNOWWorkflowTemplateItem`
 - Fixed pipeline capability with `Read-AutomateNOWScheduleTemplateItem` and `Read-AutomateNOWWorkflowTemplateItem`
 - Fixed an issue with `Get-AutomateNOWContextVariable`
-- Repaired the `-Folder` and `-Tags` parameter on `Start-AutomateNOWScheduleTemplate`
+- Repaired the `-Folder` and `-Tags` parameters on `Start-AutomateNOWScheduleTemplate`
 - Fixed an issue with `Connect-AutomateNOW` that only manifested if `-User` was used without `-Pass`
 - Enforced `Connect-AutomateNOW` to use only secure strings for passwords
 - Ensured that all functions stop 🛑 whenever a non-zero status from the ANOW API is received
