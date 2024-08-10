@@ -49,7 +49,7 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 - Enforced `Connect-AutomateNOW` to use only secure strings for passwords
 - Ensured that all functions stop 🛑 whenever a non-zero status from the ANOW API is received
 - Added the `-Force` parameter to `Edit-AutomateNOWCodeRepositoryObjectSource`
-- Added the `-VerboseMode` parameter to `Set-AutomateNOWTaskTemplate`, `Set-AutomateNOWWorkflowTemplate` ...?
+- Added the `-VerboseMode` parameter to `Set-AutomateNOWTaskTemplate` and `Set-AutomateNOWWorkflowTemplate`
 - Added the `-InactiveUsers` parameter to `Get-AutomateNOWUser` (Experimental 🧪)
 - Added the `-TaskTemplateId` parameter to `Start-AutomateNOWTaskTemplate` (allows specifying the Task Template by name instead of object)
 - Added the `-ScheduleTemplateId` parameter to `Start-AutomateNOWScheduleTemplate` (allows specifying the Schedule Template by name instead of object)
