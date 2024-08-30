@@ -168,7 +168,12 @@ Function Connect-AutomateNOW {
             [Parameter(Mandatory = $false)]
             [byte[]]$Key = @(7, 22, 15, 11, 1, 24, 8, 13, 16, 10, 5, 17, 12, 19, 27, 9)
         )
-        [string]$encrypted_string = Protect-AutomateNOWEncryptedString -Pass ($SecurePass | ConvertFrom-SecureString -AsPlainText) -Key $Key
+        If ($PSVersionTable.PSVersion.Major -ge 7) {
+            [string]$encrypted_string = Protect-AutomateNOWEncryptedString -Pass ($SecurePass | ConvertFrom-SecureString -AsPlainText) -Key $Key
+        }
+        Else {
+            [string]$encrypted_string = Protect-AutomateNOWEncryptedString -Pass ([System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($SecurePass))) -Key $Key
+        }
         [hashtable]$payload = @{}
         $payload.Add('j_username', $User)
         $payload.Add('j_password', "ENCRYPTED::$encrypted_string")
@@ -6377,7 +6382,12 @@ Function Set-AutomateNOWCodeRepository {
         If ($User.Length -gt 0) {
             $Error.Clear()
             Try {
-                [string]$password = $Pass | ConvertFrom-SecureString -AsPlainText
+                If ($PSVersionTable.PSVersion.Major -ge 7) {
+                    [string]$password = $Pass | ConvertFrom-SecureString -AsPlainText
+                }
+                Else {
+                    [string]$password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Pass))
+                }
             }
             Catch {
                 [string]$Message = $_.Exception.Message
@@ -6695,9 +6705,14 @@ Function New-AutomateNOWCodeRepository {
             $parameters.Add('NotSecure', $true)
         }
         If ($User.Length -gt 0) {
-            $Error.Clear()
+            $Error.Clear()            
             Try {
-                [string]$Pass = $Password | ConvertFrom-SecureString -AsPlainText
+                If ($PSVersionTable.PSVersion.Major -ge 7) {
+                    [string]$Pass = $Password | ConvertFrom-SecureString -AsPlainText
+                }
+                Else {
+                    [string]$Pass = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Password))
+                }
             }
             Catch {
                 [string]$Message = $_.Exception.Message
@@ -6717,7 +6732,12 @@ Function New-AutomateNOWCodeRepository {
         If ($sshKeyPassPhrase.Length -gt 0) {
             $Error.Clear()
             Try {
-                [string]$sshKeyPasswordPhrase = $sshKeyPassPhrase | ConvertFrom-SecureString -AsPlainText
+                If ($PSVersionTable.PSVersion.Major -ge 7) {
+                    [string]$sshKeyPasswordPhrase = $sshKeyPassPhrase | ConvertFrom-SecureString -AsPlainText
+                }
+                Else {
+                    [string]$sshKeyPasswordPhrase = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($sshKeyPassPhrase))
+                }
             }
             Catch {
                 [string]$Message = $_.Exception.Message
@@ -46036,14 +46056,26 @@ Function Test-AutomateNOWUserPassword {
     )
     $Error.Clear()
     Try {
-        If (($SecurePassword | ConvertFrom-SecureString -AsPlainText) -cmatch '(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z]).{4,}') {
-            Write-Verbose -Message "A valid password was presented"
-            Return $true
+        If ($PSVersionTable.PSVersion.Major -ge 7) {
+            If (($SecurePassword | ConvertFrom-SecureString -AsPlainText) -cmatch '(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z]).{4,}') {
+                Write-Verbose -Message "A valid password was presented on PowerShell Core"
+                Return $true
+            }
+            Else {
+                Write-Verbose -Message "A valid password was not presented on PowerShell Core"
+                Return $false
+            }
         }
         Else {
-            Write-Verbose -Message "A valid password was not presented"
-            Return $false
-        }
+            If (([System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($SecurePassword))) -cmatch '(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z]).{4,}') {
+                Write-Verbose -Message "A valid password was presented on Windows PowerShell"
+                Return $true
+            }
+            Else {
+                Write-Verbose -Message "A valid password was not presented on Windows PowerShell"
+                Return $false
+            }
+        }        
     }
     Catch {
         [string]$Message = $_.Exception.Message
@@ -46119,7 +46151,12 @@ Function Set-AutomateNOWUserPassword {
     }
     $Error.Clear()
     Try {
-        [string]$Body = ('id=' + $User + '&oldPassword=' + ([System.Net.WebUtility]::UrlEncode(($OldSecurePass | ConvertFrom-SecureString -AsPlainText))) + '&newPassword=' + ([System.Net.WebUtility]::UrlEncode(($NewSecurePass | ConvertFrom-SecureString -AsPlainText))) + '&repeatPassword=' + ([System.Net.WebUtility]::UrlEncode(($NewSecurePass | ConvertFrom-SecureString -AsPlainText))))
+        If ($PSVersionTable.PSVersion.Major -ge 7) {
+            [string]$Body = ('id=' + $User + '&oldPassword=' + ([System.Net.WebUtility]::UrlEncode(($OldSecurePass | ConvertFrom-SecureString -AsPlainText))) + '&newPassword=' + ([System.Net.WebUtility]::UrlEncode(($NewSecurePass | ConvertFrom-SecureString -AsPlainText))) + '&repeatPassword=' + ([System.Net.WebUtility]::UrlEncode(($NewSecurePass | ConvertFrom-SecureString -AsPlainText))))
+        }
+        Else {
+            [string]$Body = ('id=' + $User + '&oldPassword=' + ([System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($OldSecurePass))) + '&newPassword=' + ([System.Net.WebUtility]::UrlEncode(([System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($NewSecurePass))))) + '&repeatPassword=' + ([System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($NewSecurePass))))
+        }            
     }
     Catch {
         [string]$Message = $_.Exception.Message
@@ -46189,8 +46226,8 @@ Function New-AutomateNOWUser {
     .PARAMETER PhoneNumber
     An optional int64 with the user's phone number. Digits only!
 
-    .PARAMETER Pass
-    A mandatory string representing the password of the user. This must be at least 4 characters in length and consist of characters from two groups: upper and lower case, numbers and special characters
+    .PARAMETER SecurePass
+    A mandatory SecureString representing the password of the user. This must be at least 4 characters in length and consist of characters from two groups: upper and lower case, numbers and special characters
 
     .PARAMETER PasswordValidDays
     An optional integer indicating how long the account is valid for. Note that the default is 100 days!
@@ -46258,7 +46295,7 @@ Function New-AutomateNOWUser {
         [Parameter(Mandatory = $false, HelpMessage = 'Enter numbers only')]
         [int64]$PhoneNumber,
         [Parameter(Mandatory = $true)]
-        [string]$Pass,
+        [SecureString]$SecurePass,
         [Parameter(Mandatory = $false)]
         [int32]$PasswordValidDays = 100,
         [ValidateScript({ $_ -match '[0-9]{4}-[0-9]{2}-[0-9]{2}' })]
@@ -46279,7 +46316,7 @@ Function New-AutomateNOWUser {
         Write-Warning -Message "Somehow there is not a valid token confirmed."
         Break
     }
-    [boolean]$password_valid = Test-AutomateNOWUserPassword -Pass $Pass
+    [boolean]$password_valid = Test-AutomateNOWUserPassword -SecurePass $SecurePass
     If ($password_valid -eq $false) {
         Write-Warning -Message "The password supplied is not valid. The password must be at least 4 characters and have at least 1 character from 2 of 4 groups (upper, lower, digits, special chars)"
         Break
@@ -46323,6 +46360,12 @@ Function New-AutomateNOWUser {
     }
     If ($PhoneNumber.Length -gt 0) {
         $ANOWUser.Add('phone', $PhoneNumber)
+    }
+    If ($PSVersionTable.PSVersion.Major -ge 7) {
+        [string]$Pass = $SecurePass | ConvertFrom-SecureString -AsPlainText -Force
+    }
+    Else {
+        [string]$Pass = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($SecurePass))
     }
     $ANOWUser.Add('password', $Pass)
     $ANOWUser.Add('password2', $Pass) # [sic] Yes, the console really does pass a 'password2' parameter.
@@ -53967,6 +54010,10 @@ Function Protect-AutomateNOWEncryptedString {
         [Parameter(Mandatory = $false)]
         [switch]$IncludePrefix
     )
+    If($Key.Length -eq 0){
+        Write-Warning -Message "Somehow the encryption key is empty. Please check into this."
+        Break
+    }
     [byte[]]$passwd_array = [System.Text.Encoding]::UTF8.GetBytes($pass)
     [byte[]]$encrytped_array = For ($i = 0; $i -lt ($passwd_array.Length); $i++) {
         [byte]$current_byte = $passwd_array[$i]

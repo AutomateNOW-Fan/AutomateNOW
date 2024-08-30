@@ -39,6 +39,7 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 
 ## 1.0.27
 - Added new functions: `Copy-AutomateNOWNotificationMessageTemplate`, `Export-AutomateNOWNotificationMessageTemplate`, `Export-AutomateNOWSemaphoreTimestamp`, `Export-AutomateNOWVariableTimestamp`, `Get-AutomateNOWNotificationMessageTemplate`, `New-AutomateNOWNotificationMessageTemplate`, `Remove-AutomateNOWNotificationMessageTemplate`, `Rename-AutomateNOWNotificationMessageTemplate`, `Resume-AutomateNOWTimeTrigger`, `Set-AutomateNOWNotificationMessageTemplate`, `Skip-AutomateNOWTimeTrigger`, `Suspend-AutomateNOWTimeTrigger`
+- Fixed a major compatibly issue with Windows PowerShell and authentication functions (PowerShell Core was not affected)
 - Fixed some issues with `Add-AutomateNOWNotificationGroupMember`
 - Fixed an issue with `New-AutomateNOWTaskTemplate`
 - Fixed `New-AutomateNOWTag` to no longer require an icon code & library
@@ -53,6 +54,7 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 - Renamed `Set-AutomateNOWPassword` to `Set-AutomateNOWUserPassword`
 - Updated `Show-AutomateNOWEndpointType`
 - Updated the built-in help for `Connect-AutomateNOW`
+- Downgraded `New-AutomateNOWUser` to experimental status
 
 ## 1.0.26
 - Bump compatibility to _ANOW version 3.3.1.81 HF0_
