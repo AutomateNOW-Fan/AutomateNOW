@@ -1046,6 +1046,61 @@ Class ANOWDataSourceItem {
         [string]$old_values = $this.ToURL($optional_properties)
         Return $old_values
     }
+    # The primary goal of this method is to return back the same json string that the ANOW application produces when it converts an object into JSON
+    # The secondary goal of this method is to stringify the object in preparation for encoding to URL format faithfully
+    [string] ToString([string[]]$optional_properties) {
+        #[hashtable]$this2 = @{}
+        [System.Collections.Specialized.OrderedDictionary]$this2 = [System.Collections.Specialized.OrderedDictionary]@{}
+        [array]$current_members = $this | Get-Member | Where-Object { $_.MemberType -eq 'Property' }
+        If ($null -ne ($current_members | Where-Object { $_.Name -eq 'id' })) {
+            [array]$current_members = @($current_members | Where-Object { $_.Name -eq 'id' }) + @($current_members | Where-Object { $_.Name -ne 'id' })
+        }
+        ForEach ($current_member in $current_members) {
+            [string]$current_member_name = $current_member.Name
+            $current_member_value = $this.$current_member_name # this variable cannot be hard typed
+            # This omits pre-defined optional properties for this specific class when they are empty
+            If (-not ($current_member_value.Length -eq 0 -and $current_member_name -in ($optional_properties))) {
+                If ($current_member.definition -match '^datetime [a-zA-Z]{1,} {.{1,}}$' ) {
+                    # This ensures that datetimes are always formatted into ISO 8601 format. Powershell is not consistent on recognizing strings that can be safely casted into dates.
+                    [string]$current_member_value = Get-Date -Date $current_member_value -Format 'yyyy-MM-ddTHH:mm:ss.fff'
+                    $this2.Add($current_member_name, $current_member_value)
+                }
+                ElseIf ($current_member.definition -match '^bool [a-zA-Z]{1,} {.{1,}}$' ) {
+                    # This ensures that booleans are converted the same way that the application expects
+                    If ($current_member_value -eq $false) {
+                        $this2.Add($current_member_name, $false)
+                    }
+                    Else {
+                        $this2.Add($current_member_name, $true)
+                    }
+                }
+                ElseIf ($current_member_value -is [System.Enum]) {
+                    # This ensures that enums are resolved into their string value instead of the numerical index
+                    [string]$current_member_value = $current_member_value.ToString()
+                    $this2.Add($current_member_name, $current_member_value)
+                }
+                ElseIf ($current_member.definition -match '^[A-Za-z]{1,}\[] [a-zA-Z]{1,} {.{1,}}$' -and $current_member_value.Count -eq 1) {
+                    # This ensures that arrays which only contain a single item are not converted into strings
+                    $this2.Add($current_member_name, @(, $current_member_value))
+                }
+                ElseIf ($current_member_value.Length -eq 0) {
+                    # This ensures that null values remain null instead of being converted to a string
+                    $this2.Add($current_member_name, $null)
+                }
+                Else {
+                    $this2.Add($current_member_name, $current_member_value)
+                }
+            }
+        }
+        [string]$stringified_object = $this2 | ConvertTo-JSON -Compress -Depth 10
+        Return $stringified_object
+    }
+    # The primary goal of this method is to URL encode an ANOW object for conversion into the _oldValues string. The _oldValues is typically (but not always) included by the ANOW application whenever modifying an object. The behavior of this method should match the ANOW application as closely as possible. Rigorous and frequent testing will always be needed to ensure that valid payloads are sent when modifying existing objects in the ANOW application.
+    [string] ToURL([string[]]$optional_properties) {
+        [string]$stringified_object = $this.ToString([string[]]$optional_properties)
+        [string]$escaped_object = [System.Uri]::EscapeDataString($stringified_object)
+        Return $escaped_object
+    }
 }
 
 #endregion
@@ -1384,7 +1439,7 @@ Class ANOWNotification {
         [string]$old_values = $this.ToURL($optional_properties)
         Return $old_values
     }
-    
+
     # The primary goal of this method is to return back the same json string that the ANOW application produces when it converts an object into JSON
     # The secondary goal of this method is to stringify the object in preparation for encoding to URL format faithfully
     [string] ToString([string[]]$optional_properties) {
@@ -1485,7 +1540,7 @@ Class ANOWNotificationGroupMember {
             $this.$Property = $Properties.$Property
         }
     }
-        # The primary goal of this method is to return back the same json string that the ANOW application produces when it converts an object into JSON
+    # The primary goal of this method is to return back the same json string that the ANOW application produces when it converts an object into JSON
     # The secondary goal of this method is to stringify the object in preparation for encoding to URL format faithfully
     [string] ToString([string[]]$optional_properties) {
         #[hashtable]$this2 = @{}
@@ -1804,6 +1859,55 @@ Class ANOWProcessingTemplateItem {
         Return $escaped_object
     }
 }
+
+Class ANOWScheduleTemplateItem : ANOWProcessingTemplateItem {
+
+    # Default constructor
+    ANOWScheduleTemplate() { $this.Init(@{}) }
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = ''
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
+    }
+}
+
+Class ANOWTaskTemplateItem: ANOWProcessingTemplateItem {
+
+    # Default constructor
+    ANOWTaskTemplate() { $this.Init(@{}) }
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = ''
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
+    }
+}
+
+Class ANOWWorkflowTemplateItem : ANOWProcessingTemplateItem {
+
+    # Default constructor
+    ANOWWorkflowTemplate() { $this.Init(@{}) }
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = ''
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
+    }
+}
+
 
 #endregion
 
@@ -2715,6 +2819,32 @@ Class ANOWNotificationChannel : ANOW {
 
 #endregion
 
+#region Class - [ANOWNotificationMessageTemplate]
+
+Class ANOWNotificationMessageTemplate : ANOW {
+    [string]$headers
+    [string]$title
+    [string]$body
+    [string[]]$tags
+    [string]$folder
+    [boolean]$html
+
+    # Default constructor
+    ANOWNotificationChannel() { $this.Init(@{}) }
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = ''
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
+    }
+}
+
+#endregion
+
 #region Class - [ANOWProcessing] Tasks, Workflows, Schedules, ServiceManagers, Integrations
 
 Class ANOWProcessing {
@@ -3053,7 +3183,7 @@ Class ANOWProcessing {
 }
 
 Class ANOWSchedule : ANOWProcessing {
-    
+
     # Default constructor
     ANOWSchedule() { $this.Init(@{}) }
     [void] Init([hashtable]$Properties) {
@@ -3064,7 +3194,7 @@ Class ANOWSchedule : ANOWProcessing {
 }
 
 Class ANOWTask : ANOWProcessing {
-    
+
     # Default constructor
     ANOWTask() { $this.Init(@{}) }
     [void] Init([hashtable]$Properties) {
@@ -3075,7 +3205,7 @@ Class ANOWTask : ANOWProcessing {
 }
 
 Class ANOWWorkflow : ANOWProcessing {
-    
+
     # Default constructor
     ANOWWorkflow() { $this.Init(@{}) }
     [void] Init([hashtable]$Properties) {
@@ -3187,7 +3317,7 @@ Class ANOWProcessingTemplate : ANOW {
 }
 
 Class ANOWScheduleTemplate : ANOWProcessingTemplate {
-    
+
     # Default constructor
     ANOWScheduleTemplate() { $this.Init(@{}) }
     [void] Init([hashtable]$Properties) {
@@ -3203,7 +3333,7 @@ Class ANOWScheduleTemplate : ANOWProcessingTemplate {
 }
 
 Class ANOWTaskTemplate : ANOWProcessingTemplate {
-    
+
     # Default constructor
     ANOWTaskTemplate() { $this.Init(@{}) }
     [void] Init([hashtable]$Properties) {
@@ -3219,7 +3349,7 @@ Class ANOWTaskTemplate : ANOWProcessingTemplate {
 }
 
 Class ANOWWorkflowTemplate : ANOWProcessingTemplate {
-    
+
     # Default constructor
     ANOWWorkflowTemplate() { $this.Init(@{}) }
     [void] Init([hashtable]$Properties) {
@@ -3236,7 +3366,7 @@ Class ANOWWorkflowTemplate : ANOWProcessingTemplate {
 
 #endregion
 
-#Region Class - [ANOWResource] Calendars, Locks, Semaphores, Stocks, TimeWindows, Variables
+#Region Class - [ANOWResource] Calendars, Events, Locks, Metrics, PhysicalResources, Semaphores, Stocks, TimeWindows, Variables
 
 Class ANOWResource : ANOW {
     [int64]$availablePermits
@@ -3307,7 +3437,7 @@ Class ANOWResource : ANOW {
 }
 
 Class ANOWCalendar : ANOWResource {
-    
+
     # Default constructor
     ANOWCalendar() { $this.Init(@{}) }
     [void] Init([hashtable]$Properties) {
@@ -3318,7 +3448,7 @@ Class ANOWCalendar : ANOWResource {
 }
 
 Class ANOWEvent : ANOWResource {
-    
+
     # Default constructor
     ANOWEvent() { $this.Init(@{}) }
     [void] Init([hashtable]$Properties) {
@@ -3329,7 +3459,7 @@ Class ANOWEvent : ANOWResource {
 }
 
 Class ANOWLock : ANOWResource {
-    
+
     # Default constructor
     ANOWLock() { $this.Init(@{}) }
     [void] Init([hashtable]$Properties) {
@@ -3340,7 +3470,7 @@ Class ANOWLock : ANOWResource {
 }
 
 Class ANOWMetric : ANOWResource {
-    
+
     # Default constructor
     ANOWMetric() { $this.Init(@{}) }
     [void] Init([hashtable]$Properties) {
@@ -3351,7 +3481,7 @@ Class ANOWMetric : ANOWResource {
 }
 
 Class ANOWPhysicalResource : ANOWResource {
-    
+
     # Default constructor
     ANOWPhysicalResource() { $this.Init(@{}) }
     [void] Init([hashtable]$Properties) {
@@ -3362,7 +3492,7 @@ Class ANOWPhysicalResource : ANOWResource {
 }
 
 Class ANOWSemaphore : ANOWResource {
-    
+
     # Default constructor
     ANOWSemaphore() { $this.Init(@{}) }
     [void] Init([hashtable]$Properties) {
@@ -3373,7 +3503,7 @@ Class ANOWSemaphore : ANOWResource {
 }
 
 Class ANOWStock : ANOWResource {
-    
+
     # Default constructor
     ANOWStock() { $this.Init(@{}) }
     [void] Init([hashtable]$Properties) {
@@ -3384,7 +3514,7 @@ Class ANOWStock : ANOWResource {
 }
 
 Class ANOWTimeWindow : ANOWResource {
-    
+
     # Default constructor
     ANOWTimeWindow() { $this.Init(@{}) }
     [void] Init([hashtable]$Properties) {
@@ -3395,7 +3525,7 @@ Class ANOWTimeWindow : ANOWResource {
 }
 
 Class ANOWVariable : ANOWResource {
-    
+
     # Default constructor
     ANOWVariable() { $this.Init(@{}) }
     [void] Init([hashtable]$Properties) {

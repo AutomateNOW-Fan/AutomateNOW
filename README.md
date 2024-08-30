@@ -37,6 +37,23 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 <br/><br/>
 ## Change Log 📝
 
+## 1.0.27
+- Added new functions: `Copy-AutomateNOWNotificationMessageTemplate`, `Export-AutomateNOWNotificationMessageTemplate`, `Export-AutomateNOWSemaphoreTimestamp`, `Export-AutomateNOWVariableTimestamp`, `Get-AutomateNOWNotificationMessageTemplate`, `New-AutomateNOWNotificationMessageTemplate`, `Remove-AutomateNOWNotificationMessageTemplate`, `Rename-AutomateNOWNotificationMessageTemplate`, `Resume-AutomateNOWTimeTrigger`, `Set-AutomateNOWNotificationMessageTemplate`, `Skip-AutomateNOWTimeTrigger`, `Suspend-AutomateNOWTimeTrigger`
+- Fixed some issues with `Add-AutomateNOWNotificationGroupMember`
+- Fixed an issue with `New-AutomateNOWTaskTemplate`
+- Fixed `New-AutomateNOWTag` to no longer require an icon code & library
+- Enforced `Set-AutomateNOWPassword` to accept only secure strings for passwords
+- Enforced `Test-AutomateNOWPassword` to accept only secure strings for passwords
+- Enforced the Skip functions to always confirm that the object doesn't already have skip set
+- Updated and fixed some aspects of the Remove functions
+- Updated and fixed some issues with `Add-AutomateNOWScheduleTemplateItem`, `Add-AutomateNOWWorkflowTemplateItem`, `Read-AutomateNOWScheduleTemplateItem`, `Read-AutomateNOWWorkflowTemplateItem`
+- Renamed the `-template` parameter on `Get-AutomateNOWWorkflow` to `-WorkflowTemplate` to allow filtering by template
+- Added the `-TaskTemplate` parameter to `Get-AutomateNOWTask` to allow filtering by template
+- Added the `-ScheduleTemplate` parameter to `Get-AutomateNOWSchedule` to allow filtering by template
+- Renamed `Set-AutomateNOWPassword` to `Set-AutomateNOWUserPassword`
+- Updated `Show-AutomateNOWEndpointType`
+- Updated the built-in help for `Connect-AutomateNOW`
+
 ## 1.0.26
 - Bump compatibility to _ANOW version 3.3.1.81 HF0_
 - Added new functions: `Add-AutomateNOWNotificationGroupMember`, `Copy-AutomateNOWNotificationChannel`, `Copy-AutomateNOWNotificationGroup`, `Export-AutomateNOWNotificationChannel`, `Export-AutomateNOWNotificationGroupMember`, `Export-AutomateNOWNotificationGroup`, `Export-AutomateNOWNotification`, `Get-AutomateNOWNotificationChannel`, `Get-AutomateNOWNotificationGroupMember`, `Get-AutomateNOWNotificationGroup`, `Get-AutomateNOWNotification`, `New-AutomateNOWNotificationChannel`, `New-AutomateNOWNotificationGroup`, `Remove-AutomateNOWNotificationChannel`, `Remove-AutomateNOWNotificationGroupMember`, `Remove-AutomateNOWNotificationGroup`, `Remove-AutomateNOWNotification`, `Remove-AutomateNOWWorkflowTemplateItem`, `Rename-AutomateNOWNotificationChannel`, `Rename-AutomateNOWNotificationGroup`, `Set-AutomateNOWNotificationChannel`, `Set-AutomateNOWNotificationGroupMember`, `Set-AutomateNOWNotificationGroup`
@@ -46,7 +63,7 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 - Fixed an issue with `Get-AutomateNOWContextVariable`
 - Repaired the `-Folder` and `-Tags` parameters on `Start-AutomateNOWScheduleTemplate`
 - Fixed an issue with `Connect-AutomateNOW` that only manifested if `-User` was used without `-Pass`
-- Enforced `Connect-AutomateNOW` to use only secure strings for passwords
+- Enforced `Connect-AutomateNOW` to accept only secure strings for passwords
 - Ensured that all functions stop 🛑 whenever a non-zero status from the ANOW API is received
 - Added the `-Force` parameter to `Edit-AutomateNOWCodeRepositoryObjectSource`
 - Added the `-VerboseMode` parameter to `Set-AutomateNOWTaskTemplate` and `Set-AutomateNOWWorkflowTemplate`
@@ -379,6 +396,12 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 ### How do I rearrange the sort orders of the child nodes in my load balancer node?
 > Refer to `Push-AutomateNOWLoadBalancerNode` and `Pop-AutomateNOWLoadBalancerNode`
 
+### I'm confused about why some functions are prefixed with New- and others with Add-?
+> Refer to Microsoft's guidance on Powershell Approved Verbs. Also, try this command to list both the 'Add' & 'New' functions alphabetically by their noun: (Get-Command -Name New-AutomateNOW* | Select-Object -ExpandProperty Name) + (Get-Command -Name Add-AutomateNOW* | Select-Object -ExpandProperty Name) | Sort-Object { $_ -split '-' | Select-Object -Last 1 }
+
+### Why is there no Copy and Rename functions for Time Triggers?
+> The ANOW application does not actually offer this functionality. You must 'add' a Time Trigger to a Schedule Template.
+
 ## Functions 🛠
 
 `Add-AutomateNOWApprovalRule`
@@ -392,6 +415,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Add-AutomateNOWResultMappingRule`
 
 `Add-AutomateNOWScheduleTemplateItem`
+
+`Add-AutomateNOWTimeTrigger`
 
 `Add-AutomateNOWWorkflowTemplateItem`
 
@@ -442,6 +467,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Copy-AutomateNOWNotificationChannel`
 
 `Copy-AutomateNOWNotificationGroup`
+
+`Copy-AutomateNOWNotificationMessageTemplate`
 
 `Copy-AutomateNOWPhysicalResource`
 
@@ -515,6 +542,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Export-AutomateNOWNotificationGroupMember`
 
+`Export-AutomateNOWNotificationMessageTemplate`
+
 `Export-AutomateNOWPhysicalResource`
 
 `Export-AutomateNOWProcessingEventLog`
@@ -526,6 +555,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Export-AutomateNOWScheduleTemplate`
 
 `Export-AutomateNOWSemaphore`
+
+`Export-AutomateNOWSemaphoreTimestamp`
 
 `Export-AutomateNOWStock`
 
@@ -544,6 +575,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Export-AutomateNOWUser`
 
 `Export-AutomateNOWVariable`
+
+`Export-AutomateNOWVariableTimestamp`
 
 `Export-AutomateNOWWorkflow`
 
@@ -604,6 +637,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Get-AutomateNOWNotificationGroup`
 
 `Get-AutomateNOWNotificationGroupMember`
+
+`Get-AutomateNOWNotificationMessageTemplate`
 
 `Get-AutomateNOWPhysicalResource`
 
@@ -699,6 +734,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `New-AutomateNOWNotificationGroup`
 
+`New-AutomateNOWNotificationMessageTemplate`
+
 `New-AutomateNOWPhysicalResource`
 
 `New-AutomateNOWResultMapping`
@@ -791,6 +828,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Remove-AutomateNOWNotificationGroupMember`
 
+`Remove-AutomateNOWNotificationMessageTemplate`
+
 `Remove-AutomateNOWPhysicalResource`
 
 `Remove-AutomateNOWResultMapping`
@@ -853,6 +892,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Rename-AutomateNOWNotificationGroup`
 
+`Rename-AutomateNOWNotificationMessageTemplate`
+
 `Rename-AutomateNOWPhysicalResource`
 
 `Rename-AutomateNOWResultMapping`
@@ -897,6 +938,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Resume-AutomateNOWTaskTemplate`
 
+`Resume-AutomateNOWTimeTrigger`
+
 `Resume-AutomateNOWWorkflow`
 
 `Resume-AutomateNOWWorkflowTemplate`
@@ -935,7 +978,7 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Set-AutomateNOWNotificationGroupMember`
 
-`Set-AutomateNOWPassword`
+`Set-AutomateNOWNotificationMessageTemplate`
 
 `Set-AutomateNOWPhysicalResource`
 
@@ -954,6 +997,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Set-AutomateNOWTimeWindow`
 
 `Set-AutomateNOWUser`
+
+`Set-AutomateNOWUserPassword`
 
 `Set-AutomateNOWVariable`
 
@@ -978,6 +1023,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Skip-AutomateNOWTask`
 
 `Skip-AutomateNOWTaskTemplate`
+
+`Skip-AutomateNOWTimeTrigger`
 
 `Skip-AutomateNOWWorkflow`
 
@@ -1013,6 +1060,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Suspend-AutomateNOWTaskTemplate`
 
+`Suspend-AutomateNOWTimeTrigger`
+
 `Suspend-AutomateNOWWorkflow`
 
 `Suspend-AutomateNOWWorkflowTemplate`
@@ -1027,9 +1076,9 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Test-AutomateNOWUserPassword`
 
-`UnPublish-AutomateNOWCodeRepository`
-
 `Unprotect-AutomateNOWEncryptedString`
+
+`UnPublish-AutomateNOWCodeRepository`
 
 `Update-AutomateNOWCodeRepositoryObjectSource`
 
