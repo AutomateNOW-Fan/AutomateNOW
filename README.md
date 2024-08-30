@@ -37,7 +37,7 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 <br/><br/>
 ## Change Log 📝
 
-### 1.0.28
+## 1.0.28
 - Fixed for PowerShell Gallery
 
 ## 1.0.27
