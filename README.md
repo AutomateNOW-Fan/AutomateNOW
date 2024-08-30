@@ -37,6 +37,9 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 <br/><br/>
 ## Change Log 📝
 
+### 1.0.28
+- Fixed for PowerShell Gallery
+
 ## 1.0.27
 - Added new functions: `Copy-AutomateNOWNotificationMessageTemplate`, `Export-AutomateNOWNotificationMessageTemplate`, `Export-AutomateNOWSemaphoreTimestamp`, `Export-AutomateNOWVariableTimestamp`, `Get-AutomateNOWNotificationMessageTemplate`, `New-AutomateNOWNotificationMessageTemplate`, `Remove-AutomateNOWNotificationMessageTemplate`, `Rename-AutomateNOWNotificationMessageTemplate`, `Resume-AutomateNOWTimeTrigger`, `Set-AutomateNOWNotificationMessageTemplate`, `Skip-AutomateNOWTimeTrigger`, `Suspend-AutomateNOWTimeTrigger`
 - Fixed a major compatibly issue with Windows PowerShell and authentication functions (PowerShell Core was not affected)
