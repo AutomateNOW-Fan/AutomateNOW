@@ -8,11 +8,11 @@
 Created by AutomateNOW-Fan
 ```
 ```
-⚠ Not affiliated with InfiniteDATA/Beta Systems
+⚠ Not affiliated with Beta Systems
 ```
 ## Efficacy 🧪
 
-Compatible with AutomateNOW! version 3.3.1.81 HF0
+Compatible with AutomateNOW! version 3.3.1.83 HF0
 <br/><br/>
 ## Installation 🏗
 
@@ -36,6 +36,19 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 - Edit source code objects with NotePad (Windows only for now)
 <br/><br/>
 ## Change Log 📝
+
+## 1.0.29
+- Bump compatibility to _ANOW version 3.3.1.83 HF0_
+- Added new function: `Set-AutomateNOWTimeTrigger`
+- Added support for default domain to `Connect-AutomateNOWUser`
+- Improved the parameters for `Get-AutomateNOWTimeTrigger`
+- Fixed the empty name in the `-Force` confirmation prompt for many functions during pipeline processing
+- Fixed an issue with `Get-AutomateNOWWorkflow` when receiving Id's from the pipeline
+- Fixed the `-WorkflowType` parameter on `New-AutomateNOWWorkflowTemplate`
+- Fixed an issue where `Get-AutomateNOWContextVariable` would accept an empty collection of RunId's
+- Fixed an issue with `Get-AutomateNOWTimeTrigger` whenever receiving multiple Schedule Templates during pipeline processing
+- Fixed the parameters for `Get-AutomateNOWTask` to allow `-startRow` and `-endRow` parameters when filtering by Task Template
+- Fixed the parameters for `Get-AutomateNOWSchedule` to allow `-startRow` and `-endRow` parameters when filtering by Schedule Template
 
 ## 1.0.28
 - Fixed for PowerShell Gallery
@@ -392,11 +405,11 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 >2) Run `Set-AutomateNOWMetric` with these parameters: `-UnsetValueUnit` `-UnsetMinValue` `-UnsetVeryLowThreshold` `-UnsetLowThreshold` `-UnsetHighThreshold` `-UnsetVeryHighThreshold` `-UnsetMaxValue`
 
 ### What does the -Detailed parameter provide? Why should I use that?
-> Calendars will include: calculatedDates
-> Locks will include: lockState
-> Stocks will include: (unknown)
-> Time Windows will include: (unknown)
-> Variables will include: historicalValues
+>- Calendars will include: calculatedDates
+>- Locks will include: lockState
+>- Stocks will include: (unknown)
+>- Time Windows will include: (unknown)
+>- Variables will include: historicalValues
 
 ### How do I rearrange the sort orders of the child nodes in my load balancer node?
 > Refer to `Push-AutomateNOWLoadBalancerNode` and `Pop-AutomateNOWLoadBalancerNode`
@@ -693,9 +706,9 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Import-AutomateNOWTimeZone`
 
-`Invoke-AutomateNOWAPI`
-
 `Invoke-AutomateNOWAdhocReport`
+
+`Invoke-AutomateNOWAPI`
 
 `Merge-AutomateNOWCodeRepositoryBranch`
 
@@ -998,6 +1011,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Set-AutomateNOWTag`
 
 `Set-AutomateNOWTaskTemplate`
+
+`Set-AutomateNOWTimeTrigger`
 
 `Set-AutomateNOWTimeWindow`
 

@@ -15,7 +15,7 @@ Function Connect-AutomateNOW {
     Specifies the name of the AutomateNOW! instance. For example: s2.infinitedata.com
 
     .PARAMETER Domain
-    Optional string to set the AutomateNOW domain. Omit this parameter if you do not know what the available domains are and they will be shown to you. You can then run this function again with the -Domain parameter. This function does not support recognition of users with a default domain configured yet.
+    Optional string to set the AutomateNOW domain. Omit this parameter if you do not know what the available domains are and they will be shown to you. You can then run this function again with the -Domain parameter. This function does support recognition of users with a default domain.
 
     .PARAMETER AccessToken
     Optionally specify the access token manually for API users or manual testing. This parameter is required for API users.
@@ -97,9 +97,10 @@ Function Connect-AutomateNOW {
 
     .NOTES
     1. If you don't know the available domains then you can exclude the -Domain parameter to see them listed (after you authenticate).
-    2. This module will automatically refresh your token after it is 330 seconds old. (See Update-AutomateNOWToken for more info).
-    3. After you are finished interacting with the ANOW API, you should use Disconnect-AutomateNOW to fully disconnect from the instance and cleanse your PowerShell session.
-    4. You should periodally review and be familiar with the properties available in the global variable $anow_session. There is a wealth of information within.
+    2. The -Domain parameter can be skipped if the user has a default domain.
+    3. This module will automatically refresh your token after it is 330 seconds old. (See Update-AutomateNOWToken for more info).
+    4. After you are finished interacting with the ANOW API, you should use Disconnect-AutomateNOW to fully disconnect from the instance and cleanse your PowerShell session.
+    5. You should periodally review and be familiar with the properties available in the global variable $anow_session. There is a wealth of information within.
 
     #>
     [OutputType([string])]
@@ -328,21 +329,21 @@ Function Connect-AutomateNOW {
             Break
         }
         Else {
-            If ($SecondsRemaining -lt 120) {
-                [int32]$SecondsRemaining = $SecondsRemaining * -1
-                Write-Warning -Message "Your previous token expired $SecondsRemaining seconds ago at $expiration_date. Cleaning up the previous session."
+            If ($SecondsRemaining -lt -172800) {
+                [int32]$DaysRemaining = ($SecondsRemaining * -1) / 86400
+                Write-Warning -Message "Your previous token expired about $DaysRemaining days ago at $expiration_date. Cleaning up the previous session."
             }
-            ElseIf ($SecondsRemaining -lt 7200) {
-                [int32]$MinutesRemaining = ($SecondsRemaining * -1) / 60
-                Write-Warning -Message "Your previous token expired $MinutesRemaining minutes ago at $expiration_date. Cleaning up the previous session."
-            }
-            ElseIf ($SecondsRemaining -lt 86400) {
+            ElseIf ($SecondsRemaining -lt -7200) {
                 [int32]$HoursRemaining = ($SecondsRemaining * -1) / 3600
                 Write-Warning -Message "Your previous token expired about $HoursRemaining hours ago at $expiration_date. Cleaning up the previous session."
             }
+            ElseIf ($SecondsRemaining -lt -300) {
+                [int32]$MinutesRemaining = ($SecondsRemaining * -1) / 60
+                Write-Warning -Message "Your previous token expired $MinutesRemaining minutes ago at $expiration_date. Cleaning up the previous session."
+            }
             Else {
-                [int32]$DaysRemaining = ($SecondsRemaining * -1) / 86400
-                Write-Warning -Message "Your previous token expired about $DaysRemaining days ago at $expiration_date. Cleaning up the previous session."
+                [int32]$SecondsRemaining = $SecondsRemaining * -1
+                Write-Warning -Message "Your previous token expired $SecondsRemaining seconds ago at $expiration_date. Cleaning up the previous session."
             }
             $Error.Clear()
             Try {
@@ -678,6 +679,16 @@ Function Connect-AutomateNOW {
             Write-Warning -Message "Somehow it was not possible to determine if $Id is an API User. Please look into this."
             Break
         }
+        [string]$defaultDomain = $user.defaultDomain
+        If ($defaultDomain.Length -gt 0) {
+            $anow_session.Add('default_domain', $defaultDomain)
+            Write-Verbose -Message "Detected the default domain for $Id is $defaultDomain"
+            [string]$Domain = $defaultDomain
+            $userInfo.defaultDomain = $defaultDomain
+        }
+        Else {
+            $anow_session.Add('default_domain', "")
+        }
         $anow_session['user_details'] = $userInfo
         [string]$userName = $userInfo.id
         If ($userName.Length -eq 0) {
@@ -700,7 +711,7 @@ Function Connect-AutomateNOW {
             Write-Warning -Message "Somehow the count of domains is zero."
             Break
         }
-        If ($Domain.Length -eq 0) {
+        If ($Domain.Length -eq 0 -and $defaultDomain.Length -eq 0) {
             [string]$domains_display = $domains -join ', '
             Write-Warning -Message "Please try Connect-AutomateNOW again with the -Domain parameter with one of these case-sensitive domains: $domains_display"
             Remove-Variable anow_session -Force
@@ -726,12 +737,12 @@ Function Connect-AutomateNOW {
                     $anow_session.header['domain'] = $Domain
                 }
             }
-            ElseIf ($Domain.Length -gt 0) {
-                Write-Warning -Message "The domain you chose with -Domain [$Domain] is not available on [$instance]. Please check the domain name again and note that it is case-sensitive."
+            ElseIf ($Domain.Length -gt 0 -and $defaultDomain.Length -eq 0) {
+                Write-Warning -Message "The domain you chose with -Domain (or your default Domain) [$Domain] is not available on [$instance]. Please check the domain name again and note that it is case-sensitive."
                 Break
             }
             Else {
-                Write-Verbose -Message "Proceeding without a domain selected"
+                Write-Verbose -Message "Proceeding without a domain selected and there is no default domain for $Id"
             }
         }
         $anow_session.Add('current_domain', $Domain)
@@ -1461,7 +1472,7 @@ Function Set-AutomateNOWAdhocReport {
         }
         [string]$AdhocReport_id = $AdhocReport.id
         [string]$AdhocReport_type = $AdhocReport.reportType
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($AdhocReport.id)")) -eq $true) {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($AdhocReport_id)")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -1908,11 +1919,12 @@ Function Copy-AutomateNOWAdhocReport {
     Process {
         If ($PermissionToProceed -ne $false) {
             [string]$AdhocReport_oldId = $AdhocReport.id
+            [string]$AdhocReport_simpleId = $AdhocReport.simpleId
             If ($AdhocReport_oldId -eq $NewId) {
                 Write-Warning -Message "The new id cannot be the same as the old id."
                 Break
             }
-            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Adhoc Report $($AdhocReport.simpleId) to $($NewId)?")) -eq $true) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Adhoc Report $($AdhocReport_simpleId) to $($NewId)?")) -eq $true) {
                 [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
                 If ($UnsetFolder -eq $True) {
                     $BodyMetaData.'folder' = $Null
@@ -2265,6 +2277,10 @@ Function Remove-AutomateNOWAdhocReport {
             [ANOWAdhocReport]$AdhocReport = $_
         }
         [string]$AdhocReport_id = $AdhocReport.id
+        If ($AdhocReport_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($AdhocReport_id)")) -eq $true) {
             [string]$oldvalues = $AdhocReport.CreateOldValues()
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
@@ -2744,7 +2760,7 @@ Function Set-AutomateNOWAgent {
         }
         [string]$Agent_id = $Agent.id
         [string]$Agent_simpleId = $agent.simpleId
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Agent.id)")) -eq $true) {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Agent_id)")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -3216,6 +3232,10 @@ Function Remove-AutomateNOWAgent {
             [ANOWAgent]$Agent = $_
         }
         [string]$Agent_id = $Agent.id
+        If ($Agent_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Agent_id)")) -eq $true) {
             [string]$oldvalues = $Agent.CreateOldValues()
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
@@ -3385,11 +3405,12 @@ Function Copy-AutomateNOWAgent {
     Process {
         If ($PermissionToProceed -ne $false) {
             [string]$Agent_oldId = $Agent.id
+            [string]$Agent_simpleId = $Agent.simpleId
             If ($Agent_oldId -eq $NewId) {
                 Write-Warning -Message "The new id cannot be the same as the old id."
                 Break
             }
-            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Agent $($Agent.simpleId) to $($NewId)?")) -eq $true) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Agent $($Agent_simpleId) to $($NewId)?")) -eq $true) {
                 [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
                 If ($UnsetFolder -eq $True) {
                     $BodyMetaData.'folder' = $Null
@@ -3830,13 +3851,11 @@ Function Set-AutomateNOWApproval {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Approval.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [string]$Approval_id = $_.id
-            }
-            Else {
-                [string]$Approval_id = $Approval.id
-            }
+        If ($_.id.Length -gt 0) {
+            [ANOWApproval]$Approval = $_
+        }
+        [string]$Approval_id = $Approval.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Approval_id)")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -4178,6 +4197,10 @@ Function Remove-AutomateNOWApproval {
             [ANOWApproval]$Approval = $_
         }
         [string]$Approval_id = $Approval.id
+        If ($Approval_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Approval_id)")) -eq $true) {
             [string]$oldvalues = $Approval.CreateOldValues()
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
@@ -4319,11 +4342,12 @@ Function Copy-AutomateNOWApproval {
     Process {
         If ($PermissionToProceed -ne $false) {
             [string]$Approval_oldId = $Approval.id
+            [string]$Approval_simpleId = $Approval.simpleId
             If ($Approval_oldId -eq $NewId) {
                 Write-Warning -Message "The new id cannot be the same as the old id."
                 Break
             }
-            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Approval $($Approval.simpleId) to $($NewId)?")) -eq $true) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Approval $($Approval_simpleId) to $($NewId)?")) -eq $true) {
                 [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
                 $BodyMetaData.'oldId' = $Approval_oldId
                 $BodyMetaData.'domain' = $Approval.domain
@@ -5635,6 +5659,10 @@ Function Remove-AutomateNOWCalendar {
             [ANOWCalendar]$Calendar = $_
         }
         [string]$Calendar_id = $Calendar.id
+        If ($Calendar_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Calendar_id)")) -eq $true) {
             [string]$oldvalues = $Calendar.CreateOldValues()
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
@@ -5804,11 +5832,12 @@ Function Copy-AutomateNOWCalendar {
     Process {
         If ($PermissionToProceed -ne $false) {
             [string]$Calendar_oldId = $Calendar.id
+            [string]$Calendar_simpleId = $Calendar.simpleId
             If ($Calendar_oldId -eq $NewId) {
                 Write-Warning -Message "The new id cannot be the same as the old id."
                 Break
             }
-            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Calendar $($Calendar.simpleId) to $($NewId)?")) -eq $true) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Calendar $($Calendar_simpleId) to $($NewId)?")) -eq $true) {
                 [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
                 If ($UnsetFolder -eq $True) {
                     $BodyMetaData.'folder' = $Null
@@ -6705,7 +6734,7 @@ Function New-AutomateNOWCodeRepository {
             $parameters.Add('NotSecure', $true)
         }
         If ($User.Length -gt 0) {
-            $Error.Clear()            
+            $Error.Clear()
             Try {
                 If ($PSVersionTable.PSVersion.Major -ge 7) {
                     [string]$Pass = $Password | ConvertFrom-SecureString -AsPlainText
@@ -7038,6 +7067,10 @@ Function Remove-AutomateNOWCodeRepository {
             [ANOWCodeRepository]$CodeRepository = $_
         }
         [string]$CodeRepository_Id = $CodeRepository.Id
+        If ($CodeRepository_Id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
         ## Do not tamper with this code. It ensures that we are not trying to remove a local Code Repository that doesn't exist
         $Error.Clear()
         Try {
@@ -7272,49 +7305,47 @@ Function Sync-AutomateNOWCodeRepository {
     }
     Process {
         If ($_.id.Length -gt 0) {
-            [string]$CodeRepository_id = $_.id
-        }
-        Else {
+            [ANOWCodeRepository]$CodeRepository = $_
             [string]$CodeRepository_id = $CodeRepository.id
-        }
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($CodeRepository_id)")) -eq $true) {
-            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
-            $BodyMetaData.Add('id', $CodeRepository_id )
-            $BodyMetaData.Add('_operationType', 'custom')
-            $BodyMetaData.Add('_operationId', 'synchronizeAll')
-            $BodyMetaData.Add('_textMatchStyle', 'exact')
-            $BodyMetaData.Add('_dataSource', 'CodeRepositoryDataSource')
-            $BodyMetaData.Add('isc_metaDataPrefix', '_')
-            $BodyMetaData.Add('isc_dataFormat', 'json')
-            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
-            $parameters.Add('Body', $Body)
-            [string]$command = ('/codeRepository/synchronizeAll')
-            $parameters.Add('Command', $command)
-            $Error.Clear()
-            Try {
-                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
-            }
-            Catch {
-                [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$CodeRepository_id] due to [$Message]."
-                Break
-            }
-            [int32]$response_code = $results.response.status
-            If ($response_code -ne 0) {
-                If ($Quiet -eq $true) {
-                    Return $false
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($CodeRepository_id)")) -eq $true) {
+                [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+                $BodyMetaData.Add('id', $CodeRepository_id )
+                $BodyMetaData.Add('_operationType', 'custom')
+                $BodyMetaData.Add('_operationId', 'synchronizeAll')
+                $BodyMetaData.Add('_textMatchStyle', 'exact')
+                $BodyMetaData.Add('_dataSource', 'CodeRepositoryDataSource')
+                $BodyMetaData.Add('isc_metaDataPrefix', '_')
+                $BodyMetaData.Add('isc_dataFormat', 'json')
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+                $parameters.Add('Body', $Body)
+                [string]$command = ('/codeRepository/synchronizeAll')
+                $parameters.Add('Command', $command)
+                $Error.Clear()
+                Try {
+                    [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
                 }
-                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
-                Write-Warning -Message "The response code was [$response_code] instead of 0. The Code Repository $CodeRepository_id sync was not successful. Please see the full response $full_response_display"
-            }
-            Else {
-                If ($Quiet -ne $true) {
-                    $sync_table = $results.response.data
-                    $sync_table | Format-Table -Autosize -Wrap
-                    Write-Information -MessageData "The Code Repository $CodeRepository_id synchronized successfully."
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$CodeRepository_id] due to [$Message]."
+                    Break
+                }
+                [int32]$response_code = $results.response.status
+                If ($response_code -ne 0) {
+                    If ($Quiet -eq $true) {
+                        Return $false
+                    }
+                    [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                    Write-Warning -Message "The response code was [$response_code] instead of 0. The Code Repository $CodeRepository_id sync was not successful. Please see the full response $full_response_display"
                 }
                 Else {
-                    Write-Debug -MessageData "The Code Repository $CodeRepository_id synchronized successfully."
+                    If ($Quiet -ne $true) {
+                        $sync_table = $results.response.data
+                        $sync_table | Format-Table -Autosize -Wrap
+                        Write-Information -MessageData "The Code Repository $CodeRepository_id synchronized successfully."
+                    }
+                    Else {
+                        Write-Debug -MessageData "The Code Repository $CodeRepository_id synchronized successfully."
+                    }
                 }
             }
         }
@@ -7383,14 +7414,9 @@ Function Receive-AutomateNOWCodeRepository {
     }
     Process {
         If ($_.id.Length -gt 0) {
-            [string]$CodeRepository_id = $_.id
+            [ANOWCodeRepository]$CodeRepository = $_
         }
-        ElseIf ($CodeRepository.id.Length -gt 0) {
-            [string]$CodeRepository_id = $CodeRepository.id
-        }
-        Else {
-            [string]$CodeRepository_id = $Id
-        }
+        [string]$CodeRepository_id = $CodeRepository.id
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($CodeRepository_id)")) -eq $true) {
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
             $BodyMetaData.Add('id', $CodeRepository_id )
@@ -7497,14 +7523,9 @@ Function Send-AutomateNOWCodeRepository {
     }
     Process {
         If ($_.id.Length -gt 0) {
-            [string]$CodeRepository_id = $_.id
+            [ANOWCodeRepository]$CodeRepository = $_
         }
-        ElseIf ($CodeRepository.id.Length -gt 0) {
-            [string]$CodeRepository_id = $CodeRepository.id
-        }
-        Else {
-            [string]$CodeRepository_id = $Id
-        }
+        [string]$CodeRepository_id = $CodeRepository.id
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($CodeRepository_id)")) -eq $true) {
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
             $BodyMetaData.Add('id', $CodeRepository_id )
@@ -7611,11 +7632,9 @@ Function Publish-AutomateNOWCodeRepository {
     }
     Process {
         If ($_.id.Length -gt 0) {
-            [string]$CodeRepository_id = $_.id
+            [ANOWCodeRepository]$CodeRepository = $_
         }
-        Else {
-            [string]$CodeRepository_id = $CodeRepository.id
-        }
+        [string]$CodeRepository_id = $CodeRepository.id
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($CodeRepository_id)")) -eq $true) {
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
             $BodyMetaData.Add('id', $CodeRepository_id )
@@ -7722,14 +7741,9 @@ Function UnPublish-AutomateNOWCodeRepository {
     }
     Process {
         If ($_.id.Length -gt 0) {
-            [string]$CodeRepository_id = $_.id
+            [ANOWCodeRepository]$CodeRepository = $_
         }
-        ElseIf ($CodeRepository.id.Length -gt 0) {
-            [string]$CodeRepository_id = $CodeRepository.id
-        }
-        Else {
-            [string]$CodeRepository_id = $Id
-        }
+        [string]$CodeRepository_id = $CodeRepository.id
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($CodeRepository_id)")) -eq $true) {
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
             $BodyMetaData.Add('id', $CodeRepository_id )
@@ -8140,6 +8154,14 @@ Function Remove-AutomateNOWCodeRepositoryBranch {
             [string]$Branch = $_
         }
         [string]$CodeRepository_Id = $CodeRepository.Id
+        If ($CodeRepository_Id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
+        If ($Branch.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty branch name was passed to this function. Please look into this."
+            Break
+        }
         ## Do not tamper with this code. It ensures that we are not trying to remove a branch that doesn't exist
         $Error.Clear()
         Try {
@@ -8275,12 +8297,9 @@ Function Select-AutomateNOWCodeRepositoryBranch {
     }
     Process {
         If ($_.id.Length -gt 0) {
-            [string]$CodeRepository_id = $_.id
             [ANOWCodeRepository]$CodeRepository = $_
         }
-        Else {
-            [string]$CodeRepository_id = $CodeRepository.id
-        }
+        [string]$CodeRepository_id = $CodeRepository.id
         $Error.Clear()
         Try {
             [ANOWCodeRepositoryBranch[]]$available_branches = Get-AutomateNOWCodeRepositoryBranch -CodeRepository $CodeRepository
@@ -9223,7 +9242,7 @@ Function Remove-AutomateNOWCodeRepositoryItem {
         }
         [string]$Item_simpleId = $Item.simpleId
         If ($Item_simpleId.Length -eq 0) {
-            Write-Warning -Message "Somehow the Item passed to Remove-AutomateNOWCodeRepositoryItem does not have a simpleId. Please look into this."
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
             Break
         }
         [string]$Item_Domain = $Item.domain
@@ -11457,6 +11476,10 @@ Function Remove-AutomateNOWCodeRepositoryTag {
             [ANOWCodeRepositoryTag]$Tag = $_
         }
         [string]$CodeRepository_Id = $CodeRepository.Id
+        If ($CodeRepository_Id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
         ## Do not tamper with this code. It ensures that we are not trying to remove a git tag that doesn't exist
         $Error.Clear()
         Try {
@@ -11737,7 +11760,11 @@ Function Get-AutomateNOWContextVariable {
         [void]$RunIdCollection.Add($RunIdString)
     }
     End {
-        If ($RunIdCollection.Count -eq 1) {
+        If ($RunIdCollection.Count -eq 0) {
+            Write-Warning -Message "There were 0 RunId's sent. There is nothing to retrieve."
+            Break
+        }
+        ElseIf ($RunIdCollection.Count -eq 1) {
             [string]$RunIdStringCollection = ('["' + $RunIdCollection + '"]')
         }
         Else {
@@ -12340,6 +12367,10 @@ Function Remove-AutomateNOWDataSource {
             [ANOWDataSource]$DataSource = $_
         }
         [string]$DataSource_id = $DataSource.id
+        If ($DataSource_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($DataSource_id)")) -eq $true) {
             [string]$oldvalues = $DataSource.CreateOldValues()
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
@@ -12408,7 +12439,7 @@ Function Set-AutomateNOWDataSource {
     Optional string array of CASE-SENSITIVE Tag Id's to include with this object.
 
     .PARAMETER UnsetTags
-    A switch parameter that will the Tags from the Task Template
+    A switch parameter that will remove the Tags from the Task Template
 
     .PARAMETER Force
     Force the change without confirmation. This is equivalent to -Confirm:$false
@@ -12507,13 +12538,11 @@ Function Set-AutomateNOWDataSource {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($DataSource.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [string]$DataSource_id = $_.id
-            }
-            Else {
-                [string]$DataSource_id = $DataSource.id
-            }
+        If ($_.id.Length -gt 0) {
+            [ANOWDataSource]$DataSource = $_
+        }
+        [string]$DataSource_id = $DataSource.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($DataSource_id)")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -12789,11 +12818,12 @@ Function Copy-AutomateNOWDataSource {
     Process {
         If ($PermissionToProceed -ne $false) {
             [string]$DataSource_oldId = $DataSource.id
+            [string]$DataSource_simpleId = $DataSource.simpleId
             If ($DataSource_oldId -eq $NewId) {
                 Write-Warning -Message "The new id cannot be the same as the old id."
                 Break
             }
-            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Data Source $($DataSource.simpleId) to $($NewId)?")) -eq $true) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Data Source $($DataSource_simpleId) to $($NewId)?")) -eq $true) {
                 [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
                 If ($UnsetFolder -eq $True) {
                     $BodyMetaData.'folder' = $Null
@@ -13798,6 +13828,10 @@ Function Remove-AutomateNOWDataSourceItem {
             [ANOWDataSourceItem]$DataSourceItem = $_
         }
         [string]$DataSourceItem_id = $DataSourceItem.id
+        If ($DataSourceItem_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
         If ($DataSourceItem -is [ANOWLocalDictionaryRecord]) {
             [string]$command = '/localDictionaryRecord/delete'
             [string]$componentId = 'LocalDictionaryRecordList'
@@ -14238,16 +14272,11 @@ Function Set-AutomateNOWDomain {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Make changes to $($Domain.id)?")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [string]$Domain_id = $_.id
-            }
-            ElseIf ($Domain.id.Length -gt 0) {
-                [string]$Domain_id = $Domain.id
-            }
-            Else {
-                [string]$Domain_id = $Id
-            }
+        If ($_.id.Length -gt 0) {
+            [ANOWDomain]$Domain = $_
+        }
+        [string]$Domain_id = $Domain.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Make changes to $($Domain_id)?")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -15118,16 +15147,15 @@ Function Remove-AutomateNOWDomain {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("ARE YOU SURE YOU WANT TO DELETE THE DOMAIN $($Domain.id)?")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [string]$Domain_id = $_.id
-            }
-            ElseIf ($Domain.id.Length -gt 0) {
-                [string]$Domain_id = $Domain.id
-            }
-            Else {
-                [string]$Domain_id = $Id
-            }
+        If ($_.id.Length -gt 0) {
+            [ANOWDomain]$Domain = $_
+        }
+        [string]$Domain_id = $Domain.id
+        If ($Domain_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("ARE YOU SURE YOU WANT TO DELETE THE DOMAIN $($Domain_id)?")) -eq $true) {
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
             [string]$old_values = $Domain.CreateOldValues()
             $BodyMetaData.'id' = $Domain_id
@@ -15220,16 +15248,11 @@ Function Suspend-AutomateNOWDomain {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Suspend the domain $($Domain.id)?")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [string]$Domain_id = $_.id
-            }
-            ElseIf ($Domain.id.Length -gt 0) {
-                [string]$Domain_id = $Domain.id
-            }
-            Else {
-                [string]$Domain_id = $Id
-            }
+        If ($_.id.Length -gt 0) {
+            [ANOWDomain]$Domain = $_
+        }
+        [string]$Domain_id = $Domain.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Suspend the domain $($Domain_id)?")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -15336,16 +15359,11 @@ Function Resume-AutomateNOWDomain {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Resume the domain $($Domain.id)?")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [string]$Domain_id = $_.id
-            }
-            ElseIf ($Domain.id.Length -gt 0) {
-                [string]$Domain_id = $Domain.id
-            }
-            Else {
-                [string]$Domain_id = $Id
-            }
+        If ($_.id.Length -gt 0) {
+            [ANOWDomain]$Domain = $_
+        }
+        [string]$Domain_id = $Domain.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Resume the domain $($Domain_id)?")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -15968,7 +15986,7 @@ Function Set-AutomateNOWEndpoint {
         }
         [string]$Endpoint_id = $Endpoint.id
         [string]$Endpoint_type = $Endpoint.endpointType
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Endpoint.id)")) -eq $true) {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Endpoint_id)")) -eq $true) {
             Else {
             }
             ## Begin warning ##
@@ -16490,11 +16508,12 @@ Function Copy-AutomateNOWEndpoint {
     Process {
         If ($PermissionToProceed -ne $false) {
             [string]$Endpoint_oldId = $Endpoint.id
+            [string]$Endpoint_simpleId = $Endpoint.simpleId
             If ($Endpoint_oldId -eq $NewId) {
                 Write-Warning -Message "The new id cannot be the same as the old id."
                 Break
             }
-            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Endpoint $($Endpoint.simpleId) to $($NewId)?")) -eq $true) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Endpoint $($Endpoint_simpleId) to $($NewId)?")) -eq $true) {
                 [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
                 If ($UnsetFolder -eq $True) {
                     $BodyMetaData.'folder' = $Null
@@ -16795,16 +16814,15 @@ Function Remove-AutomateNOWEndpoint {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Endpoint.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [string]$Endpoint_id = $_.id
-            }
-            ElseIf ($Endpoint.id.Length -gt 0) {
-                [string]$Endpoint_id = $Endpoint.id
-            }
-            Else {
-                [string]$Endpoint_id = $Id
-            }
+        If ($_.id.Length -gt 0) {
+            [ANOWEndpoint]$Endpoint = $_
+        }
+        [string]$Endpoint_id = $Endpoint.id
+        If ($Endpoint_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Endpoint_id)")) -eq $true) {
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
             [string]$old_values = $Endpoint.CreateOldValues()
             $BodyMetaData.'id' = $Endpoint_id
@@ -17198,7 +17216,7 @@ Function Set-AutomateNOWEvent {
         Else {
             Write-Debug -Message "Detected the value of Event object [$Event_simpleId] to be [$current_Event_value]"
         }
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Event.id)")) -eq $true) {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Event_id)")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -17663,11 +17681,15 @@ Function Remove-AutomateNOWEvent {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Event.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [ANOWEvent]$Event = $_
-            }
-            [string]$Event_id = $Event.id
+        If ($_.id.Length -gt 0) {
+            [ANOWEvent]$Event = $_
+        }
+        [string]$Event_id = $Event.id
+        If ($Event_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Event_id)")) -eq $true) {
             [string]$oldvalues = $Event.CreateOldValues()
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
             $BodyMetaData.'id' = $Event.id
@@ -17836,11 +17858,12 @@ Function Copy-AutomateNOWEvent {
     Process {
         If ($PermissionToProceed -ne $false) {
             [string]$Event_oldId = $Event.id
+            [string]$Event_simpleId = $Event.simpleId
             If ($Event_oldId -eq $NewId) {
                 Write-Warning -Message "The new id cannot be the same as the old id."
                 Break
             }
-            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Event $($Event.simpleId) to $($NewId)?")) -eq $true) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Event $($Event_simpleId) to $($NewId)?")) -eq $true) {
                 [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
                 If ($UnsetFolder -eq $True) {
                     $BodyMetaData.'folder' = $Null
@@ -18756,16 +18779,11 @@ Function Set-AutomateNOWFolder {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Folder.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [string]$Folder_id = $_.id
-            }
-            ElseIf ($Folder.id.Length -gt 0) {
-                [string]$Folder_id = $Folder.id
-            }
-            Else {
-                [string]$Folder_id = $Id
-            }
+        If ($_.id.Length -gt 0) {
+            [ANOWFolder]$Folder = $_
+        }
+        [string]$Folder_id = $Folder.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Folder_id)")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -19108,6 +19126,10 @@ Function Remove-AutomateNOWFolder {
             [ANOWFolder]$Folder = $_
         }
         [string]$Folder_id = $Folder.id
+        If ($Folder_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Folder_id)")) -eq $true) {
             [string]$oldvalues = $Folder.CreateOldValues()
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
@@ -19892,7 +19914,7 @@ Function Set-AutomateNOWLock {
         }
         [string]$Lock_id = $Lock.id
         [string]$Lock_simpleId = $Lock.simpleId
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Lock.id)")) -eq $true) {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Lock_id)")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -20337,11 +20359,15 @@ Function Remove-AutomateNOWLock {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Lock.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [ANOWLock]$Lock = $_
-            }
-            [string]$Lock_id = $Lock.id
+        If ($_.id.Length -gt 0) {
+            [ANOWLock]$Lock = $_
+        }
+        [string]$Lock_id = $Lock.id
+        If ($Lock_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Lock_id)")) -eq $true) {
             [string]$oldvalues = $Lock.CreateOldValues()
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
             $BodyMetaData.'id' = $Lock.id
@@ -20510,11 +20536,12 @@ Function Copy-AutomateNOWLock {
     Process {
         If ($PermissionToProceed -ne $false) {
             [string]$Lock_oldId = $Lock.id
+            [string]$Lock_simpleId = $Lock.simpleId
             If ($Lock_oldId -eq $NewId) {
                 Write-Warning -Message "The new id cannot be the same as the old id."
                 Break
             }
-            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Lock $($Lock.simpleId) to $($NewId)?")) -eq $true) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Lock $($Lock_simpleId) to $($NewId)?")) -eq $true) {
                 [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
                 If ($UnsetFolder -eq $True) {
                     $BodyMetaData.'folder' = $Null
@@ -21207,7 +21234,7 @@ Function Set-AutomateNOWMetric {
         [string]$current_Metric_veryLowValue = $Metric.valueVeryLowThreshold
         [string]$current_Metric_highValue = $Metric.valueHighThreshold
         [string]$current_Metric_veryHighValue = $Metric.valueVeryHighThreshold
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Metric.id)")) -eq $true) {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Metric_id)")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -21825,11 +21852,15 @@ Function Remove-AutomateNOWMetric {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Metric.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [ANOWMetric]$Metric = $_
-            }
-            [string]$Metric_id = $Metric.id
+        If ($_.id.Length -gt 0) {
+            [ANOWMetric]$Metric = $_
+        }
+        [string]$Metric_id = $Metric.id
+        If ($Metric_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Metric_id)")) -eq $true) {
             [string]$oldvalues = $Metric.CreateOldValues()
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
             $BodyMetaData.'id' = $Metric.id
@@ -21998,11 +22029,12 @@ Function Copy-AutomateNOWMetric {
     Process {
         If ($PermissionToProceed -ne $false) {
             [string]$Metric_oldId = $Metric.id
+            [string]$Metric_simpleId = $Metric.simpleId
             If ($Metric_oldId -eq $NewId) {
                 Write-Warning -Message "The new id cannot be the same as the old id."
                 Break
             }
-            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Metric $($Metric.simpleId) to $($NewId)?")) -eq $true) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Metric $($Metric_simpleId) to $($NewId)?")) -eq $true) {
                 [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
                 If ($UnsetFolder -eq $True) {
                     $BodyMetaData.'folder' = $Null
@@ -22892,11 +22924,12 @@ Function Copy-AutomateNOWNode {
     Process {
         If ($PermissionToProceed -ne $false) {
             [string]$Node_oldId = $Node.id
+            [string]$Node_simpleId = $Node.simpleId
             If ($Node_oldId -eq $NewId) {
                 Write-Warning -Message "The new id cannot be the same as the old id."
                 Break
             }
-            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Node $($Node.simpleId) to $($NewId)?")) -eq $true) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Node $($Node_simpleId) to $($NewId)?")) -eq $true) {
                 [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
                 If ($UnsetFolder -eq $True) {
                     $BodyMetaData.'folder' = $Null
@@ -23048,6 +23081,10 @@ Function Remove-AutomateNOWNode {
             [ANOWNode]$Node = $_
         }
         [string]$Node_id = $Node.id
+        If ($Node_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Node_id)")) -eq $true) {
             [string]$oldvalues = $Node.CreateOldValues()
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
@@ -23456,14 +23493,10 @@ Function Stop-AutomateNOWNode {
     }
     Process {
         If ($_.id.Length -gt 0) {
-            [string]$Node_id = $_.id
-            [string]$Node_simpleId = $_.simpleId
+            [ANOWNode]$Node = $_
         }
-        Else {
-            [string]$Node_id = $Node.id
-            [string]$Node_simpleId = $Node.simpleId
-        }
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Node.id)")) -eq $true) {
+        [string]$Node_id = $Node.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Node_id)")) -eq $true) {
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
             $BodyMetaData.Add('id', $Node_id )
             $BodyMetaData.Add('_operationType', 'custom')
@@ -23675,16 +23708,11 @@ Function Suspend-AutomateNOWNode {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Suspend the Node $($Node.id)?")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [string]$Node_id = $_.id
-            }
-            ElseIf ($Node.id.Length -gt 0) {
-                [string]$Node_id = $Node.id
-            }
-            Else {
-                [string]$Node_id = $Id
-            }
+        If ($_.id.Length -gt 0) {
+            [ANOWNode]$Node = $_
+        }
+        [string]$Node_id = $Node.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Suspend the Node $($Node_id)?")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -23791,16 +23819,11 @@ Function Resume-AutomateNOWNode {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Resume the Node $($Node.id)?")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [string]$Node_id = $_.id
-            }
-            ElseIf ($Node.id.Length -gt 0) {
-                [string]$Node_id = $Node.id
-            }
-            Else {
-                [string]$Node_id = $Id
-            }
+        If ($_.id.Length -gt 0) {
+            [ANOWNode]$Node = $_
+        }
+        [string]$Node_id = $Node.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Resume the Node $($Node_id)?")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -24563,6 +24586,10 @@ Function Remove-AutomateNOWNotification {
             [ANOWNotification]$Notification = $_
         }
         [int64]$Notification_id = $Notification.id
+        If ($Notification_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Notification_id)")) -eq $true) {
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
             [string]$old_values = $Notification.CreateOldValues()
@@ -24905,11 +24932,11 @@ Function Set-AutomateNOWNotificationChannel {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($NotificationChannel.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [ANOWNotificationChannel]$NotificationChannel = $_
-            }
-            [string]$NotificationChannel_id = $NotificationChannel.Id
+        If ($_.id.Length -gt 0) {
+            [ANOWNotificationChannel]$NotificationChannel = $_
+        }
+        [string]$NotificationChannel_id = $NotificationChannel.Id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($NotificationChannel_id)")) -eq $true) {
             [string]$NotificationChannel_notificationChannelType = $NotificationChannel.notificationChannelType
             If ($ConnectionCode.Length -gt 0 -and $NotificationChannel_notificationChannelType -notin @('CUSTOM_FUNCTION', 'SCRIPT', 'WEB_SERVICE')) {
                 Write-Warning -Message "The Notification Channel type [$NotificationChannel_notificationChannelType] does not accept Connection Code!"
@@ -25396,6 +25423,10 @@ Function Remove-AutomateNOWNotificationChannel {
             [ANOWNotificationChannel]$NotificationChannel = $_
         }
         [string]$NotificationChannel_id = $NotificationChannel.id
+        If ($NotificationChannel_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($NotificationChannel_id)")) -eq $true) {
             [string]$oldvalues = $NotificationChannel.CreateOldValues()
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
@@ -25564,11 +25595,12 @@ Function Copy-AutomateNOWNotificationChannel {
     Process {
         If ($PermissionToProceed -ne $false) {
             [string]$NotificationChannel_oldId = $NotificationChannel.id
+            [string]$NotificationChannel_simpleId = $NotificationChannel.simpleId
             If ($NotificationChannel_oldId -eq $NewId) {
                 Write-Warning -Message "The new id cannot be the same as the old id."
                 Break
             }
-            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Notification Channel $($NotificationChannel.simpleId) to $($NewId)?")) -eq $true) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Notification Channel $($NotificationChannel_simpleId) to $($NewId)?")) -eq $true) {
                 [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
                 If ($UnsetFolder -eq $True) {
                     $BodyMetaData.'folder' = $Null
@@ -26047,16 +26079,11 @@ Function Set-AutomateNOWNotificationGroup {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($NotificationGroup.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [string]$NotificationGroup_id = $_.id
-            }
-            ElseIf ($NotificationGroup.id.Length -gt 0) {
-                [string]$NotificationGroup_id = $NotificationGroup.id
-            }
-            Else {
-                [string]$NotificationGroup_id = $Id
-            }
+        If ($_.id.Length -gt 0) {
+            [ANOWNotificationGroup]$NotificationGroup = $_
+        }
+        [string]$NotificationGroup_id = $NotificationGroup.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($NotificationGroup_id)")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -26525,6 +26552,10 @@ Function Remove-AutomateNOWNotificationGroup {
             [ANOWNotificationGroup]$NotificationGroup = $_
         }
         [string]$NotificationGroup_id = $NotificationGroup.id
+        If ($NotificationGroup_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($NotificationGroup_id)")) -eq $true) {
             [string]$oldvalues = $NotificationGroup.CreateOldValues()
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
@@ -26694,11 +26725,12 @@ Function Copy-AutomateNOWNotificationGroup {
     Process {
         If ($PermissionToProceed -ne $false) {
             [string]$NotificationGroup_oldId = $NotificationGroup.id
+            [string]$NotificationGroup_simpleId = $NotificationGroup.simpleId
             If ($NotificationGroup_oldId -eq $NewId) {
                 Write-Warning -Message "The new id cannot be the same as the old id."
                 Break
             }
-            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Notification Group $($NotificationGroup.simpleId) to $($NewId)?")) -eq $true) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Notification Group $($NotificationGroup_simpleId) to $($NewId)?")) -eq $true) {
                 [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
                 If ($UnsetFolder -eq $True) {
                     $BodyMetaData.'folder' = $Null
@@ -27679,6 +27711,10 @@ Function Remove-AutomateNOWNotificationGroupMember {
             [ANOWNotificationGroupMember]$NotificationGroupMember = $_
         }
         [string]$NotificationGroupMember_id = $NotificationGroupMember.id
+        If ($NotificationGroupMember_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
         ## Begin warning ##
         ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
         $Error.Clear()
@@ -28526,6 +28562,10 @@ Function Remove-AutomateNOWNotificationMessageTemplate {
             [ANOWNotificationMessageTemplate]$NotificationMessageTemplate = $_
         }
         [string]$NotificationMessageTemplate_id = $NotificationMessageTemplate.id
+        If ($NotificationMessageTemplate_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($NotificationMessageTemplate_id)")) -eq $true) {
             [string]$oldvalues = $NotificationMessageTemplate.CreateOldValues()
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
@@ -28694,11 +28734,12 @@ Function Copy-AutomateNOWNotificationMessageTemplate {
     Process {
         If ($PermissionToProceed -ne $false) {
             [string]$NotificationMessageTemplate_oldId = $NotificationMessageTemplate.id
+            [string]$NotificationMessageTemplate_simpleId = $NotificationMessageTemplate.simpleId
             If ($NotificationMessageTemplate_oldId -eq $NewId) {
                 Write-Warning -Message "The new id cannot be the same as the old id."
                 Break
             }
-            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Notification Message Template $($NotificationMessageTemplate.simpleId) to $($NewId)?")) -eq $true) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Notification Message Template $($NotificationMessageTemplate_simpleId) to $($NewId)?")) -eq $true) {
                 [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
                 If ($UnsetFolder -eq $True) {
                     $BodyMetaData.'folder' = $Null
@@ -29325,7 +29366,7 @@ Function Set-AutomateNOWPhysicalResource {
         [string]$current_PhysicalResource_valueUnit = $PhysicalResource.valueUnit
         [string]$current_PhysicalResource_minValue = $PhysicalResource.minValue
         [string]$current_PhysicalResource_maxValue = $PhysicalResource.maxValue
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($PhysicalResource.id)")) -eq $true) {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($PhysicalResource_id)")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -29854,11 +29895,15 @@ Function Remove-AutomateNOWPhysicalResource {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($PhysicalResource.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [ANOWPhysicalResource]$PhysicalResource = $_
-            }
-            [string]$PhysicalResource_id = $PhysicalResource.id
+        If ($_.id.Length -gt 0) {
+            [ANOWPhysicalResource]$PhysicalResource = $_
+        }
+        [string]$PhysicalResource_id = $PhysicalResource.id
+        If ($PhysicalResource_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($PhysicalResource_id)")) -eq $true) {
             [string]$oldvalues = $PhysicalResource.CreateOldValues()
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
             $BodyMetaData.'id' = $PhysicalResource.id
@@ -30027,11 +30072,12 @@ Function Copy-AutomateNOWPhysicalResource {
     Process {
         If ($PermissionToProceed -ne $false) {
             [string]$PhysicalResource_oldId = $PhysicalResource.id
+            [string]$PhysicalResource_simpleId = $PhysicalResource.simpleId
             If ($PhysicalResource_oldId -eq $NewId) {
                 Write-Warning -Message "The new id cannot be the same as the old id."
                 Break
             }
-            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Physical Resource $($PhysicalResource.simpleId) to $($NewId)?")) -eq $true) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Physical Resource $($PhysicalResource_simpleId) to $($NewId)?")) -eq $true) {
                 [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
                 If ($UnsetFolder -eq $True) {
                     $BodyMetaData.'folder' = $Null
@@ -31246,11 +31292,12 @@ Function Copy-AutomateNOWResultMapping {
     Process {
         If ($PermissionToProceed -ne $false) {
             [string]$ResultMapping_oldId = $ResultMapping.id
+            [string]$ResultMapping_simpleId = $ResultMapping.simpleId
             If ($ResultMapping_oldId -eq $NewId) {
                 Write-Warning -Message "The new id cannot be the same as the old id."
                 Break
             }
-            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Result Mapping $($ResultMapping.simpleId) to $($NewId)?")) -eq $true) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Result Mapping $($ResultMapping_simpleId) to $($NewId)?")) -eq $true) {
                 [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
                 If ($UnsetFolder -eq $True) {
                     $BodyMetaData.'folder' = $Null
@@ -31558,6 +31605,10 @@ Function Remove-AutomateNOWResultMapping {
             [ANOWResultMapping]$ResultMapping = $_
         }
         [string]$ResultMapping_id = $ResultMapping.id
+        If ($ResultMapping_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ResultMapping_id)")) -eq $true) {
             [string]$oldvalues = $ResultMapping.CreateOldValues()
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
@@ -32125,8 +32176,10 @@ Function Get-AutomateNOWSchedule {
         [Parameter(Mandatory = $False, ParameterSetName = 'Template')]
         [switch]$Descending,
         [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $True, ParameterSetName = 'Template')]
         [int32]$startRow = 0,
         [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $True, ParameterSetName = 'Template')]
         [int32]$endRow = 100
     )
     Begin {
@@ -32140,6 +32193,7 @@ Function Get-AutomateNOWSchedule {
         }
         [hashtable]$parameters = @{}
         $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
         If ($anow_session.NotSecure -eq $true) {
             $parameters.Add('NotSecure', $true)
         }
@@ -32377,13 +32431,12 @@ Function Remove-AutomateNOWSchedule {
     }
     Process {
         If ($_.id.Length -gt 0) {
-            [string]$Schedule_id = $_.id
+            [ANOWSchedule]$Schedule = $_
         }
-        ElseIf ($Schedule.id.Length -gt 0) {
-            [string]$Schedule_id = $Schedule.id
-        }
-        Else {
-            [string]$Schedule_id = $Id
+        [string]$Schedule_id = $Schedule.id
+        If ($Schedule_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess($Schedule_id, 'Archive')) -eq $true) {
             [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
@@ -32485,13 +32538,11 @@ Function Restart-AutomateNOWSchedule {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Schedule.id)")) -eq $true) {
-            If ($_.id -gt 0) {
-                [int64]$Schedule_id = $_.id
-            }
-            Else {
-                [int64]$Schedule_id = $Schedule.id
-            }
+        If ($_.id -gt 0) {
+            [ANOWSchedule]$Schedule = $_
+        }
+        [int64]$Schedule_id = $Schedule.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Schedule_id)")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -32639,13 +32690,11 @@ Function Stop-AutomateNOWSchedule {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Schedule.id)")) -eq $true) {
-            If ($_.id -gt 0) {
-                [int64]$Schedule_id = $_.id
-            }
-            Else {
-                [int64]$Schedule_id = $Schedule.id
-            }
+        If ($_.id -gt 0) {
+            [ANOWSchedule]$Schedule = $_
+        }
+        [int64]$Schedule_id = $Schedule.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Schedule_id)")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -32769,17 +32818,11 @@ Function Resume-AutomateNOWSchedule {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Schedule.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [int64]$Schedule_id = $_.id
-            }
-            ElseIf ($Schedule.id.Length -gt 0) {
-                [int64]$Schedule_id = $Schedule.id
-            }
-            Else {
-                Write-Warning -Message "Unable to determine the Id of the Schedule."
-                Break
-            }
+        If ($_.id.Length -gt 0) {
+            [ANOWSchedule]$Schedule = $_
+        }
+        [int64]$Schedule_id = $Schedule.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Schedule_id)")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -32886,16 +32929,11 @@ Function Suspend-AutomateNOWSchedule {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Schedule.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [string]$Schedule_id = $_.id
-            }
-            ElseIf ($Schedule.id.Length -gt 0) {
-                [string]$Schedule_id = $Schedule.id
-            }
-            Else {
-                [string]$Schedule_id = $Id
-            }
+        If ($_.id.Length -gt 0) {
+            [ANOWSchedule]$Schedule = $_
+        }
+        [string]$Schedule_id = $Schedule.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Schedule_id)")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -33327,7 +33365,7 @@ Function Set-AutomateNOWScheduleTemplate {
     Optional string array of CASE-SENSITIVE Tag Id's to include with this object.
 
     .PARAMETER UnsetTags
-    A switch parameter that will the Tags from the Schedule Template
+    A switch parameter that will remove the Tags from the Schedule Template
 
     .PARAMETER Force
     Force the change without confirmation. This is equivalent to -Confirm:$false
@@ -33415,16 +33453,11 @@ Function Set-AutomateNOWScheduleTemplate {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ScheduleTemplate.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [string]$ScheduleTemplate_id = $_.id
-            }
-            ElseIf ($ScheduleTemplate.id.Length -gt 0) {
-                [string]$ScheduleTemplate_id = $ScheduleTemplate.id
-            }
-            Else {
-                [string]$ScheduleTemplate_id = $Id
-            }
+        If ($_.id.Length -gt 0) {
+            [ANOWScheduleTemplate]$ScheduleTemplate = $_
+        }
+        [string]$ScheduleTemplate_id = $ScheduleTemplate.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ScheduleTemplate_id)")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -33956,6 +33989,10 @@ Function Remove-AutomateNOWScheduleTemplate {
             [ANOWScheduleTemplate]$ScheduleTemplate = $_
         }
         [string]$ScheduleTemplate_id = $ScheduleTemplate.id
+        If ($ScheduleTemplate_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ScheduleTemplate_id)")) -eq $true) {
             [string]$oldvalues = $ScheduleTemplate.CreateOldValues()
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
@@ -34128,11 +34165,12 @@ Function Copy-AutomateNOWScheduleTemplate {
     Process {
         If ($PermissionToProceed -ne $false) {
             [string]$ScheduleTemplate_oldId = $ScheduleTemplate.id
+            [string]$ScheduleTemplate_simpleId = $ScheduleTemplate.simpleId
             If ($ScheduleTemplate_oldId -eq $NewId) {
                 Write-Warning -Message "The new id cannot be the same as the old id."
                 Break
             }
-            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Schedule Template $($ScheduleTemplate.simpleId) to $($NewId)?")) -eq $true) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Schedule Template $($ScheduleTemplate_simpleId) to $($NewId)?")) -eq $true) {
                 [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
                 $BodyMetaData.'oldId' = $ScheduleTemplate_oldId
                 $BodyMetaData.'domain' = $ScheduleTemplate.domain
@@ -34675,16 +34713,11 @@ Function Resume-AutomateNOWScheduleTemplate {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ScheduleTemplate.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [string]$ScheduleTemplate_id = $_.id
-            }
-            ElseIf ($ScheduleTemplate.id.Length -gt 0) {
-                [string]$ScheduleTemplate_id = $ScheduleTemplate.id
-            }
-            Else {
-                [string]$ScheduleTemplate_id = $Id
-            }
+        If ($_.id.Length -gt 0) {
+            [ANOWScheduleTemplate]$ScheduleTemplate = $_
+        }
+        [string]$ScheduleTemplate_id = $ScheduleTemplate.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ScheduleTemplate_id)")) -eq $true) {
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
             $BodyMetaData.Add('id', $ScheduleTemplate_id )
             $BodyMetaData.Add('_operationType', 'update')
@@ -34793,16 +34826,11 @@ Function Suspend-AutomateNOWScheduleTemplate {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ScheduleTemplate.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [string]$ScheduleTemplate_id = $_.id
-            }
-            ElseIf ($ScheduleTemplate.id.Length -gt 0) {
-                [string]$ScheduleTemplate_id = $ScheduleTemplate.id
-            }
-            Else {
-                [string]$ScheduleTemplate_id = $Id
-            }
+        If ($_.id.Length -gt 0) {
+            [ANOWScheduleTemplate]$ScheduleTemplate = $_
+        }
+        [string]$ScheduleTemplate_id = $ScheduleTemplate.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ScheduleTemplate_id)")) -eq $true) {
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
             $BodyMetaData.Add('id', $ScheduleTemplate_id )
             $BodyMetaData.Add('_operationType', 'update')
@@ -35492,20 +35520,22 @@ Function Remove-AutomateNOWScheduleTemplateItem {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ProcessingTemplateItem.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [string]$ProcessingTemplateItem_id = $_.id
-            }
-            ElseIf ($ProcessingTemplateItem.id.Length -gt 0) {
-                [string]$ProcessingTemplateItem_id = $ProcessingTemplateItem.id
-            }
-            If ($ProcessingTemplateItem_id -notmatch '^[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}$') {
-                Write-Warning -Message "Was expecting the Id of the Processing Template Id to match a 36-character GUID, instead received [$ProcessingTemplateItem_id]. Please check into this."
-                Break
-            }
-            Else {
-                Write-Debug -Message "Received [$ProcessingTemplateItem_id] for the Id of the Processing Template Item to be removed"
-            }
+        If ($_.id.Length -gt 0) {
+            [ANOWProcessingTemplateItem]$ProcessingTemplateItem = $_.id
+        }
+        [string]$ProcessingTemplateItem_id = $ProcessingTemplateItem.id
+        If ($ProcessingTemplateItem_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
+        If ($ProcessingTemplateItem_id -notmatch '^[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}$') {
+            Write-Warning -Message "Was expecting the Id of the Processing Template Id to match a 36-character GUID, instead received [$ProcessingTemplateItem_id]. Please check into this."
+            Break
+        }
+        Else {
+            Write-Debug -Message "Received [$ProcessingTemplateItem_id] for the Id of the Processing Template Item to be removed"
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ProcessingTemplateItem_id)")) -eq $true) {
             $Error.Clear()
             Try {
                 [PSCustomObject]$ScheduleTemplateItems = Read-AutomateNOWScheduleTemplateItem -ScheduleTemplate $ScheduleTemplate
@@ -35910,7 +35940,7 @@ Function Set-AutomateNOWSemaphore {
         }
         [string]$Semaphore_id = $Semaphore.id
         [string]$Semaphore_simpleId = $Semaphore.simpleId
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Semaphore.id)")) -eq $true) {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Semaphore_id)")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -36373,11 +36403,15 @@ Function Remove-AutomateNOWSemaphore {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Semaphore.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [ANOWSemaphore]$Semaphore = $_
-            }
-            [string]$Semaphore_id = $Semaphore.id
+        If ($_.id.Length -gt 0) {
+            [ANOWSemaphore]$Semaphore = $_
+        }
+        [string]$Semaphore_id = $Semaphore.id
+        If ($Semaphore_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Semaphore_id)")) -eq $true) {
             [string]$oldvalues = $Semaphore.CreateOldValues()
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
             $BodyMetaData.'id' = $Semaphore.id
@@ -36546,11 +36580,12 @@ Function Copy-AutomateNOWSemaphore {
     Process {
         If ($PermissionToProceed -ne $false) {
             [string]$Semaphore_oldId = $Semaphore.id
+            [string]$Semaphore_simpleId = $Semaphore.simpleId
             If ($Semaphore_oldId -eq $NewId) {
                 Write-Warning -Message "The new id cannot be the same as the old id."
                 Break
             }
-            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Semaphore $($Semaphore.simpleId) to $($NewId)?")) -eq $true) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Semaphore $($Semaphore_simpleId) to $($NewId)?")) -eq $true) {
                 [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
                 If ($UnsetFolder -eq $True) {
                     $BodyMetaData.'folder' = $Null
@@ -37112,7 +37147,7 @@ Function Set-AutomateNOWSemaphoreTimestamp {
         }
         [string]$Semaphore_id = $Semaphore.id
         [string]$Semaphore_simpleId = $Semaphore.simpleId
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Semaphore.id)")) -eq $true) {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Semaphore_id)")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -37601,7 +37636,7 @@ Function Set-AutomateNOWStock {
         [string]$Stock_simpleId = $Stock.simpleId
         [int32]$Stock_total_permits = $Stock.totalPermits
         Write-Debug -Message "Detected [$Stock_total_permits] total permits in Stock [$Stock_simpleId]"
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Stock.id)")) -eq $true) {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Stock_id)")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -38065,11 +38100,15 @@ Function Remove-AutomateNOWStock {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Stock.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [ANOWStock]$Stock = $_
-            }
-            [string]$Stock_id = $Stock.id
+        If ($_.id.Length -gt 0) {
+            [ANOWStock]$Stock = $_
+        }
+        [string]$Stock_id = $Stock.id
+        If ($Stock_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Stock_id)")) -eq $true) {
             [string]$oldvalues = $Stock.CreateOldValues()
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
             $BodyMetaData.'id' = $Stock.id
@@ -38238,11 +38277,12 @@ Function Copy-AutomateNOWStock {
     Process {
         If ($PermissionToProceed -ne $false) {
             [string]$Stock_oldId = $Stock.id
+            [string]$Stock_simpleId = $Stock.simpleId
             If ($Stock_oldId -eq $NewId) {
                 Write-Warning -Message "The new id cannot be the same as the old id."
                 Break
             }
-            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Stock $($Stock.simpleId) to $($NewId)?")) -eq $true) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Stock $($Stock_simpleId) to $($NewId)?")) -eq $true) {
                 [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
                 If ($UnsetFolder -eq $True) {
                     $BodyMetaData.'folder' = $Null
@@ -38689,13 +38729,11 @@ Function Set-AutomateNOWTag {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Tag.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [string]$Tag_id = $_.simpleId
-            }
-            Else {
-                [string]$Tag_id = $Tag.simpleId
-            }
+        If ($_.id.Length -gt 0) {
+            [ANOWTag]$Tag = $_
+        }
+        [string]$Tag_id = $Tag.simpleId
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Tag_id)")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -39065,9 +39103,6 @@ Function Remove-AutomateNOWTag {
     .DESCRIPTION
     Removes a tag from an AutomateNOW! instance
 
-    .PARAMETER Id
-    A string array of simple Id's of the tags to delete. Do not include the domain. For example: 'Tag1' is valid, whereas '[Domain]Tag1' is not valid.
-
     .PARAMETER Tag
     An [ANOWTag] object representing the tag to be deleted.
 
@@ -39098,9 +39133,7 @@ Function Remove-AutomateNOWTag {
     #>
     [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
     Param(
-        [Parameter(Mandatory = $False, ParameterSetName = 'Id')]
-        [string[]]$Id,
-        [Parameter(Mandatory = $false, ValueFromPipeline = $True, ParameterSetName = 'Pipeline')]
+        [Parameter(Mandatory = $false, ValueFromPipeline = $True)]
         [ANOWTag]$Tag,
         [Parameter(Mandatory = $false)]
         [switch]$Force
@@ -39130,16 +39163,15 @@ Function Remove-AutomateNOWTag {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$(If($Tag.id.Length -gt 0) {$Tag.id} Else {$_.id})")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [string]$tag_id = $_.id
-            }
-            ElseIf ($Tag.id.Length -gt 0) {
-                [string]$tag_id = $Tag.id
-            }
-            Else {
-                [string]$tag_id = $Id
-            }
+        If ($_.id.Length -gt 0) {
+            [ANOWTag]$Tag = $_
+        }
+        [string]$tag_id = $Tag.id
+        If ($tag_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($tag_id)")) -eq $true) {
             [string]$Body = 'id=' + $tag_id
             If ($null -eq $parameters.Body) {
                 $parameters.Add('Body', $Body)
@@ -39263,25 +39295,19 @@ Function Get-AutomateNOWTask {
         [Parameter(Mandatory = $False, ParameterSetName = 'monitorType')]
         [Parameter(Mandatory = $False, ParameterSetName = 'sensorType')]
         [string]$sortBy = 'id',
-        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Template')]
         [Parameter(Mandatory = $False, ParameterSetName = 'taskType')]
         [Parameter(Mandatory = $False, ParameterSetName = 'monitorType')]
         [Parameter(Mandatory = $False, ParameterSetName = 'sensorType')]
         [switch]$Descending,
-        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Template')]
         [Parameter(Mandatory = $False, ParameterSetName = 'taskType')]
         [Parameter(Mandatory = $False, ParameterSetName = 'monitorType')]
         [Parameter(Mandatory = $False, ParameterSetName = 'sensorType')]
         [ANOWProcessing_processingStatus]$ProcessingStatus,
-        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
-        [Parameter(Mandatory = $False, ParameterSetName = 'taskType')]
-        [Parameter(Mandatory = $False, ParameterSetName = 'monitorType')]
-        [Parameter(Mandatory = $False, ParameterSetName = 'sensorType')]
+        [Parameter(Mandatory = $False)]
         [int32]$startRow = 0,
-        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
-        [Parameter(Mandatory = $False, ParameterSetName = 'taskType')]
-        [Parameter(Mandatory = $False, ParameterSetName = 'monitorType')]
-        [Parameter(Mandatory = $False, ParameterSetName = 'sensorType')]
+        [Parameter(Mandatory = $False)]
         [int32]$endRow = 100
     )
     Begin {
@@ -39529,13 +39555,12 @@ Function Remove-AutomateNOWTask {
     }
     Process {
         If ($_.id.Length -gt 0) {
-            [string]$Task_id = $_.id
+            [ANOWTask]$Task = $_
         }
-        ElseIf ($Task.id.Length -gt 0) {
-            [string]$Task_id = $Task.id
-        }
-        Else {
-            [string]$Task_id = $Id
+        [string]$Task_id = $Task.id
+        If ($Task_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess($Task_id, 'Archive')) -eq $true) {
             [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
@@ -39637,13 +39662,11 @@ Function Restart-AutomateNOWTask {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Task.id)")) -eq $true) {
-            If ($_.id -gt 0) {
-                [int64]$Task_id = $_.id
-            }
-            Else {
-                [int64]$Task_id = $Task.id
-            }
+        If ($_.id -gt 0) {
+            [ANOWTask]$Task = $_
+        }
+        [int64]$Task_id = $Task.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Task_id)")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -39791,13 +39814,11 @@ Function Stop-AutomateNOWTask {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Task.id)")) -eq $true) {
-            If ($_.id -gt 0) {
-                [int64]$Task_id = $_.id
-            }
-            Else {
-                [int64]$Task_id = $Task.id
-            }
+        If ($_.id -gt 0) {
+            [ANOWTask]$Task = $_
+        }
+        [int64]$Task_id = $Task.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Task_id)")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -39924,17 +39945,11 @@ Function Resume-AutomateNOWTask {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Task.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [int64]$Task_id = $_.id
-            }
-            ElseIf ($Task.id.Length -gt 0) {
-                [int64]$Task_id = $Task.id
-            }
-            Else {
-                Write-Warning -Message "Unable to determine the Id of the Task."
-                Break
-            }
+        If ($_.id.Length -gt 0) {
+            [ANOWTask]$Task = $_.id
+        }
+        [int64]$Task_id = $Task.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Task_id)")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -40047,16 +40062,11 @@ Function Suspend-AutomateNOWTask {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Task.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [string]$Task_id = $_.id
-            }
-            ElseIf ($Task.id.Length -gt 0) {
-                [string]$Task_id = $Task.id
-            }
-            Else {
-                [string]$Task_id = $Id
-            }
+        If ($_.id.Length -gt 0) {
+            [ANOWTask]$Task = $_.id
+        }
+        [string]$Task_id = $Task.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Task_id)")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -40531,7 +40541,7 @@ Function Set-AutomateNOWTaskTemplate {
     Optional string array of CASE-SENSITIVE Tag Id's to include with this object.
 
     .PARAMETER UnsetTags
-    A switch parameter that will the Tags from the Task Template
+    A switch parameter that will remove the Tags from the Task Template
 
     .PARAMETER Title
     A string representing the "alias" of the Task Template (this property needs a better explanation)
@@ -40768,16 +40778,11 @@ Function Set-AutomateNOWTaskTemplate {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($TaskTemplate.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [string]$TaskTemplate_id = $_.id
-            }
-            ElseIf ($TaskTemplate.id.Length -gt 0) {
-                [string]$TaskTemplate_id = $TaskTemplate.id
-            }
-            Else {
-                [string]$TaskTemplate_id = $Id
-            }
+        If ($_.id.Length -gt 0) {
+            [ANOWTaskTemplate]$TaskTemplate = $_
+        }
+        [string]$TaskTemplate_id = $TaskTemplate.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($TaskTemplate_id)")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -41653,6 +41658,10 @@ Function Remove-AutomateNOWTaskTemplate {
             [ANOWTaskTemplate]$TaskTemplate = $_
         }
         [string]$TaskTemplate_id = $TaskTemplate.id
+        If ($TaskTemplate_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($TaskTemplate_id)")) -eq $true) {
             [string]$oldvalues = $TaskTemplate.CreateOldValues()
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
@@ -41825,11 +41834,12 @@ Function Copy-AutomateNOWTaskTemplate {
     Process {
         If ($PermissionToProceed -ne $false) {
             [string]$TaskTemplate_oldId = $TaskTemplate.id
+            [string]$TaskTemplate_simpleId = $TaskTemplate.simpleId
             If ($TaskTemplate_oldId -eq $NewId) {
                 Write-Warning -Message "The new id cannot be the same as the old id."
                 Break
             }
-            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Task Template $($TaskTemplate.simpleId) to $($NewId)?")) -eq $true) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Task Template $($TaskTemplate_simpleId) to $($NewId)?")) -eq $true) {
                 [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
                 $BodyMetaData.'oldId' = $TaskTemplate_oldId
                 $BodyMetaData.'domain' = $TaskTemplate.domain
@@ -42395,16 +42405,11 @@ Function Resume-AutomateNOWTaskTemplate {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($TaskTemplate.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [string]$TaskTemplate_id = $_.id
-            }
-            ElseIf ($TaskTemplate.id.Length -gt 0) {
-                [string]$TaskTemplate_id = $TaskTemplate.id
-            }
-            Else {
-                [string]$TaskTemplate_id = $Id
-            }
+        If ($_.id.Length -gt 0) {
+            [ANOWTaskTemplate]$TaskTemplate = $_
+        }
+        [string]$TaskTemplate_id = $TaskTemplate.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($TaskTemplate_id)")) -eq $true) {
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
             $BodyMetaData.Add('id', $TaskTemplate_id )
             $BodyMetaData.Add('_operationType', 'update')
@@ -42513,16 +42518,11 @@ Function Suspend-AutomateNOWTaskTemplate {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($TaskTemplate.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [string]$TaskTemplate_id = $_.id
-            }
-            ElseIf ($TaskTemplate.id.Length -gt 0) {
-                [string]$TaskTemplate_id = $TaskTemplate.id
-            }
-            Else {
-                [string]$TaskTemplate_id = $Id
-            }
+        If ($_.id.Length -gt 0) {
+            [ANOWTaskTemplate]$TaskTemplate = $_
+        }
+        [string]$TaskTemplate_id = $TaskTemplate.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($TaskTemplate_id)")) -eq $true) {
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
             $BodyMetaData.Add('id', $TaskTemplate_id )
             $BodyMetaData.Add('_operationType', 'update')
@@ -42857,8 +42857,8 @@ Function Get-AutomateNOWTimeTrigger {
     .PARAMETER ScheduleTemplate
     Optional [ANOWScheduleTemplate] object in case you want to retrieve the Processing Time Triggers that are associated to a particular Schedule Template. Use Get-AutomateNOWScheduleTemplate to get this object.
 
-    .PARAMETER TriggerType
-    Optional string to filter the results on the type of Processing Time Trigger. Valid values are: SCHEDULE, EVENT, SELF_SERVICE, USER, PROCESSING, SERVER_NODE
+    .PARAMETER timeTriggerType
+    Optional string to filter the results on the type of Processing Time Trigger. Valid values are: TIMESTAMP, DAILY, REPEATING, CRON, CALENDAR_INTERVAL
 
     .PARAMETER startRow
     Integer to indicate the row to start from. This is intended for when you need to paginate the results. Default is 0.
@@ -42873,7 +42873,24 @@ Function Get-AutomateNOWTimeTrigger {
     An array of one or more [ANOWTimeTrigger] class objects that are linked to the provided [ANOWScheduleTemplate] object
 
     .EXAMPLE
+    Gets the first 100 Processing Time Triggers
 
+    Get-AutomateNOWTimeTrigger
+
+    .EXAMPLE
+    Gets the first 100 Processing Time Triggers of type 'DAILY'
+
+    Get-AutomateNOWTimeTrigger -timeTriggerType DAILY
+
+    .EXAMPLE
+    Gets the first 100 Processing Time Triggers that are associated with Schedule Template 'ScheduleTemplate1'
+
+    Get-AutomateNOWTimeTrigger -ScheduleTemplate (Get-AutomateNOWScheduleTemplate -Id 'ScheduleTemplate1')
+
+    .EXAMPLE
+    Gets the first 100 Processing Time Triggers that are associated with Schedule Template 'ScheduleTemplate1' of type 'DAILY'
+
+    Get-AutomateNOWTimeTrigger -ScheduleTemplate (Get-AutomateNOWScheduleTemplate -Id 'ScheduleTemplate1') -timeTriggerType DAILY
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
@@ -42884,10 +42901,13 @@ Function Get-AutomateNOWTimeTrigger {
     [OutputType([ANOWTimeTrigger[]])]
     [Cmdletbinding()]
     Param(
-        [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
+        [ValidateScript({ $_ -match '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' })]
+        [Parameter(Mandatory = $true, ParameterSetName = 'Id')]
+        [string]$Id,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default', ValueFromPipeline = $True)]
         [ANOWScheduletemplate]$ScheduleTemplate,
         [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
-        [ANOWProcessingTemplate_triggerType]$triggerType,
+        [ANOWTimeTrigger_timeTriggerType]$timeTriggerType,
         [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
         [int32]$startRow = 0,
         [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
@@ -42902,7 +42922,7 @@ Function Get-AutomateNOWTimeTrigger {
             Write-Warning -Message "Somehow there is not a valid token confirmed."
             Break
         }
-        [string]$command = '/processingTimeTrigger/read?'
+
         [hashtable]$parameters = @{}
         $parameters.Add('Method', 'GET')
         If ($anow_session.NotSecure -eq $true) {
@@ -42910,21 +42930,27 @@ Function Get-AutomateNOWTimeTrigger {
         }
     }
     Process {
+        [string]$command = '/processingTimeTrigger/read?'
         [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
         If ($_.Id.Length -gt 0 -or $ScheduleTemplate.id.Length -gt 0) {
             If ($_.Id.Length -gt 0) {
                 [ANOWScheduleTemplate]$ScheduleTemplate = $_
             }
             [string]$ScheduleTemplate_id = $ScheduleTemplate.id
-            $Body.Add('operator', 'and')
-            $Body.Add('_constructor', 'AdvancedCriteria')
-            $Body.Add('criteria', '{"fieldName":"processingTemplate","operator":"equals","value":"' + $ScheduleTemplate_id + '"}')
+        }
+        If ($Id.Length -gt 0) {
+            $Body.'id' = $Id
         }
         Else {
-            If ($triggerType.length -gt 0) {
+            If ($ScheduleTemplate_id.Length -gt 0 -or $timeTriggerType.length -gt 0) {
                 $Body.Add('operator', 'and')
                 $Body.Add('_constructor', 'AdvancedCriteria')
-                $Body.Add('criteria', '{"fieldName":"triggerType","operator":"equals","value":"' + $triggerType + '"}')
+                If ($ScheduleTemplate_id.Length -gt 0) {
+                    $Body.Add('criteria1', '{"fieldName":"processingTemplate","operator":"equals","value":"' + $ScheduleTemplate_id + '"}')
+                }
+                If ($timeTriggerType.length -gt 0) {
+                    $Body.Add('criteria2', '{"fieldName":"timeTriggerType","operator":"equals","value":"' + $timeTriggerType + '"}')
+                }
             }
             If ($Descending -eq $true) {
                 $Body.'_sortBy' = '-' + $sortBy
@@ -42973,12 +42999,28 @@ Function Get-AutomateNOWTimeTrigger {
             $Error.Clear()
             Try {
                 [ANOWTimeTrigger[]]$ProcessingTimeTriggers = ForEach ($result in $results.response.data) {
+                    [string]$TimeTrigger_Id = $result.Id
                     If ($result.timeZone.Length -gt 0) {
                         [string]$trigger_timezone = $result.timeZone
                         [ANOWTimeZone]$timezone = Get-AutomateNOWTimeZone -Id $trigger_timezone
                         $result.timeZone = $timezone
                     }
-                    $result.processingTemplate = $ScheduleTemplate
+                    If ($result.processingTemplate.Length -gt 0) {
+                        $result.processingTemplate = $ScheduleTemplate
+                    }
+                    If ($result.Calendar.Length -gt 0) {
+                        [string]$Calendar_Name = $result.Calendar
+                        $Error.Clear()
+                        Try {
+                            [ANOWCalendar]$Calendar = Get-AutomateNOWCalendar -Id $Calendar_Name
+                            $result.Calendar = $Calendar
+                        }
+                        Catch {
+                            [string]$Message = $_.Exception.Message
+                            Write-Warning -Message "Get-AutomateNOWCalendar failed to retrieve the calendar [$Calendar_Name] from Time Trigger Id [$TimeTrigger_id] under Get-AutomateNOWTimeTrigger due to [$Message]."
+                            Break
+                        }
+                    }
                     $result
                 }
             }
@@ -42995,6 +43037,426 @@ Function Get-AutomateNOWTimeTrigger {
             }
             Else {
                 Write-Verbose -Message "There were no Processing Time Triggers found at all. Was this instance of ANOW recently installed?"
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+Function Set-AutomateNOWTimeTrigger {
+    <#
+    .SYNOPSIS
+    Modifies a Time Trigger on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Modifies a Time Trigger on an AutomateNOW! instance
+
+    .PARAMETER TimeTrigger
+    A mandatory [ANOWTimeTrigger] object representing the Time Trigger to be modified
+
+    .PARAMETER timeTriggerType
+    A mandatory string representing the type of Processing Time Trigger. Valid choices are: TIMESTAMP, DAILY, REPEATING, CRON, CALENDAR_INTERVAL
+
+    .PARAMETER Hold
+    An optional boolean that causes items to be put on hold after loading
+
+    .PARAMETER Skip
+    An optional boolean that causes items to not be loaded
+
+    .PARAMETER calculateProcessingTimestampUsingLocalTime
+    An optional boolean parameter that sets the checkbox for "Calculate processing timestamp using local time"
+
+    .PARAMETER Calendar
+    An optional [ANOWCalendar] object that limits the trigger. Use Get-AutomateNOWCalendar to retrieve these.
+
+    .PARAMETER CalendarDays
+    An optional string to specify only certain days within the calendar. See the Notes section for a detailed table. Valid values are: 'CALENDAR_DAY(1,-1)', 'CALENDAR_DAY(!1)', 'CALENDAR_MONTH(1,3)', 'CALENDAR_DAY_OF_WEEK(1,-1, MON,FRIDAY)', 'RELATIVE_CALENDAR_DAY_OF_WEEK(1,-1)', 'CALENDAR_MONTH_OF_YEAR(1, -2, JAN, JULY)', 'CALENDAR_WEEK_OF_YEAR(3,-10)', 'CALENDAR_DAY_OF_MONTH(1,2,-4)', 'ADD_DAY_OF_WEEK(1,-1, MON,FRIDAY,-1)', 'ADD_MONTH_OF_YEAR(1, -2, JAN, JULY)', 'ADD_WEEK_OF_YEAR(3,-10)', 'ADD_DAY_OF_MONTH(1,2,-4)', 'CALENDAR_DAY(1)', 'CALENDAR_DAY(1)', 'SHIFT(-1D)', 'SHIFT(3W)', 'SHIFT(6M)', 'SHIFT(1Y)'
+
+    .PARAMETER CalendarInterval
+    A mandatory int32 to specify how many CalendarIntervalUnits should transpire before activation. For example: Every 5 Days. 5 is the interval and Days is the interval unit.
+
+    .PARAMETER CalendarIntervalUnit
+    A mandatory string to specify which type of "unit" is used as the interval. Valid values are: DAY, WEEK, MONTH, YEAR
+
+    .PARAMETER cronExpression
+    A mandatory string to specify the cron expression string. See the notes section for a list of examples.
+
+    .PARAMETER endTime
+    A mandatory int64 representing the "End Time" or "Until" of the REPEATING time trigger. The allowed range is between 0 and 86399999 (i.e. midnight and 13:59:59.999)
+
+    .PARAMETER preserveHourOfDayAcrossDaylightSavings
+    An optional boolean parameter that sets the checkbox for "Preserve hour across daylight savings" [sic]
+
+    .PARAMETER repeatInterval
+    A mandatory int64 representing the "Repeat every" value of the REPEATING time trigger. The allowed range is between 0 and 86399999 (i.e. midnight and 13:59:59.999)
+
+    .PARAMETER skipDayIfHourDoesNotExist
+    A boolean parameter that sets the checkbox for "Skip day if hour does not exist"
+
+    .PARAMETER startTime
+    A mandatory int64 number representing the "Start Time" or "Run Daily At" of the Processing Time Trigger. Note that this number is sometimes not shown in the UI. The allowed range is between 0 and 86399999 (i.e. midnight and 13:59:59.999)
+
+    .PARAMETER timestamp
+    A mandatory string representing the "Run Once At" time. Example: 12/31/2029 01:23:45
+
+    .PARAMETER timezone
+    An optional [ANOWTimeZone] object representing the timezone object for the Time Trigger. Use Get-AutomateNOWTimeZone to retrieve these objects.
+
+    .PARAMETER ValidFrom
+    An optional date string (e.g. 12/31/2029 01:23:45in t) that this Time Trigger is considered "Valid From"te that the timestamp you provide here is agaiapplied nst the Timezone thatobject  is applied to this Time Trigger. Example: 2029-12-31T01:23:45.678'
+
+    .PARAMETER ValidTo
+    An optional date string (e.g. 2030-01-01T01:23:45.678) that this Time Trigger is considered "Valid To". Note that the timestamp you provide here is applied against the Timezone object that is applied to this Time Trigger.
+
+    .PARAMETER Force
+    Force the change without confirmation. This is equivalent to -Confirm:$false
+
+    .PARAMETER Quiet
+    Switch parameter to silence the output of the updated [ANOWTimeTrigger] object
+
+    .INPUTS
+    ONLY [ANOWTimeTrigger] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    The modified [ANOWTimeTrigger] object will be returned
+
+    .EXAMPLE
+    Modifies a Time Trigger of type TIMESTAMP
+    Get-AutomateNOWTimeTrigger -Id '1a84bcf1-5d2f-41ae-b953-b6085864d08b' | Set-AutomateNOWTimeTrigger -timeTriggerType 'TIMESTAMP' -calculateProcessingTimestampUsingLocalTime $true -timestamp '2029-10-10T18:30:00.000' -timeZone (Get-AutomateNOWTimeZone -Id 'America/New_York') -Skip $true -Hold $true
+
+    .EXAMPLE
+    Forcibly modifies a Time Trigger of type DAILY
+    Get-AutomateNOWTimeTrigger -Id '4a15969c-803e-432b-bb4d-0ec380153455' | Set-AutomateNOWTimeTrigger -timeTriggerType 'DAILY' -calculateProcessingTimestampUsingLocalTime $true -calendar (Get-AutomateNOWCalendar -Id 'MyCalendar') -calendarDays 'RELATIVE_CALENDAR_DAY_OF_WEEK(1,-1)' -preserveHourOfDayAcrossDaylightSavings $true -startTime 1020000 -skipDayIfHourDoesNotExist $true -timeZone (Get-AutomateNOWTimeZone -Id 'America/New_York') -validFrom '2029-11-01T00:00:00.000' -validTo '2029-12-01T00:00:00.000' -skip $false -hold $false -Force
+
+    .EXAMPLE
+    Modifies a Time Trigger of type REPEATING
+    Get-AutomateNOWTimeTrigger -Id 'a779f2be-d1f1-4ff7-81b6-3e4159fd7129' | Set-AutomateNOWTimeTrigger -timeTriggerType 'REPEATING' -calendar (Get-AutomateNOWCalendar -Id 'MyCalendar') -calendarDays 'RELATIVE_CALENDAR_DAY_OF_WEEK(1,-1)' -endTime 2020000 -repeatInterval 15000 -startTime 1020000 -validFrom '2029-11-01T00:00:00.000' -validTo '2029-12-01T00:00:00.000' -skip $false -hold $false
+
+    .EXAMPLE
+    Modifies a Time Trigger of type CRON
+    Get-AutomateNOWTimeTrigger -Id '1078ab80-e068-4ef3-beb8-f63f923d3320' | Set-AutomateNOWTimeTrigger -timeTriggerType 'CRON' -calculateProcessingTimestampUsingLocalTime $true -calendar (Get-AutomateNOWCalendar -Id 'MyCalendar') -calendarDays 'RELATIVE_CALENDAR_DAY_OF_WEEK(1,-1)' -cronExpression '0 0-5 14 * * ?' -timeZone (Get-AutomateNOWTimeZone -Id 'America/New_York') -validFrom '2029-11-01T00:00:00.000' -validTo '2029-12-01T00:00:00.000' -skip $false -hold $false
+
+    .EXAMPLE
+    Modifies a Time Trigger of type CALENDAR_INTERVAL
+    Get-AutomateNOWTimeTrigger -Id '571d5c9c-bef0-4ef4-9d4e-7cdde4068b68' | Set-AutomateNOWTimeTrigger -timeTriggerType 'CALENDAR_INTERVAL' -calculateProcessingTimestampUsingLocalTime $true -calendarInterval 3 -calendarIntervalUnit 'MONTH' -preserveHourOfDayAcrossDaylightSavings $true -skipDayIfHourDoesNotExist $true -startTime 60000 -timeZone (Get-AutomateNOWTimeZone -Id 'America/New_York') -validFrom '2029-11-01T00:00:00.000' -validTo '2029-12-01T00:00:00.000' -skip $true -hold $true -Quiet
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    Calendar Days values are below:
+
+    CALENDAR_DAY(1,-1)                       First and last day of every month of base calendars
+    CALENDAR_DAY(!1)                         All days of base calendars except first day of every month
+    CALENDAR_MONTH(1,3)                      Days in first and third months of base calendars
+    CALENDAR_DAY_OF_WEEK(1,-1, MON,FRIDAY)   First and last day of week plus mondays and fridays of base calendars
+    RELATIVE_CALENDAR_DAY_OF_WEEK(1,-1)      First and last day of all calendar week days in given month
+    CALENDAR_MONTH_OF_YEAR(1, -2, JAN, JULY) First (January) and second to last (November) month of year plus June and July of base calendars
+    CALENDAR_WEEK_OF_YEAR(3,-10)             Third and 10th from last week of year of base calendars
+    CALENDAR_DAY_OF_MONTH(1,2,-4)            First, second and third to last day of each month of base calendars
+    ADD_DAY_OF_WEEK(1,-1, MON,FRIDAY,-1)     Add first and last day of week and mondays and fridays
+    ADD_MONTH_OF_YEAR(1, -2, JAN, JULY)      Add first (January) and second to last (November) month of year plus June and July
+    ADD_WEEK_OF_YEAR(3,-10)                  Add third and 10th from last week of year
+    ADD_DAY_OF_MONTH(1,2,-4)                 Add first, second and third to last day of each month
+    CALENDAR_DAY(1) and CALENDAR_MONTH(1)    First day of first month in base calendar(s)
+    CALENDAR_DAY(1) or CALENDAR_MONTH(1)     First day of every month plus all days in first month of the base calendar
+    SHIFT(-1D)                               Move base calendars' days back 1 day
+    SHIFT(3W)                                Move base calendars' days forward 3 weeks
+    SHIFT(6M)                                Move base calendars' days forward 6 months
+    SHIFT(1Y)                                Move base calendars' days forward 1 year
+
+    Cron examples are below:
+
+    '0 0 12 * * ?': 'Fire at 12pm (noon) every day',
+    '0 15 10 ? * *': 'Fire at 10:15am every day',
+    '0 15 10 * * ?': 'Fire at 10:15am every day',
+    '0 15 10 * * ? *': 'Fire at 10:15am every day',
+    '0 15 10 * * ? 2005': 'Fire at 10:15am every day during the year 2005',
+    '0 * 14 * * ?': 'Fire every minute starting at 2pm and ending at 2:59pm, every day',
+    '0 0/5 14 * * ?': 'Fire every 5 minutes starting at 2pm and ending at 2:55pm, every day',
+    '0 0/5 14,18 * * ?': 'Fire every 5 minutes starting at 2pm and ending at 2:55pm, AND fire every 5 minutes starting at 6pm and ending at 6:55pm, every day',
+    '0 0-5 14 * * ?': 'Fire every minute starting at 2pm and ending at 2:05pm, every day',
+    '0 10,44 14 ? 3 WED': 'Fire at 2:10pm and at 2:44pm every Wednesday in the month of March.',
+    '0 15 10 ? * MON-FRI': 'Fire at 10:15am every Monday, Tuesday, Wednesday, Thursday and Friday',
+    '0 15 10 15 * ?': 'Fire at 10:15am on the 15th day of every month',
+    '0 15 10 L * ?': 'Fire at 10:15am on the last day of every month',
+    '0 15 10 L-2 * ?': 'Fire at 10:15am on the 2nd-to-last last day of every month',
+    '0 15 10 ? * 6L': 'Fire at 10:15am on the last Friday of every month',
+    '0 15 10 ? * 6L 2002-2005': 'Fire at 10:15am on every last friday of every month during the years 2002, 2003, 2004 and 2005',
+    '0 15 10 ? * 6#3': 'Fire at 10:15am on the third Friday of every month',
+    '0 0 12 1/5 * ?': 'Fire at 12pm (noon) every 5 days every month, starting on the first day of the month.',
+    '0 11 11 11 11 ?': 'Fire every November 11th at 11:11am.',
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High', DefaultParameterSetName = 'DAILY')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
+        [ANOWTimeTrigger]$TimeTrigger,
+        [Parameter(Mandatory = $true)]
+        [ANOWTimeTrigger_timeTriggerType]$timeTriggerType,
+        [Parameter(Mandatory = $false)]
+        [Nullable[boolean]]$skip,
+        [Parameter(Mandatory = $false)]
+        [Nullable[boolean]]$hold,
+        [Parameter(Mandatory = $false, ParameterSetName = 'TIMESTAMP')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'DAILY')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'CRON')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'CALENDAR_INTERVAL')]
+        [Nullable[boolean]]$calculateProcessingTimestampUsingLocalTime,
+        [Parameter(Mandatory = $false, ParameterSetName = 'DAILY')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'REPEATING')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'CRON')]
+        [ANOWCalendar]$Calendar,
+        [ValidateSet('CALENDAR_DAY(1,-1)', 'CALENDAR_DAY(!1)', 'CALENDAR_MONTH(1,3)', 'CALENDAR_DAY_OF_WEEK(1,-1, MON,FRIDAY)', 'RELATIVE_CALENDAR_DAY_OF_WEEK(1,-1)', 'CALENDAR_MONTH_OF_YEAR(1, -2, JAN, JULY)', 'CALENDAR_WEEK_OF_YEAR(3,-10)', 'CALENDAR_DAY_OF_MONTH(1,2,-4)', 'ADD_DAY_OF_WEEK(1,-1, MON,FRIDAY,-1)', 'ADD_MONTH_OF_YEAR(1, -2, JAN, JULY)', 'ADD_WEEK_OF_YEAR(3,-10)', 'ADD_DAY_OF_MONTH(1,2,-4)', 'CALENDAR_DAY(1)', 'CALENDAR_DAY(1)', 'SHIFT(-1D)', 'SHIFT(3W)', 'SHIFT(6M)', 'SHIFT(1Y)')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'DAILY')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'REPEATING')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'CRON')]
+        [string]$CalendarDays,
+        [Parameter(Mandatory = $true, ParameterSetName = 'CALENDAR_INTERVAL')]
+        [int32]$calendarInterval,
+        [Parameter(Mandatory = $true, ParameterSetName = 'CALENDAR_INTERVAL')]
+        [ANOWTimeTrigger_calendarIntervalUnit]$calendarIntervalUnit,
+        [ValidateScript({ (($_ -split ' ' | Measure-Object | Select-Object -ExpandProperty Count) -in (6, 7)) })]
+        [Parameter(Mandatory = $true, ParameterSetName = 'CRON', HelpMessage = 'See the help for examples')]
+        [string]$cronExpression,
+        [ValidateRange(0, 86399999)]
+        [Parameter(Mandatory = $true, ParameterSetName = 'REPEATING')]
+        [int64]$endTime,
+        [Parameter(Mandatory = $false, ParameterSetName = 'DAILY')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'CALENDAR_INTERVAL')]
+        [Nullable[boolean]]$preserveHourOfDayAcrossDaylightSavings,
+        [ValidateRange(0, 86399999)]
+        [Parameter(Mandatory = $true, ParameterSetName = 'REPEATING')]
+        [int64]$repeatInterval,
+        [Parameter(Mandatory = $false, ParameterSetName = 'DAILY')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'CALENDAR_INTERVAL')]
+        [Nullable[boolean]]$skipDayIfHourDoesNotExist,
+        [ValidateRange(0, 86399999)]
+        [Parameter(Mandatory = $true, ParameterSetName = 'DAILY')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'REPEATING')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'CALENDAR_INTERVAL')]
+        [int64]$startTime,
+        [ValidateScript({ $_ -match '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{3}$' })]
+        [Parameter(Mandatory = $true, ParameterSetName = 'TIMESTAMP', HelpMessage = 'Enter a valid To date in the format of: 2029-12-31T01:23:45.678')]
+        [string]$timestamp,
+        [Parameter(Mandatory = $false, ParameterSetName = 'TIMESTAMP')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'DAILY')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'CRON')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'CALENDAR_INTERVAL')]
+        [ANOWTimeZone]$TimeZone,
+        [ValidateScript({ $_ -match '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{3}$' })]
+        [Parameter(Mandatory = $false, ParameterSetName = 'DAILY', HelpMessage = 'Enter a valid From date in the format of: 2029-12-31T01:23:45.678')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'REPEATING', HelpMessage = 'Enter a valid From date in the format of: 2029-12-31T01:23:45.678')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'CRON', HelpMessage = 'Enter a valid From date in the format of: 2029-12-31T01:23:45.678')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'CALENDAR_INTERVAL', HelpMessage = 'Enter a valid From date in the format of: 2029-12-31T01:23:45.678')]
+        [string]$validFrom,
+        [ValidateScript({ $_ -match '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{3}$' })]
+        [Parameter(Mandatory = $false, ParameterSetName = 'DAILY', HelpMessage = 'Enter a valid To date in the format of: 2029-12-31T01:23:45.678')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'REPEATING', HelpMessage = 'Enter a valid To date in the format of: 2029-12-31T01:23:45.678')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'CRON', HelpMessage = 'Enter a valid To date in the format of: 2029-12-31T01:23:45.678')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'CALENDAR_INTERVAL', HelpMessage = 'Enter a valid To date in the format of: 2029-12-31T01:23:45.678')]
+        [string]$validTo,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [string]$command = '/processingTimeTrigger/update'
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [ANOWTimeTrigger]$TimeTrigger = $_
+        }
+        [string]$TimeTrigger_id = $TimeTrigger.Id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($TimeTrigger_id)")) -eq $true) {
+            If ($validFrom.Length -gt 0 -or $validTo.Length -gt 0) {
+                If (($validFrom.Length -gt 0 -and $validTo.Length -gt 0) -and ($validTo -eq $validFrom)) {
+                    Write-Warning -Message "You can't have the same validFrom and validTo date!"
+                    Break
+                }
+                If (($validFrom.Length -gt 0 -and $validTo.Length -gt 0) -and ($validTo -lt $validFrom)) {
+                    Write-Warning -Message "If both a validFrom and validTo are specified then the validTo must be less then the validFrom!"
+                    Break
+                }
+                If (($validFrom.Length -eq 0 -and $validTo.Length -gt 0) -and ($TimeTrigger.validFrom.Length -gt 0)) {
+                    If ($TimeTrigger.validFrom -gt $validTo) {
+                        Write-Warning -Message "The validTo must be less than the pre-existing validFrom in this Time Trigger!"
+                        Break
+                    }
+                }
+                ElseIf (($validFrom.Length -gt 0 -and $validTo.Length -eq 0) -and ($TimeTrigger.validTo.Length -gt 0)) {
+                    If ($validFrom -gt $TimeTrigger.validTo) {
+                        Write-Warning -Message "The validFrom must be less than the pre-existing validTo in this Time Trigger!"
+                        Break
+                    }
+                }
+            }
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            [string]$oldvalues = $TimeTrigger.CreateOldValues()
+            $BodyMetaData.Add('id', $TimeTrigger_id )
+            If ($skip -eq $true) {
+                $BodyMetaData.Add('passBy', 'true' )
+            }
+            ElseIf ($skip -eq $false) {
+                $BodyMetaData.Add('passBy', 'false' )
+            }
+            If ($hold -eq $true) {
+                $BodyMetaData.Add('onHold', 'true' )
+            }
+            ElseIf ($hold -eq $false) {
+                $BodyMetaData.Add('onHold', 'false' )
+            }
+            $BodyMetaData.Add('tags', $null )
+            If ($calculateProcessingTimestampUsingLocalTime -eq $true) {
+                $BodyMetaData.Add('calculateProcessingTimestampUsingLocalTime', 'true')
+            }
+            ElseIf ($calculateProcessingTimestampUsingLocalTime -eq $false) {
+                $BodyMetaData.Add('calculateProcessingTimestampUsingLocalTime', 'false')
+            }
+            If ($Calendar.Id.Length -gt 0) {
+                [string]$Calendar_id = $Calendar.simpleId
+                $Error.Clear()
+                Try {
+                    [ANOWCalendar]$Calendar_object = Get-AutomateNOWCalendar -Id $Calendar_id
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Get-AutomateNOWCalendar failed to confirm that the Calendar object [$Calendar_id] actually existed under Set-AutomateNOWTimeTrigger due to [$Message]"
+                    Break
+                }
+                If ($Calendar_object.simpleId.Length -eq 0) {
+                    Throw "Get-AutomateNOWCalendar failed to locate the Calendar object [$Calendar_id] running under Set-AutomateNOWTimeTrigger. Please check again."
+                    Break
+                }
+                [string]$Calendar_id = $Calendar_object.Id
+                $BodyMetaData.Add('calendar', $Calendar_id)
+            }
+            If ($CalendarDays.Length -gt 0) {
+                $BodyMetaData.Add('calendarDays', $CalendarDays)
+            }
+            If ($calendarInterval.Count -gt 0) {
+                $BodyMetaData.Add('calendarInterval', $calendarInterval)
+            }
+            If ($calendarIntervalUnit.Length -gt 0) {
+                $BodyMetaData.Add('calendarIntervalUnit', $calendarIntervalUnit)
+            }
+            If ($cronExpression.Length -gt 0) {
+                $BodyMetaData.Add('cronExpression', $cronExpression)   
+            }
+            If ($endTime.Length -gt 0) {
+                $BodyMetaData.Add('endTime', $endTime )
+            }
+            If ($preserveHourOfDayAcrossDaylightSavings -eq $true) {
+                $BodyMetaData.Add('preserveHourOfDayAcrossDaylightSavings', 'true')
+            }
+            ElseIf ($preserveHourOfDayAcrossDaylightSavings -eq $false) {
+                $BodyMetaData.Add('preserveHourOfDayAcrossDaylightSavings', 'false')
+            }
+            If ($repeatInterval.Count -gt 0) {
+                $BodyMetaData.Add('repeatInterval', $repeatInterval)
+            }
+            If ($skipDayIfHourDoesNotExist -eq $true) {
+                $BodyMetaData.Add('skipDayIfHourDoesNotExist', 'true')
+            }
+            ElseIf ($skipDayIfHourDoesNotExist -eq $false) {
+                $BodyMetaData.Add('skipDayIfHourDoesNotExist', 'false')
+            }
+            If ($startTime.Length -gt 0) {
+                $BodyMetaData.Add('startTime', $startTime )
+            }
+            If ($timestamp.Length -gt 0) {
+                $BodyMetaData.Add('timestamp', $timestamp)
+                $Error.Clear()
+                Try {
+                    [string]$timestampInLocalTimezone = Get-Date -Date (Get-Date -Date $timestamp).AddMilliseconds($timezone.rawOffset) -Format 'yyyy-MM-ddTHH:mm:ss.fff'
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Somehow Get-Date failed to calculate the timestampInLocalTimezone for timestamp [$timestamp] due to $Message"
+                }
+                $BodyMetaData.Add('timestampInLocalTimezone', $timestampInLocalTimezone)
+            }
+            If ($TimeZone.Id.Length -gt 0) {
+                [string]$TimeZone_Id = $TimeZone.id
+                $BodyMetaData.Add('timeZone', $TimeZone_Id)
+            }
+            If ($validFrom.Length -gt 0) {
+                $BodyMetaData.Add('validFrom', $validFrom)
+            }
+            If ($validTo.Length -gt 0) {
+                $BodyMetaData.Add('validTo', $validTo)
+            }
+            $BodyMetaData.Add('_oldValues', $oldvalues)
+            $BodyMetaData.Add('_operationType', 'update')
+            $BodyMetaData.Add('_textMatchStyle', 'exact')
+            $BodyMetaData.Add('_componentId', 'ProcessingTimeTriggerEditForm')
+            $BodyMetaData.Add('_dataSource', 'ProcessingTimeTriggerDataSource')
+            $BodyMetaData.Add('isc_metaDataPrefix', '_')
+            $BodyMetaData.Add('isc_dataFormat', 'json')
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            $parameters.Add('Body', $Body)
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$TimeTrigger_id] due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
+            }
+            If ($results.response.data[0].timeZone.Length -gt 0) {
+                [string]$timezone_id = $results.response.data[0].timeZone
+                [ANOWTimeZone]$timezone = Get-AutomateNOWTimeZone -Id $timezone_id
+                $results.response.data[0].timeZone = $timezone
+            }
+            If ($results.response.data[0].processingTemplate.Length -gt 0) {
+                [string]$processing_template_id = $results.response.data[0].processingTemplate
+                [ANOWScheduleTemplate]$processingTemplate = Get-AutomateNOWScheduleTemplate -Id $processing_template_id
+                $results.response.data[0].processingTemplate = $processingTemplate
+            }
+            If ($results.response.data[0].Calendar.Length -gt 0) {
+                $Error.Clear()
+                Try {
+                    [ANOWCalendar]$Calendar = Get-AutomateNOWCalendar -Id ($results.response.data[0].Calendar)
+                    $results.response.data[0].Calendar = $Calendar
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Get-AutomateNOWCalendar failed to retrieve the calendar object from Time Trigger Id $TimeTrigger_id under Set-AutomateNOWTimeTrigger due to [$Message]."
+                    Break
+                }
+            }
+            $Error.Clear()
+            Try {
+                [ANOWTimeTrigger]$resumed_TimeTrigger = $results.response.data[0]
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Failed to create the [ANOWTimeTrigger] object after resuming (unpausing) [$TimeTrigger_id] due to [$Message]."
+                Break
+            }
+            Write-Verbose -Message "Time Trigger $TimeTrigger_id successfully updated"
+            If ($Quiet -ne $true) {
+                Return $resumed_TimeTrigger
             }
         }
     }
@@ -43126,6 +43588,10 @@ Function Remove-AutomateNOWTimeTrigger {
             [ANOWTimeTrigger]$ProcessingTimeTrigger = $_
         }
         [string]$ProcessingTimeTrigger_id = $ProcessingTimeTrigger.id
+        If ($ProcessingTimeTrigger_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ProcessingTimeTrigger_id)")) -eq $true) {
             [string]$oldvalues = $ProcessingTimeTrigger.CreateOldValues()
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
@@ -43185,7 +43651,7 @@ Function Add-AutomateNOWTimeTrigger {
     An int64 number representing the "start time" of the trigger. Note that this number is sometimes not shown in the UI. It is typically 0 (the first millisecond of the day).
 
     .PARAMETER endTime
-    An int64 number representing the "start time" of the trigger. Note that this number is sometimes not shown in the UI. It is typically 86399999 (the last millisecond before tomorrow).
+    An int64 number representing the "end time" of the trigger. Note that this number is sometimes not shown in the UI. It is typically 86399999 (the last millisecond before tomorrow).
 
     .PARAMETER repeatInterval
     An int64 number representing the "repeat interval" of the trigger. Note that this number is sometimes not shown in the UI. It is typically 3600000 (1 hour).
@@ -43552,7 +44018,7 @@ Function Resume-AutomateNOWTimeTrigger {
             Write-Warning -Message "$TimeTrigger_id is already resumed (unpaused) so there is no action required"
             Break
         }
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($TimeTrigger.id)")) -eq $true) {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($TimeTrigger_id)")) -eq $true) {
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
             $BodyMetaData.Add('id', $TimeTrigger_id )
             $BodyMetaData.Add('onHold', 'false')
@@ -43675,7 +44141,7 @@ Function Suspend-AutomateNOWTimeTrigger {
             Write-Warning -Message "$TimeTrigger_id is already on hold so there is no action required"
             Break
         }
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($TimeTrigger.id)")) -eq $true) {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($TimeTrigger_id)")) -eq $true) {
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
             $BodyMetaData.Add('id', $TimeTrigger_id )
             $BodyMetaData.Add('onHold', 'true')
@@ -44213,7 +44679,7 @@ Function Set-AutomateNOWTimeWindow {
         }
         [string]$TimeWindow_id = $TimeWindow.id
         [string]$TimeWindow_simpleId = $TimeWindow.simpleId
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($TimeWindow.id)")) -eq $true) {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($TimeWindow_id)")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -44676,11 +45142,15 @@ Function Remove-AutomateNOWTimeWindow {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($TimeWindow.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [ANOWTimeWindow]$TimeWindow = $_
-            }
-            [string]$TimeWindow_id = $TimeWindow.id
+        If ($_.id.Length -gt 0) {
+            [ANOWTimeWindow]$TimeWindow = $_
+        }
+        [string]$TimeWindow_id = $TimeWindow.id
+        If ($TimeWindow_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($TimeWindow_id)")) -eq $true) {
             [string]$oldvalues = $TimeWindow.CreateOldValues()
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
             $BodyMetaData.'id' = $TimeWindow.id
@@ -44849,11 +45319,12 @@ Function Copy-AutomateNOWTimeWindow {
     Process {
         If ($PermissionToProceed -ne $false) {
             [string]$TimeWindow_oldId = $TimeWindow.id
+            [string]$TimeWindow_simpleId = $TimeWindow.simpleId
             If ($TimeWindow_oldId -eq $NewId) {
                 Write-Warning -Message "The new id cannot be the same as the old id."
                 Break
             }
-            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Time Window $($TimeWindow.simpleId) to $($NewId)?")) -eq $true) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Time Window $($TimeWindow_simpleId) to $($NewId)?")) -eq $true) {
                 [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
                 If ($UnsetFolder -eq $True) {
                     $BodyMetaData.'folder' = $Null
@@ -45790,16 +46261,11 @@ Function Set-AutomateNOWUser {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($User.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [string]$User_id = $_.id
-            }
-            ElseIf ($User.id.Length -gt 0) {
-                [string]$User_id = $User.id
-            }
-            Else {
-                [string]$User_id = $Id
-            }
+        If ($_.id.Length -gt 0) {
+            [ANOWUser]$User = $_
+        }
+        [string]$User_id = $User.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($User_id)")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -46075,7 +46541,7 @@ Function Test-AutomateNOWUserPassword {
                 Write-Verbose -Message "A valid password was not presented on Windows PowerShell"
                 Return $false
             }
-        }        
+        }
     }
     Catch {
         [string]$Message = $_.Exception.Message
@@ -46156,7 +46622,7 @@ Function Set-AutomateNOWUserPassword {
         }
         Else {
             [string]$Body = ('id=' + $User + '&oldPassword=' + ([System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($OldSecurePass))) + '&newPassword=' + ([System.Net.WebUtility]::UrlEncode(([System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($NewSecurePass))))) + '&repeatPassword=' + ([System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($NewSecurePass))))
-        }            
+        }
     }
     Catch {
         [string]$Message = $_.Exception.Message
@@ -46511,20 +46977,15 @@ Function Remove-AutomateNOWUser {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($User.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [string]$User_id = $_.id
-            }
-            ElseIf ($User.id.Length -gt 0) {
-                [string]$User_id = $User.id
-            }
-            ElseIf ($Id.Length -gt 0) {
-                [string]$User_id = $Id
-            }
-            Else {
-                Write-Warning -Message "Unable to resolve the identity of the target under Remove-AutomateNOWUser"
-                Break
-            }
+        If ($_.id.Length -gt 0) {
+            [ANOWUser]$User = $_
+        }
+        [string]$User_id = $User.id
+        If ($User_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($User_id)")) -eq $true) {
             [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
             [string]$old_values = $User.CreateOldValues()
             $Body.Add('id', $User_id)
@@ -46889,7 +47350,7 @@ Function Set-AutomateNOWVariable {
         Else {
             Write-Debug -Message "Detected the value of Variable object [$Variable_simpleId] to be [$current_Variable_value]"
         }
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Variable.id)")) -eq $true) {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Variable_id)")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -47354,11 +47815,15 @@ Function Remove-AutomateNOWVariable {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Variable.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [ANOWVariable]$Variable = $_
-            }
-            [string]$Variable_id = $Variable.id
+        If ($_.id.Length -gt 0) {
+            [ANOWVariable]$Variable = $_
+        }
+        [string]$Variable_id = $Variable.id
+        If ($Variable_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Variable_id)")) -eq $true) {
             [string]$oldvalues = $Variable.CreateOldValues()
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
             $BodyMetaData.'id' = $Variable.id
@@ -47527,11 +47992,12 @@ Function Copy-AutomateNOWVariable {
     Process {
         If ($PermissionToProceed -ne $false) {
             [string]$Variable_oldId = $Variable.id
+            [string]$Variable_simpleId = $Variable.simpleId
             If ($Variable_oldId -eq $NewId) {
                 Write-Warning -Message "The new id cannot be the same as the old id."
                 Break
             }
-            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Variable $($Variable.simpleId) to $($NewId)?")) -eq $true) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Variable $($Variable_simpleId) to $($NewId)?")) -eq $true) {
                 [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
                 If ($UnsetFolder -eq $True) {
                     $BodyMetaData.'folder' = $Null
@@ -48093,7 +48559,7 @@ Function Set-AutomateNOWVariableTimestamp {
         }
         [string]$Variable_id = $Variable.id
         [string]$Variable_simpleId = $Variable.simpleId
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Variable.id)")) -eq $true) {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Variable_id)")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -48356,6 +48822,7 @@ Function Get-AutomateNOWWorkflow {
         }
         [hashtable]$parameters = @{}
         $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
         If ($anow_session.NotSecure -eq $true) {
             $parameters.Add('NotSecure', $true)
         }
@@ -48419,7 +48886,6 @@ Function Get-AutomateNOWWorkflow {
         Else {
             $parameters.Command = $command
         }
-        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
         $Error.Clear()
         Try {
             [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
@@ -48606,13 +49072,12 @@ Function Remove-AutomateNOWWorkflow {
     }
     Process {
         If ($_.id.Length -gt 0) {
-            [string]$Workflow_id = $_.id
+            [ANOWWorkflow]$Workflow = $_
         }
-        ElseIf ($Workflow.id.Length -gt 0) {
-            [string]$Workflow_id = $Workflow.id
-        }
-        Else {
-            [string]$Workflow_id = $Id
+        [int64]$Workflow_id = $Workflow.id
+        If ($Workflow_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess($Workflow_id, 'Archive')) -eq $true) {
             [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
@@ -48714,13 +49179,13 @@ Function Restart-AutomateNOWWorkflow {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Workflow.id)")) -eq $true) {
-            If ($_.id -gt 0) {
-                [int64]$Workflow_id = $_.id
-            }
-            Else {
-                [int64]$Workflow_id = $Workflow.id
-            }
+        If ($_.id -gt 0) {
+            [int64]$Workflow_id = $_.id
+        }
+        Else {
+            [int64]$Workflow_id = $Workflow.id
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Workflow_id)")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -48868,13 +49333,13 @@ Function Stop-AutomateNOWWorkflow {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Workflow.id)")) -eq $true) {
-            If ($_.id -gt 0) {
-                [int64]$Workflow_id = $_.id
-            }
-            Else {
-                [int64]$Workflow_id = $Workflow.id
-            }
+        If ($_.id -gt 0) {
+            [int64]$Workflow_id = $_.id
+        }
+        Else {
+            [int64]$Workflow_id = $Workflow.id
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Workflow_id)")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -49001,17 +49466,11 @@ Function Resume-AutomateNOWWorkflow {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Workflow.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [int64]$Workflow_id = $_.id
-            }
-            ElseIf ($Workflow.id.Length -gt 0) {
-                [int64]$Workflow_id = $Workflow.id
-            }
-            Else {
-                Write-Warning -Message "Unable to determine the Id of the Workflow."
-                Break
-            }
+        If ($_.id.Length -gt 0) {
+            [ANOWWorkflow]$Workflow = $_
+        }
+        [int64]$Workflow_id = $Workflow.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Workflow_id)")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -49124,16 +49583,11 @@ Function Suspend-AutomateNOWWorkflow {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Workflow.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [string]$Workflow_id = $_.id
-            }
-            ElseIf ($Workflow.id.Length -gt 0) {
-                [string]$Workflow_id = $Workflow.id
-            }
-            Else {
-                [string]$Workflow_id = $Id
-            }
+        If ($_.id.Length -gt 0) {
+            [ANOWWorkflow]$Workflow = $_
+        }
+        [string]$Workflow_id = $Workflow.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Workflow_id)")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -49393,7 +49847,7 @@ Function Get-AutomateNOWWorkflowTemplate {
         [Parameter(Mandatory = $False)]
         [int32]$endRow = 100,
         [Parameter(Mandatory = $False)]
-        [string]$sortBy = 'processingType',
+        [string]$sortBy = 'id',
         [Parameter(Mandatory = $False)]
         [string[]]$Tags
     )
@@ -49419,7 +49873,7 @@ Function Get-AutomateNOWWorkflowTemplate {
         $Body.'_operationType' = 'fetch'
         $Body.'_startRow' = $startRow
         $Body.'_endRow' = $endRow
-        $Body.'_textMatchStyle' = 'exact'
+        $Body.'_textMatchStyle' = 'substring'
         $Body.'_componentId' = 'ProcessingTemplateList'
         $Body.'_dataSource' = 'ProcessingTemplateDataSource'
         $Body.'isc_metaDataPrefix' = '_'
@@ -49543,7 +49997,7 @@ Function Set-AutomateNOWWorkflowTemplate {
     Optional string array of CASE-SENSITIVE Tag Id's to include with this object.
 
     .PARAMETER UnsetTags
-    A switch parameter that will the Tags from the Workflow Template
+    A switch parameter that will remove the Tags from the Workflow Template
 
     .PARAMETER Title
     A string representing the "alias" of the Workflow Template (this property needs a better explanation)
@@ -49743,16 +50197,11 @@ Function Set-AutomateNOWWorkflowTemplate {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($WorkflowTemplate.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [string]$WorkflowTemplate_id = $_.id
-            }
-            ElseIf ($WorkflowTemplate.id.Length -gt 0) {
-                [string]$WorkflowTemplate_id = $WorkflowTemplate.id
-            }
-            Else {
-                [string]$WorkflowTemplate_id = $Id
-            }
+        If ($_.id.Length -gt 0) {
+            [ANOWWorkflowTemplate]$WorkflowTemplate = $_
+        }
+        [string]$WorkflowTemplate_id = $WorkflowTemplate.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($WorkflowTemplate_id)")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -50238,7 +50687,7 @@ Function New-AutomateNOWWorkflowTemplate {
     [System.Collections.Specialized.OrderedDictionary]$ANOWWorkflowTemplate = [System.Collections.Specialized.OrderedDictionary]@{}
     $ANOWWorkFlowTemplate.Add('id', $Id)
     $ANOWWorkflowTemplate.Add('processingType', 'WORKFLOW')
-    $ANOWWorkFlowTemplate.Add('workflowType', $Type)
+    $ANOWWorkFlowTemplate.Add('workflowType', $WorkflowType)
     [string[]]$include_properties = 'id', 'processingType', 'workflowType'
     If ($Description.Length -gt 0) {
         $ANOWWorkflowTemplate.Add('description', $Description)
@@ -50340,7 +50789,7 @@ Function New-AutomateNOWWorkflowTemplate {
     [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
     $BodyMetaData.'_textMatchStyle' = 'exact'
     $BodyMetaData.'_operationType' = 'add'
-    $BodyMetaData.'_oldValues' = '{"processingType":"WORKFLOW","workflowType":"' + $Type + '","workspace":null}'
+    $BodyMetaData.'_oldValues' = '{"processingType":"WORKFLOW","workflowType":"' + $WorkflowType + '","workspace":null}'
     $BodyMetaData.'_componentId' = 'ProcessingTemplateCreateWindow_form'
     $BodyMetaData.'_dataSource' = 'ProcessingTemplateDataSource'
     $BodyMetaData.'isc_metaDataPrefix' = '_'
@@ -50368,11 +50817,11 @@ Function New-AutomateNOWWorkflowTemplate {
     }
     If ($results.response.status -lt 0 -or $results.response.status -gt 0) {
         [string]$results_display = $results.response.errors | ConvertTo-Json -Compress
-        Write-Warning -Message "Failed to create Workflow Template [$Id] of type [$Type] due to $results_display. The parameters used: $parameters_display"
+        Write-Warning -Message "Failed to create Workflow Template [$Id] of type [$WorkflowType] due to $results_display. The parameters used: $parameters_display"
         Break
     }
     ElseIf ($null -eq $results.response.status) {
-        Write-Warning -Message "Failed to create Workflow Template [$Id] of type [$Type] due to [an empty response]. The parameters used: $parameters_display"
+        Write-Warning -Message "Failed to create Workflow Template [$Id] of type [$WorkflowType] due to [an empty response]. The parameters used: $parameters_display"
         Break
     }
     $Error.Clear()
@@ -50464,6 +50913,10 @@ Function Remove-AutomateNOWWorkflowTemplate {
             [ANOWWorkflowTemplate]$WorkflowTemplate = $_
         }
         [string]$WorkflowTemplate_id = $WorkflowTemplate.id
+        If ($WorkflowTemplate_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($WorkflowTemplate_id)")) -eq $true) {
             [string]$oldvalues = $WorkflowTemplate.CreateOldValues()
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
@@ -50636,11 +51089,12 @@ Function Copy-AutomateNOWWorkflowTemplate {
     Process {
         If ($PermissionToProceed -ne $false) {
             [string]$WorkflowTemplate_oldId = $WorkflowTemplate.id
+            [string]$WorkflowTemplate_simpleId = $WorkflowTemplate.simpleId
             If ($WorkflowTemplate_oldId -eq $NewId) {
                 Write-Warning -Message "The new id cannot be the same as the old id."
                 Break
             }
-            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Workflow Template $($WorkflowTemplate.simpleId) to $($NewId)?")) -eq $true) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Workflow Template $($WorkflowTemplate_simpleId) to $($NewId)?")) -eq $true) {
                 [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
                 $BodyMetaData.'oldId' = $WorkflowTemplate_oldId
                 $BodyMetaData.'domain' = $WorkflowTemplate.domain
@@ -51211,16 +51665,11 @@ Function Resume-AutomateNOWWorkflowTemplate {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($WorkflowTemplate.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [string]$WorkflowTemplate_id = $_.id
-            }
-            ElseIf ($WorkflowTemplate.id.Length -gt 0) {
-                [string]$WorkflowTemplate_id = $WorkflowTemplate.id
-            }
-            Else {
-                [string]$WorkflowTemplate_id = $Id
-            }
+        If ($_.id.Length -gt 0) {
+            [ANOWWorkflowTemplate]$WorkflowTemplate = $_
+        }
+        [string]$WorkflowTemplate_id = $WorkflowTemplate.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($WorkflowTemplate_id)")) -eq $true) {
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
             $BodyMetaData.Add('id', $WorkflowTemplate_id )
             $BodyMetaData.Add('_operationType', 'update')
@@ -51329,16 +51778,11 @@ Function Suspend-AutomateNOWWorkflowTemplate {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($WorkflowTemplate.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [string]$WorkflowTemplate_id = $_.id
-            }
-            ElseIf ($WorkflowTemplate.id.Length -gt 0) {
-                [string]$WorkflowTemplate_id = $WorkflowTemplate.id
-            }
-            Else {
-                [string]$WorkflowTemplate_id = $Id
-            }
+        If ($_.id.Length -gt 0) {
+            [ANOWWorkflowTemplate]$WorkflowTemplate = $_
+        }
+        [string]$WorkflowTemplate_id = $WorkflowTemplate.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($WorkflowTemplate_id)")) -eq $true) {
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
             $BodyMetaData.Add('id', $WorkflowTemplate_id )
             $BodyMetaData.Add('_operationType', 'update')
@@ -52027,20 +52471,22 @@ Function Remove-AutomateNOWWorkflowTemplateItem {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ProcessingTemplateItem.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [string]$ProcessingTemplateItem_id = $_.id
-            }
-            ElseIf ($ProcessingTemplateItem.id.Length -gt 0) {
-                [string]$ProcessingTemplateItem_id = $ProcessingTemplateItem.id
-            }
-            If ($ProcessingTemplateItem_id -notmatch '^[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}$') {
-                Write-Warning -Message "Was expecting the Id of the Processing Template Id to match a 36-character GUID, instead received [$ProcessingTemplateItem_id]. Please check into this."
-                Break
-            }
-            Else {
-                Write-Debug -Message "Received [$ProcessingTemplateItem_id] for the Id of the Processing Template Item to be removed"
-            }
+        If ($_.id.Length -gt 0) {
+            [ANOWProcessingTemplateItem]$ProcessingTemplateItem = $_
+        }
+        [string]$ProcessingTemplateItem_id = $ProcessingTemplateItem.id
+        If ($ProcessingTemplateItem_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
+        If ($ProcessingTemplateItem_id -notmatch '^[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}$') {
+            Write-Warning -Message "Was expecting the Id of the Processing Template Id to match a 36-character GUID, instead received [$ProcessingTemplateItem_id]. Please check into this."
+            Break
+        }
+        Else {
+            Write-Debug -Message "Received [$ProcessingTemplateItem_id] for the Id of the Processing Template Item to be removed"
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ProcessingTemplateItem_id)")) -eq $true) {
             $Error.Clear()
             Try {
                 [PSCustomObject]$WorkflowTemplateItems = Read-AutomateNOWWorkflowTemplateItem -WorkflowTemplate $WorkflowTemplate
@@ -52455,16 +52901,11 @@ Function Set-AutomateNOWWorkspace {
         }
     }
     Process {
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Workspace.id)")) -eq $true) {
-            If ($_.id.Length -gt 0) {
-                [string]$Workspace_id = $_.id
-            }
-            ElseIf ($Workspace.id.Length -gt 0) {
-                [string]$Workspace_id = $Workspace.id
-            }
-            Else {
-                [string]$Workspace_id = $Id
-            }
+        If ($_.id.Length -gt 0) {
+            [ANOWWorkspace]$Workspace = $_.id
+        }
+        [string]$Workspace_id = $Workspace.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Workspace_id)")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
@@ -53060,6 +53501,10 @@ Function Remove-AutomateNOWWorkspace {
             [ANOWWorkspace]$Workspace = $_
         }
         [string]$Workspace_id = $Workspace.id
+        If ($Workspace_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Workspace_id)")) -eq $true) {
             [string]$oldvalues = $Workspace.CreateOldValues()
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
@@ -53229,11 +53674,12 @@ Function Copy-AutomateNOWWorkspace {
     Process {
         If ($PermissionToProceed -ne $false) {
             [string]$Workspace_oldId = $Workspace.id
+            [string]$Workspace_simpleId = $Workspace.simpleId
             If ($Workspace_oldId -eq $NewId) {
                 Write-Warning -Message "The new id cannot be the same as the old id."
                 Break
             }
-            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Workspace $($Workspace.simpleId) to $($NewId)?")) -eq $true) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Workspace $($Workspace_simpleId) to $($NewId)?")) -eq $true) {
                 [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
                 If ($UnsetFolder -eq $True) {
                     $BodyMetaData.'folder' = $Null
@@ -54010,7 +54456,7 @@ Function Protect-AutomateNOWEncryptedString {
         [Parameter(Mandatory = $false)]
         [switch]$IncludePrefix
     )
-    If($Key.Length -eq 0){
+    If ($Key.Length -eq 0) {
         Write-Warning -Message "Somehow the encryption key is empty. Please check into this."
         Break
     }
