@@ -46,7 +46,7 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 - Added the `-SecureString` parameter to `Protect-AutomateNOWString`
 - Added the `-ForceCommit` parameter to `Publish-AutomateNOWCodeRepository`
 - Added the domain class 'DataSource' to `Get-AutomateNOWCodeRepositoryObjectSource` (this means it is now possible to edit the source code of a DataSource 👍)
-- Fixed an issue with `Connect-AutomateNOWUser` where the default domain (if configured for that user) was still used in the connection even if a different domain had been specified via the `-Domain` parameter (workaround: use `Switch-AutomateNOWDomain` after logging in)
+- Fixed an issue with `Connect-AutomateNOW` where the default domain (if configured for that user) was still used in the connection even if a different domain had been specified via the `-Domain` parameter (workaround: use `Switch-AutomateNOWDomain` after logging in)
 - Fixed an issue with `Connect-AutomateNOW` and non-API users whose 'accountValidUntil' date is not configured
 - Fixed an issue with `Connect-AutomateNOW` when using `-access_token` without including the `-refresh_token`
 - Fixed the error message on all `New-*` functions when receiving a non-zero response from the API
