@@ -170,10 +170,10 @@ Function Connect-AutomateNOW {
             [byte[]]$Key = @(7, 22, 15, 11, 1, 24, 8, 13, 16, 10, 5, 17, 12, 19, 27, 9)
         )
         If ($PSVersionTable.PSVersion.Major -ge 7) {
-            [string]$encrypted_string = Protect-AutomateNOWEncryptedString -Pass ($SecurePass | ConvertFrom-SecureString -AsPlainText) -Key $Key
+            [string]$encrypted_string = Protect-AutomateNOWEncryptedString -String ($SecurePass | ConvertFrom-SecureString -AsPlainText) -Key $Key
         }
         Else {
-            [string]$encrypted_string = Protect-AutomateNOWEncryptedString -Pass ([System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($SecurePass))) -Key $Key
+            [string]$encrypted_string = Protect-AutomateNOWEncryptedString -String ([System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($SecurePass))) -Key $Key
         }
         [hashtable]$payload = @{}
         $payload.Add('j_username', $User)
@@ -274,7 +274,7 @@ Function Connect-AutomateNOW {
                 }
             }
             Else {
-                [string]$ReturnCodeWarning = "Invoke-WebRequest failed (on the home page!) due to [$Message]"
+                [string]$ReturnCodeWarning = "Invoke-WebRequest failed for an unexpected reason due to [$Message]"
                 Write-Warning -Message $ReturnCodeWarning
                 Break
             }
@@ -339,11 +339,11 @@ Function Connect-AutomateNOW {
             }
             ElseIf ($SecondsRemaining -lt -300) {
                 [int32]$MinutesRemaining = ($SecondsRemaining * -1) / 60
-                Write-Warning -Message "Your previous token expired $MinutesRemaining minutes ago at $expiration_date. Cleaning up the previous session."
+                Write-Warning -Message "Your previous token expired about $MinutesRemaining minutes ago at $expiration_date. Cleaning up the previous session."
             }
             Else {
                 [int32]$SecondsRemaining = $SecondsRemaining * -1
-                Write-Warning -Message "Your previous token expired $SecondsRemaining seconds ago at $expiration_date. Cleaning up the previous session."
+                Write-Warning -Message "Your previous token expired about $SecondsRemaining seconds ago at $expiration_date. Cleaning up the previous session."
             }
             $Error.Clear()
             Try {
@@ -438,11 +438,11 @@ Function Connect-AutomateNOW {
             Write-Warning -Message "How is it that the expiration date value is not a 64-bit integer? Something must be wrong. Are we in a time machine?"
             Break
         }
-        [string]$access_token = $token_properties.access_token
-        [string]$refresh_token = $token_properties.refresh_token
+        [string]$AccessToken = $token_properties.access_token
+        [string]$RefreshToken = $token_properties.refresh_token
     }
-    ElseIf ($RefreshToken.Length -eq 0) {
-        [string]$refresh_token = 'Not set'
+    If ($RefreshToken.Length -eq 0) {
+        [string]$RefreshToken = 'Not set'
     }
     $Error.Clear()
     Try {
@@ -460,53 +460,40 @@ Function Connect-AutomateNOW {
     Else {
         [System.TimeSpan]$utc_offset = $timezone.BaseUtcOffset
     }
-    If ($refresh_token -ne 'Not set' -and $ExpirationDate -eq 0) {
-        $Error.Clear()
-        Try {
-            [datetime]$expiration_date_utc = (Get-Date -Date '1970-01-01').AddMilliseconds($token_properties.expirationDate)
-        }
-        Catch {
-            [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Get-Date failed to process the expiration date from the `$token_properties variable due to [$Message]"
-            Break
-        }
-        [datetime]$expiration_date = ($expiration_date_utc + $utc_offset) # We're adding 2 values here: the current time in UTC and the current machine's UTC offset
-    }
-    Else {
+    [datetime]$epoch_date = Get-Date -Date '1970-01-01'
+    If (($ExpirationDate -gt 0) -or ($token_properties.expirationDate -gt 0)) {
         If ($ExpirationDate -gt 0) {
-            If ($ExpirationDate -ge 10000000000) {
-                $Error.Clear()
-                Try {
-                    [datetime]$expiration_date_utc = (Get-Date -Date '1970-01-01').AddMilliseconds($ExpirationDate)
-                }
-                Catch {
-                    Write-Warning -Message "Get-Date failed to process the expiration date from the `$ExpirationDate variable in milliseconds due to [$Message]"
-                    Break
-                }
+            $Error.Clear()
+            Try {
+                [datetime]$expiration_date = $epoch_date.AddMilliseconds($ExpirationDate)
             }
-            Else {
-                $Error.Clear()
-                Try {
-                    [datetime]$expiration_date_utc = (Get-Date -Date '1970-01-01').AddSeconds($ExpirationDate)
-                }
-                Catch {
-                    Write-Warning -Message "Get-Date failed to process the expiration date from the `$ExpirationDate variable in seconds due to [$Message]"
-                    Break
-                }
-            }
-            [datetime]$Current_Date_UTC = (Get-Date).ToUniversalTime()
-            [timespan]$Remaining_Time = ($Current_Date_UTC - $expiration_date_utc)
-            [datetime]$expiration_date = ($expiration_date_utc + $utc_offset) # We're adding 2 values here: the current time in UTC and the current machine's UTC offset
-            If ($Remaining_Time.TotalSeconds -gt 0) {
-                [int32]$remaining_minutes = $Remaining_Time.TotalMinutes
-                [string]$display_date = $expiration_date.ToString()
-                Write-Warning -Message "This token expired about [$remaining_minutes] minute(s) ago at [$display_date]. Please re-authenticate to obtain a new one."
+            Catch {
+                Write-Warning -Message "Get-Date failed to process the expiration date from the `$ExpirationDate variable in milliseconds due to [$Message]"
                 Break
             }
         }
         Else {
-            [datetime]$expiration_date = Get-Date -Date '1970-01-01'
+            $Error.Clear()
+            Try {
+                [datetime]$expiration_date = $epoch_date.AddMilliseconds($token_properties.expirationDate)
+            }
+            Catch {
+                Write-Warning -Message "Get-Date failed to process the expiration date from the `$token_properties.expirationDate variable in milliseconds due to [$Message]"
+                Break
+            }
         }
+        [datetime]$Current_Date = Get-Date
+        [datetime]$expiration_date = ($expiration_date + $utc_offset) # We're adding 2 values here: the current time in UTC and the current machine's UTC offset
+        [timespan]$Remaining_Time = ($Current_Date - $expiration_date)
+        If ($Remaining_Time.TotalSeconds -gt 0) {
+            [int32]$remaining_minutes = $Remaining_Time.TotalMinutes
+            [string]$display_date = $expiration_date.ToString()
+            Write-Warning -Message "This token expired about [$remaining_minutes] minute(s) ago at [$display_date]. Please re-authenticate to obtain a new one."
+            Break
+        }
+    }
+    Else {
+        [datetime]$expiration_date = $epoch_date
     }
     [hashtable]$anow_session = @{}
     $anow_session.Add('User', $User)
@@ -515,9 +502,9 @@ Function Connect-AutomateNOW {
         $anow_session.Add('NotSecure', $True)
     }
     $anow_session.Add('ExpirationDate', $expiration_date)
-    $anow_session.Add('AccessToken', $access_token)
-    $anow_session.Add('RefreshToken', $refresh_token)
-    [hashtable]$Header = @{'Authorization' = "Bearer $access_token"; 'domain' = ''; }
+    $anow_session.Add('AccessToken', $AccessToken)
+    $anow_session.Add('RefreshToken', $RefreshToken)
+    [hashtable]$Header = @{'Authorization' = "Bearer $AccessToken"; 'domain' = ''; }
     $anow_session.Add('header', $Header)
     Write-Verbose -Message 'Global variable $anow_session.header has been set. Refer to this as your authentication header.'
     $Error.Clear()
@@ -683,8 +670,11 @@ Function Connect-AutomateNOW {
         If ($defaultDomain.Length -gt 0) {
             $anow_session.Add('default_domain', $defaultDomain)
             Write-Verbose -Message "Detected the default domain for $Id is $defaultDomain"
-            [string]$Domain = $defaultDomain
             $userInfo.defaultDomain = $defaultDomain
+            If ($Domain.Length -eq 0) {
+                Write-Verbose -Message "There was no domain specified with the -Domain parameter, therefore using the users default domain"
+                [string]$Domain = $defaultDomain
+            }
         }
         Else {
             $anow_session.Add('default_domain', "")
@@ -775,7 +765,7 @@ Function Connect-AutomateNOW {
             Break
         }
     }
-    [PSCustomObject]$anow_session_display = [PSCustomObject]@{ protocol = $protocol; instance = $instance; token_expires = $expiration_date; user = $userName; domain = $Domain; access_token = ($access_token.SubString(0, 5) + '..' + $access_token.SubString(($access_token.Length - 5), 5)) }
+    [PSCustomObject]$anow_session_display = [PSCustomObject]@{ protocol = $protocol; instance = $instance; token_expires = $expiration_date; user = $userName; domain = $Domain; access_token = ($AccessToken.SubString(0, 5) + '..' + $AccessToken.SubString(($AccessToken.Length - 5), 5)) }
     If ($Quiet -ne $true) {
         Format-Table -InputObject $anow_session_display -AutoSize -Wrap
     }
@@ -831,13 +821,15 @@ Function Disconnect-AutomateNOW {
         Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] while running Disconnect-AutomateNOW due to [$Message]."
         Break
     }
-    If ($results.response.status -eq 0) {
-        [string]$response_text = $results.response.data
-        Write-Information -MessageData "[$Instance] reports $response_text"
+    [int32]$response_code = $results.response.status
+    If ($response_code -ne 0) {
+        [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+        Break
     }
-    Else {
-        Write-Warning -Message "Failed to received acknowledgement of disconnection from [$Instance]"
-    }
+
+    [string]$response_text = $results.response.data
+    Write-Information -MessageData "[$Instance] reports $response_text"
     $Error.Clear()
     Try {
         Remove-Variable -Name anow_session -Scope Global -Force
@@ -878,6 +870,7 @@ Function Update-AutomateNOWToken {
     }
     ElseIf ( $anow_session.RefreshToken -eq 'Not set' ) {
         Write-Warning -Message "It is not possible to refresh the token if you used -AccessToken without also including -RefreshToken"
+        Break
     }
     [string]$command = '/oauth/access_token'
     [string]$ContentType = 'application/x-www-form-urlencoded; charset=UTF-8'
@@ -1025,23 +1018,24 @@ Function Confirm-AutomateNOWSession {
         [timespan]$TimeRemaining = ($ExpirationDate - $current_date)
         [int32]$SecondsRemaining = $TimeRemaining.TotalSeconds
         If ($SecondsRemaining -lt 0) {
-            If ($SecondsRemaining -lt -86400) {
-                [int32]$DaysRemaining = ($SecondsRemaining / -86400)
-                Write-Warning -Message "This token expired about [$DaysRemaining] day(s) ago at [$ExpirationDateDisplay]. You can request a new token using Connect-AutomateNOW."
+            If ($SecondsRemaining -lt -172800) {
+                [int32]$DaysRemaining = ($SecondsRemaining * -1) / 86400
+                Write-Warning -Message "This token expired about $DaysRemaining days ago at $ExpirationDateDisplay. You can request a new token using Connect-AutomateNOW."
                 Break
             }
-            ElseIf ($SecondsRemaining -lt -3600) {
-                [int32]$HoursRemaining = ($SecondsRemaining / -3600)
-                Write-Warning -Message "This token expired about [$HoursRemaining] hour(s) ago at [$ExpirationDateDisplay]. You can request a new token using Connect-AutomateNOW."
+            ElseIf ($SecondsRemaining -lt -7200) {
+                [int32]$HoursRemaining = ($SecondsRemaining * -1) / 3600
+                Write-Warning -Message "This token expired about $HoursRemaining hours ago at $ExpirationDateDisplay. You can request a new token using Connect-AutomateNOW."
                 Break
             }
-            ElseIf ($SecondsRemaining -lt -60) {
-                [int32]$MinutesRemaining = ($SecondsRemaining / -60)
-                Write-Warning -Message "This token expired about [$MinutesRemaining] minute(s) ago at [$ExpirationDateDisplay]. You can request a new token using Connect-AutomateNOW."
+            ElseIf ($SecondsRemaining -lt -300) {
+                [int32]$MinutesRemaining = ($SecondsRemaining * -1) / 60
+                Write-Warning -Message "This token expired about $MinutesRemaining minutes ago at $ExpirationDateDisplay. You can request a new token using Connect-AutomateNOW."
                 Break
             }
             Else {
-                Write-Warning -Message "This token expired [$SecondsRemaining] second(s) ago at [$ExpirationDateDisplay]. You can request a new token using Connect-AutomateNOW."
+                [int32]$SecondsRemaining = $SecondsRemaining * -1
+                Write-Warning -Message "This token expired $SecondsRemaining seconds ago at $ExpirationDateDisplay. You can request a new token using Connect-AutomateNOW."
                 Break
             }
         }
@@ -1337,17 +1331,11 @@ Function Get-AutomateNOWAdhocReport {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] while running Get-AutomateNOWAdhocReport due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
@@ -1762,13 +1750,10 @@ Function New-AutomateNOWAdhocReport {
         Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] with parameters $parameters_display due to [$Message]."
         Break
     }
-    If ($results.response.status -lt 0 -or $results.response.status -gt 0) {
-        [string]$results_display = $results.response.errors | ConvertTo-Json -Compress
-        Write-Warning -Message "Failed to create AdhocReport [$Id] of type [$Type] due to $results_display. The parameters used: $parameters_display"
-        Break
-    }
-    ElseIf ($null -eq $results.response.status) {
-        Write-Warning -Message "Failed to create AdhocReport [$Id] of type [$Type] due to [an empty response]. The parameters used: $parameters_display"
+    [int32]$response_code = $results.response.status
+    If ($response_code -ne 0) {
+        [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
         Break
     }
     $Error.Clear()
@@ -2609,17 +2594,11 @@ Function Get-AutomateNOWAgent {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
@@ -2859,17 +2838,11 @@ Function Set-AutomateNOWAgent {
                 Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$Agent_id] due to [$Message]."
                 Break
             }
-            If ($results.response.status -ne 0) {
-                If ($null -eq $results.response.status) {
-                    Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                    Break
-                }
-                Else {
-                    [int32]$status_code = $results.response.status
-                    [string]$results_response = $results.response
-                    Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                    Break
-                }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
             }
             $Error.Clear()
             Try {
@@ -2899,7 +2872,7 @@ Function Export-AutomateNOWAgent {
     Exports the Agents from an instance of AutomateNOW! to a local .csv file
 
     .PARAMETER Agent
-    Mandatory [ANOWAgent] object (Use Get-AutomateNOWFolder to retrieve them)
+    Mandatory [ANOWAgent] object (Use Get-AutomateNOWAgent to retrieve them)
 
     .INPUTS
     ONLY [ANOWAgent] objects from the pipeline are accepted
@@ -3147,13 +3120,10 @@ Function New-AutomateNOWAgent {
         Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] with parameters $parameters_display due to [$Message]."
         Break
     }
-    If ($results.response.status -lt 0 -or $results.response.status -gt 0) {
-        [string]$results_display = $results.response.errors | ConvertTo-Json -Compress
-        Write-Warning -Message "Failed to create Agent [$Id] due to $results_display. The parameters used: $parameters_display"
-        Break
-    }
-    ElseIf ($null -eq $results.response.status) {
-        Write-Warning -Message "Failed to create Agent [$Id] due to [an empty response]. The parameters used: $parameters_display"
+    [int32]$response_code = $results.response.status
+    If ($response_code -ne 0) {
+        [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
         Break
     }
     $Error.Clear()
@@ -3742,17 +3712,11 @@ Function Get-AutomateNOWApproval {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] while running Get-AutomateNOWApproval due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
@@ -4112,13 +4076,10 @@ Function New-AutomateNOWApproval {
         Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] with parameters $parameters_display due to [$Message]."
         Break
     }
-    If ($results.response.status -lt 0 -or $results.response.status -gt 0) {
-        [string]$results_display = $results.response.errors | ConvertTo-Json -Compress
-        Write-Warning -Message "Failed to create Approval [$Id] of type [$Type] due to $results_display. The parameters used: $parameters_display"
-        Break
-    }
-    ElseIf ($null -eq $results.response.status) {
-        Write-Warning -Message "Failed to create Approval [$Id] of type [$Type] due to [an empty response]. The parameters used: $parameters_display"
+    [int32]$response_code = $results.response.status
+    If ($response_code -ne 0) {
+        [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
         Break
     }
     $Error.Clear()
@@ -4926,17 +4887,11 @@ Function Get-AutomateNOWAuditLog {
         Write-Warning -Message "Invoke-AutomateNOWAPI failed due to execute [$command] due to [$Message]."
         Break
     }
-    If ($results.response.status -ne 0) {
-        If ($null -eq $results.response.status) {
-            Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-            Break
-        }
-        Else {
-            [int32]$status_code = $results.response.status
-            [string]$results_response = $results.response
-            Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-            Break
-        }
+    [int32]$response_code = $results.response.status
+    If ($response_code -ne 0) {
+        [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+        Break
     }
     [int32]$AuditLogs_count = $results.response.data.Count
     If ($AuditLogs_count -eq 0 -and $startRow -eq 0) {
@@ -5064,6 +5019,1726 @@ Function Export-AutomateNOWAuditLog {
             [string]$filelength_display = "{0:N0}" -f $filelength
             Write-Information -MessageData "Created file $ExportFileName ($filelength_display bytes)"
         }
+    }
+}
+
+#endregion
+
+#Region - BusinessViews
+
+Function Get-AutomateNOWBusinessView {
+    <#
+    .SYNOPSIS
+    Gets the Business Views from an AutomateNOW! instance
+
+    .DESCRIPTION
+    Gets the Business Views from an AutomateNOW! instance
+
+    .PARAMETER Id
+    Optional string containing the simple id of the Business View to fetch or you can pipeline a series of simple id strings. You may not enter an array here.
+
+    .PARAMETER sortBy
+    Optional string parameter to sort the results by. Valid choices are: id {To be continued...}
+
+    .PARAMETER Descending
+    Optional switch parameter to sort in descending order
+
+    .PARAMETER startRow
+    Optional integer to indicate the row to start from. This is intended for when you need to paginate the results. Default is 0.
+
+    .PARAMETER endRow
+    Optional integer to indicate the row to stop on. This is intended for when you need to paginate the results. Default is 100.
+
+    .INPUTS
+    Accepts a string representing the simple id of the Business View from the pipeline or individually (but not an array).
+
+    .OUTPUTS
+    An array of one or more [ANOWBusinessView] class objects
+
+    .EXAMPLE
+    Gets the first 100 Business Views
+
+    Get-AutomateNOWBusinessView
+
+    .EXAMPLE
+    Gets a single Business View
+
+    Get-AutomateNOWBusinessView -Id 'BusinessView1'
+
+    .EXAMPLE
+    Gets a series of BusinessV iews from an array of strings sent across the pipeline
+
+    @( 'BusinessView1', 'BusinessView2' ) | Get-AutomateNOWBusinessView
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    Run this function without parameters to retrieve all of the Business Views.
+
+    #>
+    [OutputType([ANOWBusinessView[]])]
+    [Cmdletbinding()]
+    Param(
+        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [Parameter(Mandatory = $False, ValueFromPipeline = $true)]
+        [string]$Id,
+        [Parameter(Mandatory = $False)]
+        [int32]$startRow = 0,
+        [Parameter(Mandatory = $False)]
+        [int32]$endRow = 100,
+        [Parameter(Mandatory = $False)]
+        [string]$sortBy = 'id',
+        [Parameter(Mandatory = $False)]
+        [switch]$Descending
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'GET')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
+        If ($_.Length -gt 0 -or $Id.Length -gt 0) {
+            If ($_.Length -gt 0 ) {
+                [string]$BusinessViewName = $_
+            }
+            Else {
+                [string]$BusinessViewName = $Id
+            }
+            [string]$textMatchStyle = 'exact'
+            $Body.'id' = $BusinessViewName
+        }
+        Else {
+            [string]$textMatchStyle = 'substring'
+            $Body.'_constructor' = 'AdvancedCriteria'
+            $Body.'operator' = 'and'
+        }
+        $Body.'_operationType' = 'fetch'
+        $Body.'_startRow' = $startRow
+        $Body.'_endRow' = $endRow
+        $Body.'_textMatchStyle' = $textMatchStyle
+        $Body.'_componentId' = 'BusinessViewList'
+        $Body.'_dataSource' = 'BusinessViewDataSource'
+        If ($Descending -eq $true) {
+            $Body.'_sortBy' = '-' + $sortBy
+        }
+        Else {
+            $Body.'_sortBy' = $sortBy
+        }
+        $Body.'isc_metaDataPrefix' = '_'
+        $Body.'isc_dataFormat' = 'json'
+        [string]$Body = ConvertTo-QueryString -InputObject $Body
+        [string]$command = ('/businessView/read?' + $Body)
+        $parameters.Add('command', $command)
+        $Error.Clear()
+        Try {
+            [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
+            Break
+        }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
+        }
+        $Error.Clear()
+        Try {
+            [ANOWBusinessView[]]$BusinessViews = $results.response.data
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Failed to parse the response into a series of [ANOWBusinessView] objects due to [$Message]."
+            Break
+        }
+        If ($BusinessViews.Count -gt 0) {
+            Return $BusinessViews
+        }
+    }
+    End {
+
+    }
+}
+
+Function Set-AutomateNOWBusinessView {
+    <#
+    .SYNOPSIS
+    Changes the settings of a Business View on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Changes the settings of a Business View on an AutomateNOW! instance
+
+    .PARAMETER BusinessView
+    An [ANOWBusinessView] object representing the Business View to be changed.
+
+    .PARAMETER Description
+    A text description of at least 1 character.
+
+    .PARAMETER UnsetDescription
+    Switch parameter that will remove the description.
+
+    .PARAMETER iconSet
+    The name of the icon library (if you choose to use one). Possible choices are: FAT_COW, FUGUE (note that FONT_AWESOME is not an actual icon library)
+
+    .PARAMETER iconCode
+    The name of the icon which matches the chosen library. To see the list of available iconCodes, use Import-AutomateNOWIcon (or Import-AutomateNOWLocalIcon) then try $anow_assets.icon_library."FUGUE"[0..10] to see the names of the first 10 icons from the Fugue library.
+
+    .PARAMETER RemoveIcon
+    Switch parameter that will remove the icon configured for this Business View.
+
+    .PARAMETER Folder
+    String that specifies the name of the folder to place the Business View into.
+
+    .PARAMETER UnsetFolder
+    Switch parameter that will remove the Business View from its current folder.
+
+    .PARAMETER Tags
+    Optional string array containing the CASE-SENSITIVE id's of the tags to assign to the new Business View.
+
+    .PARAMETER UnsetTags
+    Switch parameter that will remove the tags from the Business View.
+
+    .PARAMETER CodeRepository
+    Optional name of the code repository to place the Business View into.
+
+    .PARAMETER Force
+    Force the change without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    ONLY [ANOWBusinessView] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    The modified [ANOWBusinessView] object will be returned
+
+    .EXAMPLE
+    Sets the description on a Business View
+    Set-AutomateNOWBusinessView -BusinessView $BusinessView -Description 'My Description' -Force
+
+    .EXAMPLE
+    Unsets the description on a Business View
+    Set-AutomateNOWBusinessView -BusinessView $BusinessView -UnsetDescription -Force
+
+    .EXAMPLE
+    Sets the icon on a Business View
+    Import-AutomateNOWLocalIcon
+    Set-AutomateNOWBusinessView -BusinessView $BusinessView -iconSet FUGUE -iconCode address-book -Force
+
+    .EXAMPLE
+    Unsets the icon on a Business View
+    Set-AutomateNOWBusinessView -BusinessView $BusinessView -RemoveIcon -Force
+
+    .EXAMPLE
+    Sets the folder configuration for a Business View
+    Set-AutomateNOWBusinessView -BusinessView $BusinessView -Folder 'MyFolder'
+
+    .EXAMPLE
+    Unsets the folder configuration for a Business View
+    Set-AutomateNOWBusinessView -BusinessView $BusinessView -UnsetFolder -Force
+
+    .EXAMPLE
+    Sets the tag configuration for a Business View
+    Set-AutomateNOWBusinessView -BusinessView $BusinessView -Tags 'Tag1', 'Tag2'
+
+    .EXAMPLE
+    Unsets the tag configuration for a Business View
+    Set-AutomateNOWBusinessView -BusinessView $BusinessView -UnsetTags -Force
+
+    .EXAMPLE
+    Sets the Code Repository for a Business View
+    Set-AutomateNOWBusinessView -BusinessView $BusinessView -CodeRepository 'MyCodeRepository'
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    You may only make 1 change a time! That's why there are so many parameter sets. This is done out of caution.
+
+    The -iconSet and -iconCode parameter set requires that you import the local icon names with Import-AutomateNOWIcon or Import-AutomateNOWLocalIcon. This is only to check that the name of the icon being sent to the API is valid.
+
+    If you have three tags on a Business View and wanted to remove one then use the -SetTags parameter to apply the 2 that you want to keep. If you want to remove all tags then use -UnsetTags.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
+        [ANOWBusinessView]$BusinessView,
+        [ValidateScript({ $_.Length -ge 1 -and $_.Length -le 255 })]
+        [Parameter(Mandatory = $true, ParameterSetName = 'SetDescription', HelpMessage = "Enter a descriptive string between 1 and 255 characters in length. UTF8 characters are accepted.")]
+        [string]$Description,
+        [Parameter(Mandatory = $true, ParameterSetName = 'UnsetDescription')]
+        [switch]$UnsetDescription,
+        [Parameter(Mandatory = $true, ParameterSetName = 'SetIcon')]
+        [ANOWiconSetIconsOnly]$iconSet,
+        [Parameter(Mandatory = $true, ParameterSetName = 'SetIcon')]
+        [string]$iconCode,
+        [Parameter(Mandatory = $true, ParameterSetName = 'RemoveIcon')]
+        [switch]$RemoveIcon,
+        [Parameter(Mandatory = $false, ParameterSetName = 'SetFolder')]
+        [string]$Folder,
+        [Parameter(Mandatory = $true, ParameterSetName = 'UnsetFolder')]
+        [switch]$UnsetFolder,
+        [Parameter(Mandatory = $true, ParameterSetName = 'SetTags')]
+        [string[]]$Tags,
+        [Parameter(Mandatory = $true, ParameterSetName = 'UnsetTags')]
+        [switch]$UnsetTags,
+        [Parameter(Mandatory = $false, ParameterSetName = 'CodeRepository')]
+        [string]$CodeRepository,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        If ($iconSet.length -gt 0 ) {
+            If ($anow_assets.icon_library.length -eq 0) {
+                Write-Warning -Message "Please import the ANOW icons into your session with Import-AutomateNOWIcon or Import-AutomateNOWLocalIcon"
+                Break
+            }
+            If ($iconCode -notin ($anow_assets.icon_library."$iconSet")) {
+                Write-Warning -Message "The icon [$iconCode] does not appear to exist within the [$iconSet] icon set. Please check again."
+                Break
+            }
+        }
+        [string]$command = '/businessView/update'
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [ANOWBusinessView]$BusinessView = $_.id
+        }
+        [string]$BusinessView_id = $BusinessView.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($BusinessView_id)")) -eq $true) {
+            ## Begin warning ##
+            ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
+            $Error.Clear()
+            Try {
+                [boolean]$BusinessView_exists = ($null -eq (Get-AutomateNOWBusinessView -Id $BusinessView_id))
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Get-AutomateNOWBusinessView failed to check if the Business View [$BusinessView_id] already existed due to [$Message]."
+                Break
+            }
+            If ($BusinessView_exists -eq $true) {
+                [string]$current_domain = $anow_session.header.domain
+                Write-Warning -Message "There is not a Business View named [$BusinessView_id] in the [$current_domain]. Please check into this."
+                Break
+            }
+            ## End warning ##
+            [System.Collections.ArrayList]$include_properties = [System.Collections.ArrayList]@()
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.'id' = $BusinessView_id
+            If ($Description.Length -gt 0) {
+                $BodyMetaData.'description' = $Description
+            }
+            ElseIf ($UnsetDescription -eq $true) {
+                $BodyMetaData.'description' = $null
+            }
+            ElseIf ($iconCode.Length -gt 0) {
+                $BodyMetaData.'iconCode' = $iconCode
+                $BodyMetaData.'iconSet' = $iconSet
+                $BodyMetaData.'fugueIcon' = $null
+                $BodyMetaData.'fatCowIcon' = $null
+                $BodyMetaData.'codeRepository' = $BusinessView.codeRepository
+                $BodyMetaData.'_componentId' = 'BusinessViewEditForm'
+                [void]$include_properties.Add('fugueIcon')
+                [void]$include_properties.Add('fatCowIcon')
+                [void]$include_properties.Add('codeRepository')
+            }
+            ElseIf ($RemoveIcon -eq $true) {
+                $BodyMetaData.'iconSet' = $null
+                $BodyMetaData.'fugueIcon' = $null
+                $BodyMetaData.'fatCowIcon' = $null
+                $BodyMetaData.'codeRepository' = $BusinessView.codeRepository
+                $BodyMetaData.'_componentId' = 'BusinessViewVM'
+                $BodyMetaData.'_oldValues' = $BusinessView.CreateOldValues()
+                [void]$include_properties.Add('iconSet')
+                [void]$include_properties.Add('fugueIcon')
+                [void]$include_properties.Add('fatCowIcon')
+                [void]$include_properties.Add('codeRepository')
+            }
+            If ($Tags.Count -gt 0) {
+                [int32]$total_tags = $Tags.Count
+                [int32]$current_tag = 1
+                ForEach ($tag_id in $Tags) {
+                    $Error.Clear()
+                    Try {
+                        [ANOWTag]$tag_object = Get-AutomateNOWTag -Id $tag_id
+                    }
+                    Catch {
+                        [string]$Message = $_.Exception.Message
+                        Write-Warning -Message "Get-AutomateNOWTag had an error while retrieving the tag [$tag_id] under Set-AutomateNOWBusinessView due to [$message]"
+                        Break
+                    }
+                    If ($tag_object.simpleId.length -eq 0) {
+                        Throw "Set-AutomateNOWBusinessView has detected that the tag [$tag_id] does not appear to exist. Please check again."
+                        Break
+                    }
+                    ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
+                        [string]$tag_object_simpleId = $tag_object.simpleId
+                        Throw "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
+                        Break
+                    }
+                    [string]$tag_display = $tag_object | ConvertTo-Json -Compress
+                    Write-Verbose -Message "Adding tag $tag_display [$current_tag of $total_tags]"
+                    [string]$tag_name_sequence = ('tags' + $current_tag)
+                    $BodyMetaData.$tag_name_sequence = $tag_id
+                    $include_properties += $tag_name_sequence
+                    $current_tag++
+                }
+            }
+            ElseIf ($UnsetTags -eq $true) {
+                $BodyMetaData.'tags' = $null
+            }
+            ElseIf ($Folder.Length -gt 0) {
+                $Error.Clear()
+                Try {
+                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Get-AutomateNOWFolder failed to confirm that the folder [$tag_id] actually existed under Set-AutomateNOWBusinessView due to [$Message]"
+                    Break
+                }
+                If ($folder_object.simpleId.Length -eq 0) {
+                    Throw "Get-AutomateNOWFolder failed to locate the Folder [$Folder] under Set-AutomateNOWBusinessView. Please check again."
+                    Break
+                }
+                [string]$folder_display = $folder_object | ConvertTo-Json -Compress
+                Write-Verbose -Message "Adding folder $folder_display to [ANOWBusinessView] [$Id]"
+                $BodyMetaData.'folder' = $Folder
+                $include_properties += 'folder'
+            }
+            ElseIf ($UnsetFolder -eq $true) {
+                $BodyMetaData.'folder' = $null
+            }
+            If ($CodeRepository.Length -gt 0) {
+                $Error.Clear()
+                Try {
+                    [ANOWCodeRepository]$code_repository_object = Get-AutomateNOWCodeRepository -Id $CodeRepository
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Get-AutomateNOWCodeRepository failed to confirm that the code repository [$CodeRepository] actually existed under New-AutomateNOWBusinessView due to [$Message]"
+                    Break
+                }
+                If ($code_repository_object.simpleId.Length -eq 0) {
+                    Throw "Get-AutomateNOWCodeRepository failed to locate the Code Repository [$CodeRepository] under New-AutomateNOWBusinessView. Please check again."
+                    Break
+                }
+                [string]$code_repository_display = $code_repository_object | ConvertTo-Json -Compress
+                Write-Verbose -Message "Adding code repository $code_repository_display to [ANOWWorkflowTemplate] [$Id]"
+                $BodyMetaData.'codeRepository' = $CodeRepository
+                $include_properties += 'codeRepository'
+            }
+            $BodyMetaData.'_operationType' = 'update'
+            $BodyMetaData.'_textMatchStyle' = 'exact'
+            $BodyMetaData.'_dataSource' = 'BusinessViewDataSource'
+            $BodyMetaData.'isc_metaDataPrefix' = '_'
+            $BodyMetaData.'isc_dataFormat' = 'json'
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties $include_properties
+            If ($null -eq $parameters.Body) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$BusinessView_id] due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
+            }
+            Write-Verbose -Message "Business View $BusinessView_id was successfully updated"
+        }
+    }
+    End {
+    }
+}
+
+Function Export-AutomateNOWBusinessView {
+    <#
+    .SYNOPSIS
+    Exports the Business Views from an instance of AutomateNOW!
+
+    .DESCRIPTION
+    Exports the Business Views from an instance of AutomateNOW! to a local .csv file
+
+    .PARAMETER BusinessView
+    Mandatory [ANOWBusinessView] object (Use Get-AutomateNOWBusinessView to retrieve them)
+
+    .INPUTS
+    ONLY [ANOWBusinessView] objects from the pipeline are accepted
+
+    .OUTPUTS
+    The [ANOWBusinessView] objects are exported to the local disk in CSV format
+
+    .EXAMPLE
+    Get-AutomateNOWBusinessView | Export-AutomateNOWBusinessView
+
+    .EXAMPLE
+    Get-AutomateNOWBusinessView -Id 'BusinessView01' | Export-AutomateNOWBusinessView
+
+    .EXAMPLE
+    @( 'BusinessView01', 'BusinessView02' ) | Get-AutomateNOWBusinessView | Export-AutomateNOWBusinessView
+
+    .EXAMPLE
+    Get-AutomateNOWBusinessView | Where-Object { $_.simpleId -eq 'BusinessView01' } | Export-AutomateNOWBusinessView
+
+    .NOTES
+	You must present [ANOWBusinessView] objects to the pipeline to use this function.
+    #>
+
+    [Cmdletbinding(DefaultParameterSetName = 'Pipeline')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true, ParameterSetName = 'Pipeline')]
+        [ANOWBusinessView]$BusinessView
+    )
+    Begin {
+        [string]$current_time = Get-Date -Format 'yyyyMMddHHmmssfff'
+        [string]$ExportFileName = 'Export-AutomateNOW-BusinessViews-' + $current_time + '.csv'
+        [string]$ExportFilePath = ((Get-Location | Select-Object -ExpandProperty Path) + '\' + $ExportFileName)
+        [hashtable]$parameters = @{}
+        $parameters.Add('Path', $ExportFilePath)
+        $parameters.Add('Append', $true)
+        If ($PSVersionTable.PSVersion.Major -eq 5) {
+            $parameters.Add('NoTypeInformation', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [ANOWBusinessView]$BusinessView = $_
+        }
+        $Error.Clear()
+        Try {
+            $BusinessView | Export-CSV @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Export-CSV failed to export the [ANOWBusinessView] object on the pipeline due to [$Message]"
+            Break
+        }
+    }
+    End {
+        $Error.Clear()
+        If ((Test-Path -Path $ExportFilePath) -eq $true) {
+            [System.IO.FileInfo]$fileinfo = Get-Item -Path "$ExportFilePath"
+            [int32]$filelength = $fileinfo.Length
+            [string]$filelength_display = "{0:N0}" -f $filelength
+            Write-Information -MessageData "Created file $ExportFileName ($filelength_display bytes)"
+        }
+    }
+}
+
+Function New-AutomateNOWBusinessView {
+    <#
+    .SYNOPSIS
+    Creates a Business View within an AutomateNOW! instance
+
+    .DESCRIPTION
+    Creates a Business View within an AutomateNOW! instance and returns back the newly created [ANOWBusinessView] object
+
+    .PARAMETER Id
+    The intended name of the Business View. For example: 'MyBusinessView1'. This value may not contain the domain in brackets.
+
+    .PARAMETER Description
+    Optional description of the Business View (may not exceed 255 characters).
+
+    .PARAMETER Tags
+    Optional string array containing the CASE-SENSITIVE id's of the tags to assign to the new Business View.
+
+    .PARAMETER Folder
+    Optional name of the folder to place the DataSource into.
+
+    .PARAMETER iconSet
+    Mandatory string representing a choice between three icon sets. Valid choices are: FAT_COW, FUGUE, FONT_AWESOME
+
+    .PARAMETER iconCode
+    The name of the icon which matches the chosen library.
+
+    .PARAMETER CodeRepository
+    Optional name of the code repository to place the Business View into.
+
+    .PARAMETER Quiet
+    Optional switch to suppress the return of the newly created object
+
+    .INPUTS
+    None. You cannot pipe objects to New-AutomateNOWBusinessView.
+
+    .OUTPUTS
+    An [ANOWBusinessView] object representing the newly created Business View
+
+    .EXAMPLE
+    New-AutomateNOWBusinessView -Id 'BusinessView1' -Description 'BusinessView1 description' -Tags 'Tag1', 'Tag2' -Folder 'Folder1' -iconSet 'FAT_COW' -iconCode 'paper_airplane' -codeRepository 'Repository1'
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    The name (id) of the Business View must be unique (per domain). It may consist only of letters, numbers, underscore, dot or hypen.
+
+    The names of the icon is not enforced here! If you want to know the names of the available icons try running Import-AutomateNOWLocalIcon then review the $anow_assets.icon_library global variable.
+
+    #>
+    [OutputType([ANOWBusinessView])]
+    [Cmdletbinding(DefaultParameterSetName = 'Default')]
+    Param(
+        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [Parameter(Mandatory = $true, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'iconSet')]
+        [string]$Id,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'iconSet', HelpMessage = "Enter a descriptive string between 0 and 255 characters in length. UTF8 characters are accepted.")]
+        [ValidateScript({ $_.Length -le 255 })]
+        [string]$Description,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'iconSet')]
+        [string[]]$Tags,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'iconSet')]
+        [string]$Folder,
+        [Parameter(Mandatory = $true, ParameterSetName = 'iconSet')]
+        [ANOWiconSetIconsOnly]$iconSet,
+        [Parameter(Mandatory = $true, ParameterSetName = 'iconSet')]
+        [string]$iconCode,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'iconSet')]
+        [string]$CodeRepository,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'iconSet')]
+        [switch]$Quiet
+    )
+    If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+        Write-Warning -Message "Somehow there is not a valid token confirmed."
+        Break
+    }
+    ## Begin warning ##
+    ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
+    $Error.Clear()
+    Try {
+        [boolean]$BusinessView_exists = ($null -ne (Get-AutomateNOWBusinessView -Id $Id))
+    }
+    Catch {
+        [string]$Message = $_.Exception.Message
+        Write-Warning -Message "Get-AutomateNOWBusinessView failed to check if the Business View [$Id] already existed due to [$Message]."
+        Break
+    }
+    If ($BusinessView_exists -eq $true) {
+        [string]$current_domain = $anow_session.header.domain
+        Write-Warning -Message "There is already a Business View named [$Id] in [$current_domain]. Please check into this."
+        Break
+    }
+    ## End warning ##
+    [System.Collections.Specialized.OrderedDictionary]$ANOWBusinessView = [System.Collections.Specialized.OrderedDictionary]@{}
+    $ANOWBusinessView.Add('id', $Id)
+    If ($Description.Length -gt 0) {
+        $ANOWBusinessView.Add('description', $Description)
+    }
+    If ($Tags.Count -gt 0) {
+        [int32]$total_tags = $Tags.Count
+        [int32]$current_tag = 1
+        ForEach ($tag_id in $Tags) {
+            $Error.Clear()
+            Try {
+                [ANOWTag]$tag_object = Get-AutomateNOWTag -Id $tag_id
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Get-AutomateNOWTag had an error while retrieving the tag [$tag_id] under New-AutomateNOWBusinessView due to [$message]"
+                Break
+            }
+            If ($tag_object.simpleId.length -eq 0) {
+                Throw "New-AutomateNOWBusinessView has detected that the tag [$tag_id] does not appear to exist. Please check again."
+                Break
+            }
+            ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
+                [string]$tag_object_simpleId = $tag_object.simpleId
+                Throw "Wait! Tags are case-sensitive. [$tag_object_simpleId] is not the same case as [$tag_id]. Please check more carefully..."
+                Break
+            }
+            [string]$tag_display = $tag_object | ConvertTo-Json -Compress
+            Write-Verbose -Message "Adding tag $tag_display [$current_tag of $total_tags]"
+            [string]$tag_name_sequence = ('tags' + $current_tag)
+            $ANOWBusinessView.Add($tag_name_sequence, $tag_id)
+            $include_properties += $tag_name_sequence
+            $current_tag++
+        }
+    }
+    If ($Folder.Length -gt 0) {
+        $Error.Clear()
+        Try {
+            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWFolder failed to confirm that the folder [$tag_id] actually existed under New-AutomateNOWBusinessView due to [$Message]"
+            Break
+        }
+        If ($folder_object.simpleId.Length -eq 0) {
+            Throw "Get-AutomateNOWFolder failed to locate the Folder [$Folder] under New-AutomateNOWBusinessView. Please check again."
+            Break
+        }
+        [string]$folder_display = $folder_object | ConvertTo-Json -Compress
+        Write-Verbose -Message "Adding folder $folder_display to [ANOWWorkflowTemplate] [$Id]"
+        $ANOWBusinessView.Add('folder', $Folder)
+        $include_properties += 'folder'
+    }
+    If ($CodeRepository.Length -gt 0) {
+        $Error.Clear()
+        Try {
+            [ANOWCodeRepository]$code_repository_object = Get-AutomateNOWCodeRepository -Id $CodeRepository
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWCodeRepository failed to confirm that the code repository [$CodeRepository] actually existed under New-AutomateNOWBusinessView due to [$Message]"
+            Break
+        }
+        If ($code_repository_object.simpleId.Length -eq 0) {
+            Throw "Get-AutomateNOWCodeRepository failed to locate the Code Repository [$CodeRepository] under New-AutomateNOWBusinessView. Please check again."
+            Break
+        }
+        [string]$code_repository_display = $code_repository_object | ConvertTo-Json -Compress
+        Write-Verbose -Message "Adding code repository $code_repository_display to [ANOWWorkflowTemplate] [$Id]"
+        $ANOWBusinessView.Add('codeRepository', $CodeRepository)
+        $include_properties += 'codeRepository'
+    }
+    If ($iconSet.Length -gt 0) {
+        $ANOWBusinessView.'iconSet' = $iconSet
+    }
+    If ($iconCode.Length -gt 0) {
+        $ANOWBusinessView.'iconCode' = $iconCode
+    }
+    [string]$BodyObject = ConvertTo-QueryString -InputObject $ANOWBusinessView -IncludeProperties id, description, tags, folder, codeRepository, iconSet, iconCode
+    [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+    $BodyMetaData.'_operationType' = 'add'
+    $BodyMetaData.'_textMatchStyle' = 'exact'
+    $BodyMetaData.'_oldValues' = '{}'
+    $BodyMetaData.'_componentId' = 'BusinessViewCreateWindow_form'
+    $BodyMetaData.'_dataSource' = 'BusinessViewDataSource'
+    $BodyMetaData.'isc_metaDataPrefix' = '_'
+    $BodyMetaData.'isc_dataFormat' = 'json'
+    [string]$BodyMetaDataString = ConvertTo-QueryString -InputObject $BodyMetaData
+    [string]$Body = ($BodyObject + '&' + $BodyMetaDataString)
+    [string]$command = '/BusinessView/create'
+    [hashtable]$parameters = @{}
+    $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+    $parameters.Add('Command', $command)
+    $parameters.Add('Method', 'POST')
+    $parameters.Add('Body', $Body)
+    If ($anow_session.NotSecure -eq $true) {
+        $parameters.Add('NotSecure', $true)
+    }
+    [string]$parameters_display = $parameters | ConvertTo-Json -Compress
+    $Error.Clear()
+    Try {
+        [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+    }
+    Catch {
+        [string]$Message = $_.Exception.Message
+        Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] with parameters $parameters_display due to [$Message]."
+        Break
+    }
+    [int32]$response_code = $results.response.status
+    If ($response_code -ne 0) {
+        [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+        Break
+    }
+    $Error.Clear()
+    Try {
+        [ANOWBusinessView]$BusinessView = $results.response.data[0]
+    }
+    Catch {
+        [string]$Message = $_.Exception.Message
+        Write-Warning -Message "Failed to create a new [ANOWBusinessView] object due to [$Message]."
+        Break
+    }
+    If ($BusinessView.id.Length -eq 0) {
+        Write-Warning -Message "Somehow the newly created [ANOWBusinessView] object is empty!"
+        Break
+    }
+    Return $BusinessView
+
+}
+
+Function Remove-AutomateNOWBusinessView {
+    <#
+    .SYNOPSIS
+    Removes a Business View from an AutomateNOW! instance
+
+    .DESCRIPTION
+    Removes a Business View from an AutomateNOW! instance
+
+    .PARAMETER BusinessView
+    An [ANOWBusinessView] object representing the Business View to be deleted.
+
+    .PARAMETER Force
+    Force the removal without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    ONLY [ANOWBusinessView] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    None. The status will be written to the console with Write-Verbose.
+
+    .EXAMPLE
+    Get-AutomateNOWBusinessView -Id 'BusinessView01' | Remove-AutomateNOWBusinessView
+
+    .EXAMPLE
+    @( 'BusinessView1', 'BusinessView2', 'BusinessView3') | Remove-AutomateNOWBusinessView
+
+    .EXAMPLE
+    Get-AutomateNOWBusinessView | Where-Object { $_.simpleId -match 'MyBusinessView' } | Remove-AutomateNOWBusinessView
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $false, ValueFromPipeline = $True)]
+        [ANOWBusinessView]$BusinessView,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [string]$command = '/BusinessView/delete'
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [ANOWBusinessView]$BusinessView = $_
+        }
+        [string]$BusinessView_id = $BusinessView.id
+        If ($BusinessView_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Break
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($BusinessView_id)")) -eq $true) {
+            [string]$oldvalues = $BusinessView.CreateOldValues()
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.'id' = $BusinessView_id
+            $BodyMetaData.'_textMatchStyle' = 'exact'
+            $BodyMetaData.'_operationType' = 'remove'
+            $BodyMetaData.'_oldValues' = $oldvalues
+            $BodyMetaData.'_componentId' = 'BusinessViewList'
+            $BodyMetaData.'_dataSource' = 'BusinessViewDataSource'
+            $BodyMetaData.'isc_metaDataPrefix' = '_'
+            $BodyMetaData.'isc_dataFormat' = 'json'
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            If ($null -eq $parameters["Body"]) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$BusinessView_id] due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
+            }
+            Write-Verbose -Message "Business View $BusinessView_id successfully removed"
+        }
+    }
+    End {
+
+    }
+}
+
+Function Copy-AutomateNOWBusinessView {
+    <#
+    .SYNOPSIS
+    Copies a Business View from an AutomateNOW! instance
+
+    .DESCRIPTION
+    Copies a Business View from an AutomateNOW! instance. AutomateNOW object id can never be changed, but we can copy the Business View to a new object with a new Id and it will include all of the settings but not the items.
+
+    .PARAMETER BusinessView
+    Mandatory [ANOWBusinessView] object to be copied.
+
+    .PARAMETER NewId
+    The name (Id) of the new Business View. The new Id must be unique (per domain). It may consist only of letters, numbers, underscore, dot or hypen.
+
+    .PARAMETER UnsetDescription
+    Optional switch that will ensure that the newly created Business View will not have a description set.
+
+    .PARAMETER Description
+    Optional description to set on the new Business View object. If you do not set this, the new Business View object will copy the Description of the source object.
+
+    .PARAMETER UnsetFolder
+    Optional switch that will ensure that the newly created Business View will not have a Folder set.
+
+    .PARAMETER Folder
+    Optional description to set a different folder on the new Business View object. If you do not set this, the new Business View object will use the same Folder of the source object.
+
+    .PARAMETER UnsetTags
+    Optional switch that will ensure that the newly created Business View will not have any Tags set.
+
+    .PARAMETER Tags
+    Optional string array of CASE-SENSITIVE Tag Id's to set on the new Business View object. If you do not set this, the new Business View object will apply the same Tags of the source object.
+
+    .PARAMETER Force
+    Force the copy without confirmation. This is equivalent to -Confirm:$false
+
+    .PARAMETER Quiet
+    Optional switch to suppress the return of the newly created object.
+
+    .INPUTS
+    ONLY [ANOWBusinessView] object is accepted. Pipeline support is intentionally unavailable.
+
+    .OUTPUTS
+    None. The status will be written to the console with Write-Verbose.
+
+    .EXAMPLE
+    Creates a copy of an Business View and changes the description (multi-line format)
+    $BusinessView01 = Get-AutomateNOWBusinessView -Id 'BusinessView_01'
+    Copy-AutomateNOWBusinessView -BusinessView $BusinessView01 -NewId 'BusinessView_01_production' -Description 'BusinessView 01 Production'
+
+    .EXAMPLE
+    Creates a copy of an Business View that omits the description (one-liner format)
+    Copy-AutomateNOWBusinessView -BusinessView (Get-AutomateNOWBusinessView -Id 'BusinessView_01') -NewId 'BusinessView_01_production' -UnsetDescription -Tags 'Tag1', 'Tag2'
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [ANOWBusinessView]$BusinessView,
+        [Parameter(Mandatory = $true)]
+        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [string]$NewId,
+        [Parameter(Mandatory = $false)]
+        [ValidateScript({ $_.Length -le 255 })]
+        [string]$Description,
+        [Parameter(Mandatory = $false)]
+        [switch]$UnsetDescription,
+        [Parameter(Mandatory = $false)]
+        [string[]]$Tags,
+        [Parameter(Mandatory = $false)]
+        [switch]$UnsetTags,
+        [Parameter(Mandatory = $false)]
+        [string]$Folder,
+        [Parameter(Mandatory = $false)]
+        [switch]$UnsetFolder,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        If ($UnsetDescription -eq $true -and $Description.Length -gt 0) {
+            Write-Warning -Message "You cannot set the description and unset it at the same time. Please choose one or the other."
+            Break
+        }
+        If ($UnsetFolder -eq $true -and $Folder.Length -gt 0) {
+            Write-Warning -Message "You cannot set the Folder and unset it at the same time. Please choose one or the other."
+            Break
+        }
+        If ($UnsetTags -eq $true -and $Tags.Count -gt 0) {
+            Write-Warning -Message "You cannot set the Tags and unset them at the same time. Please choose one or the other. Tags from the source object will be carried over to the new object if you do not specify any tag-related parameters."
+            Break
+        }
+        ## Begin warning ##
+        ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
+        $Error.Clear()
+        Try {
+            [boolean]$BusinessView_exists = ($null -ne (Get-AutomateNOWBusinessView -Id $NewId))
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWBusinessView failed to check if the Business View [$NewId] already existed due to [$Message]."
+            Break
+        }
+        If ($BusinessView_exists -eq $true) {
+            [string]$current_domain = $anow_session.header.domain
+            Write-Warning -Message "There is already a Business View named [$NewId] in [$current_domain]. You may not proceed."
+            [boolean]$PermissionToProceed = $false
+        }
+        ## End warning ##
+        [string]$command = '/BusinessView/copy'
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($PermissionToProceed -ne $false) {
+            [string]$BusinessView_oldId = $BusinessView.id
+            [string]$BusinessView_simpleId = $BusinessView.simpleId
+            If ($BusinessView_oldId -eq $NewId) {
+                Write-Warning -Message "The new id cannot be the same as the old id."
+                Break
+            }
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the BusinessView $($BusinessView_simpleId) to $($NewId)?")) -eq $true) {
+                [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+                If ($UnsetFolder -eq $True) {
+                    $BodyMetaData.'folder' = $Null
+                }
+                ElseIf ($Folder.Length -gt 0) {
+                    $BodyMetaData.'folder' = $Folder
+                }
+                Else {
+                    If ($BusinessView.folder.Length -gt 0) {
+                        $BodyMetaData.'folder' = $BusinessView.folder
+                    }
+                }
+                If ($Tags.Count -gt 0) {
+                    [int32]$tag_count = 1
+                    ForEach ($tag in $Tags) {
+                        $BodyMetaData.('tags' + $tag_count ) = $tag
+                        $tag_count++
+                    }
+                }
+                ElseIf ($UnsetTags -eq $true) {
+                    $BodyMetaData.'tags' = $Null
+                }
+                Else {
+                    If ($BusinessView.Tags -gt 0) {
+                        [int32]$tag_count = 1
+                        ForEach ($tag in $BusinessView.tags) {
+                            $BodyMetaData.('tags' + $tag_count ) = $tag
+                            $tag_count++
+                        }
+                    }
+                }
+                $BodyMetaData.'oldId' = $BusinessView_oldId
+                $BodyMetaData.'domain' = $BusinessView.domain
+                $BodyMetaData.'id' = $NewId
+                If ($UnsetDescription -ne $true) {
+                    If ($Description.Length -gt 0) {
+                        $BodyMetaData.'description' = $Description
+                    }
+                    Else {
+                        $BodyMetaData.'description' = $BusinessView.description
+                    }
+                }
+                $BodyMetaData.'_operationType' = 'add'
+                $BodyMetaData.'_operationId' = 'copy'
+                $BodyMetaData.'_textMatchStyle' = 'exact'
+                $BodyMetaData.'_dataSource' = 'BusinessViewDataSource'
+                $BodyMetaData.'isc_metaDataPrefix' = '_'
+                $BodyMetaData.'isc_dataFormat' = 'json'
+                $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
+                $parameters.Body = $Body
+                $Error.Clear()
+                Try {
+                    [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$BusinessView_oldId] due to [$Message]."
+                    Break
+                }
+                [int32]$response_code = $results.response.status
+                If ($response_code -ne 0) {
+                    [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                    Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                    Break
+                }
+                $Error.Clear()
+                Try {
+                    [ANOWBusinessView]$NewBusinessView = $results.response.data[0]
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Failed to create copied [ANOWBusinessView] object [$NewId] due to [$Message]."
+                    Break
+                }
+                If ($NewBusinessView.id.Length -eq 0) {
+                    Write-Warning -Message "Somehow the newly created (copied) [ANOWBusinessView] object [$NewId] is empty!"
+                    Break
+                }
+                If ($Quiet -ne $true) {
+                    Return $NewBusinessView
+                }
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+Function Rename-AutomateNOWBusinessView {
+    <#
+    .SYNOPSIS
+    Renames a Busines sView on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Performs a psuedo-rename operations of a Business View from an AutomateNOW! instance by copying it first and then deleting the source. This function merely combines Copy-AutomateNOWBusiness View and Remove-AutomateNOWBusinessView therefore it is to be considered destructive.
+
+    .PARAMETER BusinessView
+    An [ANOWBusinessView] object representing the Business View to be renamed.
+
+    .PARAMETER NewId
+    Mandatory string indicating the new id or name of the Business View. Please remember that the Id is the same as a primary key, it must be unique. The console will provide the old Id + '_COPY' in the UI when making a copy. The Id is limited to 1024 characters.
+
+    .PARAMETER Force
+    Force the renaming without confirmation. This is equivalent to -Confirm:$false
+
+    .PARAMETER Quiet
+    Optional switch to suppress the return of the newly renamed object.
+
+    .INPUTS
+    ONLY [ANOWBusinessView] objects are accepted. There is intentionally no support for the pipeline.
+
+    .OUTPUTS
+    The newly renamed [ANOWBusinessView] object will be returned.
+
+    .EXAMPLE
+    $BusinessView = Get-AutomateNOWBusinessView -Id 'BusinessView01'
+    Rename-AutomateNOWBusinessView -BusinessView $BusinessView -NewId 'BusinessView_01'
+
+    .EXAMPLE
+    Rename-AutomateNOWBusinessView -BusinessView (Get-AutomateNOWBusinessView -Id 'BusinessView01') -NewId 'BusinessView_01'
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    When renaming, you may only specify a different Id (name).
+
+    This action will be blocked if any existing referrals are found on the object.
+    #>
+    [OutputType([ANOWBusinessView])]
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [ANOWBusinessView]$BusinessView,
+        [Parameter(Mandatory = $true)]
+        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [string]$NewId,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        ## Begin standard warning ##
+        ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
+        $Error.Clear()
+        Try {
+            [boolean]$new_BusinessView_exists = ($null -ne (Get-AutomateNOWBusinessView -Id $NewId))
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWBusinessView failed to check if the Business View [$NewId] already existed due to [$Message]."
+            Break
+        }
+        If ($new_BusinessView_exists -eq $true) {
+            [string]$current_domain = $anow_session.header.domain
+            Write-Warning -Message "There is already a Business View named [$NewId] in [$current_domain]. You may not proceed."
+            [boolean]$PermissionToProceed = $false
+        }
+        #[string]$BusinessView_id = $BusinessView.id
+        [string]$BusinessView_id = $BusinessView.simpleId
+        $Error.Clear()
+        Try {
+            [boolean]$old_BusinessView_exists = ($null -ne (Get-AutomateNOWBusinessView -Id $BusinessView_id))
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWBusinessView failed to check if the Business View [$BusinessView_id] already existed due to [$Message]."
+            Break
+        }
+        If ($old_BusinessView_exists -eq $false) {
+            [string]$current_domain = $anow_session.header.domain
+            Write-Warning -Message "There is not a Business View named [$BusinessView_id] in [$current_domain]. You may not proceed."
+            [boolean]$PermissionToProceed = $false
+        }
+        ## End standard warning ##
+        ## Begin referrals warning ##
+        ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
+        $Error.Clear()
+        Try {
+            [int32]$referrals_count = Find-AutomateNOWObjectReferral -BusinessView $BusinessView -Count | Select-Object -Expandproperty referrals
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Find-AutomateNOWObjectReferral failed to extract the referrals on Business View [$BusinessView_id] due to [$Message]."
+            Break
+        }
+        If ($referrals_count -gt 0) {
+            Write-Warning -Message "Unfortunately, you cannot rename a Business View that has referrals. This is because the rename is not actually renaming but copying anew and deleting the old. Please, use the Find-AutomateNOWObjectReferral function to identify referrals and remove them."
+            Break
+        }
+        Else {
+            Write-Verbose -Message "The Business View [$BusinessView_id] does not have any referrals. It is safe to proceed."
+        }
+    }
+    Process {
+        If ($PermissionToProceed -ne $false) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($BusinessView_id)")) -eq $true) {
+                $Error.Clear()
+                Try {
+                    [ANOWBusinessView]$new_BusinessView = Copy-AutomateNOWBusinessView -BusinessView $BusinessView -NewId $NewId -Force
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Copy-AutomateNOWBusinessView failed to create a new Business View [$NewId] as Part 1 of the renaming process due to [$Message]."
+                    Break
+                }
+                If ($new_BusinessView.simpleId -eq $NewId) {
+                    Write-Verbose -Message "Part 1: Business View [$BusinessView_id] successfully copied to [$NewId]"
+                }
+                Else {
+                    Write-Warning -Message "Somehow the first phase (Copy-AutomateNOWBusinessView) failed. Please look into this."
+                    Break
+                }
+                $Error.Clear()
+                Try {
+                    Remove-AutomateNOWBusinessView -BusinessView $BusinessView -Force
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Remove-AutomateNOWBusinessView failed to remove [$BusinessView_id] as Part 2 of the renaming process due to [$Message]."
+                    Break
+                }
+                Write-Verbose -Message "Part 2: Business View [$BusinessView_id] removed"
+                Write-Verbose -Message "Task [$BusinessView_id] successfully renamed to [$NewId]"
+                If ($Quiet -ne $true) {
+                    Return $new_BusinessView
+                }
+            }
+        }
+        Else {
+            Write-Warning -Message "No action was taken because either the source object didn't exist or the new object already existed"
+        }
+    }
+    End {
+    }
+}
+
+Function Read-AutomateNOWBusinessViewItem {
+    <#
+    .SYNOPSIS
+    Reads the items in a Business View on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Reads the items in a Business View on an AutomateNOW! instance
+
+    .PARAMETER BusinessView
+    The [ANOWBusinessView] object representing the Business View to be read.
+
+    .PARAMETER sortBy
+    Optional string parameter to sort the results by. Valid choices are: item, id, businessView, createdBy, dateCreated, description, lastUpdatedBy, lastUpdated
+
+    .PARAMETER Descending
+    Optional switch parameter to sort in descending order
+
+    .PARAMETER startRow
+    Optional integer to indicate the row to start from. This is intended for when you need to paginate the results. Default is 0.
+
+    .PARAMETER endRow
+    Optional integer to indicate the row to stop on. This is intended for when you need to paginate the results. Default is 100.
+
+    .INPUTS
+    ONLY [BusinessView] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    [BusinessViewItem] objects will be returned.
+
+    .EXAMPLE
+    Gets the first 100 Business View Items from a Business View named 'BusinessView1' via the pipeline
+
+    Get-AutomateNOWBusinessView -Id 'BusinessView1' | Read-AutomateNOWBusinessViewItem
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [OutputType([ANOWBusinessViewItem[]])]
+    [Cmdletbinding()]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [ANOWBusinessView]$BusinessView,
+        [Parameter(Mandatory = $False)]
+        [int32]$startRow = 0,
+        [Parameter(Mandatory = $False)]
+        [int32]$endRow = 100,
+        [ValidateSet( 'id', 'item', 'businessView', 'createdBy', 'dateCreated', 'description', 'lastUpdatedBy', 'lastUpdated')]
+        [Parameter(Mandatory = $False)]
+        [string]$sortBy = 'id',
+        [Parameter(Mandatory = $False)]
+        [switch]$Descending,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        If ($endRow -le $startRow) {
+            Write-Warning -Message "The endRow must be greater than the startRow. Please try again."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'GET')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [ANOWBusinessView]$BusinessView = $_
+        }
+        [string]$BusinessView_id = $BusinessView.Id
+        [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+        $BodyMetaData.Add('businessView', $BusinessView_id)
+        $BodyMetaData.Add('_operationType', 'fetch')
+        $BodyMetaData.Add('_startRow', $startRow)
+        $BodyMetaData.Add('_endRow', $endRow)
+        If ($Descending -eq $true) {
+            $BodyMetaData.'_sortBy' = '-' + $sortBy
+        }
+        Else {
+            $BodyMetaData.'_sortBy' = $sortBy
+        }
+        $BodyMetaData.Add('_textMatchStyle', 'substring')
+        $BodyMetaData.Add('_componentId', 'BusinessViewItemList')
+        $BodyMetaData.Add('_dataSource', 'BusinessViewItemDataSource')
+        $BodyMetaData.Add('isc_metaDataPrefix', '_')
+        $BodyMetaData.Add('isc_dataFormat', 'json')
+        [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+        [string]$command = ('/businessViewItem/read' + '?' + $Body)
+        If ($null -eq $parameters.'Command') {
+            $parameters.Add('Command', $command)
+        }
+        Else {
+            $parameters.'Command' = $command
+        }
+        $Error.Clear()
+        Try {
+            [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$ScheduleTemplate_id] due to [$Message]."
+            Break
+        }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
+        }
+        If ($results.response.data.count -gt 0) {
+            Try {
+                [ANOWBusinessViewItem[]]$BusinessViewItems = $results.response.data
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Failed to parse the Business View Items from $BusinessView_id due to [$Message]"
+                Break
+            }
+            Write-Verbose -Message "Business View Items successfully read from $BusinessView_id"
+            If ($BusinessViewItems.Count -gt 0) {
+                Return $BusinessViewItems
+            }
+        }
+        Else {
+            Write-Verbose -Message "There were no Business View Items within $BusinessView_id"
+        }
+    }
+    End {
+
+    }
+}
+
+Function Add-AutomateNOWBusinessViewItem {
+    <#
+    .SYNOPSIS
+    Adds a Business View Item to a Business View within an AutomateNOW! instance
+
+    .DESCRIPTION
+    Adds a Business View Item to a Business View within an AutomateNOW! instance
+
+    .PARAMETER BusinessView
+    Mandatory [BusinessView] object. Use Get-AutomateNOWBusinessView to get this object.
+
+    .PARAMETER itemType
+    Required type of the Business View Item. Valid options are: PROCESSING, RESOURCE, SERVER_NODE & BUSINESS_VIEW
+
+    .PARAMETER ProcessingTemplate
+    Mandatory [ANOWProcessingTemplate] object (if itemType is PROCESSING). This includes the following object types: Task Templates, Workflow Templates & Schedule Templates. ServiceManager Templates and Integration Template objects are not supported yet.
+
+    .PARAMETER Resource
+    Mandatory [ANOWResource] object (if itemType is RESOURCE). This includes the following object types: Calendars, Events, Locks, Metrics, PhysicalResources, Semaphores, Stocks, TimeWindows, Variables
+
+    .PARAMETER ServerNode
+    Mandatory [ANOWServerNode] object (if itemType is SERVER_NODE). This includes the following object types: Server Nodes
+
+    .PARAMETER BusinessViewChild
+    Mandatory [ANOWBusinessView] object (if itemType is BUSINESS_VIEW). This includes the following object types: Business Views
+
+    .PARAMETER Quiet
+    Optional switch to suppress the return of the newly created object
+
+    .PARAMETER Force
+    Force the addition of the object without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    None. You cannot pipe objects to New-AutomateNOWDataSourceItem.
+
+    .OUTPUTS
+    An [ANOWDataSourceItem] object representing the newly created DataSourceItem
+
+    .EXAMPLE
+    Forcefully adds the first five server nodes to a Business View named 'BusinessView1'
+
+    $business_view = Get-AutomateNOWBusinessView -Id 'BusinessView1'
+    Get-AutomateNOWServerNode -startRow 0 -endRow 5 | Add-AutomateNOWBusinessViewItem -BusinessView $business_view -Force
+
+    .EXAMPLE
+    Adds a Task Template named 'TaskTemplate1' to a Business View using the pipeline
+
+    Get-AutomateNOWWorkflowTemplate -Id 'TaskTemplate1' | Add-AutomateNOWBusinessViewItem -BusinessView (Get-AutomateNOWBusinessView -Id 'BusinessView1')
+
+    .EXAMPLE
+    Adds a Task Template named 'TaskTemplate1' to a Business View without using the pipeline
+
+    Add-AutomateNOWBusinessViewItem -BusinessView (Get-AutomateNOWBusinessView -Id 'BusinessView1') -ProcessingTemplate (Get-AutomateNOWWorkflowTemplate -Id 'TaskTemplate1')
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    The parameter BusinessViewChild is used because the BusinessView parameter was already occupied.
+
+    #>
+    [OutputType([ANOWDataSourceItem])]
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true, ParameterSetName = 'PROCESSING')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'RESOURCE')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'SERVER_NODE')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'BUSINESS_VIEW')]
+        [ANOWBusinessview]$BusinessView,
+        [Parameter(Mandatory = $true, ParameterSetName = 'PROCESSING', ValueFromPipeline = $true)]
+        [ANOWProcessingTemplate]$ProcessingTemplate,
+        [Parameter(Mandatory = $true, ParameterSetName = 'RESOURCE', ValueFromPipeline = $true)]
+        [ANOWResource]$Resource,
+        [Parameter(Mandatory = $true, ParameterSetName = 'SERVER_NODE', ValueFromPipeline = $true)]
+        [ANOWServerNode]$ServerNode,
+        [Parameter(Mandatory = $true, ParameterSetName = 'BUSINESS_VIEW', ValueFromPipeline = $true)]
+        [ANOWBusinessView]$BusinessViewChild,
+        [Parameter(Mandatory = $false, ParameterSetName = 'PROCESSING')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'RESOURCE')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'SERVER_NODE')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'BUSINESS_VIEW')]
+        [switch]$Quiet,
+        [Parameter(Mandatory = $false, ParameterSetName = 'PROCESSING')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'RESOURCE')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'SERVER_NODE')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'BUSINESS_VIEW')]
+        [switch]$Force
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+        [string]$BusinessView_Id = $BusinessView.Id
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', '/businessViewItem/create')
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_ -is [ANOWProcessingTemplate] -or $ProcessingTemplate.id.Length -gt 0) {
+            [string]$Type = 'PROCESSING'
+            If ($_ -is [ANOWProcessingTemplate]) {
+                [ANOWProcessingTemplate]$ProcessingTemplate = $_
+            }
+            [string]$item_id = $ProcessingTemplate.Id
+            [ANOWProcessingEvent_processingType]$processingType = $ProcessingTemplate.processingType
+            $BodyMetaData.'processingType' = $processingType
+            If ($processingType -eq 'TASK') {
+                $BodyMetaData.'taskType' = $ProcessingTemplate.taskType
+            }
+            ElseIf ($processingType -eq 'WORKFLOW') {
+                $BodyMetaData.'workflowType' = $ProcessingTemplate.workflowType
+            }
+            ElseIf ($processingType -eq 'SERVICE') {
+                $BodyMetaData.'serviceType' = $ProcessingTemplate.serviceType
+                If ($ProcessingTemplate.serviceType -eq 'SENSOR') {
+                    $BodyMetaData.'sensorType' = $ProcessingTemplate.sensorType
+                }
+                ElseIf ($ProcessingTemplate.serviceType -eq 'MONITOR') {
+                    $BodyMetaData.'monitorType' = $ProcessingTemplate.monitorType
+                }
+                ElseIf ($ProcessingTemplate.serviceType -eq 'SERVICE_MANAGER') {
+                    $BodyMetaData.'serviceManagerType' = $ProcessingTemplate.serviceManagerType
+                    $BodyMetaData.'serverNodeType' = 'INTERNAL'
+                }
+                Else {
+                    Write-Host "Somehow was not able to determine the serviceType of the processing template under Add-AutomateNOWBusinessViewItem"
+                    Break
+                }
+            }
+            ElseIf ($processingType -eq 'TRIGGER') {
+                # There are no additional properties to add for the TRIGGER processingType
+            }
+            Else {
+                Write-Host "Somehow was not able to determine the processingType of the supplied object under Add-AutomateNOWBusinessViewItem"
+                Break
+            }
+            If ($ProcessingTemplate.Description.Length -gt 0) {
+                $BodyMetaData.'description' = $ProcessingTemplate.description
+            }
+        }
+        ElseIf ($_ -is [ANOWResource] -or $Resource.id.Length -gt 0) {
+            [string]$Type = 'RESOURCE'
+            If ($_ -is [ANOWResource]) {
+                [ANOWResource]$Resource = $_
+            }
+            [string]$item_id = $Resource.Id
+            [ANOWResource_resourceType]$resourceType = $Resource.resourceType
+            $BodyMetaData.'resourceType' = $resourceType
+            If ($Resource.Description.Length -gt 0) {
+                $BodyMetaData.'description' = $Resource.description
+            }
+        }
+        ElseIf ($_ -is [ANOWServerNode] -or $ServerNode.id.Length -gt 0) {
+            [string]$Type = 'SERVER_NODE'
+            If ($_ -is [ANOWServerNode]) {
+                [ANOWServerNode]$ServerNode = $_
+            }
+            [string]$item_id = $ServerNode.Id
+            [ANOWserverNode_serverNodeType]$serverNodeType = $ServerNode.serverNodeType
+            $BodyMetaData.'serverNodeType' = $serverNodeType
+            If ($ServerNode.Description.Length -gt 0) {
+                $BodyMetaData.'description' = $ServerNode.description
+            }
+        }
+        ElseIf ($_ -is [ANOWBusinessView] -or $BusinessViewChild.id.Length -gt 0) {
+            [string]$Type = 'BUSINESS_VIEW'
+            If ($_ -is [ANOWBusinessView]) {
+                [ANOWBusinessView]$BusinessViewChild = $_
+            }
+            [string]$item_id = $BusinessViewChild.Id
+            If ($item_id -eq $BusinessView_Id) {
+                Write-Warning -Message "You cannot add a Business View to itself but you may add a Business View to a different Business View"
+                Break
+            }
+            #[string]$businessViewItemType = $BusinessViewChild.businessViewItemType # [ANOWbusinessView_businessViewItemType] (there is no enum or class for this object yet)
+            If ($BusinessViewChild.Description.Length -gt 0) {
+                $BodyMetaData.'description' = $BusinessViewChild.description
+            }
+        }
+        Else {
+            Write-Host "Somehow was not able to determine the type of object that was supplied to Add-AutomateNOWBusinessViewItem"
+            Break
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Add $item_id to $BusinessView_Id?")) -eq $true) {
+            $BodyMetaData.'businessView' = $BusinessView_Id
+            $BodyMetaData.'businessViewItemType' = $Type
+            $BodyMetaData.'item' = $item_id
+            $BodyMetaData.'_operationType' = 'add'
+            $BodyMetaData.'_textMatchStyle' = 'exact'
+            $BodyMetaData.'_dataSource' = 'BusinessViewItemDataSource'
+            $BodyMetaData.'isc_metaDataPrefix' = '_'
+            $BodyMetaData.'isc_dataFormat' = 'json'
+            $Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            If ($null -eq $parameters.Body) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            [string]$parameters_display = $parameters | ConvertTo-Json -Compress
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] with parameters $parameters_display due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
+            }
+            Write-Verbose -Message "Business View Item item added to Business View $BusinessView_Id"
+            If ($Quiet -ne $true) {
+                Return $DataSourceItem
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+Function Remove-AutomateNOWBusinessViewItem {
+    <#
+    .SYNOPSIS
+    Removes (deletes) an item from a Business View in an AutomateNOW! instance
+
+    .DESCRIPTION
+    Removes (deletes) an item from a Business View in an AutomateNOW! instance
+
+    .PARAMETER BusinessViewItem
+    Mandatory BusinessViewItem object to be removed from a Business View. Use Read-AutomateNOWBusinessViewItem to retrieve them.
+
+    .PARAMETER Force
+    Force the removal of the object without confirmation. This is equivalent to -Confirm:$false
+
+    .PARAMETER Quiet
+    Optional switch to suppress the display of the results
+
+    .INPUTS
+    You must pass [ANOWBusinessViewItems] objects. The pipeline may be used.
+
+    .OUTPUTS
+    The object that was removed from the Business View will be returned
+
+    .EXAMPLE
+    Forcibly removes the first 100 (or less) Business View Items from a Business View named 'BusinessView1' via the pipeline
+    Get-AutomateNOWBusinessView -Id 'BusinessView1' | Read-AutomateNOWBusinessViewItem | Remove-AutomateNOWBusinessViewItem -Force
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [OutputType([PSCustomObject])]
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [ANOWBusinessViewItem]$BusinessViewItem,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('Command', '/businessViewItem/delete')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
+        If ($_.Id.Length -gt 0 ) {
+            [ANOWBusinessViewItem]$BusinessViewItem = $_
+        }
+        [string]$Item_id = $BusinessViewItem.id
+        If ($Item_id.Length -eq 0) {
+            Write-Warning -Message "Somehow a Business View Item with an empty Id was passed to Remove-AutomateNOWBusinessViewItem. Please look into this."
+            Break
+        }
+        [string]$Item_Domain = $BusinessViewItem.domain
+        If ($Item_Domain.Length -eq 0) {
+            Write-Warning -Message "Somehow a Business View Item with an empty domain was passed to Remove-AutomateNOWBusinessViewItem. Please look into this."
+            Break
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$Item_id")) -eq $true) {
+            [string]$old_values = $BusinessViewItem.CreateOldValues()
+            $Body.'id' = $Item_id
+            $Body.'_oldValues' = $old_values
+            $Body.'_textMatchStyle' = 'exact'
+            $Body.'_componentId' = 'BusinessViewItemList'
+            $Body.'_dataSource' = 'BusinessViewItemDataSource'
+            $Body.'isc_metaDataPrefix' = '_'
+            $Body.'isc_dataFormat' = 'json'
+            [string]$Body = ConvertTo-QueryString -InputObject $Body
+            If ($null -eq $parameters["Body"]) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
+            }
+            Write-Verbose -Message "$Item_id was removed from its Business View"
+        }
+    }
+    End {
+
     }
 }
 
@@ -5241,17 +6916,11 @@ Function Get-AutomateNOWCalendar {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
@@ -5567,13 +7236,10 @@ Function New-AutomateNOWCalendar {
         Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] with parameters $parameters_display due to [$Message]."
         Break
     }
-    If ($results.response.status -lt 0 -or $results.response.status -gt 0) {
-        [string]$results_display = $results.response.errors | ConvertTo-Json -Compress
-        Write-Warning -Message "Failed to create Calendar [$Id] of type [$Type] due to $results_display. The parameters used: $parameters_display"
-        Break
-    }
-    ElseIf ($null -eq $results.response.status) {
-        Write-Warning -Message "Failed to create Calendar [$Id] of type [$Type] due to [an empty response]. The parameters used: $parameters_display"
+    [int32]$response_code = $results.response.status
+    If ($response_code -ne 0) {
+        [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
         Break
     }
     $Error.Clear()
@@ -6185,17 +7851,11 @@ Function Get-AutomateNOWCodeRepository {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
@@ -6224,7 +7884,7 @@ Function Set-AutomateNOWCodeRepository {
     Modifies a local Code Repository in an AutomateNOW! instance
 
     .PARAMETER CodeRepository
-    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWFolder to retrieve them)
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
 
     .PARAMETER sshKeyLocationType
     Mandatory string representing the type of SSH Key Location of the remote Git repository. Possible choices are: SSH_KEY_FILE_PATH, INLINE
@@ -6425,7 +8085,7 @@ Function Set-AutomateNOWCodeRepository {
             }
             $Error.Clear()
             Try {
-                [string]$encrypted_password = ('ENCRYPTED::' + (Protect-AutomateNOWEncryptedString -Pass $password))
+                [string]$encrypted_password = ('ENCRYPTED::' + (Protect-AutomateNOWEncryptedString -String $password))
             }
             Catch {
                 [string]$Message = $_.Exception.Message
@@ -6576,17 +8236,11 @@ Function Set-AutomateNOWCodeRepository {
                 Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
                 Break
             }
-            If ($results.response.status -ne 0) {
-                If ($null -eq $results.response.status) {
-                    Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                    Break
-                }
-                Else {
-                    [int32]$status_code = $results.response.status
-                    [string]$results_response = $results.response
-                    Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                    Break
-                }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
             }
             $Error.Clear()
             Try {
@@ -6750,7 +8404,7 @@ Function New-AutomateNOWCodeRepository {
             }
             $Error.Clear()
             Try {
-                [string]$encrypted_password = ('ENCRYPTED::' + (Protect-AutomateNOWEncryptedString -Pass $Pass))
+                [string]$encrypted_password = ('ENCRYPTED::' + (Protect-AutomateNOWEncryptedString -String $Pass))
             }
             Catch {
                 [string]$Message = $_.Exception.Message
@@ -6775,7 +8429,7 @@ Function New-AutomateNOWCodeRepository {
             }
             $Error.Clear()
             Try {
-                [string]$encrypted_sshKeyPassPhrase = ('ENCRYPTED::' + (Protect-AutomateNOWEncryptedString -Pass $sshKeyPasswordPhrase))
+                [string]$encrypted_sshKeyPassPhrase = ('ENCRYPTED::' + (Protect-AutomateNOWEncryptedString -String $sshKeyPasswordPhrase))
             }
             Catch {
                 [string]$Message = $_.Exception.Message
@@ -6901,17 +8555,11 @@ Function New-AutomateNOWCodeRepository {
                 Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
                 Break
             }
-            If ($results.response.status -ne 0) {
-                If ($null -eq $results.response.status) {
-                    Write-Warning -Message "Received an empty response when invoking the [$command] CodeRepository. Please look into this."
-                    Break
-                }
-                Else {
-                    [int32]$status_code = $results.response.status
-                    [string]$results_response = $results.response
-                    Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                    Break
-                }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
             }
             # Note this code is untested
             $Error.Clear()
@@ -6943,7 +8591,7 @@ Function Export-AutomateNOWCodeRepository {
     Exports the Code Repositories from an instance of AutomateNOW! to a local .csv file
 
     .PARAMETER CodeRepository
-    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWFolder to retrieve them)
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
 
     .INPUTS
     ONLY [ANOWCodeRepository] objects from the pipeline are accepted
@@ -7018,7 +8666,7 @@ Function Remove-AutomateNOWCodeRepository {
     Deletes a local Code Repository in an AutomateNOW! instance
 
     .PARAMETER CodeRepository
-    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWFolder to retrieve them)
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
 
     .PARAMETER Quiet
     Optional switch to suppress the display of the results
@@ -7120,17 +8768,11 @@ Function Remove-AutomateNOWCodeRepository {
                 Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
                 Break
             }
-            If ($results.response.status -ne 0) {
-                If ($null -eq $results.response.status) {
-                    Write-Warning -Message "Received an empty response when invoking the [$command] CodeRepository. Please look into this."
-                    Break
-                }
-                Else {
-                    [int32]$status_code = $results.response.status
-                    [string]$results_response = $results.response
-                    Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                    Break
-                }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
             }
             If ($Quiet -ne $True) {
                 Write-Information -MessageData "The local Code Repository $CodeRepository_Id was deleted"
@@ -7151,7 +8793,7 @@ Function Confirm-AutomateNOWCodeRepository {
     Confirms that a remote Code Repository on an AutomateNOW! instance is available
 
     .PARAMETER CodeRepository
-    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWFolder to retrieve them)
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
 
     .INPUTS
     ONLY [ANOWCodeRepository] objects are accepted (including from the pipeline)
@@ -7254,7 +8896,7 @@ Function Sync-AutomateNOWCodeRepository {
     Synchronizes the changes between the local and remote objects within a Code Repository on an AutomateNOW! instance
 
     .PARAMETER CodeRepository
-    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWFolder to retrieve them)
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
 
     .PARAMETER Quiet
     Optional switch to suppress the display of the results
@@ -7582,10 +9224,10 @@ Function Publish-AutomateNOWCodeRepository {
     Commits the changes made in the application version to the local git repository for all objects included in the code repository from an instance of AutomateNOW!
 
     .PARAMETER CodeRepository
-    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWFolder to retrieve them)
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
 
-    .PARAMETER Quiet
-    Optional switch to suppress the display of the results
+    .PARAMETER ForceCommit
+    Optional switch to use the /forceCommit endpoint instead of the /commit endpoint. Use this when you want to force the commit despite that none of the items have changed.
 
     .PARAMETER Force
     Force the commit without confirmation. This is equivalent to -Confirm:$false
@@ -7614,9 +9256,9 @@ Function Publish-AutomateNOWCodeRepository {
         [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
         [ANOWCodeRepository]$CodeRepository,
         [Parameter(Mandatory = $false)]
-        [switch]$Force,
+        [switch]$ForceCommit,
         [Parameter(Mandatory = $false)]
-        [switch]$Quiet
+        [switch]$Force
     )
     Begin {
         If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
@@ -7638,15 +9280,21 @@ Function Publish-AutomateNOWCodeRepository {
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($CodeRepository_id)")) -eq $true) {
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
             $BodyMetaData.Add('id', $CodeRepository_id )
+            If ($ForceCommit -eq $true) {
+                $BodyMetaData.Add('_operationId', 'forceCommit')
+                [string]$command = ('/codeRepository/forceCommit')
+            }
+            Else {
+                $BodyMetaData.Add('_operationId', 'commit')
+                [string]$command = ('/codeRepository/commit')
+            }
             $BodyMetaData.Add('_operationType', 'custom')
-            $BodyMetaData.Add('_operationId', 'commit')
             $BodyMetaData.Add('_textMatchStyle', 'exact')
             $BodyMetaData.Add('_dataSource', 'CodeRepositoryDataSource')
             $BodyMetaData.Add('isc_metaDataPrefix', '_')
             $BodyMetaData.Add('isc_dataFormat', 'json')
             [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
             $parameters.Add('Body', $Body)
-            [string]$command = ('/codeRepository/commit')
             $parameters.Add('Command', $command)
             $Error.Clear()
             Try {
@@ -7659,11 +9307,10 @@ Function Publish-AutomateNOWCodeRepository {
             }
             [int32]$response_code = $results.response.status
             If ($response_code -ne 0) {
-                If ($Quiet -eq $true) {
-                    Return $false
+                If ($Quiet -ne $true) {
+                    [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                    Write-Warning -Message "The response code was [$response_code] instead of 0. The Code Repository $CodeRepository_id commit (Publish) was not successful. Please see the full response $full_response_display"
                 }
-                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
-                Write-Warning -Message "The response code was [$response_code] instead of 0. The Code Repository $CodeRepository_id commit (Publish) was not successful. Please see the full response $full_response_display"
             }
             Else {
                 If ($Quiet -ne $true) {
@@ -7691,7 +9338,7 @@ Function UnPublish-AutomateNOWCodeRepository {
     Reverts (rolls back) the changes made in the application version to the local git repository for all objects included in the code repository from an instance of AutomateNOW!
 
     .PARAMETER CodeRepository
-    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWFolder to retrieve them)
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
 
     .PARAMETER Quiet
     Optional switch to suppress the display of the results
@@ -7899,17 +9546,11 @@ Function Get-AutomateNOWCodeRepositoryBranch {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] CodeRepository. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
@@ -7956,7 +9597,7 @@ Function New-AutomateNOWCodeRepositoryBranch {
     Creates a branch on a local Code Repository in an AutomateNOW! instance
 
     .PARAMETER CodeRepository
-    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWFolder to retrieve them)
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
 
     .PARAMETER Branch
     Mandatory string for the name of the branch. The name of the branch may consist only of alphanumeric characters and 3 special characters (._-) and not to exceed 128 characters in length.
@@ -8060,17 +9701,11 @@ Function New-AutomateNOWCodeRepositoryBranch {
                 Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
                 Break
             }
-            If ($results.response.status -ne 0) {
-                If ($null -eq $results.response.status) {
-                    Write-Warning -Message "Received an empty response when invoking the [$command] CodeRepository. Please look into this."
-                    Break
-                }
-                Else {
-                    [int32]$status_code = $results.response.status
-                    [string]$results_response = $results.response
-                    Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                    Break
-                }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
             }
             If ($Quiet -ne $True) {
                 Return
@@ -8092,7 +9727,7 @@ Function Remove-AutomateNOWCodeRepositoryBranch {
     Deletes a branch on a local Code Repository in an AutomateNOW! instance
 
     .PARAMETER CodeRepository
-    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWFolder to retrieve them)
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
 
     .PARAMETER Branch
     Mandatory string for the name of the branch to delete.
@@ -8209,17 +9844,11 @@ Function Remove-AutomateNOWCodeRepositoryBranch {
                 Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
                 Break
             }
-            If ($results.response.status -ne 0) {
-                If ($null -eq $results.response.status) {
-                    Write-Warning -Message "Received an empty response when invoking the [$command] CodeRepository. Please look into this."
-                    Break
-                }
-                Else {
-                    [int32]$status_code = $results.response.status
-                    [string]$results_response = $results.response
-                    Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                    Break
-                }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
             }
             If ($Quiet -ne $True) {
                 [string]$branch_name = $results.response.data.id
@@ -8541,7 +10170,7 @@ Function Get-AutomateNOWCodeRepositoryItem {
     Gets the items from a local Code Repository in an AutomateNOW! instance
 
     .PARAMETER CodeRepository
-    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWFolder to retrieve them)
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
 
     .PARAMETER itemType
     Optional string to filter the items by type. Use -All if you prefer to receive all items in a single array. Valid choices are: 'ProcessingTemplates', 'Schedules', 'BusinessViews', 'Workspaces', 'ResultMappings', 'Approvals', 'ServerNodes', 'Agents', 'Endpoints', 'Resources', 'DataSources', 'Anomalies', 'Interfaces', 'NotificationGroups', 'NotificationChannels', 'NotificationTemplates', 'RuntimeActions', 'Dashboards', 'AdhocReports', 'UserReports', 'Tags', 'Folders'
@@ -8753,17 +10382,11 @@ Function Get-AutomateNOWCodeRepositoryItem {
                 Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
                 Break
             }
-            If ($results.response.status -ne 0) {
-                If ($null -eq $results.response.status) {
-                    Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                    Break
-                }
-                Else {
-                    [int32]$status_code = $results.response.status
-                    [string]$results_response = $results.response
-                    Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                    Break
-                }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
             }
             $Error.Clear()
             Try {
@@ -8880,17 +10503,11 @@ Function Get-AutomateNOWCodeRepositoryOutOfSyncItem {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] CodeRepository. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
@@ -8921,7 +10538,7 @@ Function Add-AutomateNOWCodeRepositoryItem {
     Adds an item to a local Code Repository in an AutomateNOW! instance
 
     .PARAMETER CodeRepository
-    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWFolder to retrieve them)
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
 
     .PARAMETER Item
     Mandatory ANOW object to be added to the Code Repository. Valid ANOW object item types are: 'ProcessingTemplates', 'Schedules', 'BusinessViews', 'Workspaces', 'ResultMappings', 'Approvals', 'ServerNodes', 'Agents', 'Endpoints', 'Resources', 'DataSources', 'Anomalies', 'Interfaces', 'NotificationGroups', 'NotificationChannels', 'NotificationTemplates', 'RuntimeActions', 'Dashboards', 'AdhocReports', 'UserReports', 'Tags', 'Folders'
@@ -9020,7 +10637,7 @@ Function Add-AutomateNOWCodeRepositoryItem {
                 }
 
                 # "ServerNodes"
-                { $_ -is [ANOWNode] } {
+                { $_ -is [ANOWServerNode] } {
                     [string]$domainClassName = 'ServerNode'
                     [string]$dataSource = 'ServerNodeDataSource'
                     Break;
@@ -9075,29 +10692,35 @@ Function Add-AutomateNOWCodeRepositoryItem {
                     Break;
                 }
 
-                # "NotificationChannels"
+                # "NotificationGroups"
                 { $_ -is [ANOWNotificationGroup] } {
                     [string]$domainClassName = 'NotificationGroup'
                     [string]$dataSource = 'CodeRepositoryObjectDataSource'
                     Break;
                 }
 
-                # "NotificationGroups"
+                # "NotificationChannels"
                 { $_ -is [ANOWNotificationChannel] } {
                     [string]$domainClassName = 'NotificationChannel'
-                    [string]$dataSource = 'CodeRepositoryObjectDataSource'
+                    [string]$dataSource = 'NotificationGroupDataSource'
                     Break;
                 }
 
                 # "NotificationTemplates"
                 { $_ -is [ANOWNotificationMessageTemplate] } {
                     [string]$domainClassName = 'NotificationMessageTemplate'
-                    [string]$dataSource = 'CodeRepositoryObjectDataSource'
+                    [string]$dataSource = 'NotificationMessageTemplateDataSource'
+                    Break;
+                }
+
+                # "BusinessViews"
+                { $_ -is [ANOWBusinessView] } {
+                    [string]$domainClassName = 'BusinessView'
+                    [string]$dataSource = 'BusinessViewDataSource'
                     Break;
                 }
 
                 # "Anomalies" not supported yet
-                # "BusinessViews" not supported yet
                 # "Interfaces" not supported yet
                 # "RuntimeActions" not supported yet
                 # "Dashboards" not supported yet
@@ -9134,17 +10757,11 @@ Function Add-AutomateNOWCodeRepositoryItem {
                 Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
                 Break
             }
-            If ($results.response.status -ne 0) {
-                If ($null -eq $results.response.status) {
-                    Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                    Break
-                }
-                Else {
-                    [int32]$status_code = $results.response.status
-                    [string]$results_response = $results.response
-                    Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                    Break
-                }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
             }
             $Error.Clear()
             Try {
@@ -9368,17 +10985,11 @@ Function Remove-AutomateNOWCodeRepositoryItem {
                 Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
                 Break
             }
-            If ($results.response.status -ne 0) {
-                If ($null -eq $results.response.status) {
-                    Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                    Break
-                }
-                Else {
-                    [int32]$status_code = $results.response.status
-                    [string]$results_response = $results.response
-                    Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                    Break
-                }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
             }
             $Error.Clear()
             Try {
@@ -9835,7 +11446,7 @@ Function Merge-AutomateNOWCodeRepositoryOutOfSyncItem {
     Merges an Out Of Sync Item in a local Code Repository in an AutomateNOW! instance between the database version (yours, left side) and the repository version (theirs, right side)
 
     .PARAMETER CodeRepository
-    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWFolder to retrieve them)
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
 
     .PARAMETER ANOWCodeRepositoryOutOfSyncItem
     Mandatory [ANOWCodeRepositoryOutOfSyncItem] (Use Get-AutomateNOWCodeRepositoryOutOfSyncItem to retreive them)
@@ -9961,17 +11572,11 @@ Function Merge-AutomateNOWCodeRepositoryOutOfSyncItem {
                 Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
                 Break
             }
-            If ($results.response.status -ne 0) {
-                If ($null -eq $results.response.status) {
-                    Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                    Break
-                }
-                Else {
-                    [int32]$status_code = $results.response.status
-                    [string]$results_response = $results.response
-                    Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                    Break
-                }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
             }
             $Error.Clear()
             Try {
@@ -10105,17 +11710,11 @@ Function Get-AutomateNOWCodeRepositoryMergeRequest {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] CodeRepository. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
@@ -10146,7 +11745,7 @@ Function Approve-AutomateNOWCodeRepositoryMergeRequest {
     Approves (accepts) a Merge Request on a local Code Repository in an AutomateNOW! instance
 
     .PARAMETER CodeRepository
-    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWFolder to retrieve them)
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
 
     .PARAMETER MergeRequest
     Mandatory [ANOWCodeRepositoryMergeRequest] object (Use Get-AutomateNOWMergeRequest to retrieve them)
@@ -10241,17 +11840,11 @@ Function Approve-AutomateNOWCodeRepositoryMergeRequest {
                 Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
                 Break
             }
-            If ($results.response.status -ne 0) {
-                If ($null -eq $results.response.status) {
-                    Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                    Break
-                }
-                Else {
-                    [int32]$status_code = $results.response.status
-                    [string]$results_response = $results.response
-                    Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                    Break
-                }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
             }
             $Error.Clear()
             Try {
@@ -10284,7 +11877,7 @@ Function Deny-AutomateNOWCodeRepositoryMergeRequest {
     Denies (rejects) a Merge Request on a local Code Repository in an AutomateNOW! instance
 
     .PARAMETER CodeRepository
-    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWFolder to retrieve them)
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
 
     .PARAMETER MergeRequest
     Mandatory [ANOWCodeRepositoryMergeRequest] object (Use Get-AutomateNOWMergeRequest to retrieve them)
@@ -10379,17 +11972,11 @@ Function Deny-AutomateNOWCodeRepositoryMergeRequest {
                 Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
                 Break
             }
-            If ($results.response.status -ne 0) {
-                If ($null -eq $results.response.status) {
-                    Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                    Break
-                }
-                Else {
-                    [int32]$status_code = $results.response.status
-                    [string]$results_response = $results.response
-                    Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                    Break
-                }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
             }
             $Error.Clear()
             Try {
@@ -10425,55 +12012,58 @@ Function Get-AutomateNOWCodeRepositoryObjectSource {
     Gets the source code for an object from an AutomateNOW! instance. This is equivalent to clicking the 'Source Code' button in the UI for the objects which support source code modification.
 
     .PARAMETER ScheduleTemplate
-    [ANOWScheduleTemplate] object to find referrals to. Use Get-AutomateNOWScheduleTemplate to obtain these objects. Note: The console refers to these as 'Schedules'.
+    [ANOWScheduleTemplate] object to retrieve the source code of. Use Get-AutomateNOWScheduleTemplate to obtain these objects. Note: The console refers to these as 'Schedules'.
 
     .PARAMETER TaskTemplate
-    [ANOWTaskTemplate] object to find referrals to. Use Get-AutomateNOWTaskTemplate to obtain these objects.
+    [ANOWTaskTemplate] object to retrieve the source code of. Use Get-AutomateNOWTaskTemplate to obtain these objects.
 
     .PARAMETER WorkflowTemplate
-    [ANOWWorkflowTemplate] object to find referrals to. Use Get-AutomateNOWWorkflowTemplate to obtain these objects.
+    [ANOWWorkflowTemplate] object to retrieve the source code of. Use Get-AutomateNOWWorkflowTemplate to obtain these objects.
 
     .PARAMETER Calendar
-    [ANOWCalendar] object to find referrals to. Use Get-AutomateNOWCalendar to obtain these objects.
+    [ANOWCalendar] object to retrieve the source code of. Use Get-AutomateNOWCalendar to obtain these objects.
 
-    .PARAMETER Node
-    [ANOWNode] object to find referrals to. Use Get-AutomateNOWNode to obtain these objects.
+    .PARAMETER ServerNode
+    [ANOWServerNode] object to retrieve the source code of. Use Get-AutomateNOWServerNode to obtain these objects.
 
     .PARAMETER Stock
-    [ANOWStock] object to find referrals to. Use Get-AutomateNOWStock to obtain these objects.
+    [ANOWStock] object to retrieve the source code of. Use Get-AutomateNOWStock to obtain these objects.
 
     .PARAMETER Lock
-    [ANOWLock] object to find referrals to. Use Get-AutomateNOWLock to obtain these objects.
+    [ANOWLock] object to retrieve the source code of. Use Get-AutomateNOWLock to obtain these objects.
 
     .PARAMETER TimeWindow
-    [ANOWTimeWindow] object to find referrals to. Use Get-AutomateNOWTimeWindow to obtain these objects.
+    [ANOWTimeWindow] object to retrieve the source code of. Use Get-AutomateNOWTimeWindow to obtain these objects.
 
     .PARAMETER Semaphore
-    [ANOWSemaphore] object to find referrals to. Use Get-AutomateNOWSemaphore to obtain these objects.
+    [ANOWSemaphore] object to retrieve the source code of. Use Get-AutomateNOWSemaphore to obtain these objects.
 
     .PARAMETER Variable
-    [ANOWVariable] object to find referrals to. Use Get-AutomateNOWVariable to obtain these objects.
+    [ANOWVariable] object to retrieve the source code of. Use Get-AutomateNOWVariable to obtain these objects.
 
     .PARAMETER Metric
-    [ANOWMetric] object to find referrals to. Use Get-AutomateNOWMetric to obtain these objects.
+    [ANOWMetric] object to retrieve the source code of. Use Get-AutomateNOWMetric to obtain these objects.
 
     .PARAMETER PhysicalResource
-    [ANOWPhysicalResource] object to find referrals to. Use Get-AutomateNOWPhysicalResource to obtain these objects.
+    [ANOWPhysicalResource] object to retrieve the source code of. Use Get-AutomateNOWPhysicalResource to obtain these objects.
 
     .PARAMETER Event
-    [ANOWEvent] object to find referrals to. Use Get-AutomateNOWEvent to obtain these objects.
+    [ANOWEvent] object to retrieve the source code of. Use Get-AutomateNOWEvent to obtain these objects.
 
     .PARAMETER Workspace
-    [ANOWWorkspace] object to find referrals to. Use Get-AutomateNOWWorkspace to obtain these objects.
+    [ANOWWorkspace] object to retrieve the source code of. Use Get-AutomateNOWWorkspace to obtain these objects.
 
     .PARAMETER Endpoint
-    [ANOWEndpoint] object to find referrals to. Use Get-AutomateNOWEndpoint to obtain these objects.
+    [ANOWEndpoint] object to retrieve the source code of. Use Get-AutomateNOWEndpoint to obtain these objects.
 
     .PARAMETER ResultMapping
-    [ANOWResultMapping] object to find referrals to. Use Get-AutomateNOWResultMapping to obtain these objects.
+    [ANOWResultMapping] object to retrieve the source code of. Use Get-AutomateNOWResultMapping to obtain these objects.
+
+    .PARAMETER DataSource
+    [ANOWDataSource] object to retrieve the source code of. Use Get-AutomateNOWDataSource to obtain these objects.
 
     .INPUTS
-    Accepts many types of [ANOW] objects including TaskTemplate, WorkflowTemplate, Nodes, Stocks, Locks & Variables across the pipeline
+    Accepts many types of [ANOW] objects including TaskTemplate, WorkflowTemplate, ServerNodes, Stocks, Locks & Variables across the pipeline
 
     .OUTPUTS
     A single [ANOWCodeRepositoryObjectSourceCode] object will be returned containing the source code of the object.
@@ -10509,8 +12099,8 @@ Function Get-AutomateNOWCodeRepositoryObjectSource {
         [ANOWTaskTemplate]$TaskTemplate,
         [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'WorkflowTemplate')]
         [ANOWWorkflowTemplate]$WorkflowTemplate,
-        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'Node')]
-        [ANOWNode]$Node,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'ServerNode')]
+        [ANOWServerNode]$ServerNode,
         [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'Calendar')]
         [ANOWCalendar]$Calendar,
         [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'Stock')]
@@ -10536,7 +12126,9 @@ Function Get-AutomateNOWCodeRepositoryObjectSource {
         [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'ResultMapping')]
         [ANOWResultMapping]$ResultMapping,
         [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'Approval')]
-        [ANOWApproval]$Approval
+        [ANOWApproval]$Approval,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'DataSource')]
+        [ANOWDataSource]$DataSource
     )
     Begin {
         If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
@@ -10578,10 +12170,10 @@ Function Get-AutomateNOWCodeRepositoryObjectSource {
                 $Body.'id' = $_.'id'
             }
         }
-        ElseIf ($_ -is [ANOWNode] -or $Node.Id.Length -gt 0) {
+        ElseIf ($_ -is [ANOWServerNode] -or $ServerNode.Id.Length -gt 0) {
             [string]$domainClassName = 'ServerNode'
-            If ($Node.id.Length -gt 0) {
-                $Body.'id' = $Node.id
+            If ($ServerNode.id.Length -gt 0) {
+                $Body.'id' = $ServerNode.id
             }
             Else {
                 $Body.'id' = $_.'id'
@@ -10704,6 +12296,15 @@ Function Get-AutomateNOWCodeRepositoryObjectSource {
                 $Body.'id' = $_.'id'
             }
         }
+        ElseIf ($_ -is [ANOWDataSource] -or $DataSource.Id.Length -gt 0) {
+            [string]$domainClassName = 'DataSource'
+            If ($DataSource.id.Length -gt 0) {
+                $Body.'id' = $DataSource.id
+            }
+            Else {
+                $Body.'id' = $_.'id'
+            }
+        }
         Else {
             Write-Warning -Message "Unable to determine input object. Please specify an object of [ANOW] base class type."
             Break
@@ -10731,17 +12332,11 @@ Function Get-AutomateNOWCodeRepositoryObjectSource {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] while running Find-AutomateNOWObjectReferral due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
@@ -11229,17 +12824,11 @@ Function Get-AutomateNOWCodeRepositoryTag {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
@@ -11268,7 +12857,7 @@ Function New-AutomateNOWCodeRepositoryTag {
     Creates a git tag on a local Code Repository in an AutomateNOW! instance
 
     .PARAMETER CodeRepository
-    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWFolder to retrieve them)
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
 
     .PARAMETER Tag
     Mandatory string for the name of the git tag. The name of the git tag may consist only of alphanumeric characters and 3 special characters (._-) and not to exceed 128 characters in length.
@@ -11379,17 +12968,11 @@ Function New-AutomateNOWCodeRepositoryTag {
                 Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
                 Break
             }
-            If ($results.response.status -ne 0) {
-                If ($null -eq $results.response.status) {
-                    Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                    Break
-                }
-                Else {
-                    [int32]$status_code = $results.response.status
-                    [string]$results_response = $results.response
-                    Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                    Break
-                }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
             }
             If ($Quiet -ne $True) {
                 [string]$tag_id = $results.response.data.id
@@ -11412,7 +12995,7 @@ Function Remove-AutomateNOWCodeRepositoryTag {
     Deletes a git tag on a local Code Repository in an AutomateNOW! instance
 
     .PARAMETER CodeRepository
-    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWFolder to retrieve them)
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
 
     .PARAMETER Tag
     Mandatory [ANOWCodeRepositoryTag] object to be deleted from the Code Repository. Use Get-AutomateNOWCodeRepositoryTag to retrieve these.
@@ -11528,17 +13111,11 @@ Function Remove-AutomateNOWCodeRepositoryTag {
                 Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
                 Break
             }
-            If ($results.response.status -ne 0) {
-                If ($null -eq $results.response.status) {
-                    Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                    Break
-                }
-                Else {
-                    [int32]$status_code = $results.response.status
-                    [string]$results_response = $results.response
-                    Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                    Break
-                }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
             }
             If ($Quiet -ne $True) {
                 [string]$tag_name = $results.response.data.name
@@ -11818,17 +13395,11 @@ Function Get-AutomateNOWContextVariable {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed due to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         [int32]$ContextVariables_count = $results.response.data.Count
         If ($ContextVariables_count -eq 0 -and $startRow -gt 0) {
@@ -12038,17 +13609,11 @@ Function Get-AutomateNOWDataSource {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] while running Get-AutomateNOWDataSource due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
@@ -12278,13 +13843,10 @@ Function New-AutomateNOWDataSource {
         Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] with parameters $parameters_display due to [$Message]."
         Break
     }
-    If ($results.response.status -lt 0 -or $results.response.status -gt 0) {
-        [string]$results_display = $results.response.errors | ConvertTo-Json -Compress
-        Write-Warning -Message "Failed to create DataSource [$Id] of type [$Type] due to $results_display. The parameters used: $parameters_display"
-        Break
-    }
-    ElseIf ($null -eq $results.response.status) {
-        Write-Warning -Message "Failed to create DataSource [$Id] of type [$Type] due to [an empty response]. The parameters used: $parameters_display"
+    [int32]$response_code = $results.response.status
+    If ($response_code -ne 0) {
+        [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
         Break
     }
     $Error.Clear()
@@ -13184,17 +14746,11 @@ Function Get-AutomateNOWDataSourceItem {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         [int32]$DataSourceItemsCount = $results.response.data.count
         If ($DataSourceItemsCount -gt 50000) {
@@ -13754,17 +15310,20 @@ Function Add-AutomateNOWDataSourceItem {
         [string]$parameters_display = $parameters | ConvertTo-Json -Compress
         $Error.Clear()
         Try {
-            [int32]$results = Invoke-AutomateNOWAPI @parameters
+            [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
         }
         Catch {
             [string]$Message = $_.Exception.Message
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] with parameters $parameters_display due to [$Message]."
             Break
         }
-        If ($results -ne 0) {
-            Write-Warning -Message "Somehow Add-AutomateNOWDataSourceItem did not receive an error-free response of 0 after sending a binary payload with Invoke-AutomateNOWAPI. Please look into this."
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
             Break
         }
+        Write-Verbose -Message "DataSourceItem item added"
         If ($Quiet -ne $true) {
             Return $DataSourceItem
         }
@@ -13968,17 +15527,11 @@ Function Get-AutomateNOWDomain {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         If ($results.response.data.count -gt 0) {
@@ -14448,15 +16001,9 @@ Function Set-AutomateNOWDomain {
             }
             [int32]$response_code = $results.response.status
             If ($response_code -ne 0) {
-                If ($null -eq $results.response.status) {
-                    Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                    Break
-                }
-                Else {
-                    [string]$results_response = $results.response
-                    Write-Warning -Message "Received status code [$response_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                    Break
-                }
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
             }
             If ($logofile.count -eq 0) {
                 $Error.Clear()
@@ -14744,21 +16291,11 @@ Function New-AutomateNOWDomain {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed due to [$Message]"
             Break
         }
-        If ($results.response.status -ne 0) {
-            [string]$parameters_display = $parameters | ConvertTo-Json -Compress
-            If ($results.response.status -lt 0 -or $results.response.status -gt 0) {
-                [string]$results_display = $results.response.errors | ConvertTo-Json -Compress
-                Write-Warning -Message "Executing [$command] returned the error $results_display. Parameters: $parameters_display"
-                Break
-            }
-            ElseIf ($null -eq $results.response.status) {
-                Write-Warning -Message "Executing [$command] returned an empty response. Parameters: $parameters_display"
-                Break
-            }
-            Else {
-                Write-Warning -Message "Unknown error when executing [$command]. Parameters: $parameters_display"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
@@ -15484,17 +17021,11 @@ Function Sync-AutomateNOWDomainServerNode {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         Else {
             Write-Verbose -Message "The server node cache was rebuilt on $Domain_Id"
@@ -15571,17 +17102,11 @@ Function Sync-AutomateNOWDomainResource {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         Else {
             Write-Verbose -Message "The resource cache was rebuilt on $Domain_Id"
@@ -15711,17 +17236,11 @@ Function Clear-AutomateNOWDomain {
                 Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
                 Break
             }
-            If ($results.response.status -ne 0) {
-                If ($null -eq $results.response.status) {
-                    Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                    Break
-                }
-                Else {
-                    [int32]$status_code = $results.response.status
-                    [string]$results_response = $results.response
-                    Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                    Break
-                }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
             }
             Else {
                 Write-Verbose -Message "The resource cache was rebuilt on $Domain_Id was cleared of the specified items"
@@ -15854,17 +17373,11 @@ Function Get-AutomateNOWEndpoint {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
@@ -15881,208 +17394,6 @@ Function Get-AutomateNOWEndpoint {
     }
     End {
 
-    }
-}
-
-Function Set-AutomateNOWEndpoint {
-    <#
-    .SYNOPSIS
-    Changes the settings of an Endpoint on an AutomateNOW! instance
-
-    .DESCRIPTION
-    Changes the settings of an Endpoint on an AutomateNOW! instance
-
-    .PARAMETER Endpoint
-    An [ANOWEndpoint] object representing the Endpoint to be modified.
-
-    .PARAMETER UnsetDescription
-    Optional switch that will remove the Description from the Endpoint object.
-
-    .PARAMETER Description
-    Optional string to set on the new Endpoint object.
-
-    .PARAMETER UnsetFolder
-    Optional switch that will remove the Folder assignment from the Endpoint object.
-
-    .PARAMETER Folder
-    Optional string to set a different folder on the Endpoint object.
-
-    .PARAMETER UnsetTags
-    Optional switch that will remove the Tags from the Endpoint object.
-
-    .PARAMETER Tags
-    Optional string array of CASE-SENSITIVE Tag Id's to set on the new Endpoint object.
-
-    .PARAMETER Force
-    Force the change without confirmation. This is equivalent to -Confirm:$false
-
-    .INPUTS
-    ONLY [ANOWEndpoint] objects are accepted (including from the pipeline)
-
-    .OUTPUTS
-    The modified [ANOWEndpoint] object will be returned
-
-    .EXAMPLE
-    Changes the description of an Endpoint
-
-    $Endpoint = Get-AutomateNOWEndpoint -Id 'Endpoint1'
-    Set-AutomateNOWEndpoint -Endpoint $Endpoint -Description 'My Description'
-
-    .NOTES
-    You must use Connect-AutomateNOW to establish the token by way of global variable.
-
-    This function is a work-in-progress. Only common properties can be modified (Description, Folder, Tags). Credentials are not supported yet :(
-
-    #>
-    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
-    Param(
-        [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
-        [ANOWEndpoint]$Endpoint,
-        [Parameter(Mandatory = $false)]
-        [ValidateScript({ $_.Length -le 255 })]
-        [string]$Description,
-        [Parameter(Mandatory = $false)]
-        [switch]$UnsetDescription,
-        [Parameter(Mandatory = $false)]
-        [string[]]$Tags,
-        [Parameter(Mandatory = $false)]
-        [switch]$UnsetTags,
-        [Parameter(Mandatory = $false)]
-        [string]$Folder,
-        [Parameter(Mandatory = $false)]
-        [switch]$UnsetFolder,
-        [Parameter(Mandatory = $false)]
-        [switch]$Force
-    )
-    Begin {
-        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
-            Write-Warning -Message "Somehow there is not a valid token confirmed."
-            Break
-        }
-        If ($UnsetDescription -eq $true -and $Description.Length -gt 0) {
-            Write-Warning -Message "You cannot set the description and unset it at the same time. Please choose one or the other."
-            Break
-        }
-        If ($UnsetFolder -eq $true -and $Folder.Length -gt 0) {
-            Write-Warning -Message "You cannot set the Folder and unset it at the same time. Please choose one or the other."
-            Break
-        }
-        If ($UnsetTags -eq $true -and $Tags.Count -gt 0) {
-            Write-Warning -Message "You cannot set the Tags and unset them at the same time. Please choose one or the other. Tags from the source object will be carried over to the new object if you do not specify any tag-related parameters."
-            Break
-        }
-        [string]$command = '/endpoint/update'
-        [hashtable]$parameters = @{}
-        $parameters.Add('Command', $command)
-        $parameters.Add('Method', 'POST')
-        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
-        If ($anow_session.NotSecure -eq $true) {
-            $parameters.Add('NotSecure', $true)
-        }
-    }
-    Process {
-        If ($_.id.Length -gt 0) {
-            [ANOWEndpoint]$Endpoint = $_
-        }
-        [string]$Endpoint_id = $Endpoint.id
-        [string]$Endpoint_type = $Endpoint.endpointType
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Endpoint_id)")) -eq $true) {
-            Else {
-            }
-            ## Begin warning ##
-            ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
-            $Error.Clear()
-            Try {
-                [boolean]$Endpoint_exists = ($null -eq (Get-AutomateNOWEndpoint -Id $Endpoint_id))
-            }
-            Catch {
-                [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Get-AutomateNOWEndpoint failed to check if the Endpoint [$Endpoint_id] already existed due to [$Message]."
-                Break
-            }
-            If ($Endpoint_exists -eq $true) {
-                [string]$current_domain = $anow_session.header.domain
-                Write-Warning -Message "There is not a Result Mapping named [$Endpoint_id] in the [$current_domain] domain. Please check into this."
-                Break
-            }
-            ## End warning ##
-            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
-            $BodyMetaData.'id' = $Endpoint_id
-            If ($Description.Length -gt 0) {
-                $BodyMetaData.'description' = $Description
-            }
-            ElseIf ($UnsetDescription -eq $true) {
-                $BodyMetaData.'description' = $Null
-            }
-            Else {
-                If ($Endpoint.description.Length -gt 0) {
-                    $BodyMetaData.'description' = $Endpoint.description
-                }
-            }
-            If ($UnsetFolder -eq $True) {
-                $BodyMetaData.'folder' = $Null
-            }
-            ElseIf ($Folder.Length -gt 0) {
-                $BodyMetaData.'folder' = $Folder
-            }
-            Else {
-                If ($Endpoint.folder.Length -gt 0) {
-                    $BodyMetaData.'folder' = $Endpoint.folder
-                }
-            }
-            If ($Tags.Count -gt 0) {
-                [int32]$tag_count = 1
-                ForEach ($tag in $Tags) {
-                    $BodyMetaData.('tags' + $tag_count ) = $tag
-                    $tag_count++
-                }
-            }
-            ElseIf ($UnsetTags -eq $true) {
-                $BodyMetaData.'tags' = $Null
-            }
-            Else {
-                If ($Endpoint.Tags -gt 0) {
-                    [int32]$tag_count = 1
-                    ForEach ($tag in $Endpoint.tags) {
-                        $BodyMetaData.('tags' + $tag_count ) = $tag
-                        $tag_count++
-                    }
-                }
-            }
-            [string]$old_values = $Endpoint.CreateOldValues()
-            $BodyMetaData.'_oldValues' = $old_values
-            $BodyMetaData.'_componentId' = 'EndpointVM'
-            $BodyMetaData.'_operationType' = 'update'
-            $BodyMetaData.'_textMatchStyle' = 'exact'
-            $BodyMetaData.'_dataSource' = 'EndpointDataSource'
-            $BodyMetaData.'isc_metaDataPrefix' = '_'
-            $BodyMetaData.'isc_dataFormat' = 'json'
-            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
-            If ($null -eq $parameters.Body) {
-                $parameters.Add('Body', $Body)
-            }
-            Else {
-                $parameters.Body = $Body
-            }
-            $Error.Clear()
-            Try {
-                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
-            }
-            Catch {
-                [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$Endpoint_id] of type [$Endpoint_type] due to [$Message]."
-                Break
-            }
-            [int32]$response_code = $results.response.status
-            If ($response_code -ne 0) {
-                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
-                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
-                Break
-            }
-            Write-Verbose -Message "Endpoint object [$Endpoint_id] of type [$Endpoint_type] was successfully updated"
-        }
-    }
-    End {
     }
 }
 
@@ -16353,13 +17664,10 @@ Function New-AutomateNOWEndpoint {
         Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] with parameters $parameters_display due to [$Message]."
         Break
     }
-    If ($results.response.status -lt 0 -or $results.response.status -gt 0) {
-        [string]$results_display = $results.response.errors | ConvertTo-Json -Compress
-        Write-Warning -Message "Failed to create Endpoint [$Id] of type [$endpointType] due to $results_display. The parameters used: $parameters_display"
-        Break
-    }
-    ElseIf ($null -eq $results.response.status) {
-        Write-Warning -Message "Failed to create Endpoint [$Id] of type [$endpointType] due to [an empty response]. The parameters used: $parameters_display"
+    [int32]$response_code = $results.response.status
+    If ($response_code -ne 0) {
+        [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
         Break
     }
     $Error.Clear()
@@ -16377,6 +17685,262 @@ Function New-AutomateNOWEndpoint {
     }
     If ($Quiet -ne $true) {
         Return $Endpoint
+    }
+}
+
+Function Set-AutomateNOWEndpoint {
+    <#
+    .SYNOPSIS
+    Changes the settings of an Endpoint on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Changes the settings of an Endpoint on an AutomateNOW! instance (but not the credential)
+
+    .PARAMETER Endpoint
+    An [ANOWEndpoint] object representing the Endpoint to be modified.
+
+    .PARAMETER UnsetDescription
+    Optional switch that will remove the Description from the Endpoint object.
+
+    .PARAMETER Description
+    Optional string to set on the new Endpoint object.
+
+    .PARAMETER UnsetFolder
+    Optional switch that will remove the Folder assignment from the Endpoint object.
+
+    .PARAMETER Folder
+    Optional string to set a different folder on the Endpoint object.
+
+    .PARAMETER UnsetTags
+    Optional switch that will remove the Tags from the Endpoint object.
+
+    .PARAMETER Tags
+    Optional string array of CASE-SENSITIVE Tag Id's to set on the new Endpoint object.
+
+    .PARAMETER EndpointCredential
+    An optional hashtable that contains the needed properties to set the credential. See the examples.
+
+    .PARAMETER Force
+    Force the change without confirmation. This is equivalent to -Confirm:$false
+
+    .PARAMETER Quiet
+    Optional switch to suppress the return of the modified object
+
+    .INPUTS
+    ONLY [ANOWEndpoint] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    The modified [ANOWEndpoint] object will be returned
+
+    .EXAMPLE
+    Changes the description, tags and folder of an Endpoint named 'Endpoint1'
+
+    $Endpoint = Get-AutomateNOWEndpoint -Id 'Endpoint1'
+    Set-AutomateNOWEndpoint -Endpoint $Endpoint -Description 'My New Description' -Tags 'Tag1', 'Tag2' -Folder 'Folder1' -Force
+
+    .EXAMPLE
+    Removes the Description, folder and tags from an Endpoint named 'Endpoint1'
+
+    Set-AutomateNOWEndpoint -Endpoint (Get-AutomateNOWEndpoint -Id 'Endoint1') -UnsetDescription -UnsetTags -UnsetFolder
+
+    .EXAMPLE
+    Sets the credential using Read-Host to securely receive the password on an Endpoint object of type USER
+
+    $Endpoint = Get-AutomateNOWEndpoint -Id 'Endpoint1'
+    [securestring]$secure_string = Read-Host -AsSecureString
+    [string]$encrypted_string = Protect-AutomateNOWEncryptedString -SecureString $secure_string -IncludePrefix
+    Set-AutomateNOWEndpoint -Endpoint $Endpoint -EndpointCredential (@{password = $encrypted_string; domain = "Domain"; user = "Username";})
+
+    .EXAMPLE
+    Forcefully and quietly sets the credential on an Endpoint object of type POSTGRESQL named 'Endpoint1' that includes a password 'MyCoolPassword'
+
+    [securestring]$secure_string = 'MyCoolPassword' | ConvertTo-SecureString -AsPlainText -Force
+    [string]$protected_string = Protect-AutomateNOWEncryptedString -SecureString $secure_string -IncludePrefix
+    Set-AutomateNOWEndpoint -Endpoint $endpoint -EndpointCredential @{ url = 'jdbc:postgresql://anow-database.contoso.com:5432/anow'; oauthGrantType = 'CLIENT_CREDENTIALS'; connectionPoolSize = 10; maxLifeTime = 30; user = 'user'; password = $protected_string; closeConnectionPoolIfNotUsed = 'true' } -Quiet -Force
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    Setting the credential is currently in PREVIEW mode. You must supply the endpoint properties in a hashtable. See the examples in the help!
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
+        [ANOWEndpoint]$Endpoint,
+        [Parameter(Mandatory = $false)]
+        [ValidateScript({ $_.Length -le 255 })]
+        [string]$Description,
+        [Parameter(Mandatory = $false)]
+        [switch]$UnsetDescription,
+        [Parameter(Mandatory = $false)]
+        [string[]]$Tags,
+        [Parameter(Mandatory = $false)]
+        [switch]$UnsetTags,
+        [Parameter(Mandatory = $false)]
+        [string]$Folder,
+        [Parameter(Mandatory = $false)]
+        [switch]$UnsetFolder,
+        [Parameter(Mandatory = $false)]
+        [hashtable]$EndpointCredential,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        If ($UnsetDescription -eq $true -and $Description.Length -gt 0) {
+            Write-Warning -Message "You cannot set the description and unset it at the same time. Please choose one or the other."
+            Break
+        }
+        If ($UnsetFolder -eq $true -and $Folder.Length -gt 0) {
+            Write-Warning -Message "You cannot set the Folder and unset it at the same time. Please choose one or the other."
+            Break
+        }
+        If ($UnsetTags -eq $true -and $Tags.Count -gt 0) {
+            Write-Warning -Message "You cannot set the Tags and unset them at the same time. Please choose one or the other. Tags from the source object will be carried over to the new object if you do not specify any tag-related parameters."
+            Break
+        }
+        [string]$command = '/endpoint/update'
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [ANOWEndpoint]$Endpoint = $_
+        }
+        [string]$Endpoint_id = $Endpoint.id
+        [string]$Endpoint_type = $Endpoint.endpointType
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Endpoint_id)")) -eq $true) {
+            ## Begin warning ##
+            ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
+            $Error.Clear()
+            Try {
+                [boolean]$Endpoint_exists = ($null -eq (Get-AutomateNOWEndpoint -Id $Endpoint_id))
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Get-AutomateNOWEndpoint failed to check if the Endpoint [$Endpoint_id] already existed due to [$Message]."
+                Break
+            }
+            If ($Endpoint_exists -eq $true) {
+                [string]$current_domain = $anow_session.header.domain
+                Write-Warning -Message "There is not a Result Mapping named [$Endpoint_id] in the [$current_domain] domain. Please check into this."
+                Break
+            }
+            ## End warning ##
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.'id' = $Endpoint_id
+            If ($Description.Length -gt 0) {
+                $BodyMetaData.'description' = $Description
+            }
+            ElseIf ($UnsetDescription -eq $true) {
+                $BodyMetaData.'description' = $Null
+            }
+            Else {
+                If ($Endpoint.description.Length -gt 0) {
+                    $BodyMetaData.'description' = $Endpoint.description
+                }
+            }
+            If ($UnsetFolder -eq $True) {
+                $BodyMetaData.'folder' = $Null
+            }
+            ElseIf ($Folder.Length -gt 0) {
+                $BodyMetaData.'folder' = $Folder
+            }
+            Else {
+                If ($Endpoint.folder.Length -gt 0) {
+                    $BodyMetaData.'folder' = $Endpoint.folder
+                }
+            }
+            If ($Tags.Count -gt 0) {
+                [int32]$tag_count = 1
+                ForEach ($tag in $Tags) {
+                    $BodyMetaData.('tags' + $tag_count ) = $tag
+                    $tag_count++
+                }
+            }
+            ElseIf ($UnsetTags -eq $true) {
+                $BodyMetaData.'tags' = $Null
+            }
+            Else {
+                If ($Endpoint.Tags -gt 0) {
+                    [int32]$tag_count = 1
+                    ForEach ($tag in $Endpoint.tags) {
+                        $BodyMetaData.('tags' + $tag_count ) = $tag
+                        $tag_count++
+                    }
+                }
+            }
+            If ($null -ne $EndpointCredential) {
+                $Error.Clear()
+                Try {
+                    [string]$EndpointCredentialString = $EndpointCredential | ConvertTo-Json -Compress
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "ConvertFrom-Json failed when to convert the provided credential object under Set-AutomateNOWEndpoint to JSON format due to [$Message]."
+                    Break
+                }
+                $BodyMetaData.endpointProperties = $EndpointCredentialString
+            }
+            [string]$old_values = $Endpoint.CreateOldValues()
+            $BodyMetaData.'_oldValues' = $old_values
+            $BodyMetaData.'_componentId' = 'EndpointVM'
+            $BodyMetaData.'_operationType' = 'update'
+            $BodyMetaData.'_textMatchStyle' = 'exact'
+            $BodyMetaData.'_dataSource' = 'EndpointDataSource'
+            $BodyMetaData.'isc_metaDataPrefix' = '_'
+            $BodyMetaData.'isc_dataFormat' = 'json'
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            If ($null -eq $parameters.Body) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$Endpoint_id] of type [$Endpoint_type] due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
+            }
+            Else {
+                Write-Verbose -Message "Endpoint object [$Endpoint_id] of type [$Endpoint_type] was successfully updated"
+            }
+            $Error.Clear()
+            Try {
+                [ANOWEndpoint]$Endpoint = $results.response.data[0]
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Failed to parse the response into an [ANOWEndpoint] object under Set-AutomateNOWEndpoint due to [$Message]."
+                Break
+            }
+            If ($Quiet -ne $true) {
+                Return $Endpoint
+            }
+        }
+    }
+    End {
     }
 }
 
@@ -17064,17 +18628,11 @@ Function Get-AutomateNOWEvent {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
@@ -17598,13 +19156,10 @@ Function New-AutomateNOWEvent {
         Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] with parameters $parameters_display due to [$Message]."
         Break
     }
-    If ($results.response.status -lt 0 -or $results.response.status -gt 0) {
-        [string]$results_display = $results.response.errors | ConvertTo-Json -Compress
-        Write-Warning -Message "Failed to create Event [$Id] due to $results_display. The parameters used: $parameters_display"
-        Break
-    }
-    ElseIf ($null -eq $results.response.status) {
-        Write-Warning -Message "Failed to create Event [$Id] due to [an empty response]. The parameters used: $parameters_display"
+    [int32]$response_code = $results.response.status
+    If ($response_code -ne 0) {
+        [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
         Break
     }
     $Error.Clear()
@@ -18281,8 +19836,8 @@ Function Get-AutomateNOWProcessingEventLog {
     .PARAMETER Agent
     Mandatory (ONLY IF AGENT CATEGORY IS SELECTED) [ANOWAgent] object that corresponds to the Agent you wish to retrieve the event logs from.
 
-    .PARAMETER Node
-    Optional (ONLY IF NODE CATEGORY IS SELECTED) [ANOWNode] object that corresponds to the Node you wish to retrieve the event logs about.
+    .PARAMETER ServerNode
+    Optional (ONLY IF SERVER_NODE CATEGORY IS SELECTED) [ANOWServerNode] object that corresponds to the Node you wish to retrieve the event logs about.
 
     .PARAMETER sortBy
     Optional string parameter to sort the results by. Valid choices are: 'dateCreated', 'timestamp', 'parentProcessingId', 'processingId', 'rootProcessingId'
@@ -18308,9 +19863,9 @@ Function Get-AutomateNOWProcessingEventLog {
     Get-AutomateNOWProcessingEventLog -category SERVER_NODE
 
      .EXAMPLE
-    Gets the first 100 Server Node Processing Events (i.e. log entries) for a specied node named Node1
+    Gets the first 100 Server Node Processing Events (i.e. log entries) for a specied node named ServerNode1
 
-    Get-AutomateNOWProcessingEventLog -category SERVER_NODE -Node (Get-AutomateNOWNode -Id 'Node1')
+    Get-AutomateNOWProcessingEventLog -category SERVER_NODE -Node (Get-AutomateNOWServerNode -Id 'ServerNode1')
 
     .EXAMPLE
     Gets the first 100 Resource Processing Events (i.e. log entries) in the domaim
@@ -18358,7 +19913,7 @@ Function Get-AutomateNOWProcessingEventLog {
         [Parameter(Mandatory = $False)]
         [ANOWResource]$Resource,
         [Parameter(Mandatory = $False)]
-        [ANOWNode]$Node,
+        [ANOWServerNode]$ServerNode,
         [Parameter(Mandatory = $False)]
         [ANOWDomain]$Domain,
         [ValidateSet('dateCreated', 'timestamp', 'parentProcessingId', 'processingId', 'rootProcessingId')]
@@ -18394,18 +19949,18 @@ Function Get-AutomateNOWProcessingEventLog {
             Break
         }
     }
-    If ($Node.Id.Length -gt 0) {
+    If ($ServerNode.Id.Length -gt 0) {
         If ($category -eq 'SERVER_NODE') {
-            [string]$node_id = $Node.id
+            [string]$ServerNode_id = $ServerNode.id
         }
         Else {
-            Write-Warning -Message "Please do not pass an [ANOWNode] object to this function unless you are also selecting the SERVER_NODE category."
+            Write-Warning -Message "Please do not pass an [ANOWServerNode] object to this function unless you are also selecting the SERVER_NODE category."
             Break
         }
     }
     Else {
         If ($category -eq 'SERVER_NODE') {
-            Write-Warning -Message "You must use the -Node parameter to include an [ANOWNode] object if the SERVER_NODE category is selected. Use Get-AutomateNOWNode to retrieve one."
+            Write-Warning -Message "You must use the -Node parameter to include an [ANOWServerNode] object if the SERVER_NODE category is selected. Use Get-AutomateNOWServerNode to retrieve one."
             Break
         }
     }
@@ -18454,8 +20009,8 @@ Function Get-AutomateNOWProcessingEventLog {
     }
     ElseIf ($category -eq 'SERVER_NODE') {
         [string]$componentId = 'ServerNodeEventList'
-        If ($node_id.Length -gt 0) {
-            $Body.'criteria3' = ('{"fieldName":"serverNode","operator":"equals","value":"' + $node_id + '"}')
+        If ($ServerNode_id.Length -gt 0) {
+            $Body.'criteria3' = ('{"fieldName":"serverNode","operator":"equals","value":"' + $ServerNode_id + '"}')
         }
     }
     ElseIf ($category -eq 'RESOURCE') {
@@ -18522,17 +20077,11 @@ Function Get-AutomateNOWProcessingEventLog {
         Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
         Break
     }
-    If ($results.response.status -ne 0) {
-        If ($null -eq $results.response.status) {
-            Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-            Break
-        }
-        Else {
-            [int32]$status_code = $results.response.status
-            [string]$results_response = $results.response
-            Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-            Break
-        }
+    [int32]$response_code = $results.response.status
+    If ($response_code -ne 0) {
+        [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+        Break
     }
     $Error.Clear()
     Try {
@@ -18557,7 +20106,7 @@ Function Export-AutomateNOWProcessingEventLog {
     Exports the Processing Events (log entries) from an instance of AutomateNOW! to a local .csv file
 
     .PARAMETER ProcessingEvent
-    Mandatory [ANOWProcessingEvent] object (Use Get-AutomateNOWFolder to retrieve them)
+    Mandatory [ANOWProcessingEvent] object (Use Get-AutomateNOWProcessingEventLog to retrieve them)
 
     .INPUTS
     ONLY [ANOWProcessingEvent] objects from the pipeline are accepted
@@ -18694,17 +20243,11 @@ Function Get-AutomateNOWFolder {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
@@ -19040,13 +20583,10 @@ Function New-AutomateNOWFolder {
         Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] with parameters $parameters_display due to [$Message]."
         Break
     }
-    If ($results.response.status -lt 0 -or $results.response.status -gt 0) {
-        [string]$results_display = $results.response.errors | ConvertTo-Json -Compress
-        Write-Warning -Message "Failed to create folder [$Id] due to $results_display. The parameters used: $parameters_display"
-        Break
-    }
-    ElseIf ($null -eq $results.response.status) {
-        Write-Warning -Message "Failed to create folder [$Id] due to [an empty response]. The parameters used: $parameters_display"
+    [int32]$response_code = $results.response.status
+    If ($response_code -ne 0) {
+        [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
         Break
     }
     $Error.Clear()
@@ -19785,17 +21325,11 @@ Function Get-AutomateNOWLock {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
@@ -20276,13 +21810,10 @@ Function New-AutomateNOWLock {
         Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] with parameters $parameters_display due to [$Message]."
         Break
     }
-    If ($results.response.status -lt 0 -or $results.response.status -gt 0) {
-        [string]$results_display = $results.response.errors | ConvertTo-Json -Compress
-        Write-Warning -Message "Failed to create Lock [$Id] due to $results_display. The parameters used: $parameters_display"
-        Break
-    }
-    ElseIf ($null -eq $results.response.status) {
-        Write-Warning -Message "Failed to create Lock [$Id] due to [an empty response]. The parameters used: $parameters_display"
+    [int32]$response_code = $results.response.status
+    If ($response_code -ne 0) {
+        [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
         Break
     }
     $Error.Clear()
@@ -20957,17 +22488,11 @@ Function Get-AutomateNOWMetric {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
@@ -21769,13 +23294,10 @@ Function New-AutomateNOWMetric {
         Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] with parameters $parameters_display due to [$Message]."
         Break
     }
-    If ($results.response.status -lt 0 -or $results.response.status -gt 0) {
-        [string]$results_display = $results.response.errors | ConvertTo-Json -Compress
-        Write-Warning -Message "Failed to create Metric [$Id] due to $results_display. The parameters used: $parameters_display"
-        Break
-    }
-    ElseIf ($null -eq $results.response.status) {
-        Write-Warning -Message "Failed to create Metric [$Id] due to [an empty response]. The parameters used: $parameters_display"
+    [int32]$response_code = $results.response.status
+    If ($response_code -ne 0) {
+        [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
         Break
     }
     $Error.Clear()
@@ -22281,7 +23803,7 @@ Function Rename-AutomateNOWMetric {
 
 #Region - Nodes
 
-Function Get-AutomateNOWNode {
+Function Get-AutomateNOWServerNode {
     <#
     .SYNOPSIS
     Gets the nodes from an AutomateNOW! instance
@@ -22314,21 +23836,21 @@ Function Get-AutomateNOWNode {
     Accepts a string representing the simple id of the node from the pipeline or individually (but not an array).
 
     .OUTPUTS
-    An array of one or more [ANOWNode] class objects
+    An array of one or more [ANOWServerNode] class objects
 
     .EXAMPLE
     Gets all of the nodes
-    Get-AutomateNOWNode
+    Get-AutomateNOWServerNode
 
     .EXAMPLE
     Gets a single node by name
 
-    Get-AutomateNOWNode -Id 'my_node_01'
+    Get-AutomateNOWServerNode -Id 'my_node_01'
 
     .EXAMPLE
     Gets a series of nodes by feeding their names through the pipeline.
 
-    @( 'my_node_01', 'my_node_02' ) | Get-AutomateNOWNode
+    @( 'my_node_01', 'my_node_02' ) | Get-AutomateNOWServerNode
 
     .EXAMPLE
     Gets all of the nodes which have the load balancer role
@@ -22358,7 +23880,7 @@ Function Get-AutomateNOWNode {
     The -ChildNodes parameter must be combined with -Id.
 
     #>
-    [OutputType([ANOWNode[]])]
+    [OutputType([ANOWServerNode[]])]
     [Cmdletbinding(DefaultParameterSetName = 'All')]
     Param(
         [Parameter(Mandatory = $False, ParameterSetName = 'Single', ValueFromPipeline = $true)]
@@ -22467,29 +23989,23 @@ Function Get-AutomateNOWNode {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
-            [ANOWNode[]]$nodes = $results.response.data
+            [ANOWServerNode[]]$ServerNodes = $results.response.data
         }
         Catch {
             [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Failed to parse the response into a series of [ANOWNode] objects due to [$Message]."
+            Write-Warning -Message "Failed to parse the response into a series of [ANOWServerNode] objects due to [$Message]."
             Break
         }
-        If ($nodes.Count -gt 0) {
-            Return $nodes
+        If ($ServerNodes.Count -gt 0) {
+            Return $ServerNodes
         }
     }
     End {
@@ -22497,7 +24013,7 @@ Function Get-AutomateNOWNode {
     }
 }
 
-Function Export-AutomateNOWNode {
+Function Export-AutomateNOWServerNode {
     <#
     .SYNOPSIS
     Exports the nodes from an instance of AutomateNOW!
@@ -22505,35 +24021,35 @@ Function Export-AutomateNOWNode {
     .DESCRIPTION
     Exports the nodes from an instance of AutomateNOW! to a local .csv file
 
-    .PARAMETER Node
-    Mandatory [ANOWNode] object (Use Get-AutomateNOWNode to retrieve them)
+    .PARAMETER ServerNode
+    Mandatory [ANOWServerNode] object (Use Get-AutomateNOWServerNode to retrieve them)
 
     .INPUTS
-    ONLY [ANOWNode] objects from the pipeline are accepted
+    ONLY [ANOWServerNode] objects from the pipeline are accepted
 
     .OUTPUTS
-    The [ANOWNode] objects are exported to the local disk in CSV format
+    The [ANOWServerNode] objects are exported to the local disk in CSV format
 
     .EXAMPLE
-    Get-AutomateNOWNode | Export-AutomateNOWNode
+    Get-AutomateNOWServerNode | Export-AutomateNOWServerNode
 
     .EXAMPLE
-    Get-AutomateNOWNode -Id 'Node01' | Export-AutomateNOWNode
+    Get-AutomateNOWServerNode -Id 'ServerNode01' | Export-AutomateNOWServerNode
 
     .EXAMPLE
-    @( 'Node01', 'Node02' ) | Get-AutomateNOWNode | Export-AutomateNOWNode
+    @( 'ServerNode01', 'ServerNode02' ) | Get-AutomateNOWServerNode | Export-AutomateNOWServerNode
 
     .EXAMPLE
-    Get-AutomateNOWNode | Where-Object { $_.serverNodeType -eq 'LINUX' } | Export-AutomateNOWNode
+    Get-AutomateNOWServerNode | Where-Object { $_.serverNodeType -eq 'LINUX' } | Export-AutomateNOWServerNode
 
     .NOTES
-	You must present [ANOWNode] objects to the pipeline to use this function.
+	You must present [ANOWServerNode] objects to the pipeline to use this function.
     #>
 
     [Cmdletbinding(DefaultParameterSetName = 'Pipeline')]
     Param(
         [Parameter(Mandatory = $true, ValueFromPipeline = $true, ParameterSetName = 'Pipeline')]
-        [ANOWNode]$Node
+        [ANOWServerNode]$ServerNode
     )
     Begin {
         [string]$current_time = Get-Date -Format 'yyyyMMddHHmmssfff'
@@ -22548,15 +24064,15 @@ Function Export-AutomateNOWNode {
     }
     Process {
         If ($_.id.Length -gt 0) {
-            [ANOWNode]$Node = $_
+            [ANOWServerNode]$ServerNode = $_
         }
         $Error.Clear()
         Try {
-            $Node | Export-CSV @parameters
+            $ServerNode | Export-CSV @parameters
         }
         Catch {
             [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Export-CSV failed to export the [ANOWNode] object on the pipeline due to [$Message]"
+            Write-Warning -Message "Export-CSV failed to export the [ANOWServerNode] object on the pipeline due to [$Message]"
             Break
         }
     }
@@ -22571,16 +24087,16 @@ Function Export-AutomateNOWNode {
     }
 }
 
-Function New-AutomateNOWNode {
+Function New-AutomateNOWServerNode {
     <#
     .SYNOPSIS
     Creates a node within an AutomateNOW! instance
 
     .DESCRIPTION
-    Creates a node within an AutomateNOW! instance and returns back the newly created [ANOWNode] object
+    Creates a node within an AutomateNOW! instance and returns back the newly created [ANOWServerNode] object
 
     .PARAMETER Id
-    The intended name of the node. For example: 'LinuxNode1'. This value may not contain the domain in brackets.
+    The intended name of the node. For example: 'LinuxServerNode1'. This value may not contain the domain in brackets.
 
     .PARAMETER Type
     Required type of the node.
@@ -22604,15 +24120,15 @@ Function New-AutomateNOWNode {
     Optional switch to suppress the return of the newly created object
 
     .INPUTS
-    None. You cannot pipe objects to New-AutomateNOWNode.
+    None. You cannot pipe objects to New-AutomateNOWServerNode.
 
     .OUTPUTS
-    An [ANOWNode] object representing the newly created node
+    An [ANOWServerNode] object representing the newly created node
 
     .EXAMPLE
     Creats a new REST WEB node named 'NameOfNOde' that is assigned a tag 'Tag1' and placed into a folder 'Folder1'
 
-    New-AutomateNOWNode -Id 'NameOfNode' -Type REST_WEB_SERVICE -Tags 'Tag1' -Folder 'Folder1'
+    New-AutomateNOWServerNode -Id 'NameOfNode' -Type REST_WEB_SERVICE -Tags 'Tag1' -Folder 'Folder1'
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
@@ -22620,7 +24136,7 @@ Function New-AutomateNOWNode {
     The name (id) of the node must be unique (per domain). It may consist only of letters, numbers, underscore, dot or hypen.
 
     #>
-    [OutputType([ANOWNode])]
+    [OutputType([ANOWServerNode])]
     [Cmdletbinding()]
     Param(
         [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
@@ -22650,26 +24166,26 @@ Function New-AutomateNOWNode {
     ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
     $Error.Clear()
     Try {
-        [boolean]$node_exists = ($null -ne (Get-AutomateNOWNode -Id $Id))
+        [boolean]$ServerNode_exists = ($null -ne (Get-AutomateNOWServerNode -Id $Id))
     }
     Catch {
         [string]$Message = $_.Exception.Message
-        Write-Warning -Message "Get-AutomateNOWNode failed to check if the node [$Id] already existed due to [$Message]."
+        Write-Warning -Message "Get-AutomateNOWServerNode failed to check if the node [$Id] already existed due to [$Message]."
         Break
     }
-    If ($node_exists -eq $true) {
+    If ($ServerNode_exists -eq $true) {
         [string]$current_domain = $anow_session.header.domain
         Write-Warning -Message "There is already a Node named [$Id] in [$current_domain]. Please check into this."
         Break
     }
     ## End warning ##
-    [System.Collections.Specialized.OrderedDictionary]$ANOWNode = [System.Collections.Specialized.OrderedDictionary]@{}
-    $ANOWNode.Add('id', $Id)
-    $ANOWNode.Add('serverNodeType', $Type)
-    $ANOWNode.Add('loadBalancer', $False)
-    $ANOWNode.Add('totalWeightCapacity', $WeightCapacity)
+    [System.Collections.Specialized.OrderedDictionary]$ANOWServerNode = [System.Collections.Specialized.OrderedDictionary]@{}
+    $ANOWServerNode.Add('id', $Id)
+    $ANOWServerNode.Add('serverNodeType', $Type)
+    $ANOWServerNode.Add('loadBalancer', $False)
+    $ANOWServerNode.Add('totalWeightCapacity', $WeightCapacity)
     If ($Description.Length -gt 0) {
-        $ANOWNode.Add('description', $Description)
+        $ANOWServerNode.Add('description', $Description)
     }
     If ($Tags.Count -gt 0) {
         [int32]$total_tags = $Tags.Count
@@ -22681,11 +24197,11 @@ Function New-AutomateNOWNode {
             }
             Catch {
                 [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Get-AutomateNOWTag had an error while retrieving the tag [$tag_id] running under New-AutomateNOWNode due to [$message]"
+                Write-Warning -Message "Get-AutomateNOWTag had an error while retrieving the tag [$tag_id] running under New-AutomateNOWServerNode due to [$message]"
                 Break
             }
             If ($tag_object.simpleId.length -eq 0) {
-                Throw "New-AutomateNOWNode has detected that the tag [$tag_id] does not appear to exist. Please check again."
+                Throw "New-AutomateNOWServerNode has detected that the tag [$tag_id] does not appear to exist. Please check again."
                 Break
             }
             ElseIf ($tag_object.simpleId -eq $tag_id -and $tag_object.simpleId -cne $tag_id) {
@@ -22696,7 +24212,7 @@ Function New-AutomateNOWNode {
             [string]$tag_display = $tag_object | ConvertTo-Json -Compress
             Write-Verbose -Message "Adding tag $tag_display [$current_tag of $total_tags]"
             [string]$tag_name_sequence = ('tags' + $current_tag)
-            $ANOWNode.Add($tag_name_sequence, $tag_id)
+            $ANOWServerNode.Add($tag_name_sequence, $tag_id)
             $include_properties += $tag_name_sequence
             $current_tag++
         }
@@ -22708,16 +24224,16 @@ Function New-AutomateNOWNode {
         }
         Catch {
             [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Get-AutomateNOWFolder failed to confirm that the folder [$tag_id] existed under New-AutomateNOWNode due to [$Message]"
+            Write-Warning -Message "Get-AutomateNOWFolder failed to confirm that the folder [$tag_id] existed under New-AutomateNOWServerNode due to [$Message]"
             Break
         }
         If ($folder_object.simpleId.Length -eq 0) {
-            Throw "Get-AutomateNOWFolder failed to locate the Folder [$Folder] under New-AutomateNOWNode. Please check again."
+            Throw "Get-AutomateNOWFolder failed to locate the Folder [$Folder] under New-AutomateNOWServerNode. Please check again."
             Break
         }
         [string]$folder_display = $folder_object | ConvertTo-Json -Compress
-        Write-Verbose -Message "Adding folder $folder_display to [ANOWNode] [$Id]"
-        $ANOWNode.Add('folder', $Folder)
+        Write-Verbose -Message "Adding folder $folder_display to [ANOWServerNode] [$Id]"
+        $ANOWServerNode.Add('folder', $Folder)
         $include_properties += 'folder'
     }
     If ($CodeRepository.Length -gt 0) {
@@ -22727,19 +24243,19 @@ Function New-AutomateNOWNode {
         }
         Catch {
             [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Get-AutomateNOWCodeRepository failed to confirm that the code repository [$CodeRepository] existed under New-AutomateNOWNode due to [$Message]"
+            Write-Warning -Message "Get-AutomateNOWCodeRepository failed to confirm that the code repository [$CodeRepository] existed under New-AutomateNOWServerNode due to [$Message]"
             Break
         }
         If ($code_repository_object.simpleId.Length -eq 0) {
-            Throw "Get-AutomateNOWCodeRepository failed to locate the Code Repository [$CodeRepository] under New-AutomateNOWNode. Please check again."
+            Throw "Get-AutomateNOWCodeRepository failed to locate the Code Repository [$CodeRepository] under New-AutomateNOWServerNode. Please check again."
             Break
         }
         [string]$code_repository_display = $code_repository_object | ConvertTo-Json -Compress
-        Write-Verbose -Message "Adding code repository $code_repository_display to [ANOWNode] [$Id]"
-        $ANOWNode.Add('codeRepository', $CodeRepository)
+        Write-Verbose -Message "Adding code repository $code_repository_display to [ANOWServerNode] [$Id]"
+        $ANOWServerNode.Add('codeRepository', $CodeRepository)
         $include_properties += 'codeRepository'
     }
-    [string]$BodyObject = ConvertTo-QueryString -InputObject $ANOWNode -IncludeProperties id, serverNodeType, loadBalancer, totalWeightCapacity, description, tags, folder, codeRepository
+    [string]$BodyObject = ConvertTo-QueryString -InputObject $ANOWServerNode -IncludeProperties id, serverNodeType, loadBalancer, totalWeightCapacity, description, tags, folder, codeRepository
     [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
     $BodyMetaData.'_textMatchStyle' = 'exact'
     $BodyMetaData.'_operationType' = 'add'
@@ -22769,34 +24285,31 @@ Function New-AutomateNOWNode {
         Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] with parameters $parameters_display due to [$Message]."
         Break
     }
-    If ($results.response.status -lt 0 -or $results.response.status -gt 0) {
-        [string]$results_display = $results.response.errors | ConvertTo-Json -Compress
-        Write-Warning -Message "Failed to create node [$Id] of type [$Type] due to $results_display. The parameters used: $parameters_display"
-        Break
-    }
-    ElseIf ($null -eq $results.response.status) {
-        Write-Warning -Message "Failed to create node [$Id] of type [$Type] due to [an empty response]. The parameters used: $parameters_display"
+    [int32]$response_code = $results.response.status
+    If ($response_code -ne 0) {
+        [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
         Break
     }
     $Error.Clear()
     Try {
-        [ANOWNode]$node = $results.response.data[0]
+        [ANOWServerNode]$ServerNode = $results.response.data[0]
     }
     Catch {
         [string]$Message = $_.Exception.Message
-        Write-Warning -Message "Failed to create [ANOWNode] object due to [$Message]."
+        Write-Warning -Message "Failed to create [ANOWServerNode] object due to [$Message]."
         Break
     }
-    If ($node.id.Length -eq 0) {
-        Write-Warning -Message "Somehow the newly created [ANOWNode] node is empty!"
+    If ($ServerNode.id.Length -eq 0) {
+        Write-Warning -Message "Somehow the newly created [ANOWServerNode] node is empty!"
         Break
     }
     If ($Quiet -ne $true) {
-        Return $node
+        Return $ServerNode
     }
 }
 
-Function Copy-AutomateNOWNode {
+Function Copy-AutomateNOWServerNode {
     <#
     .SYNOPSIS
     Copies a Node from an AutomateNOW! instance
@@ -22804,8 +24317,8 @@ Function Copy-AutomateNOWNode {
     .DESCRIPTION
     Copies a Node from an AutomateNOW! instance. AutomateNOW object id can never be changed, but we can copy the object to a new id and it will include all of the items therein.
 
-    .PARAMETER Node
-    Mandatory [ANOWNode] object to be copied.
+    .PARAMETER ServerNode
+    Mandatory [ANOWServerNode] object to be copied.
 
     .PARAMETER NewId
     The name (Id) of the new Node. The new Id must be unique (per domain). It may consist only of letters, numbers, underscore, dot or hypen.
@@ -22835,19 +24348,19 @@ Function Copy-AutomateNOWNode {
     Optional switch to suppress the return of the newly created object.
 
     .INPUTS
-    ONLY [ANOWNode] object is accepted. Pipeline support is intentionally unavailable.
+    ONLY [ANOWServerNode] object is accepted. Pipeline support is intentionally unavailable.
 
     .OUTPUTS
     None. The status will be written to the console with Write-Verbose.
 
     .EXAMPLE
     Creates a copy of an Node and changes the description (multi-line format)
-    $Node01 = Get-AutomateNOWNode -Id 'Node_01'
-    Copy-AutomateNOWNode -Node $Node01 -NewId 'Node_01_production' -Description 'Node 01 Production'
+    $ServerNode01 = Get-AutomateNOWServerNode -Id 'ServerNode_01'
+    Copy-AutomateNOWServerNode -Node $ServerNode01 -NewId 'ServerNode_01_production' -Description 'ServerNode 01 Production'
 
     .EXAMPLE
     Creates a copy of an Node that omits the description (one-liner format)
-    Copy-AutomateNOWNode -Node (Get-AutomateNOWNode -Id 'Node_01') -NewId 'Node_01_production' -UnsetDescription -Tags 'Tag1', 'Tag2'
+    Copy-AutomateNOWServerNode -Node (Get-AutomateNOWServerNode -Id 'ServerNode_01') -NewId 'ServerNode_01_production' -UnsetDescription -Tags 'Tag1', 'Tag2'
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
@@ -22856,7 +24369,7 @@ Function Copy-AutomateNOWNode {
     [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
     Param(
         [Parameter(Mandatory = $true)]
-        [ANOWNode]$Node,
+        [ANOWServerNode]$ServerNode,
         [Parameter(Mandatory = $true)]
         [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
         [string]$NewId,
@@ -22899,14 +24412,14 @@ Function Copy-AutomateNOWNode {
         ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
         $Error.Clear()
         Try {
-            [boolean]$Node_exists = ($null -ne (Get-AutomateNOWNode -Id $NewId))
+            [boolean]$ServerNode_exists = ($null -ne (Get-AutomateNOWServerNode -Id $NewId))
         }
         Catch {
             [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Get-AutomateNOWNode failed to check if the Node [$NewId] already existed due to [$Message]."
+            Write-Warning -Message "Get-AutomateNOWServerNode failed to check if the Node [$NewId] already existed due to [$Message]."
             Break
         }
-        If ($Node_exists -eq $true) {
+        If ($ServerNode_exists -eq $true) {
             [string]$current_domain = $anow_session.header.domain
             Write-Warning -Message "There is already a Node named [$NewId] in [$current_domain]. You may not proceed."
             [boolean]$PermissionToProceed = $false
@@ -22923,13 +24436,13 @@ Function Copy-AutomateNOWNode {
     }
     Process {
         If ($PermissionToProceed -ne $false) {
-            [string]$Node_oldId = $Node.id
-            [string]$Node_simpleId = $Node.simpleId
-            If ($Node_oldId -eq $NewId) {
+            [string]$ServerNode_oldId = $ServerNode.id
+            [string]$ServerNode_simpleId = $ServerNode.simpleId
+            If ($ServerNode_oldId -eq $NewId) {
                 Write-Warning -Message "The new id cannot be the same as the old id."
                 Break
             }
-            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Node $($Node_simpleId) to $($NewId)?")) -eq $true) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the Node $($ServerNode_simpleId) to $($NewId)?")) -eq $true) {
                 [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
                 If ($UnsetFolder -eq $True) {
                     $BodyMetaData.'folder' = $Null
@@ -22938,8 +24451,8 @@ Function Copy-AutomateNOWNode {
                     $BodyMetaData.'folder' = $Folder
                 }
                 Else {
-                    If ($Node.folder.Length -gt 0) {
-                        $BodyMetaData.'folder' = $Node.folder
+                    If ($ServerNode.folder.Length -gt 0) {
+                        $BodyMetaData.'folder' = $ServerNode.folder
                     }
                 }
                 If ($Tags.Count -gt 0) {
@@ -22953,23 +24466,23 @@ Function Copy-AutomateNOWNode {
                     $BodyMetaData.'tags' = $Null
                 }
                 Else {
-                    If ($Node.Tags -gt 0) {
+                    If ($ServerNode.Tags -gt 0) {
                         [int32]$tag_count = 1
-                        ForEach ($tag in $Node.tags) {
+                        ForEach ($tag in $ServerNode.tags) {
                             $BodyMetaData.('tags' + $tag_count ) = $tag
                             $tag_count++
                         }
                     }
                 }
-                $BodyMetaData.'oldId' = $Node_oldId
-                $BodyMetaData.'domain' = $Node.domain
+                $BodyMetaData.'oldId' = $ServerNode_oldId
+                $BodyMetaData.'domain' = $ServerNode.domain
                 $BodyMetaData.'id' = $NewId
                 If ($UnsetDescription -ne $true) {
                     If ($Description.Length -gt 0) {
                         $BodyMetaData.'description' = $Description
                     }
                     Else {
-                        $BodyMetaData.'description' = $Node.description
+                        $BodyMetaData.'description' = $ServerNode.description
                     }
                 }
                 $BodyMetaData.'_operationType' = 'add'
@@ -22986,7 +24499,7 @@ Function Copy-AutomateNOWNode {
                 }
                 Catch {
                     [string]$Message = $_.Exception.Message
-                    Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$Node_oldId] due to [$Message]."
+                    Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$ServerNode_oldId] due to [$Message]."
                     Break
                 }
                 [int32]$response_code = $results.response.status
@@ -22997,15 +24510,15 @@ Function Copy-AutomateNOWNode {
                 }
                 $Error.Clear()
                 Try {
-                    [ANOWNode]$NewNode = $results.response.data[0]
+                    [ANOWServerNode]$NewNode = $results.response.data[0]
                 }
                 Catch {
                     [string]$Message = $_.Exception.Message
-                    Write-Warning -Message "Failed to create copied [ANOWNode] object [$NewId] due to [$Message]."
+                    Write-Warning -Message "Failed to create copied [ANOWServerNode] object [$NewId] due to [$Message]."
                     Break
                 }
                 If ($NewNode.id.Length -eq 0) {
-                    Write-Warning -Message "Somehow the newly created (copied) [ANOWNode] object [$NewId] is empty!"
+                    Write-Warning -Message "Somehow the newly created (copied) [ANOWServerNode] object [$NewId] is empty!"
                     Break
                 }
                 If ($Quiet -ne $true) {
@@ -23019,37 +24532,37 @@ Function Copy-AutomateNOWNode {
     }
 }
 
-Function Remove-AutomateNOWNode {
+Function Remove-AutomateNOWServerNode {
     <#
     .SYNOPSIS
     Removes a node from an AutomateNOW! instance
 
     .DESCRIPTION
-    The `Remove-AutomateNOWNode` function removes a node from an AutomateNOW! instance
+    The `Remove-AutomateNOWServerNode` function removes a node from an AutomateNOW! instance
 
-    .PARAMETER Node
-    An [ANOWNode] object representing the node to be deleted.
+    .PARAMETER ServerNode
+    An [ANOWServerNode] object representing the node to be deleted.
 
     .PARAMETER Force
     Force the removal without confirmation. This is equivalent to -Confirm:$false
 
     .INPUTS
-    ONLY [ANOWNode] objects are accepted (including from the pipeline)
+    ONLY [ANOWServerNode] objects are accepted (including from the pipeline)
 
     .OUTPUTS
     None. The status will be written to the console with Write-Verbose.
 
     .EXAMPLE
-    Get-AutomateNOWNode -Id 'Node01' | Remove-AutomateNOWNode
+    Get-AutomateNOWServerNode -Id 'ServerNode01' | Remove-AutomateNOWServerNode
 
     .EXAMPLE
-    Get-AutomateNOWNode -Id 'Node01', 'Node02' | Remove-AutomateNOWNode
+    Get-AutomateNOWServerNode -Id 'ServerNode01', 'ServerNode02' | Remove-AutomateNOWServerNode
 
     .EXAMPLE
-    @( 'Node1', 'Node2', 'Node3') | Remove-AutomateNOWNode
+    @( 'ServerNode1', 'ServerNode2', 'ServerNode3') | Remove-AutomateNOWServerNode
 
     .EXAMPLE
-    Get-AutomateNOWNode | ? { $_.serverNodeType -eq 'LINUX' } | Remove-AutomateNOWNode
+    Get-AutomateNOWServerNode | ? { $_.serverNodeType -eq 'LINUX' } | Remove-AutomateNOWServerNode
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
@@ -23058,7 +24571,7 @@ Function Remove-AutomateNOWNode {
     [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
     Param(
         [Parameter(Mandatory = $false, ValueFromPipeline = $True)]
-        [ANOWNode]$Node,
+        [ANOWServerNode]$ServerNode,
         [Parameter(Mandatory = $false)]
         [switch]$Force
     )
@@ -23078,17 +24591,17 @@ Function Remove-AutomateNOWNode {
     }
     Process {
         If ($_.id.Length -gt 0) {
-            [ANOWNode]$Node = $_
+            [ANOWServerNode]$ServerNode = $_
         }
-        [string]$Node_id = $Node.id
-        If ($Node_id.Length -eq 0) {
+        [string]$ServerNode_id = $ServerNode.id
+        If ($ServerNode_id.Length -eq 0) {
             Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
             Break
         }
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Node_id)")) -eq $true) {
-            [string]$oldvalues = $Node.CreateOldValues()
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ServerNode_id)")) -eq $true) {
+            [string]$oldvalues = $ServerNode.CreateOldValues()
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
-            $BodyMetaData.'id' = $Node_id
+            $BodyMetaData.'id' = $ServerNode_id
             $BodyMetaData.'_textMatchStyle' = 'exact'
             $BodyMetaData.'_operationType' = 'remove'
             $BodyMetaData.'_oldValues' = $oldvalues
@@ -23109,7 +24622,7 @@ Function Remove-AutomateNOWNode {
             }
             Catch {
                 [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$node_id] due to [$Message]."
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$ServerNode_id] due to [$Message]."
                 Break
             }
             [int32]$response_code = $results.response.status
@@ -23118,7 +24631,7 @@ Function Remove-AutomateNOWNode {
                 Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
                 Break
             }
-            Write-Verbose -Message "Node $node_id successfully removed"
+            Write-Verbose -Message "Node $ServerNode_id successfully removed"
         }
     }
     End {
@@ -23126,16 +24639,16 @@ Function Remove-AutomateNOWNode {
     }
 }
 
-Function Rename-AutomateNOWNode {
+Function Rename-AutomateNOWServerNode {
     <#
     .SYNOPSIS
     Renames a Node on an AutomateNOW! instance
 
     .DESCRIPTION
-    Performs a psuedo-rename operations of a Node from an AutomateNOW! instance by copying it first and then deleting the source. This function merely combines Copy-AutomateNOWNode and Remove-AutomateNOWNode therefore it is to be considered destructive.
+    Performs a psuedo-rename operations of a Node from an AutomateNOW! instance by copying it first and then deleting the source. This function merely combines Copy-AutomateNOWServerNode and Remove-AutomateNOWServerNode therefore it is to be considered destructive.
 
-    .PARAMETER Node
-    An [ANOWNode] object representing the Node to be renamed.
+    .PARAMETER ServerNode
+    An [ANOWServerNode] object representing the Node to be renamed.
 
     .PARAMETER NewId
     Mandatory string indicating the new id or name of the Node. Please remember that the Id is the same as a primary key, it must be unique. The console will provide the old Id + '_COPY' in the UI when making a copy. The Id is limited to 1024 characters.
@@ -23147,17 +24660,17 @@ Function Rename-AutomateNOWNode {
     Optional switch to suppress the return of the newly renamed object.
 
     .INPUTS
-    ONLY [ANOWNode] objects are accepted. There is intentionally no support for the pipeline.
+    ONLY [ANOWServerNode] objects are accepted. There is intentionally no support for the pipeline.
 
     .OUTPUTS
-    The newly renamed [ANOWNode] object will be returned.
+    The newly renamed [ANOWServerNode] object will be returned.
 
     .EXAMPLE
-    $Node = Get-AutomateNOWNode -Id 'Node01'
-    Rename-AutomateNOWNode -Node $Node -NewId 'Node_02'
+    $ServerNode = Get-AutomateNOWServerNode -Id 'ServerNode01'
+    Rename-AutomateNOWServerNode -Node $ServerNode -NewId 'ServerNode_02'
 
     .EXAMPLE
-    Rename-AutomateNOWNode -Node (Get-AutomateNOWNode -Id 'Node01') -NewId 'Node_02'
+    Rename-AutomateNOWServerNode -Node (Get-AutomateNOWServerNode -Id 'ServerNode01') -NewId 'ServerNode_02'
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
@@ -23166,11 +24679,11 @@ Function Rename-AutomateNOWNode {
 
     This action will be denied if any existing referrals are found on the object.
     #>
-    [OutputType([ANOWNode])]
+    [OutputType([ANOWServerNode])]
     [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
     Param(
         [Parameter(Mandatory = $true)]
-        [ANOWNode]$Node,
+        [ANOWServerNode]$ServerNode,
         [Parameter(Mandatory = $true)]
         [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
         [string]$NewId,
@@ -23188,11 +24701,11 @@ Function Rename-AutomateNOWNode {
         ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
         $Error.Clear()
         Try {
-            [boolean]$new_Node_exists = ($null -ne (Get-AutomateNOWNode -Id $NewId))
+            [boolean]$new_Node_exists = ($null -ne (Get-AutomateNOWServerNode -Id $NewId))
         }
         Catch {
             [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Get-AutomateNOWNode failed to check if the Node [$NewId] already existed due to [$Message]."
+            Write-Warning -Message "Get-AutomateNOWServerNode failed to check if the Node [$NewId] already existed due to [$Message]."
             Break
         }
         If ($new_Node_exists -eq $true) {
@@ -23200,19 +24713,19 @@ Function Rename-AutomateNOWNode {
             Write-Warning -Message "There is already a Node named [$NewId] in [$current_domain]. You may not proceed."
             [boolean]$PermissionToProceed = $false
         }
-        [string]$Node_id = $Node.simpleId
+        [string]$ServerNode_id = $ServerNode.simpleId
         $Error.Clear()
         Try {
-            [boolean]$old_Node_exists = ($null -ne (Get-AutomateNOWNode -Id $Node_id))
+            [boolean]$old_Node_exists = ($null -ne (Get-AutomateNOWServerNode -Id $ServerNode_id))
         }
         Catch {
             [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Get-AutomateNOWNode failed to check if the Node [$Node_id] already existed due to [$Message]."
+            Write-Warning -Message "Get-AutomateNOWServerNode failed to check if the Node [$ServerNode_id] already existed due to [$Message]."
             Break
         }
         If ($old_Node_exists -eq $false) {
             [string]$current_domain = $anow_session.header.domain
-            Write-Warning -Message "There is not a Node named [$Node_id] in [$current_domain]. You may not proceed."
+            Write-Warning -Message "There is not a Node named [$ServerNode_id] in [$current_domain]. You may not proceed."
             [boolean]$PermissionToProceed = $false
         }
         ## End standard warning ##
@@ -23220,11 +24733,11 @@ Function Rename-AutomateNOWNode {
         ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
         $Error.Clear()
         Try {
-            [int32]$referrals_count = Find-AutomateNOWObjectReferral -Node $Node -Count | Select-Object -Expandproperty referrals
+            [int32]$referrals_count = Find-AutomateNOWObjectReferral -Node $ServerNode -Count | Select-Object -Expandproperty referrals
         }
         Catch {
             [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Find-AutomateNOWObjectReferral failed to extract the referrals on Node [$Node_id] due to [$Message]."
+            Write-Warning -Message "Find-AutomateNOWObjectReferral failed to extract the referrals on Node [$ServerNode_id] due to [$Message]."
             Break
         }
         If ($referrals_count -gt 0) {
@@ -23232,39 +24745,39 @@ Function Rename-AutomateNOWNode {
             Break
         }
         Else {
-            Write-Verbose -Message "The Node [$Node_id] does not have any referrals. It is safe to proceed."
+            Write-Verbose -Message "The Node [$ServerNode_id] does not have any referrals. It is safe to proceed."
         }
     }
     Process {
         If ($PermissionToProceed -ne $false) {
-            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Node_id)")) -eq $true) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ServerNode_id)")) -eq $true) {
                 $Error.Clear()
                 Try {
-                    [ANOWNode]$new_Node = Copy-AutomateNOWNode -Node $Node -NewId $NewId -Force
+                    [ANOWServerNode]$new_Node = Copy-AutomateNOWServerNode -Node $ServerNode -NewId $NewId -Force
                 }
                 Catch {
                     [string]$Message = $_.Exception.Message
-                    Write-Warning -Message "Copy-AutomateNOWNode failed to create a new Node [$NewId] as Part 1 of the renaming process due to [$Message]."
+                    Write-Warning -Message "Copy-AutomateNOWServerNode failed to create a new Node [$NewId] as Part 1 of the renaming process due to [$Message]."
                     Break
                 }
                 If ($new_Node.simpleId -eq $NewId) {
-                    Write-Verbose -Message "Part 1: Node [$Node_id] successfully copied to [$NewId]"
+                    Write-Verbose -Message "Part 1: Node [$ServerNode_id] successfully copied to [$NewId]"
                 }
                 Else {
-                    Write-Warning -Message "Somehow the first phase (Copy-AutomateNOWNode) failed. Please look into this."
+                    Write-Warning -Message "Somehow the first phase (Copy-AutomateNOWServerNode) failed. Please look into this."
                     Break
                 }
                 $Error.Clear()
                 Try {
-                    Remove-AutomateNOWNode -Node $Node -Force
+                    Remove-AutomateNOWServerNode -Node $ServerNode -Force
                 }
                 Catch {
                     [string]$Message = $_.Exception.Message
-                    Write-Warning -Message "Remove-AutomateNOWNode failed to remove [$Node_id] as Part 2 of the renaming process due to [$Message]."
+                    Write-Warning -Message "Remove-AutomateNOWServerNode failed to remove [$ServerNode_id] as Part 2 of the renaming process due to [$Message]."
                     Break
                 }
-                Write-Verbose -Message "Part 2: Node [$Node_id] removed"
-                Write-Verbose -Message "Task [$Node_id] successfully renamed to [$NewId]"
+                Write-Verbose -Message "Part 2: Node [$ServerNode_id] removed"
+                Write-Verbose -Message "Task [$ServerNode_id] successfully renamed to [$NewId]"
                 If ($Quiet -ne $true) {
                     Return $new_Node
                 }
@@ -23278,7 +24791,7 @@ Function Rename-AutomateNOWNode {
     }
 }
 
-Function Start-AutomateNOWNode {
+Function Start-AutomateNOWServerNode {
     <#
     .SYNOPSIS
     Starts a Node from an AutomateNOW! instance
@@ -23286,32 +24799,32 @@ Function Start-AutomateNOWNode {
     .DESCRIPTION
     Starts a Node from an AutomateNOW! instance
 
-    .PARAMETER Node
-    An [ANOWNode] object representing the Node to be started.
+    .PARAMETER ServerNode
+    An [ANOWServerNode] object representing the Node to be started.
 
     .PARAMETER Quiet
-    Switch parameter to silence the returned [ANOWNode] object
+    Switch parameter to silence the returned [ANOWServerNode] object
 
     .INPUTS
-    ONLY [ANOWNode] objects are accepted (including from the pipeline)
+    ONLY [ANOWServerNode] objects are accepted (including from the pipeline)
 
     .OUTPUTS
-    An [ANOWNode] object representing the started node will be returned.
+    An [ANOWServerNode] object representing the started node will be returned.
 
     .EXAMPLE
     Starts a single node
 
-    Get-AutomateNOWNode -Id 'Node_01' | Start-AutomateNOWNode
+    Get-AutomateNOWServerNode -Id 'ServerNode_01' | Start-AutomateNOWServerNode
 
     .EXAMPLE
     Starts a single node quietly
 
-    Get-AutomateNOWNode -Id 'Node_01' | Start-AutomateNOWNode -Quiet
+    Get-AutomateNOWServerNode -Id 'ServerNode_01' | Start-AutomateNOWServerNode -Quiet
 
     .EXAMPLE
     Starts a series of nodes quietly through the pipeline
 
-    @('Node01', 'Node02') | Start-AutomateNOWNode -Quiet
+    @('ServerNode01', 'ServerNode02') | Start-AutomateNOWServerNode -Quiet
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
@@ -23320,7 +24833,7 @@ Function Start-AutomateNOWNode {
     [Cmdletbinding()]
     Param(
         [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
-        [ANOWNode]$Node,
+        [ANOWServerNode]$ServerNode,
         [Parameter(Mandatory = $false)]
         [switch]$Quiet
     )
@@ -23340,15 +24853,15 @@ Function Start-AutomateNOWNode {
     }
     Process {
         If ($_.id.Length -gt 0) {
-            [string]$Node_id = $_.id
-            [string]$Node_simpleId = $_.simpleId
+            [string]$ServerNode_id = $_.id
+            [string]$ServerNode_simpleId = $_.simpleId
         }
         Else {
-            [string]$Node_id = $Node.id
-            [string]$Node_simpleId = $Node.simpleId
+            [string]$ServerNode_id = $ServerNode.id
+            [string]$ServerNode_simpleId = $ServerNode.simpleId
         }
         [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
-        $BodyMetaData.Add('id', $Node_id )
+        $BodyMetaData.Add('id', $ServerNode_id )
         $BodyMetaData.Add('_operationType', 'custom')
         $BodyMetaData.Add('_operationId', 'start')
         $BodyMetaData.Add('_textMatchStyle', 'exact')
@@ -23368,7 +24881,7 @@ Function Start-AutomateNOWNode {
         }
         Catch {
             [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$Node_id] due to [$Message]."
+            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$ServerNode_id] due to [$Message]."
             Break
         }
         [int32]$response_code = $results.response.status
@@ -23377,18 +24890,18 @@ Function Start-AutomateNOWNode {
             Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
             Break
         }
-        Write-Verbose -Message "Task $Node_id successfully started"
+        Write-Verbose -Message "Task $ServerNode_id successfully started"
         $Error.Clear()
         Try {
-            [ANOWNode]$ANOWNode = $results.response.data[0]
+            [ANOWServerNode]$ANOWServerNode = $results.response.data[0]
         }
         Catch {
             [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Unable to create the [ANOWNode] object under Start-AutomateNOWNode from the response due to [$Message]."
+            Write-Warning -Message "Unable to create the [ANOWServerNode] object under Start-AutomateNOWServerNode from the response due to [$Message]."
             Break
         }
         If ($Quiet -ne $true) {
-            Return $ANOWNode
+            Return $ANOWServerNode
         }
     }
     End {
@@ -23396,7 +24909,7 @@ Function Start-AutomateNOWNode {
     }
 }
 
-Function Stop-AutomateNOWNode {
+Function Stop-AutomateNOWServerNode {
     <#
     .SYNOPSIS
     Stops a Node on an AutomateNOW! instance
@@ -23404,8 +24917,8 @@ Function Stop-AutomateNOWNode {
     .DESCRIPTION
     Stops a Node on an AutomateNOW! instance
 
-    .PARAMETER Node
-    An [ANOWNode] object representing the Node to be stopped.
+    .PARAMETER ServerNode
+    An [ANOWServerNode] object representing the Node to be stopped.
 
     .PARAMETER Kill
     Switch parameter to kill tasks running on the server instead of waiting for them to complete
@@ -23414,31 +24927,31 @@ Function Stop-AutomateNOWNode {
     Switch parameter to abort tasks running on the server instead of waiting for them to complete
 
     .PARAMETER Quiet
-    Switch parameter to silence the returned [ANOWNode] object
+    Switch parameter to silence the returned [ANOWServerNode] object
 
     .PARAMETER Force
     Force the stop action without confirmation. This is equivalent to -Confirm:$false
 
     .INPUTS
-    ONLY [ANOWNode] objects are accepted (including from the pipeline)
+    ONLY [ANOWServerNode] objects are accepted (including from the pipeline)
 
     .OUTPUTS
-    An [ANOWNode] object representing the stopped node will be returned.
+    An [ANOWServerNode] object representing the stopped node will be returned.
 
     .EXAMPLE
     Stops a single node
 
-    Get-AutomateNOWNode -Id 'Node_01' | Stop-AutomateNOWNode
+    Get-AutomateNOWServerNode -Id 'ServerNode_01' | Stop-AutomateNOWServerNode
 
     .EXAMPLE
     Stops a single node quietly
 
-    Get-AutomateNOWNode -Id 'Node_01' | Stop-AutomateNOWNode -Quiet
+    Get-AutomateNOWServerNode -Id 'ServerNode_01' | Stop-AutomateNOWServerNode -Quiet
 
     .EXAMPLE
     Stops a series of nodes quietly through the pipeline
 
-    @('Node01', 'Node02') | Stop-AutomateNOWNode -Quiet
+    @('ServerNode01', 'ServerNode02') | Stop-AutomateNOWServerNode -Quiet
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
@@ -23451,7 +24964,7 @@ Function Stop-AutomateNOWNode {
         [Parameter(Mandatory = $true, ParameterSetName = 'Default', ValueFromPipeline = $True)]
         [Parameter(Mandatory = $true, ParameterSetName = 'Kill', ValueFromPipeline = $True)]
         [Parameter(Mandatory = $true, ParameterSetName = 'Abort', ValueFromPipeline = $True)]
-        [ANOWNode]$Node,
+        [ANOWServerNode]$ServerNode,
         [Parameter(Mandatory = $true, ParameterSetName = 'Kill')]
         [switch]$Kill,
         [Parameter(Mandatory = $true, ParameterSetName = 'Abort')]
@@ -23493,12 +25006,12 @@ Function Stop-AutomateNOWNode {
     }
     Process {
         If ($_.id.Length -gt 0) {
-            [ANOWNode]$Node = $_
+            [ANOWServerNode]$ServerNode = $_
         }
-        [string]$Node_id = $Node.id
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Node_id)")) -eq $true) {
+        [string]$ServerNode_id = $ServerNode.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ServerNode_id)")) -eq $true) {
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
-            $BodyMetaData.Add('id', $Node_id )
+            $BodyMetaData.Add('id', $ServerNode_id )
             $BodyMetaData.Add('_operationType', 'custom')
             $BodyMetaData.Add('_operationId', $operation_id)
             $BodyMetaData.Add('_textMatchStyle', 'exact')
@@ -23518,7 +25031,7 @@ Function Stop-AutomateNOWNode {
             }
             Catch {
                 [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$Node_id] due to [$Message]."
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$ServerNode_id] due to [$Message]."
                 Break
             }
             [int32]$response_code = $results.response.status
@@ -23527,18 +25040,18 @@ Function Stop-AutomateNOWNode {
                 Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
                 Break
             }
-            Write-Verbose -Message "Task $Node_id successfully $stop_message"
+            Write-Verbose -Message "Task $ServerNode_id successfully $stop_message"
             $Error.Clear()
             Try {
-                [ANOWNode]$ANOWNode = $results.response.data[0]
+                [ANOWServerNode]$ANOWServerNode = $results.response.data[0]
             }
             Catch {
                 [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Unable to create the [ANOWNode] object under Stop-AutomateNOWNode (performing $operation_id) from the response due to [$Message]."
+                Write-Warning -Message "Unable to create the [ANOWServerNode] object under Stop-AutomateNOWServerNode (performing $operation_id) from the response due to [$Message]."
                 Break
             }
             If ($Quiet -ne $true) {
-                Return $ANOWNode
+                Return $ANOWServerNode
             }
         }
     }
@@ -23547,7 +25060,7 @@ Function Stop-AutomateNOWNode {
     }
 }
 
-Function Dismount-AutomateNOWNode {
+Function Dismount-AutomateNOWServerNode {
     <#
     .SYNOPSIS
     Dismounts (detaches) a Node from an Agent on an AutomateNOW! instance
@@ -23555,20 +25068,20 @@ Function Dismount-AutomateNOWNode {
     .DESCRIPTION
     Dismounts (detaches) a Node from an Agent on an AutomateNOW! instance
 
-    .PARAMETER Node
-    An [ANOWNode] object representing the Node to be detached from an Agent.
+    .PARAMETER ServerNode
+    An [ANOWServerNode] object representing the Node to be detached from an Agent.
 
     .PARAMETER Agent
     An [ANOWAgent] object representing the Agent from which the Node will be dismounted (detached).
 
     .PARAMETER Quiet
-    Switch parameter to silence the returned [ANOWNode] object
+    Switch parameter to silence the returned [ANOWServerNode] object
 
     .PARAMETER Force
     Force the dismounting without confirmation. This is equivalent to -Confirm:$false
 
     .INPUTS
-    One [ANOWAgent] object must be presented along with at least one [AnowNode] object. Nodes can be sent along the pipeline.
+    One [ANOWAgent] object must be presented along with at least one [ANOWServerNode] object. Nodes can be sent along the pipeline.
 
     .OUTPUTS
     Informational message that the Node was detached from the Agent.
@@ -23578,13 +25091,11 @@ Function Dismount-AutomateNOWNode {
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
 
-
-
     #>
     [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
     Param(
         [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
-        [ANOWNode]$Node,
+        [ANOWServerNode]$ServerNode,
         [Parameter(Mandatory = $true)]
         [ANOWAgent]$Agent,
         [Parameter(Mandatory = $false)]
@@ -23608,14 +25119,14 @@ Function Dismount-AutomateNOWNode {
     }
     Process {
         If ($_.id.Length -gt 0) {
-            [ANOWNode]$Node = $_
+            [ANOWServerNode]$ServerNode = $_
         }
-        [string]$Node_id = $Node.id
+        [string]$ServerNode_id = $ServerNode.id
         [string]$Agent_Id = $Agent.Id
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Node_id) from $Agent_Id")) -eq $true) {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ServerNode_id) from $Agent_Id")) -eq $true) {
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
             $BodyMetaData.Add('agent', $Agent_Id )
-            $BodyMetaData.Add('id', $Node_id )
+            $BodyMetaData.Add('id', $ServerNode_id )
             $BodyMetaData.Add('_operationType', 'remove')
             $BodyMetaData.Add('_operationId', 'deleteAgentNode')
             $BodyMetaData.Add('_componentId', 'AgentServerNodeList')
@@ -23636,16 +25147,17 @@ Function Dismount-AutomateNOWNode {
             }
             Catch {
                 [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$Node_id] due to [$Message]."
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$ServerNode_id] due to [$Message]."
                 Break
             }
-            If ($results.response.status -ne 0) {
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
                 [string]$full_response_display = $results.response | ConvertTo-Json -Compress
                 Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
                 Break
             }
             If ($Quiet -ne $true) {
-                Write-Information -MessageData "Node $Node_id was dismounted (detached) from $Agent_Id"
+                Write-Information -MessageData "Node $ServerNode_id was dismounted (detached) from $Agent_Id"
             }
         }
     }
@@ -23654,7 +25166,7 @@ Function Dismount-AutomateNOWNode {
     }
 }
 
-Function Suspend-AutomateNOWNode {
+Function Suspend-AutomateNOWServerNode {
     <#
     .SYNOPSIS
     Suspends (holds) all activities within a specific Node on an AutomateNOW! instance.
@@ -23662,23 +25174,23 @@ Function Suspend-AutomateNOWNode {
     .DESCRIPTION
     Suspends (holds) all activities within a specific Node on an AutomateNOW! instance, ensuring a temporary freeze on all automated processes and workflows until further action is taken.
 
-    .PARAMETER Node
-    An [ANOWNode] object representing the Node to be suspended (placed on hold)
+    .PARAMETER ServerNode
+    An [ANOWServerNode] object representing the Node to be suspended (placed on hold)
 
     .PARAMETER Force
     Force the change without confirmation. This is equivalent to -Confirm:$false
 
     .INPUTS
-    ONLY [ANOWNode] objects are accepted (including from the pipeline)
+    ONLY [ANOWServerNode] objects are accepted (including from the pipeline)
 
     .OUTPUTS
     A verbose information message will be sent indicating success
 
     .EXAMPLE
-    Get-AutomateNOWNode -Id 'MyCoolNode' | Suspend-AutomateNOWNode -Force
+    Get-AutomateNOWServerNode -Id 'MyCoolNode' | Suspend-AutomateNOWServerNode -Force
 
     .EXAMPLE
-    @( 'Node1', 'Node2' ) | Get-AutomateNOWNode | Suspend-AutomateNOWNode
+    @( 'ServerNode1', 'ServerNode2' ) | Get-AutomateNOWServerNode | Suspend-AutomateNOWServerNode
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
@@ -23689,7 +25201,7 @@ Function Suspend-AutomateNOWNode {
     [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
     Param(
         [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
-        [ANOWNode]$Node,
+        [ANOWServerNode]$ServerNode,
         [Parameter(Mandatory = $false)]
         [switch]$Force
     )
@@ -23709,33 +25221,33 @@ Function Suspend-AutomateNOWNode {
     }
     Process {
         If ($_.id.Length -gt 0) {
-            [ANOWNode]$Node = $_
+            [ANOWServerNode]$ServerNode = $_
         }
-        [string]$Node_id = $Node.id
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Suspend the Node $($Node_id)?")) -eq $true) {
+        [string]$ServerNode_id = $ServerNode.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Suspend the Node $($ServerNode_id)?")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
             Try {
-                [ANOWNode]$current_Node = Get-AutomateNOWNode -Id $Node_id
+                [ANOWServerNode]$current_Node = Get-AutomateNOWServerNode -Id $ServerNode_id
             }
             Catch {
                 [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Get-AutomateNOWNode failed to check if the Node [$Node_id] existed under Resume-AutomateNOWNode due to [$Message]."
+                Write-Warning -Message "Get-AutomateNOWServerNode failed to check if the Node [$ServerNode_id] existed under Resume-AutomateNOWServerNode due to [$Message]."
                 Break
             }
             If ($current_Node.id.length -eq 0) {
-                Write-Warning -Message "The Node you specified does not seem to exist (Resume-AutomateNOWNode)"
+                Write-Warning -Message "The Node you specified does not seem to exist (Resume-AutomateNOWServerNode)"
                 Break
             }
             [boolean]$current_Node_hold_status = $current_Node.onHold
             If ($current_Node_hold_status -eq $true) {
-                Write-Warning -Message "[$Node_id] cannot be suspended (placed on hold) as it is already suspended (on hold)"
+                Write-Warning -Message "[$ServerNode_id] cannot be suspended (placed on hold) as it is already suspended (on hold)"
                 Break
             }
             ## End warning ##
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
-            $BodyMetaData.Add('id', $Node_id )
+            $BodyMetaData.Add('id', $ServerNode_id )
             $BodyMetaData.Add('_operationType', 'update')
             $BodyMetaData.Add('_operationId', 'hold')
             $BodyMetaData.Add('_textMatchStyle', 'exact')
@@ -23750,7 +25262,7 @@ Function Suspend-AutomateNOWNode {
             }
             Catch {
                 [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$Node_id] due to [$Message]."
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$ServerNode_id] due to [$Message]."
                 Break
             }
             [int32]$response_code = $results.response.status
@@ -23759,7 +25271,7 @@ Function Suspend-AutomateNOWNode {
                 Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
                 Break
             }
-            Write-Verbose -Message "Node $Node_id was successfully suspended (placed on hold)"
+            Write-Verbose -Message "Node $ServerNode_id was successfully suspended (placed on hold)"
         }
     }
     End {
@@ -23767,7 +25279,7 @@ Function Suspend-AutomateNOWNode {
     }
 }
 
-Function Resume-AutomateNOWNode {
+Function Resume-AutomateNOWServerNode {
     <#
     .SYNOPSIS
     Removes the temporary freeze placed on a specific Node on an AutomateNOW! instance and allows it to resume.
@@ -23775,23 +25287,23 @@ Function Resume-AutomateNOWNode {
     .DESCRIPTION
     Removes the temporary freeze placed on a specific Node on an AutomateNOW! instance and allows it to resume.
 
-    .PARAMETER Node
-    An [ANOWNode] object representing the Node to be resumed
+    .PARAMETER ServerNode
+    An [ANOWServerNode] object representing the Node to be resumed
 
     .PARAMETER Force
     Force the change without confirmation. This is equivalent to -Confirm:$false
 
     .INPUTS
-    ONLY [ANOWNode] objects are accepted (including from the pipeline)
+    ONLY [ANOWServerNode] objects are accepted (including from the pipeline)
 
     .OUTPUTS
     A verbose information message will be sent indicating success
 
     .EXAMPLE
-    Get-AutomateNOWNode -Id 'MyCoolNode' | Resume-AutomateNOWNode -Force
+    Get-AutomateNOWServerNode -Id 'MyCoolNode' | Resume-AutomateNOWServerNode -Force
 
     .EXAMPLE
-    @( 'Node1', 'Node2' ) | Get-AutomateNOWNode | Resume-AutomateNOWNode
+    @( 'ServerNode1', 'ServerNode2' ) | Get-AutomateNOWServerNode | Resume-AutomateNOWServerNode
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
@@ -23800,7 +25312,7 @@ Function Resume-AutomateNOWNode {
     [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
     Param(
         [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
-        [ANOWNode]$Node,
+        [ANOWServerNode]$ServerNode,
         [Parameter(Mandatory = $false)]
         [switch]$Force
     )
@@ -23820,33 +25332,33 @@ Function Resume-AutomateNOWNode {
     }
     Process {
         If ($_.id.Length -gt 0) {
-            [ANOWNode]$Node = $_
+            [ANOWServerNode]$ServerNode = $_
         }
-        [string]$Node_id = $Node.id
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Resume the Node $($Node_id)?")) -eq $true) {
+        [string]$ServerNode_id = $ServerNode.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Resume the Node $($ServerNode_id)?")) -eq $true) {
             ## Begin warning ##
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
             Try {
-                [ANOWNode]$current_Node = Get-AutomateNOWNode -Id $Node_id
+                [ANOWServerNode]$current_Node = Get-AutomateNOWServerNode -Id $ServerNode_id
             }
             Catch {
                 [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Get-AutomateNOWNode failed to check if the Node [$Node_id] existed under Resume-AutomateNOWNode due to [$Message]."
+                Write-Warning -Message "Get-AutomateNOWServerNode failed to check if the Node [$ServerNode_id] existed under Resume-AutomateNOWServerNode due to [$Message]."
                 Break
             }
             If ($current_Node.id.length -eq 0) {
-                Write-Warning -Message "The Node you specified does not seem to exist (Resume-AutomateNOWNode)"
+                Write-Warning -Message "The Node you specified does not seem to exist (Resume-AutomateNOWServerNode)"
                 Break
             }
             [boolean]$current_Node_hold_status = $current_Node.onHold
             If ($current_Node_hold_status -eq $false) {
-                Write-Warning -Message "[$Node_id] cannot be resumed because it is not currently suspended (on hold)"
+                Write-Warning -Message "[$ServerNode_id] cannot be resumed because it is not currently suspended (on hold)"
                 Break
             }
             ## End warning ##
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
-            $BodyMetaData.Add('id', $Node_id )
+            $BodyMetaData.Add('id', $ServerNode_id )
             $BodyMetaData.Add('_operationType', 'update')
             $BodyMetaData.Add('_operationId', 'resume')
             $BodyMetaData.Add('_textMatchStyle', 'exact')
@@ -23861,7 +25373,7 @@ Function Resume-AutomateNOWNode {
             }
             Catch {
                 [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$Node_id] due to [$Message]."
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$ServerNode_id] due to [$Message]."
                 Break
             }
             [int32]$response_code = $results.response.status
@@ -23870,7 +25382,7 @@ Function Resume-AutomateNOWNode {
                 Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
                 Break
             }
-            Write-Verbose -Message "Node $Node_id was successfully resumed (removed from hold)"
+            Write-Verbose -Message "Node $ServerNode_id was successfully resumed (removed from hold)"
         }
     }
     End {
@@ -23878,7 +25390,7 @@ Function Resume-AutomateNOWNode {
     }
 }
 
-Function Skip-AutomateNOWNode {
+Function Skip-AutomateNOWServerNode {
     <#
     .SYNOPSIS
     Sets or unsets the Skip flag on a Node on an AutomateNOW! instance
@@ -23886,42 +25398,42 @@ Function Skip-AutomateNOWNode {
     .DESCRIPTION
     Sets or unsets the Skip flag on a Node on an AutomateNOW! instance
 
-    .PARAMETER Node
-    An [ANOWNode] object representing the Node to be set to skipped or unskipped
+    .PARAMETER ServerNode
+    An [ANOWServerNode] object representing the Node to be set to skipped or unskipped
 
     .PARAMETER UnSkip
-    Removes the skip flag from a [ANOWNode] object. This is the opposite of the default behavior.
+    Removes the skip flag from a [ANOWServerNode] object. This is the opposite of the default behavior.
 
     .PARAMETER Force
     Force the change without confirmation. This is equivalent to -Confirm:$false
 
     .PARAMETER Quiet
-    Switch parameter to silence the emitted [ANOWNode] object
+    Switch parameter to silence the emitted [ANOWServerNode] object
 
     .INPUTS
-    ONLY [ANOWNode] objects are accepted (including from the pipeline)
+    ONLY [ANOWServerNode] objects are accepted (including from the pipeline)
 
     .OUTPUTS
-    The skipped/unskipped [ANOWNode] object will be returned
+    The skipped/unskipped [ANOWServerNode] object will be returned
 
     .EXAMPLE
     Sets a Node to Skip (bypass)
 
-    Get-AutomateNOWNode -Id 'Node01' | Skip-AutomateNOWNode -Force
+    Get-AutomateNOWServerNode -Id 'ServerNode01' | Skip-AutomateNOWServerNode -Force
 
     .EXAMPLE
     Unsets the Skip (bypass) flag on a Node
 
-    Get-AutomateNOWNode | Skip-AutomateNOWNode -UnSkip
+    Get-AutomateNOWServerNode | Skip-AutomateNOWServerNode -UnSkip
 
     .EXAMPLE
     Sets an array of Node to Skip (bypass)
 
-    @( 'Task1', 'Task2', 'Task3') | Skip-AutomateNOWNode
+    @( 'Task1', 'Task2', 'Task3') | Skip-AutomateNOWServerNode
 
     .EXAMPLE
     Forcibly and quietly sets all Linux
-    Get-AutomateNOWNode | ? { $_.serverNodeType -eq 'LINUX' } | Skip-AutomateNOWNode -UnSkip -Force -Quiet
+    Get-AutomateNOWServerNode | ? { $_.serverNodeType -eq 'LINUX' } | Skip-AutomateNOWServerNode -UnSkip -Force -Quiet
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
@@ -23930,7 +25442,7 @@ Function Skip-AutomateNOWNode {
     [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
     Param(
         [Parameter(Mandatory = $false, ValueFromPipeline = $True)]
-        [ANOWNode]$Node,
+        [ANOWServerNode]$ServerNode,
         [Parameter(Mandatory = $false)]
         [switch]$UnSkip,
         [Parameter(Mandatory = $false)]
@@ -23964,20 +25476,20 @@ Function Skip-AutomateNOWNode {
     }
     Process {
         If ($_.id.Length -gt 0) {
-            [ANOWNode]$Node = $_
+            [ANOWServerNode]$ServerNode = $_
         }
-        [string]$Node_id = $Node.id
-        If ($Node.passBy -eq $true -and $UnSkip -ne $True) {
-            Write-Warning -Message "Node $Node_id already has the skip flag set. No action is required."
+        [string]$ServerNode_id = $ServerNode.id
+        If ($ServerNode.passBy -eq $true -and $UnSkip -ne $True) {
+            Write-Warning -Message "Node $ServerNode_id already has the skip flag set. No action is required."
             Break
         }
-        ElseIf ($Node.passBy -eq $false -and $UnSkip -eq $True) {
-            Write-Warning -Message "Node $Node_id does not have the skip flag set. No action is required."
+        ElseIf ($ServerNode.passBy -eq $false -and $UnSkip -eq $True) {
+            Write-Warning -Message "Node $ServerNode_id does not have the skip flag set. No action is required."
             Break
         }
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess($Node_id, $ProcessDescription)) -eq $true) {
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess($ServerNode_id, $ProcessDescription)) -eq $true) {
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
-            $BodyMetaData.Add('id', $Node_id )
+            $BodyMetaData.Add('id', $ServerNode_id )
             $BodyMetaData.Add('_operationType', 'update')
             $BodyMetaData.Add('_operationId', $operation_id)
             $BodyMetaData.Add('_textMatchStyle', 'exact')
@@ -23992,7 +25504,7 @@ Function Skip-AutomateNOWNode {
             }
             Catch {
                 [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$Node_id] due to [$Message]."
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$ServerNode_id] due to [$Message]."
                 Break
             }
             [int32]$response_code = $results.response.status
@@ -24003,14 +25515,14 @@ Function Skip-AutomateNOWNode {
             }
             $Error.Clear()
             Try {
-                [ANOWNode]$skipped_task_template = $results.response.data[0]
+                [ANOWServerNode]$skipped_task_template = $results.response.data[0]
             }
             Catch {
                 [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Failed to create the [ANOWNode] object after setting the skip flag to [$skip_flag_status] on [$Node_id] due to [$Message]."
+                Write-Warning -Message "Failed to create the [ANOWServerNode] object after setting the skip flag to [$skip_flag_status] on [$ServerNode_id] due to [$Message]."
                 Break
             }
-            Write-Verbose -Message "Successfully set the skip flag to [$skip_flag_status] on [$Node_id]"
+            Write-Verbose -Message "Successfully set the skip flag to [$skip_flag_status] on [$ServerNode_id]"
             If ($Quiet -ne $true) {
                 Return $skipped_task_template
             }
@@ -24029,14 +25541,14 @@ Function Push-AutomateNOWLoadBalancerNode {
     .DESCRIPTION
     Moves (pushes) a Load Balancer node to the top of the list (stack).
 
-    .PARAMETER Node
-    An [ANOWNode] object representing the Load Balancer Child Node to be moved (popped) to the bottom of the stack.
+    .PARAMETER ServerNode
+    An [ANOWServerNode] object representing the Load Balancer Child Node to be moved (popped) to the bottom of the stack.
 
     .PARAMETER Force
     Force the change without confirmation. This is equivalent to -Confirm:$false
 
     .INPUTS
-    ONLY [ANOWNode] objects are accepted (including from the pipeline)
+    ONLY [ANOWServerNode] objects are accepted (including from the pipeline)
 
     .OUTPUTS
     A verbose information message will be sent indicating success
@@ -24044,25 +25556,25 @@ Function Push-AutomateNOWLoadBalancerNode {
     .EXAMPLE
     Forcibly pops (moves to the bottom) a server node to the top of the list (stack) with a Load Balancer node.
 
-    Get-AutomateNOWNode -Id 'MyNode' | Push-AutomateNOWNode -Force
+    Get-AutomateNOWServerNode -Id 'MyNode' | Push-AutomateNOWServerNode -Force
 
     .EXAMPLE
     Forcibly arranges the sort order of a group of child nodes
 
-    @( 'Node3', 'Node2', 'Node1' ) | Get-AutomateNOWNode | Push-AutomateNOWNode -Force
+    @( 'ServerNode3', 'ServerNode2', 'ServerNode1' ) | Get-AutomateNOWServerNode | Push-AutomateNOWServerNode -Force
 
     .EXAMPLE
     Forcibly re-arranges the sort order of the child nodes within a load balancer
 
-    $node1 = Get-AutomateNOWNode -Id 'NODE1'
-    $node2 = Get-AutomateNOWNode -Id 'NODE2'
-    $node3 = Get-AutomateNOWNode -Id 'NODE3'
-    $node4 = Get-AutomateNOWNode -Id 'NODE4'
+    $ServerNode1 = Get-AutomateNOWServerNode -Id 'ServerNode1'
+    $ServerNode2 = Get-AutomateNOWServerNode -Id 'ServerNode2'
+    $ServerNode3 = Get-AutomateNOWServerNode -Id 'ServerNode3'
+    $ServerNode4 = Get-AutomateNOWServerNode -Id 'ServerNode4'
 
-    Push-AutomateNOWLoadBalancerNode -Node $node4 -Force
-    Push-AutomateNOWLoadBalancerNode -Node $node3 -Force
-    Push-AutomateNOWLoadBalancerNode -Node $node2 -Force
-    Push-AutomateNOWLoadBalancerNode -Node $node1 -Force
+    Push-AutomateNOWLoadBalancerNode -Node $ServerNode4 -Force
+    Push-AutomateNOWLoadBalancerNode -Node $ServerNode3 -Force
+    Push-AutomateNOWLoadBalancerNode -Node $ServerNode2 -Force
+    Push-AutomateNOWLoadBalancerNode -Node $ServerNode1 -Force
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
@@ -24076,7 +25588,7 @@ Function Push-AutomateNOWLoadBalancerNode {
     Param(
         [ValidateScript({ $_.parentLoadBalancer.Length -gt 0 })]
         [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
-        [ANOWNode]$Node,
+        [ANOWServerNode]$ServerNode,
         [Parameter(Mandatory = $false)]
         [switch]$Force
     )
@@ -24096,33 +25608,33 @@ Function Push-AutomateNOWLoadBalancerNode {
     }
     Process {
         If ($_.Id.Length -gt 0) {
-            [ANOWNode]$Node = $_
+            [ANOWServerNode]$ServerNode = $_
         }
-        [string]$Node_id = $Node.Id
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Node_id)?")) -eq $true) {
-            [string]$parent_load_balancer_id = $Node.parentLoadBalancer
+        [string]$ServerNode_id = $ServerNode.Id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ServerNode_id)?")) -eq $true) {
+            [string]$parent_load_balancer_id = $ServerNode.parentLoadBalancer
             $Error.Clear()
             Try {
-                [ANOWNode[]]$child_nodes = Get-AutomateNOWNode -Id $parent_load_balancer_id -ChildNodes
+                [ANOWServerNode[]]$child_nodes = Get-AutomateNOWServerNode -Id $parent_load_balancer_id -ChildNodes
             }
             Catch {
                 [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Get-AutomateNOWNode failed to parse the response into [ANOWNode] objects under Pop-AutomateNOWLoadBalancerNode due to [$Message]."
+                Write-Warning -Message "Get-AutomateNOWServerNode failed to parse the response into [ANOWServerNode] objects under Pop-AutomateNOWLoadBalancerNode due to [$Message]."
                 Break
             }
             If ($child_nodes.count -eq 0) {
                 Write-Warning -Message "Somehow the parent node does not have any child nodes. Please look into this."
                 Break
             }
-            [string]$old_values = $Node.CreateOldValues()
-            [PSCustomObject[]]$node_collection = ([PSCustomObject[]]($child_nodes | Where-Object { $_.Id -eq "$Node_id" } | Select-Object -Property simpleId, sortOrder) + [PSCustomObject[]]($child_nodes | Sort-Object -Property sortOrder, simpleId | Where-Object { $_.Id -ne "$Node_id" } | Select-Object -Property simpleId, sortOrder))
-            [int32]$node_order_count = $node_collection.count
-            Write-Verbose -Message "Discovered [$node_order_count] child nodes in load balancer $parent_load_balancer_id"
+            [string]$old_values = $ServerNode.CreateOldValues()
+            [PSCustomObject[]]$ServerNode_collection = ([PSCustomObject[]]($child_nodes | Where-Object { $_.Id -eq "$ServerNode_id" } | Select-Object -Property simpleId, sortOrder) + [PSCustomObject[]]($child_nodes | Sort-Object -Property sortOrder, simpleId | Where-Object { $_.Id -ne "$ServerNode_id" } | Select-Object -Property simpleId, sortOrder))
+            [int32]$ServerNode_order_count = $ServerNode_collection.count
+            Write-Verbose -Message "Discovered [$ServerNode_order_count] child nodes in load balancer $parent_load_balancer_id"
             [int32]$current_node = 0
-            ForEach ($temp_node in $node_collection) {
-                [string]$node_simple_id = $temp_node.simpleId
+            ForEach ($temp_node in $ServerNode_collection) {
+                [string]$ServerNode_simple_id = $temp_node.simpleId
                 [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
-                $BodyMetaData.Add('id', $node_simple_id )
+                $BodyMetaData.Add('id', $ServerNode_simple_id )
                 $BodyMetaData.Add('sortOrder', $current_node )
                 $BodyMetaData.Add('_operationType', 'update')
                 $BodyMetaData.Add('_operationId', 'hold')
@@ -24144,7 +25656,7 @@ Function Push-AutomateNOWLoadBalancerNode {
                 }
                 Catch {
                     [string]$Message = $_.Exception.Message
-                    Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$node_simple_id] due to [$Message]."
+                    Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$ServerNode_simple_id] due to [$Message]."
                     Break
                 }
                 [int32]$response_code = $results.response.status
@@ -24153,7 +25665,7 @@ Function Push-AutomateNOWLoadBalancerNode {
                     Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
                     Break
                 }
-                Write-Verbose -Message "Node $node_simple_id was successfully set to sortOrder [$current_node]"
+                Write-Verbose -Message "Node $ServerNode_simple_id was successfully set to sortOrder [$current_node]"
                 $current_node++
             }
         }
@@ -24171,14 +25683,14 @@ Function Pop-AutomateNOWLoadBalancerNode {
     .DESCRIPTION
     Moves (pops) a Load Balancer node to the bottom of the list (stack).
 
-    .PARAMETER Node
-    An [ANOWNode] object representing the Load Balancer Child Node to be moved (popped) to the bottom of the stack.
+    .PARAMETER ServerNode
+    An [ANOWServerNode] object representing the Load Balancer Child Node to be moved (popped) to the bottom of the stack.
 
     .PARAMETER Force
     Force the change without confirmation. This is equivalent to -Confirm:$false
 
     .INPUTS
-    ONLY child node [ANOWNode] objects are accepted (including from the pipeline).
+    ONLY child node [ANOWServerNode] objects are accepted (including from the pipeline).
 
     .OUTPUTS
     A verbose information message will be sent indicating success
@@ -24186,25 +25698,25 @@ Function Pop-AutomateNOWLoadBalancerNode {
     .EXAMPLE
     Forcibly pops (moves to the bottom) a server node to the bottom of the list (stack) with a Load Balancer node.
 
-    Get-AutomateNOWNode -Id 'MyNode' | Pop-AutomateNOWNode -Force
+    Get-AutomateNOWServerNode -Id 'MyNode' | Pop-AutomateNOWServerNode -Force
 
     .EXAMPLE
     Forcibly arranges the sort order of a group of child nodes
 
-    @( 'Node1', 'Node2', 'Node3' ) | Get-AutomateNOWNode | Pop-AutomateNOWNode -Force
+    @( 'ServerNode1', 'ServerNode2', 'ServerNode3' ) | Get-AutomateNOWServerNode | Pop-AutomateNOWServerNode -Force
 
     .EXAMPLE
     Forcibly re-arranges the sort order of the child nodes within a load balancer
 
-    $node1 = Get-AutomateNOWNode -Id 'NODE1'
-    $node2 = Get-AutomateNOWNode -Id 'NODE2'
-    $node3 = Get-AutomateNOWNode -Id 'NODE3'
-    $node4 = Get-AutomateNOWNode -Id 'NODE4'
+    $ServerNode1 = Get-AutomateNOWServerNode -Id 'ServerNode1'
+    $ServerNode2 = Get-AutomateNOWServerNode -Id 'ServerNode2'
+    $ServerNode3 = Get-AutomateNOWServerNode -Id 'ServerNode3'
+    $ServerNode4 = Get-AutomateNOWServerNode -Id 'ServerNode4'
 
-    Pop-AutomateNOWLoadBalancerNode -Node $node4 -Force
-    Pop-AutomateNOWLoadBalancerNode -Node $node3 -Force
-    Pop-AutomateNOWLoadBalancerNode -Node $node2 -Force
-    Pop-AutomateNOWLoadBalancerNode -Node $node1 -Force
+    Pop-AutomateNOWLoadBalancerNode -Node $ServerNode4 -Force
+    Pop-AutomateNOWLoadBalancerNode -Node $ServerNode3 -Force
+    Pop-AutomateNOWLoadBalancerNode -Node $ServerNode2 -Force
+    Pop-AutomateNOWLoadBalancerNode -Node $ServerNode1 -Force
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
@@ -24218,7 +25730,7 @@ Function Pop-AutomateNOWLoadBalancerNode {
     Param(
         [ValidateScript({ $_.parentLoadBalancer.Length -gt 0 })]
         [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
-        [ANOWNode]$Node,
+        [ANOWServerNode]$ServerNode,
         [Parameter(Mandatory = $false)]
         [switch]$Force
     )
@@ -24238,33 +25750,33 @@ Function Pop-AutomateNOWLoadBalancerNode {
     }
     Process {
         If ($_.Id.Length -gt 0) {
-            [ANOWNode]$Node = $_
+            [ANOWServerNode]$ServerNode = $_
         }
-        [string]$Node_id = $Node.Id
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Node_id)?")) -eq $true) {
-            [string]$parent_load_balancer_id = $Node.parentLoadBalancer
+        [string]$ServerNode_id = $ServerNode.Id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ServerNode_id)?")) -eq $true) {
+            [string]$parent_load_balancer_id = $ServerNode.parentLoadBalancer
             $Error.Clear()
             Try {
-                [ANOWNode[]]$child_nodes = Get-AutomateNOWNode -Id $parent_load_balancer_id -ChildNodes
+                [ANOWServerNode[]]$child_nodes = Get-AutomateNOWServerNode -Id $parent_load_balancer_id -ChildNodes
             }
             Catch {
                 [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Get-AutomateNOWNode failed to parse the response into [ANOWNode] objects under Push-AutomateNOWLoadBalancerNode due to [$Message]."
+                Write-Warning -Message "Get-AutomateNOWServerNode failed to parse the response into [ANOWServerNode] objects under Push-AutomateNOWLoadBalancerNode due to [$Message]."
                 Break
             }
             If ($child_nodes.count -eq 0) {
                 Write-Warning -Message "Somehow the parent node does not have any child nodes. Please look into this."
                 Break
             }
-            [string]$old_values = $Node.CreateOldValues()
-            [PSCustomObject[]]$node_collection = ([PSCustomObject[]]($child_nodes | Sort-Object -Property sortOrder, simpleId | Where-Object { $_.Id -ne "$Node_id" } | Select-Object -Property simpleId, sortOrder) + [PSCustomObject[]]($child_nodes | Where-Object { $_.Id -eq "$Node_id" } | Select-Object -Property simpleId, sortOrder))
-            [int32]$node_order_count = $node_collection.count
-            Write-Verbose -Message "Discovered [$node_order_count] child nodes in load balancer $parent_load_balancer_id"
+            [string]$old_values = $ServerNode.CreateOldValues()
+            [PSCustomObject[]]$ServerNode_collection = ([PSCustomObject[]]($child_nodes | Sort-Object -Property sortOrder, simpleId | Where-Object { $_.Id -ne "$ServerNode_id" } | Select-Object -Property simpleId, sortOrder) + [PSCustomObject[]]($child_nodes | Where-Object { $_.Id -eq "$ServerNode_id" } | Select-Object -Property simpleId, sortOrder))
+            [int32]$ServerNode_order_count = $ServerNode_collection.count
+            Write-Verbose -Message "Discovered [$ServerNode_order_count] child nodes in load balancer $parent_load_balancer_id"
             [int32]$current_node = 0
-            ForEach ($temp_node in $node_collection) {
-                [string]$node_simple_id = $temp_node.simpleId
+            ForEach ($temp_node in $ServerNode_collection) {
+                [string]$ServerNode_simple_id = $temp_node.simpleId
                 [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
-                $BodyMetaData.Add('id', $node_simple_id )
+                $BodyMetaData.Add('id', $ServerNode_simple_id )
                 $BodyMetaData.Add('sortOrder', $current_node )
                 $BodyMetaData.Add('_operationType', 'update')
                 $BodyMetaData.Add('_operationId', 'hold')
@@ -24286,7 +25798,7 @@ Function Pop-AutomateNOWLoadBalancerNode {
                 }
                 Catch {
                     [string]$Message = $_.Exception.Message
-                    Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$node_simple_id] due to [$Message]."
+                    Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$ServerNode_simple_id] due to [$Message]."
                     Break
                 }
                 [int32]$response_code = $results.response.status
@@ -24295,7 +25807,7 @@ Function Pop-AutomateNOWLoadBalancerNode {
                     Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
                     Break
                 }
-                Write-Verbose -Message "Node $node_simple_id was successfully set to sortOrder [$current_node]"
+                Write-Verbose -Message "Node $ServerNode_simple_id was successfully set to sortOrder [$current_node]"
                 $current_node++
             }
         }
@@ -24429,17 +25941,11 @@ Function Get-AutomateNOWNotification {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
@@ -24753,17 +26259,11 @@ Function Get-AutomateNOWNotificationChannel {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         [PSCustomObject[]]$response_data = ForEach ($response in $results.response.data) {
             If ($response.endpoint.Length -gt 0) {
@@ -25339,13 +26839,10 @@ Function New-AutomateNOWNotificationChannel {
         Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] with parameters $parameters_display due to [$Message]."
         Break
     }
-    If ($results.response.status -lt 0 -or $results.response.status -gt 0) {
-        [string]$results_display = $results.response.errors | ConvertTo-Json -Compress
-        Write-Warning -Message "Failed to create Notification Channel [$Id] due to $results_display. The parameters used: $parameters_display"
-        Break
-    }
-    ElseIf ($null -eq $results.response.status) {
-        Write-Warning -Message "Failed to create Notification Channel [$Id] due to [an empty response]. The parameters used: $parameters_display"
+    [int32]$response_code = $results.response.status
+    If ($response_code -ne 0) {
+        [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
         Break
     }
     $Error.Clear()
@@ -25944,17 +27441,11 @@ Function Get-AutomateNOWNotificationGroup {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
@@ -26468,13 +27959,10 @@ Function New-AutomateNOWNotificationGroup {
         Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] with parameters $parameters_display due to [$Message]."
         Break
     }
-    If ($results.response.status -lt 0 -or $results.response.status -gt 0) {
-        [string]$results_display = $results.response.errors | ConvertTo-Json -Compress
-        Write-Warning -Message "Failed to create Notification Group [$Id] due to $results_display. The parameters used: $parameters_display"
-        Break
-    }
-    ElseIf ($null -eq $results.response.status) {
-        Write-Warning -Message "Failed to create Notification Group [$Id] due to [an empty response]. The parameters used: $parameters_display"
+    [int32]$response_code = $results.response.status
+    If ($response_code -ne 0) {
+        [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
         Break
     }
     $Error.Clear()
@@ -27085,17 +28573,11 @@ Function Get-AutomateNOWNotificationGroupMember {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
@@ -27894,17 +29376,11 @@ Function Get-AutomateNOWNotificationMessageTemplate {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         [PSCustomObject[]]$response_data = ForEach ($response in $results.response.data) {
             If ($response.endpoint.Length -gt 0) {
@@ -28478,13 +29954,10 @@ Function New-AutomateNOWNotificationMessageTemplate {
         Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] with parameters $parameters_display due to [$Message]."
         Break
     }
-    If ($results.response.status -lt 0 -or $results.response.status -gt 0) {
-        [string]$results_display = $results.response.errors | ConvertTo-Json -Compress
-        Write-Warning -Message "Failed to create Notification Message Template [$Id] due to $results_display. The parameters used: $parameters_display"
-        Break
-    }
-    ElseIf ($null -eq $results.response.status) {
-        Write-Warning -Message "Failed to create Notification Message Template [$Id] due to [an empty response]. The parameters used: $parameters_display"
+    [int32]$response_code = $results.response.status
+    If ($response_code -ne 0) {
+        [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
         Break
     }
     $Error.Clear()
@@ -29156,17 +30629,11 @@ Function Get-AutomateNOWPhysicalResource {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
@@ -29812,13 +31279,10 @@ Function New-AutomateNOWPhysicalResource {
         Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] with parameters $parameters_display due to [$Message]."
         Break
     }
-    If ($results.response.status -lt 0 -or $results.response.status -gt 0) {
-        [string]$results_display = $results.response.errors | ConvertTo-Json -Compress
-        Write-Warning -Message "Failed to create PhysicalResource [$Id] due to $results_display. The parameters used: $parameters_display"
-        Break
-    }
-    ElseIf ($null -eq $results.response.status) {
-        Write-Warning -Message "Failed to create PhysicalResource [$Id] due to [an empty response]. The parameters used: $parameters_display"
+    [int32]$response_code = $results.response.status
+    If ($response_code -ne 0) {
+        [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
         Break
     }
     $Error.Clear()
@@ -30350,8 +31814,8 @@ Function Find-AutomateNOWObjectReferral {
     .PARAMETER WorkflowTemplate
     [ANOWWorkflowTemplate] object to find referrals to. Use Get-AutomateNOWWorkflowTemplate to obtain these objects.
 
-    .PARAMETER Node
-    [ANOWNode] object to find referrals to. Use Get-AutomateNOWNode to obtain these objects.
+    .PARAMETER ServerNode
+    [ANOWServerNode] object to find referrals to. Use Get-AutomateNOWServerNode to obtain these objects.
 
     .PARAMETER Calendar
     [ANOWCalendar] object to find referrals to. Use Get-AutomateNOWCalendar to obtain these objects.
@@ -30392,14 +31856,17 @@ Function Find-AutomateNOWObjectReferral {
     .PARAMETER NotificationMessageTemplate
     [ANOWNotificationMessageTemplate] object to find referrals to. Use Get-AutomateNOWNotificationMessageTemplate to obtain these objects.
 
+    .PARAMETER BusinessView
+    [ANOWBusinessView] object to find referrals to. Use Get-AutomateNOWBusinessview to obtain these objects.
+
     .INPUTS
-    Accepts many types of [ANOW] objects including TaskTemplate, WorkflowTemplate, Nodes, Stocks, Locks & Variables
+    Accepts the following types of ANOW objects: BusinessView,  Calendar,  Endpoint,  Event,  Lock,  Metric,  NotificationMessageTemplate,  PhysicalResource,  ResultMapping,  Semaphore,  ServerNode,  Stock,  TaskTemplate,  TimeWindow,  Variable,  WorkflowTemplate,  Workspace
 
     .OUTPUTS
     Raw results by default or a summary with the -Count parameter
 
     .EXAMPLE
-    $server_node = Get-AutomateNOWNode -Id 'server_node_01'
+    $server_node = Get-AutomateNOWServerNode -Id 'server_node_01'
     Find-AutomateNOWObjectReferral -Node $server_node
 
     .EXAMPLE
@@ -30407,7 +31874,7 @@ Function Find-AutomateNOWObjectReferral {
     Find-AutomateNOWObjectReferral -WorkflowTemplate $workflow_template -Count
 
     .EXAMPLE
-    Get-AutomateNOWNode -Id 'Server_Node_01' | Find-AutomateNOWObjectReferral
+    Get-AutomateNOWServerNode -Id 'Server_Node_01' | Find-AutomateNOWObjectReferral
 
     .EXAMPLE
     @('Workflow_01', 'Workflow_02') | Get-AutomateNOWWorkflowTemplate | Find-AutomateNOWObjectReferral
@@ -30438,8 +31905,8 @@ Function Find-AutomateNOWObjectReferral {
         [ANOWTaskTemplate]$TaskTemplate,
         [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'WorkflowTemplate')]
         [ANOWWorkflowTemplate]$WorkflowTemplate,
-        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'Node')]
-        [ANOWNode]$Node,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'ServerNode')]
+        [ANOWServerNode]$ServerNode,
         [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'Calendar')]
         [ANOWCalendar]$Calendar,
         [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'Stock')]
@@ -30467,7 +31934,9 @@ Function Find-AutomateNOWObjectReferral {
         [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'Approval')]
         [ANOWApproval]$Approval,
         [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'NotificationMessageTemplate')]
-        [ANOWNotificationMessageTemplate]$NotificationMessageTemplate
+        [ANOWNotificationMessageTemplate]$NotificationMessageTemplate,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'BusinessView')]
+        [ANOWBusinessView]$BusinessView
     )
     Begin {
         If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
@@ -30513,10 +31982,10 @@ Function Find-AutomateNOWObjectReferral {
                 $Body.'id' = $_.'id'
             }
         }
-        ElseIf ($_ -is [ANOWNode] -or $Node.Id.Length -gt 0) {
+        ElseIf ($_ -is [ANOWServerNode] -or $ServerNode.Id.Length -gt 0) {
             [string]$domainClass = 'ServerNode'
-            If ($Node.id.Length -gt 0) {
-                $Body.'id' = $Node.id
+            If ($ServerNode.id.Length -gt 0) {
+                $Body.'id' = $ServerNode.id
             }
             Else {
                 $Body.'id' = $_.'id'
@@ -30648,6 +32117,15 @@ Function Find-AutomateNOWObjectReferral {
                 $Body.'id' = $_.'id'
             }
         }
+        ElseIf ($_ -is [ANOWBusinessView] -or $BusinessView.Id.Length -gt 0) {
+            [string]$domainClass = 'BusinessView'
+            If ($BusinessView.id.Length -gt 0) {
+                $Body.'id' = $BusinessView.id
+            }
+            Else {
+                $Body.'id' = $_.'id'
+            }
+        }
         Else {
             Write-Warning -Message "Unable to determine input object. Please specify an object of [ANOW] base class type."
             Break
@@ -30679,17 +32157,11 @@ Function Find-AutomateNOWObjectReferral {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] while running Find-AutomateNOWObjectReferral due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $data = $results.response.data # it's less lines of code if this variable is not hard typed
         If ($Count -eq $true) {
@@ -30824,17 +32296,11 @@ Function Get-AutomateNOWResultMapping {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         [ANOWResultMapping[]]$ResultMappings = ForEach ($ResultMapping in $results.response.data) {
@@ -31137,13 +32603,10 @@ Function New-AutomateNOWResultMapping {
         Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] with parameters $parameters_display due to [$Message]."
         Break
     }
-    If ($results.response.status -lt 0 -or $results.response.status -gt 0) {
-        [string]$results_display = $results.response.errors | ConvertTo-Json -Compress
-        Write-Warning -Message "Failed to create Result Mapping [$Id] of type [$Type] due to $results_display. The parameters used: $parameters_display"
-        Break
-    }
-    ElseIf ($null -eq $results.response.status) {
-        Write-Warning -Message "Failed to create Result Mapping [$Id] of type [$Type] due to [an empty response]. The parameters used: $parameters_display"
+    [int32]$response_code = $results.response.status
+    If ($response_code -ne 0) {
+        [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
         Break
     }
     $Error.Clear()
@@ -32263,17 +33726,11 @@ Function Get-AutomateNOWSchedule {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
@@ -33287,17 +34744,11 @@ Function Get-AutomateNOWScheduleTemplate {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
@@ -33576,15 +35027,9 @@ Function Set-AutomateNOWScheduleTemplate {
             }
             [int32]$response_code = $results.response.status
             If ($response_code -ne 0) {
-                If ($null -eq $results.response.status) {
-                    Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                    Break
-                }
-                Else {
-                    [string]$results_response = $results.response
-                    Write-Warning -Message "Received status code [$response_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                    Break
-                }
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
             }
             $Error.Clear()
             Try {
@@ -33894,13 +35339,10 @@ Function New-AutomateNOWScheduleTemplate {
         Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] with parameters $parameters_display due to [$Message]."
         Break
     }
-    If ($results.response.status -lt 0 -or $results.response.status -gt 0) {
-        [string]$results_display = $results.response.errors | ConvertTo-Json -Compress
-        Write-Warning -Message "Failed to create Schedule Template [$Id] of type [$ScheduleType] due to $results_display. The parameters used: $parameters_display"
-        Break
-    }
-    ElseIf ($null -eq $results.response.status) {
-        Write-Warning -Message "Failed to create Schedule Template [$Id] of type [$ScheduleType] due to [an empty response]. The parameters used: $parameters_display"
+    [int32]$response_code = $results.response.status
+    If ($response_code -ne 0) {
+        [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
         Break
     }
     $Error.Clear()
@@ -34025,7 +35467,7 @@ Function Remove-AutomateNOWScheduleTemplate {
                 [string]$error_message = $results.response.data
                 If ($error_message -match 'Object may still be in use') {
                     [string]$ScheduleTemplate_id_formatted = $ScheduleTemplate_id -split '\]' | Select-Object -Last 1
-                    Write-Warning -Message "This object $ScheduleTemplate_id_formatted is still in use somewhere therefore it cannot be removed! Please use 'Find-AutomateNOWObjectReferral -Object $WorkflowTemplate_id_formatted' to list the references for this object and then remove them."
+                    Write-Warning -Message "This object $ScheduleTemplate_id_formatted is still in use somewhere therefore it cannot be removed! Please use 'Find-AutomateNOWObjectReferral -Object $ScheduleTemplate_id_formatted' to list the references for this object and then remove them."
                 }
                 Else {
                     [string]$full_response_display = $results.response | ConvertTo-Json -Compress
@@ -35595,6 +37037,194 @@ Function Remove-AutomateNOWScheduleTemplateItem {
 
 #endregion
 
+#Region - Security Log (Users)
+
+Function Get-AutomateNOWSecurityEventLog {
+    <#
+    .SYNOPSIS
+    Gets the Security Event Log entries from an AutomateNOW! instance
+
+    .DESCRIPTION
+    Gets the Security Event Log entries from an AutomateNOW! instance
+
+    .PARAMETER sortBy
+    Optional string parameter to sort the results by. Valid choices are: id, dateCreated, createdBy, userIp, eventType, accessToken
+
+    .PARAMETER Ascending
+    Optional switch parameter to sort in ascending order
+
+    .PARAMETER startRow
+    Optional integer to indicate the row to start from. This is intended for when you need to paginate the results. Default is 0.
+
+    .PARAMETER endRow
+    Optional integer to indicate the row to stop on. This is intended for when you need to paginate the results. Default is 100. The console default hard limit is 10,000.
+
+    .INPUTS
+    You cannot pipe input to `Get-AutomateNOWSecurityEventLog`
+
+    .OUTPUTS
+    An array of one or more [ANOWSecurityEvent] objects
+
+    .EXAMPLE
+    Gets the first 100 entries in the Security Log
+
+    Get-AutomateNOWSecurityEventLog
+
+    .EXAMPLE
+    Gets the first 10,000 entries in the Security Log
+
+    Get-AutomateNOWSecurityEventLog -startRow 0 -endrow 10000
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [OutputType([ANOWSecurityEvent[]])]
+    [Cmdletbinding()]
+    Param(
+        [ValidateSet('id', 'dateCreated', 'createdBy', 'userIp', 'eventType', 'accessToken')]
+        [Parameter(Mandatory = $False)]
+        [string]$sortBy = 'dateCreated',
+        [Parameter(Mandatory = $False)]
+        [switch]$Ascending,
+        [Parameter(Mandatory = $False)]
+        [int32]$startRow = 0,
+        [Parameter(Mandatory = $False)]
+        [int32]$endRow = 100
+    )
+    If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+        Write-Warning -Message "Somehow there is not a valid token confirmed."
+        Break
+    }
+    If ($endRow -le $startRow) {
+        Write-Warning -Message "The endRow must be greater than the startRow. Please try again."
+        Break
+    }
+    [hashtable]$parameters = @{}
+    $parameters.Add('Method', 'POST')
+    If ($anow_session.NotSecure -eq $true) {
+        $parameters.Add('NotSecure', $true)
+    }
+    [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
+    $Body.'_operationType' = 'fetch'
+    $Body.'_startRow' = $startRow
+    $Body.'_endRow' = $endRow
+    If ($Ascending -eq $true) {
+        $Body.'_sortBy' = $sortBy
+    }
+    Else {
+        $Body.'_sortBy' = '-' + $sortBy
+    }
+    $Body.'_textMatchStyle' = 'exact'
+    $Body.'_componentId' = 'SecurityEventList'
+    $Body.'_dataSource' = 'SecurityEventDataSource'
+    $Body.'isc_metaDataPrefix' = '_'
+    $Body.'isc_dataFormat' = 'json'
+    [string]$Body = ConvertTo-QueryString -InputObject $Body
+    $parameters.Add('Body', $Body)
+    [string]$command = ('/securityEvent/read')
+    If ($null -eq $parameters["Command"]) {
+        $parameters.Add('Command', $command)
+    }
+    Else {
+        $parameters.Command = $command
+    }
+    $Error.Clear()
+    Try {
+        [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+    }
+    Catch {
+        [string]$Message = $_.Exception.Message
+        Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
+        Break
+    }
+    [int32]$response_code = $results.response.status
+    If ($response_code -ne 0) {
+        [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+        Break
+    }
+    $Error.Clear()
+    Try {
+        [ANOWSecurityEvent[]]$SecurityEvents = $results.response.data
+    }
+    Catch {
+        [string]$Message = $_.Exception.Message
+        Write-Warning -Message "Failed to parse the response into a series of [ANOWSecurityEvent] objects due to [$Message]."
+        Break
+    }
+    If ($SecurityEvents.Count -gt 0) {
+        Return $SecurityEvents
+    }
+}
+
+Function Export-AutomateNOWSecurityEventLog {
+    <#
+    .SYNOPSIS
+    Exports the Security Events (log entries) from an instance of AutomateNOW!
+
+    .DESCRIPTION
+    Exports the Security Events (log entries) from an instance of AutomateNOW! to a local .csv file
+
+    .PARAMETER SecurityEvent
+    Mandatory [ANOWSecurityEvent] object (Use Get-AutomateNOWSecurityEvent to retrieve them)
+
+    .INPUTS
+    ONLY [ANOWSecurityEvent] objects from the pipeline are accepted
+
+    .OUTPUTS
+    The [ANOWSecurityEvent] objects are exported to the local disk in CSV format
+
+    .EXAMPLE
+    Get-AutomateNOWSecurityEvent | Export-AutomateNOWSecurityEvent
+
+    .NOTES
+	You must present [ANOWSecurityEvent] objects to the pipeline to use this function.
+    #>
+
+    [Cmdletbinding(DefaultParameterSetName = 'Pipeline')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true, ParameterSetName = 'Pipeline')]
+        [ANOWSecurityEvent]$SecurityEvent
+    )
+    Begin {
+        [string]$current_time = Get-Date -Format 'yyyyMMddHHmmssfff'
+        [string]$ExportFileName = 'Export-AutomateNOW-SecurityEvents-' + $current_time + '.csv'
+        [string]$ExportFilePath = ((Get-Location | Select-Object -ExpandProperty Path) + '\' + $ExportFileName)
+        [hashtable]$parameters = @{}
+        $parameters.Add('Path', $ExportFilePath)
+        $parameters.Add('Append', $true)
+        If ($PSVersionTable.PSVersion.Major -eq 5) {
+            $parameters.Add('NoTypeInformation', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [ANOWSecurityEvent]$SecurityEvent = $_
+        }
+        $Error.Clear()
+        Try {
+            $SecurityEvent | Export-CSV @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Export-CSV failed to export the [ANOWSecurityEvent] object on the pipeline due to [$Message]"
+            Break
+        }
+    }
+    End {
+        $Error.Clear()
+        If ((Test-Path -Path $ExportFilePath) -eq $true) {
+            [System.IO.FileInfo]$fileinfo = Get-Item -Path "$ExportFilePath"
+            [int32]$filelength = $fileinfo.Length
+            [string]$filelength_display = "{0:N0}" -f $filelength
+            Write-Information -MessageData "Created file $ExportFileName ($filelength_display bytes)"
+        }
+    }
+}
+
+#endregion
+
 #Region - Semaphores (RESOURCE)
 
 Function Get-AutomateNOWSemaphore {
@@ -35767,17 +37397,11 @@ Function Get-AutomateNOWSemaphore {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
@@ -36315,13 +37939,10 @@ Function New-AutomateNOWSemaphore {
         Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] with parameters $parameters_display due to [$Message]."
         Break
     }
-    If ($results.response.status -lt 0 -or $results.response.status -gt 0) {
-        [string]$results_display = $results.response.errors | ConvertTo-Json -Compress
-        Write-Warning -Message "Failed to create Semaphore [$Id] of type [$Type] due to $results_display. The parameters used: $parameters_display"
-        Break
-    }
-    ElseIf ($null -eq $results.response.status) {
-        Write-Warning -Message "Failed to create Semaphore [$Id] of type [$Type] due to [an empty response]. The parameters used: $parameters_display"
+    [int32]$response_code = $results.response.status
+    If ($response_code -ne 0) {
+        [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
         Break
     }
     $Error.Clear()
@@ -37023,17 +38644,11 @@ Function Get-AutomateNOWSemaphoreTimestamp {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
@@ -37490,17 +39105,11 @@ Function Get-AutomateNOWStock {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
@@ -38017,13 +39626,10 @@ Function New-AutomateNOWStock {
         Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] with parameters $parameters_display due to [$Message]."
         Break
     }
-    If ($results.response.status -lt 0 -or $results.response.status -gt 0) {
-        [string]$results_display = $results.response.errors | ConvertTo-Json -Compress
-        Write-Warning -Message "Failed to create Stock [$Id] due to $results_display. The parameters used: $parameters_display"
-        Break
-    }
-    ElseIf ($null -eq $results.response.status) {
-        Write-Warning -Message "Failed to create Stock [$Id] due to [an empty response]. The parameters used: $parameters_display"
+    [int32]$response_code = $results.response.status
+    If ($response_code -ne 0) {
+        [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
         Break
     }
     $Error.Clear()
@@ -39063,21 +40669,11 @@ Function New-AutomateNOWTag {
         Write-Warning -Message "Invoke-AutomateNOWAPI failed due to [$Message]"
         Break
     }
-    If ($results.response.status -ne 0) {
-        [string]$parameters_display = $parameters | ConvertTo-Json -Compress
-        If ($results.response.status -lt 0 -or $results.response.status -gt 0) {
-            [string]$results_display = $results.response.errors | ConvertTo-Json -Compress
-            Write-Warning -Message "Executing [$command] returned the error $results_display. Parameters: $parameters_display"
-            Break
-        }
-        ElseIf ($null -eq $results.response.status) {
-            Write-Warning -Message "Executing [$command] returned an empty response. Parameters: $parameters_display"
-            Break
-        }
-        Else {
-            Write-Warning -Message "Unknown error when executing [$command]. Parameters: $parameters_display"
-            Break
-        }
+    [int32]$response_code = $results.response.status
+    If ($response_code -ne 0) {
+        [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+        Break
     }
     $Error.Clear()
     Try {
@@ -39291,6 +40887,7 @@ Function Get-AutomateNOWTask {
         [Parameter(Mandatory = $True, ParameterSetName = 'sensorType')]
         [ANOWProcessingTemplate_sensorType]$sensorType,
         [ValidateSet('id', 'firstStartTime', 'startTime', 'endTime')]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Template')]
         [Parameter(Mandatory = $False, ParameterSetName = 'taskType')]
         [Parameter(Mandatory = $False, ParameterSetName = 'monitorType')]
         [Parameter(Mandatory = $False, ParameterSetName = 'sensorType')]
@@ -39391,17 +40988,11 @@ Function Get-AutomateNOWTask {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
@@ -40468,17 +42059,11 @@ Function Get-AutomateNOWTaskTemplate {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
@@ -40547,7 +42132,7 @@ Function Set-AutomateNOWTaskTemplate {
     A string representing the "alias" of the Task Template (this property needs a better explanation)
 
     .PARAMETER ServerNode
-    An [ANOWNode] object representing the node to connect to the Task Template. Note that load balancers are considered nodes in this context. Be careful with this as the lookup table which prevents mismatched server node / task types may not be perfectly correct. Always be sure that the node type matches the task type.
+    An [ANOWServerNode] object representing the node to connect to the Task Template. Note that load balancers are considered nodes in this context. Be careful with this as the lookup table which prevents mismatched server node / task types may not be perfectly correct. Always be sure that the node type matches the task type.
 
     .PARAMETER UnsetServerNode
     A switch parameter that will remove the Server Node from the Task Template.
@@ -40604,7 +42189,10 @@ Function Set-AutomateNOWTaskTemplate {
     A boolean that indicates if the Tasks from this Task Template should ?
 
     .PARAMETER EagerScriptExecution
-    A boolean that indicates if the scripts from the Tasks from this Task Template should use "Eager" load strategy. In orderto use this parameter, you must include -UseScripts $true.
+    A boolean that indicates if the scripts from the Tasks from this Task Template should use "Eager" load strategy. In order to use this parameter, you must include -UseScripts $true.
+
+    .PARAMETER Owner
+    An optional decorational string to indicate who the owner of this object is.
 
     .PARAMETER Force
     Force the change without confirmation. This is equivalent to -Confirm:$false
@@ -40632,7 +42220,7 @@ Function Set-AutomateNOWTaskTemplate {
 
     .EXAMPLE
     Forcefully sets a Server Node on the Task Template
-    Set-AutomateNOWTaskTemplate -TaskTemplate $task_template -Force -ServerNode $node
+    Set-AutomateNOWTaskTemplate -TaskTemplate $task_template -Force -ServerNode $ServerNode
 
     .EXAMPLE
     Removes the Server Node from the Task Template
@@ -40662,67 +42250,69 @@ Function Set-AutomateNOWTaskTemplate {
     [Cmdletbinding(SupportsShouldProcess, DefaultParameterSetName = 'Default', ConfirmImpact = 'High')]
     Param(
         [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
-        [ANOWTaskTemplate]$TaskTemplate,
-        [Parameter(Mandatory = $false, ParameterSetName = 'SetProcessingCommand')]
+        $TaskTemplate,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [hashtable]$ProcessingCommand,
         [ValidateScript({ $_.Length -le 255 })]
-        [Parameter(Mandatory = $false, ParameterSetName = 'SetDescription')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [string]$Description,
-        [Parameter(Mandatory = $false, ParameterSetName = 'SetDescription')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [switch]$UnsetDescription,
-        [Parameter(Mandatory = $false, ParameterSetName = 'SetFolder')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Folder')]
         [string]$Folder,
-        [Parameter(Mandatory = $false, ParameterSetName = 'SetFolder')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Folder')]
         [switch]$UnsetFolder,
-        [Parameter(Mandatory = $false, ParameterSetName = 'SetTags')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [string[]]$Tags,
-        [Parameter(Mandatory = $false, ParameterSetName = 'SetTags')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [switch]$UnsetTags,
-        [Parameter(Mandatory = $false, ParameterSetName = 'SetTitle')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [string]$Title,
-        [Parameter(Mandatory = $false, ParameterSetName = 'SetTitle')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [switch]$UnsetTitle,
-        [Parameter(Mandatory = $false, ParameterSetName = 'SetServerNode')]
-        [ANOWNode]$ServerNode,
-        [Parameter(Mandatory = $false, ParameterSetName = 'SetServerNode')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
+        [ANOWServerNode]$ServerNode,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [switch]$UnsetServerNode,
-        [Parameter(Mandatory = $false, ParameterSetName = 'SetEndpoint')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [ANOWEndpoint]$Endpoint,
-        [Parameter(Mandatory = $false, ParameterSetName = 'SetEndpoint')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [switch]$UnsetEndpoint,
-        [Parameter(Mandatory = $false, ParameterSetName = 'SetResultMapping')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [ANOWResultMapping]$ResultMapping,
-        [Parameter(Mandatory = $false, ParameterSetName = 'SetResultMapping')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [switch]$UnsetResultMapping,
-        [Parameter(Mandatory = $false, ParameterSetName = 'SetCalendar')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [ANOWCalendar]$Calendar,
-        [Parameter(Mandatory = $false, ParameterSetName = 'SetCalendar')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [switch]$UnsetCalendar,
-        [Parameter(Mandatory = $false, ParameterSetName = 'SetApproval')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [ANOWApproval]$Approval,
-        [Parameter(Mandatory = $false, ParameterSetName = 'SetApproval')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [switch]$UnsetApproval,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [int32]$Priority,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [int32]$Weight,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
-        [Nullable[boolean]]$OnHold = $null,
+        [Nullable[boolean]]$OnHold,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
-        [Nullable[boolean]]$Skip = $null,
+        [Nullable[boolean]]$Skip,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
-        [Nullable[boolean]]$AutoArchive = $null,
+        [Nullable[boolean]]$AutoArchive,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [Nullable[boolean]]$VerboseMode,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
-        [Nullable[boolean]]$KeepResources = $null,
+        [Nullable[boolean]]$KeepResources,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
-        [Nullable[boolean]]$UseScripts = $null,
+        [Nullable[boolean]]$UseScripts,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
-        [Nullable[boolean]]$EagerScriptExecution = $null,
+        [Nullable[boolean]]$EagerScriptExecution,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [string]$Owner,
+        [Parameter(Mandatory = $false)]
         [switch]$Force,
+        [Parameter(Mandatory = $false)]
         [switch]$Quiet
     )
     Begin {
@@ -40886,15 +42476,15 @@ Function Set-AutomateNOWTaskTemplate {
                 [string]$ServerNode_id = $ServerNode.simpleId
                 $Error.Clear()
                 Try {
-                    [ANOWNode]$node_object = Get-AutomateNOWNode -Id $ServerNode_id
+                    [ANOWServerNode]$ServerNode_object = Get-AutomateNOWServerNode -Id $ServerNode_id
                 }
                 Catch {
                     [string]$Message = $_.Exception.Message
-                    Write-Warning -Message "Get-AutomateNOWNode failed to confirm that the Server Node [$ServerNode_id] actually existed while running under Set-AutomateNOWTaskTemplate due to [$Message]"
+                    Write-Warning -Message "Get-AutomateNOWServerNode failed to confirm that the Server Node [$ServerNode_id] actually existed while running under Set-AutomateNOWTaskTemplate due to [$Message]"
                     Break
                 }
-                If ($node_object.simpleId.Length -eq 0) {
-                    Throw "Get-AutomateNOWNode failed to locate the Server Node [$ServerNode_id] running under Set-AutomateNOWTaskTemplate. Please check again."
+                If ($ServerNode_object.simpleId.Length -eq 0) {
+                    Throw "Get-AutomateNOWServerNode failed to locate the Server Node [$ServerNode_id] running under Set-AutomateNOWTaskTemplate. Please check again."
                     Break
                 }
                 [ANOWProcessingTemplate_taskType]$TaskType = $TaskTemplate.taskType
@@ -40912,14 +42502,14 @@ Function Set-AutomateNOWTaskTemplate {
                         Break
                     }
                 }
-                [string]$node_display = $node_object | ConvertTo-Json -Compress
-                Write-Verbose -Message "Adding Server Node $node_display to [ANOWTaskTemplate] [$TaskTemplate_id]"
+                [string]$ServerNode_display = $ServerNode_object | ConvertTo-Json -Compress
+                Write-Verbose -Message "Adding Server Node $ServerNode_display to [ANOWTaskTemplate] [$TaskTemplate_id]"
                 $BodyMetaData.'node' = ($ServerNode.id)
                 $include_properties += 'node'
             }
             ElseIf ($UnsetServerNode -eq $true) {
-                [string]$node_display = $node_object | ConvertTo-Json -Compress
-                Write-Verbose -Message "Removing [ANOWTaskTemplate] [$TaskTemplate_id] from Server Node $node_display"
+                [string]$ServerNode_display = $ServerNode_object | ConvertTo-Json -Compress
+                Write-Verbose -Message "Removing [ANOWTaskTemplate] [$TaskTemplate_id] from Server Node $ServerNode_display"
                 $BodyMetaData.'node' = $null
                 $include_properties += 'node'
             }
@@ -41116,15 +42706,9 @@ Function Set-AutomateNOWTaskTemplate {
             }
             [int32]$response_code = $results.response.status
             If ($response_code -ne 0) {
-                If ($null -eq $results.response.status) {
-                    Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                    Break
-                }
-                Else {
-                    [string]$results_response = $results.response
-                    Write-Warning -Message "Received status code [$response_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                    Break
-                }
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
             }
             $Error.Clear()
             Try {
@@ -41560,13 +43144,10 @@ Function New-AutomateNOWTaskTemplate {
         Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] with parameters $parameters_display due to [$Message]."
         Break
     }
-    If ($results.response.status -lt 0 -or $results.response.status -gt 0) {
-        [string]$results_display = $results.response.errors | ConvertTo-Json -Compress
-        Write-Warning -Message "Failed to create Task Template [$Id] of type [$TaskType] due to $results_display. The parameters used: $parameters_display"
-        Break
-    }
-    ElseIf ($null -eq $results.response.status) {
-        Write-Warning -Message "Failed to create Task Template [$Id] of type [$TaskType] due to [an empty response]. The parameters used: $parameters_display"
+    [int32]$response_code = $results.response.status
+    If ($response_code -ne 0) {
+        [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
         Break
     }
     $Error.Clear()
@@ -41690,17 +43271,15 @@ Function Remove-AutomateNOWTaskTemplate {
                 Break
             }
             [int32]$response_code = $results.response.status
-            If ($response_code -ne 0) {
-                [string]$error_message = $results.response.data
-                If ($error_message -match 'Object may still be in use') {
-                    [string]$TaskTemplate_id_formatted = $TaskTemplate_id -split '\]' | Select-Object -Last 1
-                    Write-Warning -Message "This object $TaskTemplate_id_formatted is still in use somewhere therefore it cannot be removed! Please use 'Find-AutomateNOWObjectReferral -Object $WorkflowTemplate_id_formatted' to list the references for this object and then remove them."
-                }
-                Else {
-                    [string]$full_response_display = $results.response | ConvertTo-Json -Compress
-                    Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
-                    Break
-                }
+            [string]$error_message = $results.response.data
+            If ($error_message -match 'Object may still be in use') {
+                [string]$TaskTemplate_id_formatted = $TaskTemplate_id -split '\]' | Select-Object -Last 1
+                Write-Warning -Message "This object $TaskTemplate_id_formatted is still in use somewhere therefore it cannot be removed! Please use 'Find-AutomateNOWObjectReferral -Object $TaskTemplate_id_formatted' to list the references for this object and then remove them."
+            }
+            Else {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
             }
             Write-Verbose -Message "Task $TaskTemplate_id successfully removed"
         }
@@ -42982,17 +44561,11 @@ Function Get-AutomateNOWTimeTrigger {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         [int32]$ProcessingTimeTriggersCount = $results.response.data.count
         If ($ProcessingTimeTriggersCount -gt 0) {
@@ -43354,7 +44927,7 @@ Function Set-AutomateNOWTimeTrigger {
                 $BodyMetaData.Add('calendarIntervalUnit', $calendarIntervalUnit)
             }
             If ($cronExpression.Length -gt 0) {
-                $BodyMetaData.Add('cronExpression', $cronExpression)   
+                $BodyMetaData.Add('cronExpression', $cronExpression)
             }
             If ($endTime.Length -gt 0) {
                 $BodyMetaData.Add('endTime', $endTime )
@@ -44506,17 +46079,11 @@ Function Get-AutomateNOWTimeWindow {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
@@ -45054,13 +46621,10 @@ Function New-AutomateNOWTimeWindow {
         Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] with parameters $parameters_display due to [$Message]."
         Break
     }
-    If ($results.response.status -lt 0 -or $results.response.status -gt 0) {
-        [string]$results_display = $results.response.errors | ConvertTo-Json -Compress
-        Write-Warning -Message "Failed to create TimeWindow [$Id] of type [$Type] due to $results_display. The parameters used: $parameters_display"
-        Break
-    }
-    ElseIf ($null -eq $results.response.status) {
-        Write-Warning -Message "Failed to create Time Window [$Id] of type [$Type] due to [an empty response]. The parameters used: $parameters_display"
+    [int32]$response_code = $results.response.status
+    If ($response_code -ne 0) {
+        [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
         Break
     }
     $Error.Clear()
@@ -46108,6 +47672,7 @@ Function Get-AutomateNOWUser {
                 Catch {
                     [string]$Message = $_.Exception.Message
                     Write-Warning -Message "Failed to convert the returned [ANOWUserInfo] object from direct data for [$id] due to [$Message]."
+                    Remove-Variable -Name anow_session -Force
                     Break
                 }
                 If ($ANOWUserInfo.id.Length -gt 0) {
@@ -46644,20 +48209,13 @@ Function Set-AutomateNOWUserPassword {
         Break
     }
     Remove-Variable -Name Parameters -Force
-    If ($results.response.status -eq 0) {
-        Write-Information -MessageData "Password successfully changed for $User"
-        [string]$response_display = $results.response | ConvertTo-Json -Compress
-        Write-Verbose -Message $response_display
-    }
-    ElseIf ($null -eq $results.response.status) {
-        Write-Warning -Message "Somehow there was no response data. Please look into this."
+    [int32]$response_code = $results.response.status
+    If ($response_code -ne 0) {
+        [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
         Break
     }
-    Else {
-        [string]$response_display = $results.response | ConvertTo-Json -Compress
-        Write-Warning -Message "The attempt to change the password failed. Please see the returned data: $response_display"
-        Break
-    }
+    Write-Information -MessageData "Password successfully changed for $User"
 }
 
 Function New-AutomateNOWUser {
@@ -46889,13 +48447,10 @@ Function New-AutomateNOWUser {
         Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] with parameters $parameters_display due to [$Message]."
         Break
     }
-    If ($results.response.status -lt 0 -or $results.response.status -gt 0) {
-        [string]$results_display = $results.response.errors | ConvertTo-Json -Compress
-        Write-Warning -Message "Failed to create User [$Id] due to $results_display. The parameters used: $parameters_display"
-        Break
-    }
-    ElseIf ($null -eq $results.response.status) {
-        Write-Warning -Message "Failed to create User [$Id] due to [an empty response]. The parameters used: $parameters_display"
+    [int32]$response_code = $results.response.status
+    If ($response_code -ne 0) {
+        [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
         Break
     }
     $Error.Clear()
@@ -47200,17 +48755,11 @@ Function Get-AutomateNOWVariable {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
@@ -47732,13 +49281,10 @@ Function New-AutomateNOWVariable {
         Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] with parameters $parameters_display due to [$Message]."
         Break
     }
-    If ($results.response.status -lt 0 -or $results.response.status -gt 0) {
-        [string]$results_display = $results.response.errors | ConvertTo-Json -Compress
-        Write-Warning -Message "Failed to create Variable [$Id] due to $results_display. The parameters used: $parameters_display"
-        Break
-    }
-    ElseIf ($null -eq $results.response.status) {
-        Write-Warning -Message "Failed to create Variable [$Id] due to [an empty response]. The parameters used: $parameters_display"
+    [int32]$response_code = $results.response.status
+    If ($response_code -ne 0) {
+        [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
         Break
     }
     $Error.Clear()
@@ -48436,17 +49982,11 @@ Function Get-AutomateNOWVariableTimestamp {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
@@ -48895,17 +50435,11 @@ Function Get-AutomateNOWWorkflow {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
@@ -49927,17 +51461,11 @@ Function Get-AutomateNOWWorkflowTemplate {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
@@ -50057,7 +51585,7 @@ Function Set-AutomateNOWWorkflowTemplate {
     A boolean that indicates if the Workflows from this Workflow Template should ?
 
     .PARAMETER EagerScriptExecution
-    A boolean that indicates if the scripts from the Workflows from this Workflow Template should use "Eager" load strategy. In orderto use this parameter, you must include -UseScripts $true.
+    A boolean that indicates if the scripts from the Workflows from this Workflow Template should use "Eager" load strategy. In order to use this parameter, you must include -UseScripts $true.
 
     .PARAMETER Force
     Force the change without confirmation. This is equivalent to -Confirm:$false
@@ -50147,9 +51675,9 @@ Function Set-AutomateNOWWorkflowTemplate {
         [Nullable[boolean]]$EagerScriptExecution = $null,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [string]$Owner,
-        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $false)]
         [switch]$Force,
-        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $false)]
         [switch]$Quiet
     )
     Begin {
@@ -50471,15 +51999,9 @@ Function Set-AutomateNOWWorkflowTemplate {
             }
             [int32]$response_code = $results.response.status
             If ($response_code -ne 0) {
-                If ($null -eq $results.response.status) {
-                    Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                    Break
-                }
-                Else {
-                    [string]$results_response = $results.response
-                    Write-Warning -Message "Received status code [$response_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                    Break
-                }
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
             }
             $Error.Clear()
             Try {
@@ -50815,13 +52337,10 @@ Function New-AutomateNOWWorkflowTemplate {
         Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] with parameters $parameters_display due to [$Message]."
         Break
     }
-    If ($results.response.status -lt 0 -or $results.response.status -gt 0) {
-        [string]$results_display = $results.response.errors | ConvertTo-Json -Compress
-        Write-Warning -Message "Failed to create Workflow Template [$Id] of type [$WorkflowType] due to $results_display. The parameters used: $parameters_display"
-        Break
-    }
-    ElseIf ($null -eq $results.response.status) {
-        Write-Warning -Message "Failed to create Workflow Template [$Id] of type [$WorkflowType] due to [an empty response]. The parameters used: $parameters_display"
+    [int32]$response_code = $results.response.status
+    If ($response_code -ne 0) {
+        [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
         Break
     }
     $Error.Clear()
@@ -52667,17 +54186,11 @@ Function Get-AutomateNOWWorkspace {
             Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
-        If ($results.response.status -ne 0) {
-            If ($null -eq $results.response.status) {
-                Write-Warning -Message "Received an empty response when invoking the [$command] endpoint. Please look into this."
-                Break
-            }
-            Else {
-                [int32]$status_code = $results.response.status
-                [string]$results_response = $results.response
-                Write-Warning -Message "Received status code [$status_code] instead of 0. Something went wrong. Here's the full response: $results_response"
-                Break
-            }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
         }
         $Error.Clear()
         Try {
@@ -52990,7 +54503,7 @@ Function Set-AutomateNOWWorkspace {
                         Break
                     }
                     [string]$folder_display = $folder_object | ConvertTo-Json -Compress
-                    Write-Verbose -Message "Adding folder $folder_display to [ANOWWorkflowTemplate] [$Workspace_id]"
+                    Write-Verbose -Message "Adding folder $folder_display to [ANOWWorkspace] [$Workspace_id]"
                     $BodyMetaData.'setWorkspaceFolder' = $Folder
                     [void]$include_properties.Add('setWorkspaceFolder')
                 }
@@ -53357,7 +54870,7 @@ Function New-AutomateNOWWorkspace {
             Break
         }
         [string]$folder_display = $folder_object | ConvertTo-Json -Compress
-        Write-Verbose -Message "Adding folder $folder_display to [ANOWWorkflowTemplate] [$Id]"
+        Write-Verbose -Message "Adding folder $folder_display to [ANOWWorkspace] [$Id]"
         $ANOWWorkspace.Add('folder', $Folder)
         $include_properties += 'folder'
     }
@@ -53416,13 +54929,10 @@ Function New-AutomateNOWWorkspace {
         Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] with parameters $parameters_display due to [$Message]."
         Break
     }
-    If ($results.response.status -lt 0 -or $results.response.status -gt 0) {
-        [string]$results_display = $results.response.errors | ConvertTo-Json -Compress
-        Write-Warning -Message "Failed to create Workspace [$Id] due to $results_display. The parameters used: $parameters_display"
-        Break
-    }
-    ElseIf ($null -eq $results.response.status) {
-        Write-Warning -Message "Failed to create Workspace [$Id] due to [an empty response]. The parameters used: $parameters_display"
+    [int32]$response_code = $results.response.status
+    If ($response_code -ne 0) {
+        [string]$full_response_display = $results.response | ConvertTo-Json -Compress
+        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
         Break
     }
     $Error.Clear()
@@ -54426,8 +55936,11 @@ Function Protect-AutomateNOWEncryptedString {
     .DESCRIPTION
     "Encrypts" and encodes a plain text string for use with certain object types within an instance of AutomateNOW!
 
-    .PARAMETER Pass
-    The plain text string to "encrypt" and decode
+    .PARAMETER String
+    A mandatory plain text string to "encrypt"
+
+    .PARAMETER SecureString
+    A mandatory secure string to "encrypt"
 
     .PARAMETER Key
     Optional 16-byte encryption key. The default will be used when this parameter is not specified.
@@ -54439,7 +55952,7 @@ Function Protect-AutomateNOWEncryptedString {
     The protected string is returned in plain text (base64 encoded) format
 
     .EXAMPLE
-    Protect-AutomateNOWEncryptedString -Pass 'MySecretString'
+    Protect-AutomateNOWEncryptedString -String 'MySecretString'
 
     Return 'DxEIEAwFBQoMChMQBQoREAwFERATEAgKFgoQCg=='
 
@@ -54447,10 +55960,12 @@ Function Protect-AutomateNOWEncryptedString {
 
     #>
     [OutputType([string])]
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'SecureString')]
     Param(
-        [Parameter(Mandatory = $true)]
-        [string]$Pass,
+        [Parameter(Mandatory = $true, ParameterSetName = 'String')]
+        [string]$String,
+        [Parameter(Mandatory = $true, ParameterSetName = 'SecureString')]
+        [SecureString]$SecureString,
         [Parameter(Mandatory = $false)]
         [byte[]]$Key = @(7, 22, 15, 11, 1, 24, 8, 13, 16, 10, 5, 17, 12, 19, 27, 9),
         [Parameter(Mandatory = $false)]
@@ -54460,7 +55975,10 @@ Function Protect-AutomateNOWEncryptedString {
         Write-Warning -Message "Somehow the encryption key is empty. Please check into this."
         Break
     }
-    [byte[]]$passwd_array = [System.Text.Encoding]::UTF8.GetBytes($pass)
+    If ($null -ne $SecureString) {
+        [string]$String = $SecureString | ConvertFrom-SecureString -AsPlainText
+    }
+    [byte[]]$passwd_array = [System.Text.Encoding]::UTF8.GetBytes($String)
     [byte[]]$encrytped_array = For ($i = 0; $i -lt ($passwd_array.Length); $i++) {
         [byte]$current_byte = $passwd_array[$i]
         [int32]$first = (-bnot $current_byte -shr 0) -band 0x0f
@@ -54983,7 +56501,7 @@ Function Resolve-AutomateNOWTaskType2ServerNodeType {
     If ($TaskType.Length -gt 0) {
         [string[]]$TaskTypes = $ANOWLookupTaskTypeToServerNodeType | Where-Object { $_.keys -eq $TaskType } | Select-Object -ExpandProperty Values
         If ($TaskTypes.Count -gt 0) {
-            Return $TaskTypes
+            Return $TaskTypes | Sort-Object
         }
         Else {
             Write-Warning -Message "There were no Task Types that match [$TaskType]"
@@ -54992,14 +56510,14 @@ Function Resolve-AutomateNOWTaskType2ServerNodeType {
     ElseIf ($ServerNodeType.Length -gt 0) {
         [string[]]$ServerNodeTypes = $ANOWLookupTaskTypeToServerNodeType | Where-Object { $_.values -eq $ServerNodeType } | Select-Object -ExpandProperty Keys
         If ($ServerNodeTypes.Count -gt 0) {
-            Return $ServerNodeTypes
+            Return $ServerNodeTypes | Sort-Object
         }
         Else {
             Write-Warning -Message "There were no Server Node Types that match [$ServerNodeType]"
         }
     }
     ElseIf ($All -eq $true) {
-        Return $ANOWLookupTaskTypeToServerNodeType
+        Return $ANOWLookupTaskTypeToServerNodeType | Sort-Object
     }
     Else {
         Write-Warning -Message "Unable to resolve which output to return!"
@@ -55075,7 +56593,7 @@ Function Resolve-AutomateNOWMonitorType2ServerNodeType {
     If ($MonitorType.Length -gt 0) {
         [string[]]$MonitorTypes = $ANOWLookupMonitorTypeToServerNodeType | Where-Object { $_.keys -eq $MonitorType } | Select-Object -ExpandProperty Values
         If ($MonitorTypes.Count -gt 0) {
-            Return $MonitorTypes
+            Return $MonitorTypes | Sort-Object
         }
         Else {
             Write-Warning -Message "There were no Monitor Types that match [$MonitorType]"
@@ -55084,14 +56602,14 @@ Function Resolve-AutomateNOWMonitorType2ServerNodeType {
     ElseIf ($ServerNodeType.Length -gt 0) {
         [string[]]$ServerNodeTypes = $ANOWLookupMonitorTypeToServerNodeType | Where-Object { $_.values -eq $ServerNodeType } | Select-Object -ExpandProperty Keys
         If ($ServerNodeTypes.Count -gt 0) {
-            Return $ServerNodeTypes
+            Return $ServerNodeTypes | Sort-Object
         }
         Else {
             Write-Warning -Message "There were no Server Node Types that match [$ServerNodeType]"
         }
     }
     ElseIf ($All -eq $true) {
-        Return $ANOWLookupMonitorTypeToServerNodeType
+        Return $ANOWLookupMonitorTypeToServerNodeType | Sort-Object
     }
     Else {
         Write-Warning -Message "Unable to resolve which output to return!"
@@ -55162,7 +56680,7 @@ Function Resolve-AutomateNOWSensorType2ServerNodeType {
     If ($SensorType.Length -gt 0) {
         [string[]]$SensorTypes = $ANOWLookupSensorTypeToServerNodeType | Where-Object { $_.keys -eq $SensorType } | Select-Object -ExpandProperty Values
         If ($SensorTypes.Count -gt 0) {
-            Return $SensorTypes
+            Return $SensorTypes | Sort-Object
         }
         Else {
             Write-Warning -Message "There were no Sensor Types that match [$SensorType]"
@@ -55171,14 +56689,177 @@ Function Resolve-AutomateNOWSensorType2ServerNodeType {
     ElseIf ($ServerNodeType.Length -gt 0) {
         [string[]]$ServerNodeTypes = $ANOWLookupSensorTypeToServerNodeType | Where-Object { $_.values -eq $ServerNodeType } | Select-Object -ExpandProperty Keys
         If ($ServerNodeTypes.Count -gt 0) {
-            Return $ServerNodeTypes
+            Return $ServerNodeTypes | Sort-Object
         }
         Else {
             Write-Warning -Message "There were no Server Node Types that match [$ServerNodeType]"
         }
     }
     ElseIf ($All -eq $true) {
-        Return $ANOWLookupSensorTypeToServerNodeType
+        Return $ANOWLookupSensorTypeToServerNodeType | Sort-Object
+    }
+    Else {
+        Write-Warning -Message "Unable to resolve which output to return!"
+        Break
+    }
+}
+
+Function Resolve-AutomateNOWEndpoinType2JavaScriptDefinition {
+    [OutputType([string[]])]
+    [CmdletBinding(DefaultParameterSetName = 'EndpointType')]
+    Param(
+        [Parameter(Mandatory = $true, ParameterSetName = 'EndpointType')]
+        [ANOWEndpoint_endpointType]$EndpointType,
+        [ValidateScript({ $_ -match '.js$' })]
+        [Parameter(Mandatory = $true, ParameterSetName = 'JavaScriptDefinition')]
+        [string]$JavaScriptDefinition,
+        [Parameter(Mandatory = $true, ParameterSetName = 'All')]
+        [switch]$All
+    )
+    [System.Collections.ArrayList]$ANOWLookupEndpointType2JavaScriptDefinition = [System.Collections.ArrayList]::new()
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'AS400' = 'as400.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'TUMBLR' = 'socialMedia.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'TIKTOK' = 'socialMedia.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'REDDIT' = 'reddit.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'INSTAGRAM' = 'instagram.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'FACEBOOK' = 'facebook.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'TWITTER' = 'twitter.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'TELEGRAM' = 'telegram.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'TEAMS' = 'teams.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'POWER_AUTOMATE' = 'powerAutomate.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'WHATSAPP' = 'whatsapp.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'LINKED_IN' = 'linkedin.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'YOUTUBE' = 'youtube.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'PEGA' = 'url.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'WORK_FUSION' = 'url.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'AUTOMATION_ANYWHERE' = 'url.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'UI_PATH' = 'uiPath.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'BLUE_PRISM' = 'bluePrism.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'ROBOT_FRAMEWORK' = 'robotFramework.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'TABLEAU' = 'tableau.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'MICROSOFT_POWER_BI' = 'powerBi.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'Z_OS' = 'zos.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'Z_OS_REST' = 'zosRest.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'AUTOMATE_NOW' = 'automateNow.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'APACHE_AIRFLOW' = 'apacheAirflow.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'RAINCODE' = 'raincode.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'RAINCODE_BRS' = 'raincode_brs.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'OPENTEXT' = 'opentext.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'PEOPLESOFT' = 'peoplesoft.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'MS_SSIS' = 'ssis.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'SAS' = 'sas.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'SAS_VIYA' = 'sasViya.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'ODI' = 'odi.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'TALEND' = 'talend.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'DBT' = 'dbt.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'DBT_CORE' = 'dbtCore.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'HDFS' = 'hdfs.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'SOAP_WEB_SERVICE' = 'soap.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'HTTP' = 'http.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'REST_WEB_SERVICE' = 'http.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'REDIS' = 'redis.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'GIT' = 'git.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'DASHDB' = 'jdbc.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'DB2' = 'jdbc.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'MYSQL' = 'jdbc.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'NETEZZA' = 'jdbc.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'ORACLE' = 'jdbc.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'ORACLE_EBS' = 'jdbc.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'POSTGRESQL' = 'jdbc.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'SQL_SERVER' = 'jdbc.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'SQL_SERVER_JTDS' = 'jdbc.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'AZURE_SQL_DATABASE' = 'jdbc.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'AZURE_SQL_DATA_WAREHOUSE' = 'jdbc.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'TERADATA' = 'jdbc.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'SINGLESTORE' = 'jdbc.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'VERTICA' = 'jdbc.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'SNOWFLAKE' = 'jdbc.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'PRESTO_DB' = 'jdbc.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'SYBASE' = 'jdbc.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'H2' = 'jdbc.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'INFORMIX' = 'jdbc.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'HIVE_QL' = 'jdbc.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'GOOGLE_BIG_QUERY' = 'jdbc.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'SAP_HANA' = 'jdbc.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'MONGO_DB' = 'mongoDb.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'EMAIL' = 'email.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'EMAIL_EWS' = 'ews.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'FLINK' = 'flink.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'SPARK' = 'spark.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'PGP' = 'pgp.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'USER' = 'user.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'SSH' = 'ssh.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'SFTP' = 'sftp.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'FTP' = 'ftp.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'MAINFRAME_FTP' = 'ftp.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'FTPS' = 'ftps.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'MAINFRAME_FTPS' = 'ftps.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'AZURE_BLOB' = 'azureBlob.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'AZURE_FILE' = 'azureBlob.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'S3' = 's3.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'AWS' = 'aws.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'AWS_COMMON' = 'awsCommon.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'GOOGLE_COULD_STORAGE_BUCKET' = 'googleCloudStorageBucket.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'INFORMATICA' = 'informatica.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'INFORMATICA_WS' = 'informaticaWs.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'SAP_S4_HANA' = 'sapS4Hana.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'SAP' = 'sap.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'SAP_S4_HANA_CLOUD' = 'sapIbp.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'AZURE' = 'azure.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'AZURE_DATABRICKS' = 'azureDatabricks.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'INFORMATICA_CLOUD' = 'informaticaCloud.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'IBM_DATASTAGE' = 'ibmDataStage.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'IBM_MQ' = 'ibmMq.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'SQS' = 'jms.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'ACTIVE_MQ' = 'jms.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'QPID' = 'jms.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'IBM_SIBUS' = 'jms.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'HORNETQ' = 'jms.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'JORAM_MQ' = 'jms.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'QMQ' = 'jms.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'ZERO_MQ' = 'jms.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'PULSAR' = 'jms.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'AMAZON_KINESIS' = 'jms.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'GOOGLE_CLOUD_PUB_SUB' = 'jms.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'MICROSOFT_AZURE_EVENT_HUB' = 'jms.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'SOLACE' = 'solace.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'KAFKA' = 'kafka.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'RABBIT_MQ' = 'rabbitMq.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'AMQP' = 'amqp.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'XMPP' = 'xmpp.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'STOMP' = 'stomp.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'WINRM' = 'winrm.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'JIRA' = 'jira.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'SERVICE_NOW' = 'serviceNow.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'IBM_CONTROL_DESK' = 'url.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'BMC_REMEDY' = 'url.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'CA_SERVICE_MANAGEMENT' = 'url.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'SAP_SOLUTION_MANAGER' = 'url.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'HP_OPEN_VIEW_SERVICE_MANAGER' = 'url.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'ORACLE_SERVICE_CENTER' = 'url.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'ANSIBLE' = 'ansible.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'CTRL_M' = 'ctrlm.js'; })
+    [void]$ANOWLookupEndpointType2JavaScriptDefinition.Add([hashtable]@{'GOOGLE_DATA_FLOW' = 'googleDataFlow.js'; })
+    If ($EndpointType.Length -gt 0) {
+        [string[]]$EndpointTypes = $ANOWLookupEndpointType2JavaScriptDefinition | Where-Object { $_.keys -eq $EndpointType } | Select-Object -ExpandProperty Values
+        If ($EndpointType.Count -gt 0) {
+            Return $EndpointTypes | Sort-Object
+        }
+        Else {
+            Write-Warning -Message "There were no Endpoint Types that match [$EndpointType]"
+        }
+    }
+    ElseIf ($JavaScriptDefinition.Length -gt 0) {
+        [string[]]$JavaScriptDefinitionTypes = $ANOWLookupEndpointType2JavaScriptDefinition | Where-Object { $_.values -eq $JavaScriptDefinition } | Select-Object -ExpandProperty Keys
+        If ($JavaScriptDefinitionTypes.Count -gt 0) {
+            Return $JavaScriptDefinitionTypes | Sort-Object
+        }
+        Else {
+            Write-Warning -Message "There were no JavaScrip tDefinition Types Types that match [$JavaScriptDefinitionTypes]"
+        }
+    }
+    ElseIf ($All -eq $true) {
+        Return $ANOWLookupEndpointType2JavaScriptDefinition | Sort-Object
     }
     Else {
         Write-Warning -Message "Unable to resolve which output to return!"

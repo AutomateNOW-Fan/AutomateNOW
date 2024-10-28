@@ -32,6 +32,14 @@ Enum ANOWApprovalRule_approvalActionType {
     READY_TO_START; PROCESSING_RESTART; PROCESSING_FORCE_READY; PROCESSING_FORCE_COMPLETED; PROCESSING_FORCE_FAILED; PROCESSING_SKIP_ON; PROCESSING_SKIP_OFF; PROCESSING_HOLD; PROCESSING_RESUME; PROCESSING_INTERNAL_ACTION; PROCESSING_ABORT; PROCESSING_KILL; PROCESSING_ARCHIVED; PROCESSING_ARCHIVED_CLEANUP;
 }
 
+#Region - Enum [BusinessViewItem]
+
+Enum ANOWBusinessViewItem_itemType {
+    PROCESSING; RESOURCE; SERVER_NODE; BUSINESS_VIEW
+}
+
+#endregion
+
 #endregion
 
 #Region - Enum [CommunicationNote]
@@ -131,30 +139,6 @@ Enum ANOWiconSet {
 Enum ANOWiconSetIconsOnly {
     # Notes: Some features (e.g. Workspace) only support the two real icon sets
     FAT_COW; FUGUE;
-}
-
-#endregion
-
-#Region - Enum [Node]
-
-Enum ANOWserverNode_serverNodeType {
-    AZURE; AWS; GOOGLE_CLOUD; GOOGLE_DATA_FLOW; AZURE_DATABRICKS; INFORMATICA_CLOUD; UNIX; LINUX; WINDOWS; SOLARIS; HPUX; AIX; OPENVMS; MACOS; AS400; Z_OS; RAINCODE; CTRL_M; OPENTEXT; INFORMATICA; INFORMATICA_WS; SAS; SAS_VIYA; IBM_DATASTAGE; ODI; MS_SSIS; AB_INITIO; SAP_BODI; SKYVIA; TALEND; DBT; DBT_CORE; SAP; SAP_S4_HANA; SAP_S4_HANA_CLOUD; SAP_IBP; JD_EDWARDS; ORACLE_EBS; PEOPLESOFT; MICROSOFT_DYNAMICS; HIVE_QL; GOOGLE_BIG_QUERY; AZURE_SQL_DATA_WAREHOUSE; AZURE_SQL_DATABASE; DASHDB; DB2; MYSQL; NETEZZA; ORACLE; POSTGRESQL; SQL_SERVER; TERADATA; SINGLESTORE; SNOWFLAKE; VERTICA; PRESTO_DB; SYBASE; INFORMIX; H2; FILE_MANAGER; SNMP; HTTP; EMAIL; SOAP_WEB_SERVICE; REST_WEB_SERVICE; INTERNAL; IBM_MQ; RABBIT_MQ; SQS; ACTIVE_MQ; QPID; IBM_SIBUS; HORNETQ; SOLACE; JORAM_MQ; QMQ; ZERO_MQ; KAFKA; PULSAR; AMAZON_KINESIS; GOOGLE_CLOUD_PUB_SUB; MICROSOFT_AZURE_EVENT_HUB; AMQP; XMPP; STOMP; HDFS; REDIS; HADOOP; HIVE; IMPALA; SQOOP; YARN; SPARK; FLUME; FLINK; STORM; OOZIE; AMBARI; ELASTIC_SEARCH; CASSANDRA; SAP_HANA; MONGO_DB; COUCH_DB; COUCH_BASE; DYNAMO_DB; ARANGO_DB; NEO4J; ORIENT_DB; TITAN; ANDROID; IOS; WINDOWS_MOBILE; MICROSOFT_POWER_BI; TABLEAU; BLUE_PRISM; UI_PATH; AUTOMATION_ANYWHERE; WORK_FUSION; PEGA; ROBOT_FRAMEWORK; CONTROL_M; STONEBRANCH; CA_WLA; AUTOMIC_WLA; IBM_WLA; TIDAL; FACEBOOK; INSTAGRAM; TWITTER; YOUTUBE; LINKED_IN; TUMBLR; TIKTOK; REDDIT; TELEGRAM; WHATSAPP; TEAMS; JIRA; SERVICE_NOW; ORACLE_SERVICE_CENTER; BMC_REMEDY; CA_SERVICE_MANAGEMENT; IBM_CONTROL_DESK; HP_OPEN_VIEW_SERVICE_MANAGER; SAP_SOLUTION_MANAGER; AUTOMATE_NOW; APACHE_AIRFLOW; POWER_AUTOMATE; ANSIBLE;
-}
-
-Enum ANOWserverNode_status {
-    ON_HOLD; DISCONNECTED; CONNECTED;
-}
-
-Enum ANOWserverNode_loadBalancerStrategy {
-    ROUND_ROBIN; MIN_WEIGHT; MAX_WEIGHT; TIME_SEMAPHORE; ACTIVE_PASSIVE_FAILOVER; RANDOM;
-}
-
-Enum ANOWserverNode_semaphoreState {
-    ON; OFF;
-}
-
-Enum ANOWserverNode_resourceType {
-    STOCK; LOCK; BINARY_SEMAPHORE; TIME_SEMAPHORE; VARIABLE; PHYSICAL_RESOURCE; METRIC; CALENDAR; EVENT;
 }
 
 #endregion
@@ -582,8 +566,47 @@ Enum ANOWResource_resourceType {
 
 #endregion
 
-#Region - Enum [TimeTrigger]
+#Region - Enum [SecurityAccessToken]
 
+Enum ANOWSecurityAccessToken_securityAccessTokenHashAlgorithm {
+    MD5; BCRYPT;
+}
+
+#endregion
+
+#Region - Enum [SecurityEvent]
+
+Enum ANOWSecurityEvent_eventType {
+    ACCOUNT_LOCKED; ACCOUNT_EXPIRED; BAD_CREDENTIALS; EXPIRED_CREDENTIALS; LOG_IN_SUCCESS; LOG_IN_FAILED; LOG_OUT_SUCCESS; SYSTEM_LOGOUT; SESSION_INVALIDATED; LOG_IN_SUCCESS_SFP; NOT_AUTHORIZED;
+}
+
+#endregion
+
+#Region - Enum [ServerNode]
+
+Enum ANOWserverNode_serverNodeType {
+    AZURE; AWS; GOOGLE_CLOUD; GOOGLE_DATA_FLOW; AZURE_DATABRICKS; INFORMATICA_CLOUD; UNIX; LINUX; WINDOWS; SOLARIS; HPUX; AIX; OPENVMS; MACOS; AS400; Z_OS; RAINCODE; CTRL_M; OPENTEXT; INFORMATICA; INFORMATICA_WS; SAS; SAS_VIYA; IBM_DATASTAGE; ODI; MS_SSIS; AB_INITIO; SAP_BODI; SKYVIA; TALEND; DBT; DBT_CORE; SAP; SAP_S4_HANA; SAP_S4_HANA_CLOUD; SAP_IBP; JD_EDWARDS; ORACLE_EBS; PEOPLESOFT; MICROSOFT_DYNAMICS; HIVE_QL; GOOGLE_BIG_QUERY; AZURE_SQL_DATA_WAREHOUSE; AZURE_SQL_DATABASE; DASHDB; DB2; MYSQL; NETEZZA; ORACLE; POSTGRESQL; SQL_SERVER; TERADATA; SINGLESTORE; SNOWFLAKE; VERTICA; PRESTO_DB; SYBASE; INFORMIX; H2; FILE_MANAGER; SNMP; HTTP; EMAIL; SOAP_WEB_SERVICE; REST_WEB_SERVICE; INTERNAL; IBM_MQ; RABBIT_MQ; SQS; ACTIVE_MQ; QPID; IBM_SIBUS; HORNETQ; SOLACE; JORAM_MQ; QMQ; ZERO_MQ; KAFKA; PULSAR; AMAZON_KINESIS; GOOGLE_CLOUD_PUB_SUB; MICROSOFT_AZURE_EVENT_HUB; AMQP; XMPP; STOMP; HDFS; REDIS; HADOOP; HIVE; IMPALA; SQOOP; YARN; SPARK; FLUME; FLINK; STORM; OOZIE; AMBARI; ELASTIC_SEARCH; CASSANDRA; SAP_HANA; MONGO_DB; COUCH_DB; COUCH_BASE; DYNAMO_DB; ARANGO_DB; NEO4J; ORIENT_DB; TITAN; ANDROID; IOS; WINDOWS_MOBILE; MICROSOFT_POWER_BI; TABLEAU; BLUE_PRISM; UI_PATH; AUTOMATION_ANYWHERE; WORK_FUSION; PEGA; ROBOT_FRAMEWORK; CONTROL_M; STONEBRANCH; CA_WLA; AUTOMIC_WLA; IBM_WLA; TIDAL; FACEBOOK; INSTAGRAM; TWITTER; YOUTUBE; LINKED_IN; TUMBLR; TIKTOK; REDDIT; TELEGRAM; WHATSAPP; TEAMS; JIRA; SERVICE_NOW; ORACLE_SERVICE_CENTER; BMC_REMEDY; CA_SERVICE_MANAGEMENT; IBM_CONTROL_DESK; HP_OPEN_VIEW_SERVICE_MANAGER; SAP_SOLUTION_MANAGER; AUTOMATE_NOW; APACHE_AIRFLOW; POWER_AUTOMATE; ANSIBLE;
+}
+
+Enum ANOWserverNode_status {
+    ON_HOLD; DISCONNECTED; CONNECTED;
+}
+
+Enum ANOWserverNode_loadBalancerStrategy {
+    ROUND_ROBIN; MIN_WEIGHT; MAX_WEIGHT; TIME_SEMAPHORE; ACTIVE_PASSIVE_FAILOVER; RANDOM;
+}
+
+Enum ANOWserverNode_semaphoreState {
+    ON; OFF;
+}
+
+Enum ANOWserverNode_resourceType {
+    STOCK; LOCK; BINARY_SEMAPHORE; TIME_SEMAPHORE; VARIABLE; PHYSICAL_RESOURCE; METRIC; CALENDAR; EVENT;
+}
+
+#endregion
+
+#Region - Enum [TimeTrigger]
 Enum ANOWTimeTrigger_calendarIntervalUnit {
     DAY; WEEK; MONTH; YEAR;
 }
@@ -761,6 +784,109 @@ Class ANOWAuditLog {
     [string]$oldValuesText
     [PSCustomObject]$changedValues # this is a custom member
     [string]$changedValuesText # this is a custom member
+}
+
+#endregion
+
+#region Class - [BusinessViewItem]
+
+Class ANOWBusinessViewItem {
+    [string]$createdBy
+    [datetime]$dateCreated
+    [string]$domain
+    [string]$description
+    [string]$id
+    [string]$lastUpdatedBy
+    [datetime]$lastUpdated
+    [string]$userIp
+    [string]$businessView
+    [string]$item
+    [ANOWBusinessViewItem_itemType]$businessViewItemType
+    [Nullable[ANOWProcessingTemplate_processingType]]$processingType
+    [Nullable[ANOWProcessingTemplate_workflowType]]$workflowType
+    [Nullable[ANOWProcessingTemplate_taskType]]$taskType
+    [Nullable[ANOWProcessingTemplate_serviceType]]$serviceType
+    [Nullable[ANOWProcessingTemplate_sensorType]]$sensorType
+    [Nullable[ANOWProcessingTemplate_monitorType]]$monitorType
+    [Nullable[ANOWProcessingTemplate_serviceManagerType]]$serviceManagerType
+    [Nullable[ANOWResource_resourceType]]$resourceType
+    [Nullable[ANOWserverNode_serverNodeType]]$serverNodeType
+    # Default constructor
+    ANOWBusinessViewItem() { $this.Init(@{}) }
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = ''
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
+    }
+    # The primary goal of this method is to return back the same json string that the ANOW application produces when it converts an object into JSON
+    # The secondary goal of this method is to stringify the object in preparation for encoding to URL format faithfully
+    [string] ToString([string[]]$optional_properties) {
+        [System.Collections.Specialized.OrderedDictionary]$this2 = [System.Collections.Specialized.OrderedDictionary]@{}
+        $current_members = $this | Get-Member | Where-Object { $_.MemberType -eq 'Property' }
+        ForEach ($current_member in $current_members) {
+            [string]$current_member_name = $current_member.Name
+            If ($current_member_value.Length -gt 0 -or $current_member_value.count -gt 0) {
+                Remove-Variable current_member_value -Force
+            }
+            If (($this.$current_member_name.count -gt 0)) {
+                If ($this.$current_member_name[0] -is [ANOWSecurityRole]) {
+                    [ANOWSecurityRole[]]$current_member_value = $this.$current_member_name
+                }
+                Else {
+                    $current_member_value = $this.$current_member_name # this variable cannot be hard typed
+                }
+            }
+            Else {
+                $current_member_value = $this.$current_member_name # this variable cannot be hard typed
+            }
+            # This omits pre-defined optional properties for this specific class when they are empty
+            If (-not ($current_member_value.Length -eq 0 -and $current_member_name -in ($optional_properties))) {
+                If ($current_member.definition -match '^datetime [a-zA-Z]{1,} {.{1,}}$' ) {
+                    # This ensures that datetimes are always formatted into ISO 8601 format. Powershell is not consistent on recognizing strings that can be safely casted into dates.
+                    [string]$current_member_value = Get-Date -Date $current_member_value -Format 'yyyy-MM-ddTHH:mm:ss.fff'
+                    $this2.Add($current_member_name, $current_member_value)
+                }
+                ElseIf ($current_member.definition -match '^bool [a-zA-Z]{1,} {.{1,}}$' ) {
+                    # This ensures that booleans are converted the same way that the application expects
+                    If ($current_member_value -eq $false) {
+                        $this2.Add($current_member_name, $false)
+                    }
+                    Else {
+                        $this2.Add($current_member_name, $true)
+                    }
+                }
+                ElseIf ($current_member_value -is [System.Enum]) {
+                    # This ensures that enums are resolved into their string value instead of the numerical index
+                    [string]$current_member_value = $current_member_value.ToString()
+                    $this2.Add($current_member_name, $current_member_value)
+                }
+                ElseIf ($current_member.definition -match '^[A-Za-z]{1,}\[] [a-zA-Z]{1,} {.{1,}}$' -and $current_member_value.Count -eq 1) {
+                    # This ensures that arrays which only contain a single item are not converted into strings
+                    $this2.Add($current_member_name, @(, $current_member_value))
+                }
+                ElseIf ($current_member_value.Length -eq 0) {
+                    # This ensures that null values remain null instead of being converted to a string
+                    $this2.Add($current_member_name, $null)
+                }
+                Else {
+                    $this2.Add($current_member_name, $current_member_value)
+                }
+            }
+        }
+        [string]$stringified_object = $this2 | ConvertTo-JSON -Compress -Depth 10
+        Return $stringified_object
+    }
+    # The primary goal of this method is to URL encode an ANOW object for conversion into the _oldValues string. The _oldValues is typically (but not always) included by the ANOW application whenever modifying an object. The behavior of this method should match the ANOW application as closely as possible. Rigorous and frequent testing will always be needed to ensure that valid payloads are sent when modifying existing objects in the ANOW application.
+    [string] ToURL([string[]]$optional_properties) {
+        [string]$stringified_object = $this.ToString([string[]]$optional_properties)
+        [string]$escaped_object = [System.Uri]::EscapeDataString($stringified_object)
+        Return $escaped_object
+    }
 }
 
 #endregion
@@ -1607,6 +1733,7 @@ Class ANOWNotificationGroupMember {
 #endregion
 
 #region Class - [ProcessingEvent]
+
 Class ANOWProcessingEvent {
     [string]$agent
     [string]$agentOperatingSystemType
@@ -1923,6 +2050,122 @@ Class ANOWResultMappingRule {
 
 #endregion
 
+#region Class - [SecurityAccessToken]
+
+Class ANOWSecurityAccessToken {
+
+    [string]$id
+    [string]$accessToken
+    [Nullable[datetime]]$tokenExpirationDate
+    [string]$tokenHash
+    [boolean]$tokenExpired
+    [ANOWSecurityAccessToken_securityAccessTokenHashAlgorithm]$securityAccessTokenHashAlgorithm
+    [string]$userId
+    [datetime]$dateCreated
+    [Nullable[datetime]]$lastCreated
+
+    # Default constructor
+    ANOWSecurityAccessToken() { $this.Init(@{}) }
+
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = ''
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
+    }
+    # The primary goal of this method is to return back the same json string that the ANOW application produces when it converts an object into JSON
+    # The secondary goal of this method is to stringify the object in preparation for encoding to URL format faithfully
+    [string] ToString([string[]]$optional_properties) {
+        #[hashtable]$this2 = @{}
+        [System.Collections.Specialized.OrderedDictionary]$this2 = [System.Collections.Specialized.OrderedDictionary]@{}
+        #$current_members = $this | Get-Member | Where-Object { $_.MemberType -eq 'Property' }
+        $current_members = @('id', 'lastUpdatedBy', 'passwordEncoded', 'dateCreated', 'firstName', 'location', 'active', 'accountExpired', 'skinThemeType', 'lastAccessTokenCreated', 'lastPasswordChange', 'admin', 'secRole', 'ldapAdmin', 'skinDensityType', 'lastName', 'passwordValidDays', 'phone', 'incorrectLogons', 'passwordExpired', 'lastUpdated', 'agent', 'department', 'lastAccessTokenExpire', 'username', 'accountLocked', 'accountValidUntil', 'email', 'domains', 'firstLastName', 'name', 'passwordValidUntil', 'secRoles', 'secRolesList', 'createdBy', 'lastAccountExpired', 'languageCode')
+        ForEach ($current_member in $current_members) {
+            [string]$current_member_name = $current_member
+            If ($current_member_value.Length -gt 0 -or $current_member_value.count -gt 0) {
+                Remove-Variable current_member_value -Force
+            }
+            $current_member_value = $this.$current_member_name
+            # This omits pre-defined optional properties for this specific class when they are empty
+            If (-not ($current_member_value.Length -eq 0 -and $current_member_name -in ($optional_properties))) {
+                If ($current_member -in @('accountValidUntil', 'dateCreated', 'lastAccessTokenCreated', 'lastAccessTokenExpire', 'lastPasswordChange', 'lastUpdated', 'passwordValidUntil') ) {
+                    # This ensures that datetimes are always formatted into ISO 8601 format. Powershell is not consistent on recognizing strings that can be safely casted into dates.
+                    [string]$current_member_value = Get-Date -Date $current_member_value -Format 'yyyy-MM-ddTHH:mm:ss.fff'
+                    $this2.Add($current_member_name, $current_member_value)
+                }
+                ElseIf ($current_member -in @('accountExpired', 'accountLocked', 'active', 'admin', 'agent', 'ldapAdmin', 'passwordEncoded', 'passwordExpired') ) {
+                    # This ensures that booleans are converted the same way that the application expects
+                    If ($current_member_value -eq $false) {
+                        $this2.Add($current_member_name, $false)
+                    }
+                    Else {
+                        $this2.Add($current_member_name, $true)
+                    }
+                }
+                ElseIf ($current_member_name -eq 'secRoles') {
+                    If ($current_member_value.count -gt 0) {
+                        [ANOWSecurityRole[]]$current_member_value = $this.secRoles
+                    }
+                    $this2.Add($current_member_name, @())
+                }
+                ElseIf ($current_member_name -eq 'secRolesList') {
+                    If ($current_member_value.count -gt 0) {
+                        [string[]]$current_member_value = $this.secRolesList
+                    }
+                    $this2.Add($current_member_name, "")
+                }
+                ElseIf ($current_member_value -is [System.Enum]) {
+                    # This ensures that enums are resolved into their string value instead of the numerical index
+                    [string]$current_member_value = $current_member_value.ToString()
+                    $this2.Add($current_member_name, $current_member_value)
+                }
+                ElseIf ($current_member_value.Length -eq 0) {
+                    # This ensures that null values remain null instead of being converted to a string
+                    $this2.Add($current_member_name, $null)
+                }
+                Else {
+                    $this2.Add($current_member_name, $current_member_value)
+                }
+            }
+        }
+        [string]$stringified_object = $this2 | ConvertTo-JSON -Compress -Depth 10
+        Return $stringified_object
+    }
+    # The primary goal of this method is to URL encode an ANOW object for conversion into the _oldValues string. The _oldValues is typically (but not always) included by the ANOW application whenever modifying an object. The behavior of this method should match the ANOW application as closely as possible. Rigorous and frequent testing will always be needed to ensure that valid payloads are sent when modifying existing objects in the ANOW application.
+    [string] ToURL([string[]]$optional_properties) {
+        [string]$stringified_object = $this.ToString([string[]]$optional_properties)
+        [string]$escaped_object = [System.Uri]::EscapeDataString($stringified_object)
+        Return $escaped_object
+    }
+}
+
+#endregion
+
+#region Class - [SecurityEvent]
+
+Class ANOWSecurityEvent {
+    [int64]$id
+    [datetime]$dateCreated
+    [string]$createdBy
+    [string]$userIp
+    [ANOWSecurityEvent_eventType]$eventType
+    [string]$accessToken
+    # Default constructor
+    ANOWSecurityEvent() { $this.Init(@{}) }
+
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+}
+
+#endregion
+
 #region Class - [SecurityRole]
 
 Class ANOWSecurityRole {
@@ -2128,7 +2371,7 @@ Class ANOWUserInfo {
     [boolean]$superuser
     [PSCustomObject]$domainRoles
     [boolean]$accountExpired
-    [datetime]$accountValidUntil
+    [Nullable[datetime]]$accountValidUntil
     [boolean]$passwordExpired
     [datetime]$lastPasswordChange
     [int64]$passwordValidDays
@@ -2534,6 +2777,22 @@ Class ANOWCodeRepositoryObjectSourceCode : ANOW {
 
 #endregion
 
+#region Class - [ANOWBusinessView]
+Class ANOWBusinessView : ANOW {
+    [boolean]$arranged
+    [string]$folder
+    [string]$iconCode
+    [string]$iconSet
+    [string]$tags
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = ''
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
+    }
+}
+
+#endregion
+
 #region Class - [ANOWDataSource]
 Class ANOWDataSource : ANOW {
     [Nullable[ANOWiconSet]]$iconSet
@@ -2667,68 +2926,6 @@ Class ANOWFolder : ANOW {
     }
     [string] CreateOldValues() {
         [string[]]$optional_properties = 'description', 'folderPath'
-        [string]$old_values = $this.ToURL($optional_properties)
-        Return $old_values
-    }
-}
-
-#endregion
-
-#region Class - [ANOWNode]
-
-Class ANOWNode : ANOW {
-    [string]$parent
-    [int64]$connectedNodes
-    [boolean]$onAnyHold
-    [string]$parentLoadBalancer
-    [datetime]$lastActivityDate
-    [PSCustomObject]$info
-    [Nullable[datetime]]$agentStartTime
-    [boolean]$isParent
-    [boolean]$onHold
-    [string]$resource
-    [ANOWserverNode_serverNodeType]$serverNodeType
-    [boolean]$onGlobalHold
-    [string[]]$tags
-    [string]$lastLoadBalanceNode
-    [Nullable[float]]$manualBaselineDeviationMultiplier
-    [string]$folder
-    [PSCustomObject]$customFieldValues
-    [string]$lastInfoDate
-    [int64]$sortOrder
-    [ANOWserverNode_status]$status
-    [float]$baselineDeviationMultiplier
-    [PSCustomObject]$configuration
-    [string]$agentIp
-    [Nullable[ANOWserverNode_loadBalancerStrategy]]$loadBalancerStrategy
-    [int64]$totalNodes
-    [int64]$availableWeightCapacity
-    [boolean]$loadBalancer
-    [int64]$connectionTimeout
-    [PSCustomObject]$relatedResources
-    [boolean]$holdOnAgentIpChanged
-    [int64]$occupiedWeightCapacity
-    [boolean]$passBy
-    [PSCustomObject]$serverNodeState
-    [int64]$totalWeightCapacity
-    [string]$agentVersion
-    [Nullable[ANOWserverNode_semaphoreState]]$semaphoreState
-    [Nullable[ANOWserverNode_resourceType]]$resourceType
-    [boolean]$hasNotes
-    [boolean]$hasPendingNotes
-    [int64]$noteCount
-    [int64]$pendingNoteCount
-
-    # Default constructor
-    ANOWNode() { $this.Init(@{}) }
-
-    [void] Init([hashtable]$Properties) {
-        foreach ($Property in $Properties.Keys) {
-            $this.$Property = $Properties.$Property
-        }
-    }
-    [string] CreateOldValues() {
-        [string[]]$optional_properties = 'configuration', 'folder', 'lastUpdatedBy', 'parentLoadBalancer', 'sortOrder', 'tags'
         [string]$old_values = $this.ToURL($optional_properties)
         Return $old_values
     }
@@ -2984,6 +3181,7 @@ Class ANOWProcessing {
     [int64]$rootProcessingId
     [int64]$sortOrder
     [int64]$statisticalDuration
+    [int64]$totalDuration
     [int64]$version
     [int64]$weight
     [PSCustomObject]$agentProcessingCommand
@@ -3520,6 +3718,68 @@ Class ANOWResultMapping : ANOW {
     }
     [string] CreateOldValues() {
         [string[]]$optional_properties = ''
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
+    }
+}
+
+#endregion
+
+#region Class - [ANOWServerNode]
+
+Class ANOWServerNode : ANOW {
+    [string]$parent
+    [int64]$connectedNodes
+    [boolean]$onAnyHold
+    [string]$parentLoadBalancer
+    [datetime]$lastActivityDate
+    [PSCustomObject]$info
+    [Nullable[datetime]]$agentStartTime
+    [boolean]$isParent
+    [boolean]$onHold
+    [string]$resource
+    [ANOWserverNode_serverNodeType]$serverNodeType
+    [boolean]$onGlobalHold
+    [string[]]$tags
+    [string]$lastLoadBalanceNode
+    [Nullable[float]]$manualBaselineDeviationMultiplier
+    [string]$folder
+    [PSCustomObject]$customFieldValues
+    [string]$lastInfoDate
+    [int64]$sortOrder
+    [ANOWserverNode_status]$status
+    [float]$baselineDeviationMultiplier
+    [PSCustomObject]$configuration
+    [string]$agentIp
+    [Nullable[ANOWserverNode_loadBalancerStrategy]]$loadBalancerStrategy
+    [int64]$totalNodes
+    [int64]$availableWeightCapacity
+    [boolean]$loadBalancer
+    [int64]$connectionTimeout
+    [PSCustomObject]$relatedResources
+    [boolean]$holdOnAgentIpChanged
+    [int64]$occupiedWeightCapacity
+    [boolean]$passBy
+    [PSCustomObject]$serverNodeState
+    [int64]$totalWeightCapacity
+    [string]$agentVersion
+    [Nullable[ANOWserverNode_semaphoreState]]$semaphoreState
+    [Nullable[ANOWserverNode_resourceType]]$resourceType
+    [boolean]$hasNotes
+    [boolean]$hasPendingNotes
+    [int64]$noteCount
+    [int64]$pendingNoteCount
+
+    # Default constructor
+    ANOWServerNode() { $this.Init(@{}) }
+
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = 'configuration', 'folder', 'lastUpdatedBy', 'parentLoadBalancer', 'sortOrder', 'tags'
         [string]$old_values = $this.ToURL($optional_properties)
         Return $old_values
     }

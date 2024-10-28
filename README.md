@@ -12,7 +12,7 @@ Created by AutomateNOW-Fan
 ```
 ## Efficacy 🧪
 
-Compatible with AutomateNOW! version 3.3.1.83 HF0
+Compatible with AutomateNOW! version 3.3.1.84
 <br/><br/>
 ## Installation 🏗
 
@@ -36,6 +36,23 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 - Edit source code objects with NotePad (Windows only for now)
 <br/><br/>
 ## Change Log 📝
+
+## 1.0.30
+- Bump compatibility to _ANOW version 3.3.1.84
+- Added new functions: `Add-AutomateNOWBusinessViewItem`, `Copy-AutomateNOWBusinessView`, `Export-AutomateNOWBusinessView`, `Export-AutomateNOWSecurityEventLog`, `Get-AutomateNOWBusinessView`, `Get-AutomateNOWSecurityEventLog`, `New-AutomateNOWBusinessView`, `Read-AutomateNOWBusinessViewItem`, `Remove-AutomateNOWBusinessView`, `Remove-AutomateNOWBusinessViewItem`, `Rename-AutomateNOWBusinessView`, `Resolve-AutomateNOWEndpoinType2JavaScriptDefinition`, `Set-AutomateNOWBusinessView`
+- Added preliminary functionality for setting the credential details within an ANOW Endpoint object
+- Renamed the `AutomateNOWNode` functions to `AutomateNOWServerNode`
+- Renamed class object [ANOWNode] to [ANOWServerNode]
+- Renamed the `-Pass` parameter to `-String` in `Protect-AutomateNOWString`
+- Added the `-SecureString` parameter to `Protect-AutomateNOWString`
+- Added the `-ForceCommit` parameter to `Publish-AutomateNOWCodeRepository`
+- Added the domain class 'DataSource' to `Get-AutomateNOWCodeRepositoryObjectSource` (this means it is now possible to edit the source code of a DataSource)
+- Fixed an issue with `Connect-AutomateNOWUser` where the default domain (if configured for that user) was still used in the connection even if a different domain had been specified via the `-Domain` parameter (workaround: use `Switch-AutomateNOWDomain` after logging in)
+- Fixed an issue with `Connect-AutomateNOW` and non-API users whose 'accountValidUntil' date is not configured (null)
+- Fixed a rare issue with `Connect-AutomateNOW` when using the `-access_token` parameter without also including the `-refresh_token` parameter
+- Fixed the error message on all `New-*` functions when receiving a non-zero response from the API
+- Fixed an issue with the response object from `Add-AutomateNOWDataSourceItem`
+- Fixed an issue with `Add-AutomateNOWCodeRepositoryItem` where the datasource property was wrong for some of the object classes
 
 ## 1.0.29
 - Bump compatibility to _ANOW version 3.3.1.83 HF0_
@@ -415,7 +432,7 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 > Refer to `Push-AutomateNOWLoadBalancerNode` and `Pop-AutomateNOWLoadBalancerNode`
 
 ### I'm confused about why some functions are prefixed with New- and others with Add-?
-> Refer to Microsoft's guidance on Powershell Approved Verbs. Also, try this command to list both the 'Add' & 'New' functions alphabetically by their noun: (Get-Command -Name New-AutomateNOW* | Select-Object -ExpandProperty Name) + (Get-Command -Name Add-AutomateNOW* | Select-Object -ExpandProperty Name) | Sort-Object { $_ -split '-' | Select-Object -Last 1 }
+> Refer to Microsoft's guidance on Powershell Approved Verbs. To list both Add and New functions, try this: `Get-Command -Name New-AutomateNOW* | Select-Object -ExpandProperty Name) + (Get-Command -Name Add-AutomateNOW* | Select-Object -ExpandProperty Name) | Sort-Object { $_ -split '-' | Select-Object -Last 1 }`
 
 ### Why is there no Copy and Rename functions for Time Triggers?
 > The ANOW application does not actually offer this functionality. You must 'add' a Time Trigger to a Schedule Template.
@@ -423,6 +440,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 ## Functions 🛠
 
 `Add-AutomateNOWApprovalRule`
+
+`Add-AutomateNOWBusinessViewItem`
 
 `Add-AutomateNOWCodeRepositoryItem`
 
@@ -466,6 +485,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Copy-AutomateNOWApproval`
 
+`Copy-AutomateNOWBusinessView`
+
 `Copy-AutomateNOWCalendar`
 
 `Copy-AutomateNOWDataSource`
@@ -480,8 +501,6 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Copy-AutomateNOWMetric`
 
-`Copy-AutomateNOWNode`
-
 `Copy-AutomateNOWNotificationChannel`
 
 `Copy-AutomateNOWNotificationGroup`
@@ -495,6 +514,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Copy-AutomateNOWScheduleTemplate`
 
 `Copy-AutomateNOWSemaphore`
+
+`Copy-AutomateNOWServerNode`
 
 `Copy-AutomateNOWStock`
 
@@ -512,7 +533,7 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Disconnect-AutomateNOW`
 
-`Dismount-AutomateNOWNode`
+`Dismount-AutomateNOWServerNode`
 
 `Edit-AutomateNOWCodeRepositoryObjectSource`
 
@@ -523,6 +544,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Export-AutomateNOWApproval`
 
 `Export-AutomateNOWAuditLog`
+
+`Export-AutomateNOWBusinessView`
 
 `Export-AutomateNOWCalendar`
 
@@ -550,8 +573,6 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Export-AutomateNOWMetric`
 
-`Export-AutomateNOWNode`
-
 `Export-AutomateNOWNotification`
 
 `Export-AutomateNOWNotificationChannel`
@@ -572,9 +593,13 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Export-AutomateNOWScheduleTemplate`
 
+`Export-AutomateNOWSecurityEventLog`
+
 `Export-AutomateNOWSemaphore`
 
 `Export-AutomateNOWSemaphoreTimestamp`
+
+`Export-AutomateNOWServerNode`
 
 `Export-AutomateNOWStock`
 
@@ -612,6 +637,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Get-AutomateNOWAuditLog`
 
+`Get-AutomateNOWBusinessView`
+
 `Get-AutomateNOWCalendar`
 
 `Get-AutomateNOWCodeRepository`
@@ -646,8 +673,6 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Get-AutomateNOWMetric`
 
-`Get-AutomateNOWNode`
-
 `Get-AutomateNOWNotification`
 
 `Get-AutomateNOWNotificationChannel`
@@ -668,9 +693,13 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Get-AutomateNOWScheduleTemplate`
 
+`Get-AutomateNOWSecurityEventLog`
+
 `Get-AutomateNOWSemaphore`
 
 `Get-AutomateNOWSemaphoreTimestamp`
+
+`Get-AutomateNOWServerNode`
 
 `Get-AutomateNOWStock`
 
@@ -722,6 +751,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `New-AutomateNOWApprovalRule`
 
+`New-AutomateNOWBusinessView`
+
 `New-AutomateNOWCalendar`
 
 `New-AutomateNOWCodeRepository`
@@ -746,8 +777,6 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `New-AutomateNOWMetric`
 
-`New-AutomateNOWNode`
-
 `New-AutomateNOWNotificationChannel`
 
 `New-AutomateNOWNotificationGroup`
@@ -769,6 +798,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `New-AutomateNOWSemaphore`
 
 `New-AutomateNOWServerDayTimestamp`
+
+`New-AutomateNOWServerNode`
 
 `New-AutomateNOWStock`
 
@@ -796,6 +827,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Push-AutomateNOWLoadBalancerNode`
 
+`Read-AutomateNOWBusinessViewItem`
+
 `Read-AutomateNOWIcon`
 
 `Read-AutomateNOWScheduleTemplateItem`
@@ -809,6 +842,10 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Remove-AutomateNOWAgent`
 
 `Remove-AutomateNOWApproval`
+
+`Remove-AutomateNOWBusinessView`
+
+`Remove-AutomateNOWBusinessViewItem`
 
 `Remove-AutomateNOWCalendar`
 
@@ -836,8 +873,6 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Remove-AutomateNOWMetric`
 
-`Remove-AutomateNOWNode`
-
 `Remove-AutomateNOWNotification`
 
 `Remove-AutomateNOWNotificationChannel`
@@ -859,6 +894,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Remove-AutomateNOWScheduleTemplateItem`
 
 `Remove-AutomateNOWSemaphore`
+
+`Remove-AutomateNOWServerNode`
 
 `Remove-AutomateNOWStock`
 
@@ -890,6 +927,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Rename-AutomateNOWApproval`
 
+`Rename-AutomateNOWBusinessView`
+
 `Rename-AutomateNOWCalendar`
 
 `Rename-AutomateNOWDataSource`
@@ -903,8 +942,6 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Rename-AutomateNOWLock`
 
 `Rename-AutomateNOWMetric`
-
-`Rename-AutomateNOWNode`
 
 `Rename-AutomateNOWNotificationChannel`
 
@@ -920,6 +957,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Rename-AutomateNOWSemaphore`
 
+`Rename-AutomateNOWServerNode`
+
 `Rename-AutomateNOWStock`
 
 `Rename-AutomateNOWTaskTemplate`
@@ -931,6 +970,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Rename-AutomateNOWWorkflowTemplate`
 
 `Rename-AutomateNOWWorkspace`
+
+`Resolve-AutomateNOWEndpoinType2JavaScriptDefinition`
 
 `Resolve-AutomateNOWMonitorType2ServerNodeType`
 
@@ -946,11 +987,11 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Resume-AutomateNOWDomain`
 
-`Resume-AutomateNOWNode`
-
 `Resume-AutomateNOWSchedule`
 
 `Resume-AutomateNOWScheduleTemplate`
+
+`Resume-AutomateNOWServerNode`
 
 `Resume-AutomateNOWTask`
 
@@ -973,6 +1014,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Set-AutomateNOWAgent`
 
 `Set-AutomateNOWApproval`
+
+`Set-AutomateNOWBusinessView`
 
 `Set-AutomateNOWCodeRepository`
 
@@ -1034,11 +1077,11 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Show-AutomateNOWTaskTemplateType`
 
-`Skip-AutomateNOWNode`
-
 `Skip-AutomateNOWSchedule`
 
 `Skip-AutomateNOWScheduleTemplate`
+
+`Skip-AutomateNOWServerNode`
 
 `Skip-AutomateNOWTask`
 
@@ -1052,17 +1095,17 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Start-AutomateNOWEvent`
 
-`Start-AutomateNOWNode`
-
 `Start-AutomateNOWScheduleTemplate`
+
+`Start-AutomateNOWServerNode`
 
 `Start-AutomateNOWTaskTemplate`
 
 `Start-AutomateNOWWorkflowTemplate`
 
-`Stop-AutomateNOWNode`
-
 `Stop-AutomateNOWSchedule`
+
+`Stop-AutomateNOWServerNode`
 
 `Stop-AutomateNOWTask`
 
@@ -1070,11 +1113,11 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Suspend-AutomateNOWDomain`
 
-`Suspend-AutomateNOWNode`
-
 `Suspend-AutomateNOWSchedule`
 
 `Suspend-AutomateNOWScheduleTemplate`
+
+`Suspend-AutomateNOWServerNode`
 
 `Suspend-AutomateNOWTask`
 
