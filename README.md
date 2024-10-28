@@ -38,9 +38,9 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 ## Change Log 📝
 
 ## 1.0.30
-- Bump compatibility to _ANOW version 3.3.1.84
+- Bump compatibility to _ANOW version 3.3.1.84_
 - Added new functions: `Add-AutomateNOWBusinessViewItem`, `Copy-AutomateNOWBusinessView`, `Export-AutomateNOWBusinessView`, `Export-AutomateNOWSecurityEventLog`, `Get-AutomateNOWBusinessView`, `Get-AutomateNOWSecurityEventLog`, `New-AutomateNOWBusinessView`, `Read-AutomateNOWBusinessViewItem`, `Remove-AutomateNOWBusinessView`, `Remove-AutomateNOWBusinessViewItem`, `Rename-AutomateNOWBusinessView`, `Resolve-AutomateNOWEndpoinType2JavaScriptDefinition`, `Set-AutomateNOWBusinessView`
-- Added preliminary functionality for setting the credential details within an ANOW Endpoint object
+- Added preliminary functionality for securely setting endpoint credentials via `Set-AutomateNOWEndpoint` 🥳
 - Renamed the `AutomateNOWNode` functions to `AutomateNOWServerNode`
 - Renamed class object [ANOWNode] to [ANOWServerNode]
 - Renamed the `-Pass` parameter to `-String` in `Protect-AutomateNOWString`
