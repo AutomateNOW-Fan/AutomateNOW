@@ -42,22 +42,6 @@ Enum ANOWBusinessViewItem_itemType {
 
 #endregion
 
-#Region - Enum [CommunicationNote]
-
-Enum ANOWCommunicationNote_noteType {
-    INFO; WARNING; QUESTION; CHANGE_REQUEST; PROBLEM;
-}
-
-Enum ANOWCommunicationNote_noteStatus {
-    NEW; IN_PROGRESS; COMPLETED; CLOSED;
-}
-
-Enum ANOWCommunicationNote_noteSourceType {
-    USER; PROCESSING; SERVER_NODE; AGENT; RESOURCE;
-}
-
-#endregion
-
 #Region - Enum [CodeRepository]
 
 Enum ANOWCodeRepository_authenticationMethod {
@@ -70,6 +54,14 @@ Enum ANOWCodeRepository_sshKeyLocationType {
 
 #endregion
 
+#Region - Enum [CodeRepositoryObjectSourceCode]
+
+Enum ANOWCodeRepositoryObjectSourceCode_domainClassName {
+    AdhocReport; Agent; Anomaly; ApprovalConfiguration; BusinessView; Dashboard; DataSource; Endpoint; Folder; Integration; NotificationChannel; NotificationGroup; NotificationMessageTemplate; ProcessingAction; ProcessingTemplate; Resource; ResultMapping; ServerNode; Tag; UserReport; Workspace;
+}
+
+#endregion
+
 #Region - Enum [CodeRepositoryMergeRequest]
 
 Enum ANOWCodeRepositoryMergeRequest_status {
@@ -78,10 +70,18 @@ Enum ANOWCodeRepositoryMergeRequest_status {
 
 #endregion
 
-#Region - Enum [CodeRepositoryOutOfSyncItem]
+#Region - Enum [CommunicationNote]
 
-Enum ANOWCodeRepositoryOutOfSyncItem_itemType {
-    ProcessingTemplates; Schedules; BusinessViews; Workspaces; ResultMappings; Approvals; ServerNodes; Agents; Endpoints; Resources; DataSources; Anomalies; Interfaces; NotificationGroups; NotificationChannels; NotificationTemplates; RuntimeActions; Dashboards; AdhocReports; UserReports; Tags; Folders;
+Enum ANOWCommunicationNote_noteType {
+    INFO; WARNING; QUESTION; CHANGE_REQUEST; PROBLEM;
+}
+
+Enum ANOWCommunicationNote_noteStatus {
+    NEW; IN_PROGRESS; COMPLETED; CLOSED;
+}
+
+Enum ANOWCommunicationNote_noteSourceType {
+    USER; PROCESSING; SERVER_NODE; AGENT; RESOURCE;
 }
 
 #endregion
@@ -517,23 +517,18 @@ Enum ANOWProcessingTemplate_taskType {
 }
 
 Enum ANOWProcessingTemplateCustom_Tasks {
-    # This a custom class for separating the processing items into the UI's "Tasks" (this is NOT internal tasks)
+    # This a custom class for separating the processing items into the UI's "Tasks" vs. "Internal Tasks" - This is needed for New-AutomateNOWTaskTemplate
     AE_SHELL_SCRIPT; AGENT_ADD_NOTE; AMQP_SEND; ANSIBLE_PLAYBOOK; ANSIBLE_PLAYBOOK_PATH; APACHE_AIRFLOW_RUN_DAG; ARANGO_DB_INSERT; AS400_BATCH_JOB; AS400_COMMAND_CALL; AS400_PROGRAM_CALL; AS400_RPA; AUTOMATE_NOW_RUN_JOB; AUTOMATE_NOW_TRIGGER_EVENT; AUTOMATION_ANYWHERE; AUTOMATION_ANYWHERE_DEPLOY_ROBOT; AUTOMATION_ANYWHERE_START_ROBOT; AUTOMATION_ANYWHERE_STOP_ROBOT; AUTOMATION_ANYWHERE_UNDEPLOY_ROBOT; AUTOMIC_WLA_RUN_JOB; AWS_BATCH_JOB; AWS_EC2_DELETE_VOLUME; AWS_EC2_START_INSTANCE; AWS_EC2_STOP_INSTANCE; AWS_EC2_TERMINATE_INSTANCE; AWS_EMR_ADD_STEPS; AWS_EMR_API_COMMAND; AWS_EMR_CANCEL_STEPS; AWS_EMR_GET; AWS_EMR_PUT; AWS_EMR_START_NOTEBOOK_EXECUTION; AWS_EMR_STOP_NOTEBOOK_EXECUTION; AWS_EMR_TERMINATE_JOB_FLOW; AWS_EMR_WORKFLOW; AWS_GLUE_CRAWLER; AWS_GLUE_JOB; AWS_GLUE_TRIGGER; AWS_GLUE_WORKFLOW; AWS_LAMBDA_CREATE_FUNCTION; AWS_LAMBDA_DELETE_FUNCTION; AWS_LAMBDA_INVOKE; AWS_S3_COPY_OBJECT; AWS_S3_DELETE_OBJECT; AWS_S3_MOVE_OBJECT; AWS_S3_RENAME_OBJECT; AWS_SAGE_MAKER_ADD_MODEL; AWS_SAGE_MAKER_API_COMMAND; AWS_SAGE_MAKER_DELETE_MODEL; AWS_SAGE_MAKER_PROCESSING; AWS_SAGE_MAKER_TRAINING; AWS_SAGE_MAKER_TRANSFORM; AWS_SAGE_MAKER_TUNING; AWS_START_STEP_FUNCTION_STATE_MACHINE; AZURE_BATCH_JOB; AZURE_DATA_FACTORY_PIPELINE; AZURE_DATA_FACTORY_TRIGGER; AZURE_DATA_LAKE_JOB; AZURE_DATABRICKS_DELETE_CLUSTER; AZURE_DATABRICKS_JOB; AZURE_DATABRICKS_LIST_CLUSTERS; AZURE_DATABRICKS_START_CLUSTER; AZURE_DATABRICKS_TERMINATE_CLUSTER; AZURE_RUN_LOGIC_APP; BLUE_PRISM; BLUE_PRISM_DEPLOY_ROBOT; BLUE_PRISM_START_ROBOT; BLUE_PRISM_STOP_ROBOT; BLUE_PRISM_UNDEPLOY_ROBOT; BMC_REMEDY_INCIDENT; C; CA_SERVICE_MANAGEMENT_INCIDENT; CA_WLA_RUN_JOB; CASSANDRA_CQL_SCRIPT; CHECK_QUEUE; CLEAR_QUEUE; CONTROL_M_RUN_JOB; COUCH_BASE_INSERT; COUCH_DB_INSERT; CPP; CTRLM_ADD_CONDITION; CTRLM_CREATE_JOB; CTRLM_DELETE_CONDITION; CTRLM_ORDER_JOB; CTRLM_RESOURCE_TABLE_ADD; CTRLM_RESOURCE_TABLE_DELETE; CTRLM_RESOURCE_TABLE_UPDATE; DATASOURCE_DELETE_FILE; DATASOURCE_DOWNLOAD_FILE; DATASOURCE_UPLOAD_FILE; DBT_CORE_JOB; DBT_JOB; DYNAMO_DB_INSERT; EMAIL_CONFIRMATION; EMAIL_INPUT; EMAIL_SEND; ENDPOINT_ADD_NOTE; FACEBOOK_POST; FILE_CHECK; FILE_TRANSFER; FILE_WATCHER; FLINK_JAR_DELETE; FLINK_JAR_UPLOAD; FLINK_RUN_JOB; GO; GOOGLE_DATA_FLOW_JOB; GROOVY; HDFS_APPEND_FILE; HDFS_CREATE_DIRECTORY; HDFS_DELETE_DIRECTORY; HDFS_DELETE_FILE; HDFS_DOWNLOAD_FILE; HDFS_RENAME; HDFS_UPLOAD_FILE; HP_OPEN_VIEW_SERVICE_MANAGER_INCIDENT; HTTP_REQUEST; IBM_CONTROL_DESK_INCIDENT; IBM_DATASTAGE; IBM_MQ_SEND; IBM_WLA_RUN_JOB; INFORMATICA_ASSIGNMENT; INFORMATICA_CLOUD_TASKFLOW; INFORMATICA_COMMAND; INFORMATICA_CONTROL; INFORMATICA_EMAIL; INFORMATICA_EVENT_RAISE; INFORMATICA_EVENT_WAIT; INFORMATICA_SESSION; INFORMATICA_START; INFORMATICA_TIMER; INFORMATICA_WORKFLOW; INFORMATICA_WS_WORKFLOW; INSTAGRAM_POST; JAVA; JAVASCRIPT; JIRA_ADD_ISSUE; JIRA_CLOSE_ISSUE; JMS_SEND; KAFKA_SEND; KOTLIN; LINKED_IN_POST; MICROSOFT_POWER_BI_DATAFLOW_REFRESH; MICROSOFT_POWER_BI_DATASET_REFRESH; MONGO_DB_INSERT; MQTT_SEND; MS_SSIS; NEO4J_INSERT; ODI_LOAD_PLAN; ODI_SESSION; OPENTEXT_DYNAMIC_JCL; OPENTEXT_STORED_JCL; ORACLE_EBS_EXECUTE_PROGRAM; ORACLE_EBS_EXECUTE_REQUEST_SET; ORACLE_EBS_PROGRAM; ORACLE_EBS_REQUEST_SET; ORACLE_SERVICE_CENTER_CASE; PEGA_DEPLOY_ROBOT; PEGA_START_ROBOT; PEGA_STOP_ROBOT; PEGA_UNDEPLOY_ROBOT; PEOPLESOFT_APPLICATION_ENGINE_TASK; PEOPLESOFT_COBOL_SQL_TASK; PEOPLESOFT_CRW_ONLINE_TASK; PEOPLESOFT_CRYSTAL_REPORTS_TASK; PEOPLESOFT_CUBE_BUILDER_TASK; PEOPLESOFT_JOB_TASK; PEOPLESOFT_NVISION_TASK; PEOPLESOFT_SQR_PROCESS_TASK; PEOPLESOFT_SQR_REPORT_TASK; PEOPLESOFT_WINWORD_TASK; PERL; POP_FROM_QUEUE; POWERSHELL; PROCESSING_TEMPLATE_ADD_NOTE; PUSH_TO_QUEUE; PYTHON; RABBIT_MQ_SEND; RAINCODE_DYNAMIC_JCL; RAINCODE_STORED_JCL; RDBMS_SQL; RDBMS_SQL_STATEMENT; RDBMS_STORED_PROCEDURE; REDDIT_POST; REDIS_CLI; REDIS_DELETE; REDIS_GET; REDIS_SET; RESOURCE_ADD_NOTE; REST_WEB_SERVICE_CALL; ROBOT_FRAMEWORK_DEPLOY_ROBOT; ROBOT_FRAMEWORK_START_ROBOT; ROBOT_FRAMEWORK_STOP_ROBOT; ROBOT_FRAMEWORK_UNDEPLOY_ROBOT; RUBY; RUST; SAP_4H_ARCHIVE; SAP_4H_BW_PROCESS_CHAIN; SAP_4H_CM_PROFILE_ACTIVATE; SAP_4H_CM_PROFILE_DEACTIVATE; SAP_4H_COPY_EXISTING_JOB; SAP_4H_EXPORT_CALENDAR; SAP_4H_EXPORT_JOB; SAP_4H_FUNCTION_MODULE_CALL; SAP_4H_GET_APPLICATION_LOG; SAP_4H_JOB; SAP_4H_JOB_INTERCEPTOR; SAP_4H_MODIFY_INTERCEPTION_CRITERIA; SAP_4H_MONITOR_EXISTING_JOB; SAP_4H_RAISE_EVENT; SAP_4H_READ_TABLE; SAP_4H_RELEASE_EXISTING_JOB; SAP_4H_START_SCHEDULED_JOB; SAP_4H_SWITCH_OPERATION_MODE; SAP_4H_VARIANT_COPY; SAP_4H_VARIANT_CREATE; SAP_4H_VARIANT_DELETE; SAP_4H_VARIANT_UPDATE; SAP_ARCHIVE; SAP_BW_PROCESS_CHAIN; SAP_CM_PROFILE_ACTIVATE; SAP_CM_PROFILE_DEACTIVATE; SAP_EXPORT_CALENDAR; SAP_EXPORT_JOB; SAP_FUNCTION_MODULE_CALL; SAP_GET_APPLICATION_LOG; SAP_IBP_CREATE_PROCESS; SAP_IBP_DELETE_PROCESS; SAP_IBP_JOB; SAP_IBP_SET_PROCESS_STEP_STATUS; SAP_MODIFY_INTERCEPTION_CRITERIA; SAP_ODATA_API_CALL; SAP_R3_COPY_EXISTING_JOB; SAP_R3_JOB; SAP_R3_JOB_INTERCEPTOR; SAP_R3_MONITOR_EXISTING_JOB; SAP_R3_RAISE_EVENT; SAP_R3_RELEASE_EXISTING_JOB; SAP_R3_START_SCHEDULED_JOB; SAP_R3_VARIANT_COPY; SAP_R3_VARIANT_CREATE; SAP_R3_VARIANT_DELETE; SAP_R3_VARIANT_UPDATE; SAP_READ_TABLE; SAP_SOLUTION_MANAGER_TICKET; SAP_SWITCH_OPERATION_MODE; SAS_4GL; SAS_DI; SAS_JOB; SAS_VIYA_JOB; SCALA; SERVER_NODE_SET_CONNECTION; SERVER_NODE_SET_PARAMETERS; SERVICE_NOW_CLOSE_INCIDENT; SERVICE_NOW_CREATE_INCIDENT; SERVICE_NOW_INCIDENT_STATUS_SENSOR; SERVICE_NOW_RESOLVE_INCIDENT; SERVICE_NOW_UPDATE_INCIDENT; SET_PROCESSING_STATUS; SET_SEMAPHORE_TIMESTAMP_STATE; SET_SERVER_NODE; SET_VARIABLE_TIMESTAMP_VALUE; SEVER_NODE_ADD_NOTE; SH; SOAP_WEB_SERVICE_CALL; SPARK_JAVA; SPARK_PYTHON; SPARK_R; SPARK_RUN_JOB; SPARK_SCALA; SPARK_SQL; STOMP_SEND; STONEBRANCH_RUN_JOB; SWIFT; TABLEAU_REFRESH_EXTRACT; TALEND_JOB; TCL; TEAMS_CHAT_MESSAGE; TELEGRAM_MESSAGE; TERMA_RUN_JOB; TIDAL_RUN_JOB; TIKTOK_POST; TITAN_INSERT; TUMBLR_POST; TWITTER_POST; TYPESCRIPT; UI_PATH; UI_PATH_DEPLOY_ROBOT; UI_PATH_START_ROBOT; UI_PATH_STOP_ROBOT; UI_PATH_UNDEPLOY_ROBOT; VBSCRIPT; WHATSAPP_MESSAGE; WORK_FUSION_DEPLOY_ROBOT; WORK_FUSION_START_ROBOT; WORK_FUSION_STOP_ROBOT; WORK_FUSION_UNDEPLOY_ROBOT; XFTP_COMMAND; XMPP_SEND; YOUTUBE_POST; Z_OS_COMMAND; Z_OS_DYNAMIC_JCL; Z_OS_STORED_JCL;
 }
 
 Enum ANOWProcessingTemplateCustom_InternalTasks {
-    # This a custom class for separating the processing items into the UI's "Internal Tasks"
+    # This a custom class for separating the processing items into the UI's "Tasks" vs. "Internal Tasks" - This is needed for New-AutomateNOWTaskTemplate
     ADHOC_REPORT_SEND; AE_SCRIPT; ARCHIVE_CLEANUP; ARCHIVE_INTERVAL; CHECK_TIME; DESIGN_BACKUP; DESIGN_IMPORT; NOTIFY_CHANNEL; NOTIFY_EMAIL; NOTIFY_GROUP; PROCESSING_ACTION_SKIP_OFF; PROCESSING_ACTION_SKIP_ON; PROCESSING_ADD_NOTE; PROCESSING_OBSERVER; PROCESSING_TEMPLATE_HOLD; PROCESSING_TEMPLATE_RESUME; PROCESSING_TEMPLATE_SKIP_OFF; PROCESSING_TEMPLATE_SKIP_ON; RECALCULATE_STATISTICS; SERVER_NODE_ABORT_ALL; SERVER_NODE_ADD_TAG; SERVER_NODE_HOLD; SERVER_NODE_KILL_ALL; SERVER_NODE_REMOVE_TAG; SERVER_NODE_RESUME; SERVER_NODE_SET_FOLDER; SERVER_NODE_SET_TOTAL_WEIGHT_CAPACITY; SERVER_NODE_SKIP_OFF; SERVER_NODE_SKIP_ON; SERVER_NODE_STOP; SET_CONTEXT_VARIABLE_VALUES; SET_RESOURCES; TRIGGER_ITEM; USER_CONFIRM; USER_INPUT; WAIT; ABORT; ADD_TAG; ARCHIVE; CHECK_BARRIER_AVAILABLE_PERMITS; CHECK_BARRIER_TOTAL_PERMITS; CHECK_CALENDAR; CHECK_LOCK_STATE; CHECK_METRIC; CHECK_PHYSICAL_RESOURCE; CHECK_PROCESSING_STATE; CHECK_SEMAPHORE_STATE; CHECK_STOCK_AVAILABLE_PERMITS; CHECK_STOCK_TOTAL_PERMITS; CHECK_TIME_WINDOW_STATE; CHECK_VARIABLE_VALUE; DATA_SOURCE_GET; DATA_SOURCE_REMOVE; DATA_SOURCE_SET; FORCE_COMPLETED; FORCE_FAILED; FORCE_READY; HOLD; KILL; PROCESSING_CLEAR_STATE_REGISTRY; PROCESSING_REGISTER_STATE; PROCESSING_RUN_NOW; PROCESSING_UNREGISTER_STATE; REMOVE_TAG; RESOURCE_ADD_TAG; RESOURCE_REMOVE_TAG; RESOURCE_SET_FOLDER; RESTART; RESUME; RETRY; SET_BARRIER_TOTAL_PERMITS; SET_CONTEXT_VARIABLE_VALUE; SET_FOLDER; SET_METRIC; SET_PHYSICAL_RESOURCE; SET_PRIORITY; SET_SEMAPHORE_STATE; SET_STATUS_CODE; SET_STOCK_TOTAL_PERMITS; SET_TIME_WINDOW_STATE; SET_VARIABLE_VALUE; SKIP_OFF; SKIP_ON; TRIGGER_EVENT;
 }
 
-Enum ANOWProcessingTemplateCustom_Workflows {
-    # This a custom class for separating the processing items into the UI's "Workflows"
-    STANDARD; BROADCAST; FOR_EACH; TIME_SERIES; SWITCH; CYCLE; INFORMATICA;
-}
-
 Enum ANOWProcessingTemplateCustom_ServiceManagers {
-    # This a custom class for separating the processing items into the UI's "Service Level Managers"
-    SLA_SERVICE_MANAGER; PROCESSING_DEADLINE_MONITOR
+    # This a custom class for separating the processing items into the UI's "Service Level Agreement" vs. "Processing Deadline Monitor" - This is needed for New-AutomateNOWServiceManagerTemplate
+    SLA_SERVICE_MANAGER; PROCESSING_DEADLINE_MONITOR;
 }
 
 #endregion
@@ -602,6 +597,18 @@ Enum ANOWserverNode_semaphoreState {
 
 Enum ANOWserverNode_resourceType {
     STOCK; LOCK; BINARY_SEMAPHORE; TIME_SEMAPHORE; VARIABLE; PHYSICAL_RESOURCE; METRIC; CALENDAR; EVENT;
+}
+
+#endregion
+
+#Region - Enum [ServerNodeEndpoint]
+
+Enum ServerNodeANOWEndpoint_endpointType {
+    USER; FTP; MAINFRAME_FTP; FTPS; MAINFRAME_FTPS; SFTP; S3; HDFS; AZURE_BLOB; AZURE_FILE; GOOGLE_COULD_STORAGE_BUCKET; PGP; HTTP; REST_WEB_SERVICE; SOAP_WEB_SERVICE; EMAIL; EMAIL_EWS; AWS; AZURE; GOOGLE_CLOUD; GOOGLE_DATA_FLOW; AZURE_DATABRICKS; INFORMATICA_CLOUD; AWS_COMMON; IBM_MQ; RABBIT_MQ; SQS; ACTIVE_MQ; QPID; IBM_SIBUS; HORNETQ; SOLACE; JORAM_MQ; QMQ; ZERO_MQ; KAFKA; PULSAR; AMAZON_KINESIS; GOOGLE_CLOUD_PUB_SUB; MICROSOFT_AZURE_EVENT_HUB; AMQP; XMPP; STOMP; REDIS; HADOOP; HIVE; IMPALA; SQOOP; YARN; SPARK; FLUME; FLINK; STORM; OOZIE; AMBARI; ELASTIC_SEARCH; CASSANDRA; SAP_HANA; MONGO_DB; COUCH_DB; COUCH_BASE; DYNAMO_DB; ARANGO_DB; NEO4J; ORIENT_DB; TITAN; SSH; WINRM; HIVE_QL; GOOGLE_BIG_QUERY; DASHDB; DB2; MYSQL; NETEZZA; AZURE_SQL_DATABASE; AZURE_SQL_DATA_WAREHOUSE; ORACLE; POSTGRESQL; SQL_SERVER; SQL_SERVER_JTDS; TERADATA; SINGLESTORE; VERTICA; SNOWFLAKE; PRESTO_DB; SYBASE; INFORMIX; H2; AS400; Z_OS; Z_OS_REST; RAINCODE; RAINCODE_BRS; OPENTEXT; CTRL_M; INFORMATICA; INFORMATICA_WS; SAS; SAS_VIYA; IBM_DATASTAGE; ODI; MS_SSIS; AB_INITIO; SAP_BODI; SKYVIA; TALEND; DBT; DBT_CORE; SAP; SAP_S4_HANA; SAP_S4_HANA_CLOUD; SAP_IBP; JD_EDWARDS; ORACLE_EBS; PEOPLESOFT; MICROSOFT_DYNAMICS; JIRA; SERVICE_NOW; ORACLE_SERVICE_CENTER; BMC_REMEDY; CA_SERVICE_MANAGEMENT; IBM_CONTROL_DESK; HP_OPEN_VIEW_SERVICE_MANAGER; SAP_SOLUTION_MANAGER; FACEBOOK; INSTAGRAM; TWITTER; YOUTUBE; LINKED_IN; TUMBLR; TIKTOK; REDDIT; TELEGRAM; TEAMS; WHATSAPP; MICROSOFT_POWER_BI; TABLEAU; BLUE_PRISM; UI_PATH; AUTOMATION_ANYWHERE; WORK_FUSION; PEGA; ROBOT_FRAMEWORK; AUTOMATE_NOW; APACHE_AIRFLOW; POWER_AUTOMATE; ANSIBLE;
+}
+
+Enum ServerNodeEndpoint_serverNodeType {
+    AZURE; AWS; GOOGLE_CLOUD; GOOGLE_DATA_FLOW; AZURE_DATABRICKS; INFORMATICA_CLOUD; UNIX; LINUX; WINDOWS; SOLARIS; HPUX; AIX; OPENVMS; MACOS; AS400; Z_OS; RAINCODE; CTRL_M; OPENTEXT; INFORMATICA; INFORMATICA_WS; SAS; SAS_VIYA; IBM_DATASTAGE; ODI; MS_SSIS; AB_INITIO; SAP_BODI; SKYVIA; TALEND; DBT; DBT_CORE; SAP; SAP_S4_HANA; SAP_S4_HANA_CLOUD; SAP_IBP; JD_EDWARDS; ORACLE_EBS; PEOPLESOFT; MICROSOFT_DYNAMICS; HIVE_QL; GOOGLE_BIG_QUERY; AZURE_SQL_DATA_WAREHOUSE; AZURE_SQL_DATABASE; DASHDB; DB2; MYSQL; NETEZZA; ORACLE; POSTGRESQL; SQL_SERVER; TERADATA; SINGLESTORE; SNOWFLAKE; VERTICA; PRESTO_DB; SYBASE; INFORMIX; H2; FILE_MANAGER; SNMP; HTTP; EMAIL; SOAP_WEB_SERVICE; REST_WEB_SERVICE; INTERNAL; IBM_MQ; RABBIT_MQ; SQS; ACTIVE_MQ; QPID; IBM_SIBUS; HORNETQ; SOLACE; JORAM_MQ; QMQ; ZERO_MQ; KAFKA; PULSAR; AMAZON_KINESIS; GOOGLE_CLOUD_PUB_SUB; MICROSOFT_AZURE_EVENT_HUB; AMQP; XMPP; STOMP; HDFS; REDIS; HADOOP; HIVE; IMPALA; SQOOP; YARN; SPARK; FLUME; FLINK; STORM; OOZIE; AMBARI; ELASTIC_SEARCH; CASSANDRA; SAP_HANA; MONGO_DB; COUCH_DB; COUCH_BASE; DYNAMO_DB; ARANGO_DB; NEO4J; ORIENT_DB; TITAN; ANDROID; IOS; WINDOWS_MOBILE; MICROSOFT_POWER_BI; TABLEAU; BLUE_PRISM; UI_PATH; AUTOMATION_ANYWHERE; WORK_FUSION; PEGA; ROBOT_FRAMEWORK; CONTROL_M; STONEBRANCH; CA_WLA; AUTOMIC_WLA; IBM_WLA; TIDAL; FACEBOOK; INSTAGRAM; TWITTER; YOUTUBE; LINKED_IN; TUMBLR; TIKTOK; REDDIT; TELEGRAM; WHATSAPP; TEAMS; JIRA; SERVICE_NOW; ORACLE_SERVICE_CENTER; BMC_REMEDY; CA_SERVICE_MANAGEMENT; IBM_CONTROL_DESK; HP_OPEN_VIEW_SERVICE_MANAGER; SAP_SOLUTION_MANAGER; AUTOMATE_NOW; APACHE_AIRFLOW; POWER_AUTOMATE; ANSIBLE;
 }
 
 #endregion
@@ -900,6 +907,7 @@ Class ANOWContextVariable {
     [datetime]$lastUpdated
     [boolean]$isArray
     [boolean]$archived
+    [string]$valuePreview
     [string]$name
     [string]$value
     [string]$domain
@@ -907,7 +915,6 @@ Class ANOWContextVariable {
     [boolean]$isFile
     [boolean]$isTextFile
     [Nullable[ANOWContextVariable_dataType]]$dataType
-    [string]$valuePreview
     [string]$lastUpdatedBy
     [string]$originalValue
     [string]$createdBy
@@ -1039,6 +1046,28 @@ Class ANOWCodeRepositoryBranch {
 
 #endregion
 
+#region Class - [CodeRepositoryConflictItem]
+
+Class ANOWCodeRepositoryConflictItem {
+    [string]$id
+    [string]$domain
+    [string]$simpleId
+    [string]$file
+    [ANOWCodeRepositoryObjectSourceCode_domainClassName]$domainClassName # this enum is unofficial
+    [string]$codeRepository
+    [string]$filePath
+
+    # Default constructor
+    ANOWCodeRepositoryConflictItem() { $this.Init(@{}) }
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+}
+
+#endregion
+
 #region Class - [CodeRepositoryMergeRequest]
 
 Class ANOWCodeRepositoryMergeRequest {
@@ -1060,30 +1089,6 @@ Class ANOWCodeRepositoryMergeRequest {
 
     # Default constructor
     ANOWCodeRepositoryMergeRequest() { $this.Init(@{}) }
-    [void] Init([hashtable]$Properties) {
-        foreach ($Property in $Properties.Keys) {
-            $this.$Property = $Properties.$Property
-        }
-    }
-}
-
-#endregion
-
-#region Class - [CodeRepositoryOutOfSyncItem]
-
-Class ANOWCodeRepositoryOutOfSyncItem {
-    [string]$id
-    [string]$domain
-    [string]$itemId
-    [string]$codeRepository
-    [string]$lastUpdatedBy
-    [datetime]$lastUpdated
-    [ANOWCodeRepositoryOutOfSyncItem_itemType]$itemType
-    [datetime]$dateCreated
-    [string]$createdBy
-
-    # Default constructor
-    ANOWCodeRepositoryOutOfSyncItem() { $this.Init(@{}) }
     [void] Init([hashtable]$Properties) {
         foreach ($Property in $Properties.Keys) {
             $this.$Property = $Properties.$Property
@@ -1997,6 +2002,21 @@ Class ANOWWorkflowTemplateItem : ANOWProcessingTemplateItem {
     }
 }
 
+Class ANOWServiceManagerTemplateItem : ANOWProcessingTemplateItem {
+
+    # Default constructor
+    ANOWServiceManagerTemplate() { $this.Init(@{}) }
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = ''
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
+    }
+}
 
 #endregion
 
@@ -2218,6 +2238,102 @@ Class ANOWSemaphoreTimestamp {
         foreach ($Property in $Properties.Keys) {
             $this.$Property = $Properties.$Property
         }
+    }
+}
+
+#endregion
+
+#region Class - [ServerNodeEndpoint]
+
+Class ANOWServerNodeEndpoint {
+    [string]$lastUpdatedBy
+    [ANOWServerNode]$serverNode
+    [ServerNodeANOWEndpoint_endpointType]$endpointType
+    [ServerNodeEndpoint_serverNodeType]$serverNodeType
+    [boolean]$defaultEndpoint
+    [datetime]$lastUpdated
+    [string]$endpoint
+    [datetime]$dateCreated
+    [string]$createdBy
+    [int64]$sortOrder
+    [string]$domain
+    [string]$userIp
+    [string]$id
+    ANOWServerNodeEndpoint() { $this.Init(@{}) }
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = 'actions', 'barriers', 'calendars', 'CrossDependencies', 'description', 'domain', 'endpointTypeId', 'events', 'folder', 'highRiskStatisticMethodId', 'highRiskStatisticPeriodId', 'locks', 'metrics', 'monitorType', 'monitorTypeId', 'notifications', 'parentMonitorType', 'parentMonitorTypeId', 'parentProcessingType', 'parentProcessingTypeId', 'parentSensorType', 'parentSensorTypeId', 'parentServiceManagerType', 'parentServiceManagerTypeId', 'parentServiceType', 'parentServiceTypeId', 'parentTaskType', 'parentTaskTypeId', 'parentTriggerType', 'parentTriggerTypeId', 'parentWorkflowType', 'parentWorkflowTypeId', 'physicalResources', 'predecessors', 'processingTypeId', 'queues', 'semaphores', 'sensorType', 'sensorTypeId', 'serverNodeTypeId', 'serviceManagerType', 'serviceManagerTypeId', 'serviceType', 'serviceTypeId', 'statisticMethodId', 'statisticPeriodId', 'stocks', 'successors', 'tags', 'taskType', 'taskTypeId', 'timeWindows', 'triggerType', 'triggerTypeId', 'userIp', 'valueDataPath', 'variables', 'workflowId', 'workflowType', 'workflowTypeId'
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
+    }
+    # The primary goal of this method is to return back the same json string that the ANOW application produces when it converts an object into JSON
+    # The secondary goal of this method is to stringify the object in preparation for encoding to URL format faithfully
+    [string] ToString([string[]]$optional_properties) {
+        #[hashtable]$this2 = @{}
+        [System.Collections.Specialized.OrderedDictionary]$this2 = [System.Collections.Specialized.OrderedDictionary]@{}
+        $current_members = $this | Get-Member | Where-Object { $_.MemberType -eq 'Property' }
+        ForEach ($current_member in $current_members) {
+            [string]$current_member_name = $current_member.Name
+            If ($current_member_value.Length -gt 0 -or $current_member_value.count -gt 0) {
+                Remove-Variable current_member_value -Force
+            }
+            If (($this.$current_member_name.count -gt 0)) {
+                If ($this.$current_member_name[0] -is [ANOWSecurityRole]) {
+                    [ANOWSecurityRole[]]$current_member_value = $this.$current_member_name
+                }
+                Else {
+                    $current_member_value = $this.$current_member_name # this variable cannot be hard typed
+                }
+            }
+            Else {
+                $current_member_value = $this.$current_member_name # this variable cannot be hard typed
+            }
+            # This omits pre-defined optional properties for this specific class when they are empty
+            If (-not ($current_member_value.Length -eq 0 -and $current_member_name -in ($optional_properties))) {
+                If ($current_member.definition -match '^datetime [a-zA-Z]{1,} {.{1,}}$' ) {
+                    # This ensures that datetimes are always formatted into ISO 8601 format. Powershell is not consistent on recognizing strings that can be safely casted into dates.
+                    [string]$current_member_value = Get-Date -Date $current_member_value -Format 'yyyy-MM-ddTHH:mm:ss.fff'
+                    $this2.Add($current_member_name, $current_member_value)
+                }
+                ElseIf ($current_member.definition -match '^bool [a-zA-Z]{1,} {.{1,}}$' ) {
+                    # This ensures that booleans are converted the same way that the application expects
+                    If ($current_member_value -eq $false) {
+                        $this2.Add($current_member_name, $false)
+                    }
+                    Else {
+                        $this2.Add($current_member_name, $true)
+                    }
+                }
+                ElseIf ($current_member_value -is [System.Enum]) {
+                    # This ensures that enums are resolved into their string value instead of the numerical index
+                    [string]$current_member_value = $current_member_value.ToString()
+                    $this2.Add($current_member_name, $current_member_value)
+                }
+                ElseIf ($current_member.definition -match '^[A-Za-z]{1,}\[] [a-zA-Z]{1,} {.{1,}}$' -and $current_member_value.Count -eq 1) {
+                    # This ensures that arrays which only contain a single item are not converted into strings
+                    $this2.Add($current_member_name, @(, $current_member_value))
+                }
+                ElseIf ($current_member_value.Length -eq 0) {
+                    # This ensures that null values remain null instead of being converted to a string
+                    $this2.Add($current_member_name, $null)
+                }
+                Else {
+                    $this2.Add($current_member_name, $current_member_value)
+                }
+            }
+        }
+        [string]$stringified_object = $this2 | ConvertTo-JSON -Compress -Depth 10
+        Return $stringified_object
+    }
+    # The primary goal of this method is to URL encode an ANOW object for conversion into the _oldValues string. The _oldValues is typically (but not always) included by the ANOW application whenever modifying an object. The behavior of this method should match the ANOW application as closely as possible. Rigorous and frequent testing will always be needed to ensure that valid payloads are sent when modifying existing objects in the ANOW application.
+    [string] ToURL([string[]]$optional_properties) {
+        [string]$stringified_object = $this.ToString([string[]]$optional_properties)
+        [string]$escaped_object = [System.Uri]::EscapeDataString($stringified_object)
+        Return $escaped_object
     }
 }
 
@@ -2755,7 +2871,7 @@ Class ANOWCodeRepositoryObjectSourceCode : ANOW {
     [boolean]$checkedOut
     [string]$checkoutBy
     [Nullable[datetime]]$checkoutDate
-    [string]$domainClassName # there needs to be an ENUM for this object
+    [ANOWCodeRepositoryObjectSourceCode_domainClassName]$domainClassName # this enum is unofficial
     [string]$sourceCode
     [string[]]$tags
     [string]$name
@@ -3380,6 +3496,17 @@ Class ANOWWorkflow : ANOWProcessing {
     }
 }
 
+Class ANOWServiceManager : ANOWProcessing {
+
+    # Default constructor
+    ANOWServiceManager() { $this.Init(@{}) }
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+}
+
 #endregion
 
 #region Class - [ANOWProcessingTemplate] TaskTemplates, WorkflowTemplates, ScheduleTemplates, ServiceManagerTemplates, IntegrationTemplates
@@ -3518,6 +3645,22 @@ Class ANOWWorkflowTemplate : ANOWProcessingTemplate {
 
     # Default constructor
     ANOWWorkflowTemplate() { $this.Init(@{}) }
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = ''
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
+    }
+}
+
+Class ANOWServiceManagerTemplate : ANOWProcessingTemplate {
+
+    # Default constructor
+    ANOWServiceManagerTemplate() { $this.Init(@{}) }
     [void] Init([hashtable]$Properties) {
         foreach ($Property in $Properties.Keys) {
             $this.$Property = $Properties.$Property
@@ -3811,6 +3954,33 @@ Class ANOWTag : ANOW {
 }
 
 #endregion
+
+#region Class - [ANOWUserReport]
+
+Class ANOWUserReport : ANOW {
+    [string]$folder
+    [PSCustomObject]$reportDefinition
+    [string[]]$tags
+    [string]$iconCode
+    [string]$iconSet
+
+    # Default constructor
+    ANOWUserReport() { $this.Init(@{}) }
+
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+    [string] CreateOldValues() {
+        [string[]]$optional_properties = ''
+        [string]$old_values = $this.ToURL($optional_properties)
+        Return $old_values
+    }
+}
+
+#endregion
+
 
 #region Class - [ANOWWorkspace]
 
