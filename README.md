@@ -12,7 +12,7 @@ Created by AutomateNOW-Fan
 ```
 ## Efficacy 🧪
 
-Compatible with AutomateNOW! version 3.3.1.84
+Compatible with AutomateNOW! version 3.3.1.85 HF1
 <br/><br/>
 ## Installation 🏗
 
@@ -36,6 +36,40 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 - Edit source code objects with NotePad (Windows only for now)
 <br/><br/>
 ## Change Log 📝
+
+## 1.0.32
+### Major updates
++ A single command `Trace-AutomateNOWProcessing` will trace any Task, Workflow, Service Manager or Schedule.
++ Security Roles, User Roles & Domain Roles are added and fully supported.
++ Security Access Tokens for API users are fully supported
+
+### Minor updates
++ You can now easily convert returned context variables into a hash table (or json string) via `ConvertFrom-AutomateNOWContextVariable`
++ Tracing with the -WaitForExecution parameter now includes the 'WAITING' status along with 'EXECUTING'
++ You can now change the order of ServerNode Endpoint objects within a Node object
++ Bump compatibility to _ANOW version 3.3.1.85 HF1_
+
+### Detailed Change Log
+- Added new functions: `Add-AutomateNOWSecurityAccessToken`, `Add-AutomateNOWSecurityRoleDomain`, `Add-AutomateNOWSecurityRoleUser`, `ConvertFrom-AutomateNOWContextVariable`, `Copy-AutomateNOWAnomaly`, `Copy-AutomateNOWSecurityRole`, `Copy-AutomateNOWSecurityRoleDomain`, `Export-AutomateNOWAnomaly`, `Export-AutomateNOWResourceAnomaly`, `Export-AutomateNOWSecurityAccessToken`, `Export-AutomateNOWSecurityRole`, `Export-AutomateNOWSecurityRoleDomain`, `Export-AutomateNOWSecurityRoleUser`, `Export-AutomateNOWServerNodeEndpoint`, `Get-AutomateNOWAnomaly`, `Get-AutomateNOWSecurityRole`, `New-AutomateNOWAnomaly`, `New-AutomateNOWSecurityRole`, `Pop-AutomateNOWServerNodeEndpoint`, `Push-AutomateNOWServerNodeEndpoint`, `Read-AutomateNOWResourceAnomaly`, `Read-AutomateNOWSecurityAccessToken`, `Read-AutomateNOWSecurityRoleDomain`, `Read-AutomateNOWSecurityRoleUser`, `Remove-AutomateNOWAnomaly`, `Remove-AutomateNOWResourceAnomaly`, `Remove-AutomateNOWSecurityAccessToken`, `Remove-AutomateNOWSecurityRole`, `Remove-AutomateNOWSecurityRoleDomain`, `Remove-AutomateNOWSecurityRoleUser`, `Rename-AutomateNOWAnomaly`, `Rename-AutomateNOWSecurityRole`, `Set-AutomateNOWAnomaly`, `Set-AutomateNOWSecurityRole`, `Set-AutomateNOWSecurityRoleDomain`, `Set-AutomateNOWServerNodeEndpoint`, `Trace-AutomateNOWProcessing`, `Wait-AutomateNOWSchedule`
+- Fixed another issue with `Get-AutomateNOWVariable` only returning preview values
+- Fixed an issue with the parameter sets for `Set-AutomateNOWBusinessView`
+- Corrected the usage of the `iconSet` enum in a number of places (some objects only accept two types of icons instead of three)
+- Repaired some issues with `Read-AutomateNOWServiceManagerTemplateItem`
+- Renamed all "User" functions to "SecUser" (e.g. `Export-AutomateNOWUser` is now `Export-AutomateNOWSecUser`)
+- Renamed `Get-AutomateNOWCodeRepositoryItem` to `Read-AutomateNOWCodeRepositoryItem`
+- Renamed the parameter `-InactiveUsers` to `-ActiveUsersOnly` for `Get-AutomateNOWSecUser`
+- Renamed `Trace-AutomateNOWWorkflow` to `Trace-AutomateNOWProcessing` (aliases cover Schedules, Service Managers, Tasks & Workflows)
+- Changed the default sortBy from `id` to `dateCreated` for `Get-AutomateNOWSchedule`, `Get-AutomateNOWServiceManager`, `Get-AutomateNOWTask` & `Get-AutomateNOWWorkflow`
+- Added the parameters `-IncludeAPIUsers` and `APIUsersOnly` to `Get-AutomateNOWSecUser`
+- Added the parameters `-startRow` and `-endRow` to `Get-AutomateNOWDomain`
+- Added the parameters `-startRow` and `-endRow` to `Get-AutomateNOWFolder`
+- Added the parameters `-startRow`, `-endRow` and `-AllDomains` to `Get-AutomateNOWTag`
+- Added the parameter `-PreviewOnly` to `Get-AutomateNOWContextVariable`
+- Added the parameter `-EventParameters` to `Start-AutomateNOWEvent`
+- Added the parameter `-Folder` to `Get-AutomateNOWScheduleTemplate`, `Get-AutomateNOWServiceManagerTemplate` and `Get-AutomateWorkflowScheduleTemplate`
+- Added new method `GetCurrentTime()` to [ANOWTimeZone]
+- Optimzed and re-organized the Classes.psm1 file significantly. All custom classes are clearly identified.
+- Many tiny fixes and improvements to the in-line help
 
 ## 1.0.31
 ### Major update
@@ -399,6 +433,9 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 ### How do I use a particular command? Where's the help?
 >Type the name of the command followed by -?.
 
+### Help! I keep receiving the error message "Parameter set cannot be resolved using the specified named parameters."
+>Again, type the name of the command followed by -?. You need to review the "parameter sets". Not all parameters can be mixed with others. Please consult the built-in help.
+
 ### How do I see the actual payloads, headers, parameters that are sent to ANOW? In other words, how can I see what's happening "under the hood" while the function is running?
 >Include the `-Verbose` parameter (use with caution)
 
@@ -494,787 +531,868 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 ### How do I start a Workflow, wait for it to finish executing and then return all of the related Context Variables in a single command?
 > `Get-AutomateNOWWorkflowTemplate -Id 'WorkflowTemplate1' | Start-AutomateNOWWorkflowTemplate | Trace-AutomateNOWWorkflow -WaitForExecution -ReturnContextVariables`
 
-### Where are the items from the Monitoring -> Trigger tab?
+### How can I see the items that exist in the UI under the Monitoring -> Trigger tab?
 > Use `Get-AutomateNOWSchedule` to retrieve these
+
+### I just want to remove the tags from 1 privilege in a Domain Security Role. How do I do that?
+> To clear the tags from an individual privilege in a Domain Security Role without disabling it you have to use the `Set-AutomateNOWSecurityRoleDomain` function twice. First, set the privilege to $false then back to $true.
+
+### What is the difference between an [ANOWResource] object, an [ANOWAnomaly] object and the [ANOWResourceAnomaly] object? This is confusing
+> An [ANOWResource] is a base class that is the foundation for the 9 Resource objects (e.g. Locks, Stocks, Metrics).
+> An [ANOWAnomaly] is a class representing the ANOW Anomaly object. These are intended for interpreting Metrics.
+> An [ANOWResourceAnomaly] is a class representing what you get when you add an Anomaly to a Metric.
+> Think of [ANOWResourceAnomaly] as synonymous with adding a Task Template to a Workflow Template or a Business View Item to a Business View.
 
 ## Functions 🛠
 
-`Add-AutomateNOWApprovalRule`
+`Add-AutomateNOWApprovalRule`,
 
-`Add-AutomateNOWBusinessViewItem`
+`Add-AutomateNOWBusinessViewItem`,
 
-`Add-AutomateNOWCodeRepositoryItem`
+`Add-AutomateNOWCodeRepositoryItem`,
 
-`Add-AutomateNOWDataSourceItem`
+`Add-AutomateNOWDataSourceItem`,
 
-`Add-AutomateNOWNotificationGroupMember`
+`Add-AutomateNOWNotificationGroupMember`,
 
-`Add-AutomateNOWResultMappingRule`
+`Add-AutomateNOWResultMappingRule`,
 
-`Add-AutomateNOWScheduleTemplateItem`
+`Add-AutomateNOWScheduleTemplateItem`,
 
-`Add-AutomateNOWServerNodeEndpoint`
+`Add-AutomateNOWSecurityAccessToken`,
 
-`Add-AutomateNOWServiceManagerTemplateItem`
+`Add-AutomateNOWSecurityRoleDomain`,
 
-`Add-AutomateNOWTimeTrigger`
+`Add-AutomateNOWSecurityRoleUser`,
 
-`Add-AutomateNOWWorkflowTemplateItem`
+`Add-AutomateNOWServerNodeEndpoint`,
 
-`Approve-AutomateNOWCodeRepositoryMergeRequest`
+`Add-AutomateNOWServiceManagerTemplateItem`,
 
-`Clear-AutomateNOWDomain`
+`Add-AutomateNOWTimeTrigger`,
 
-`Compare-AutomateNOWCodeRepositoryConflictItem`
+`Add-AutomateNOWWorkflowTemplateItem`,
 
-`Confirm-AutomateNOWCodeRepository`
+`Approve-AutomateNOWCodeRepositoryMergeRequest`,
 
-`Confirm-AutomateNOWScheduleTemplate`
+`Clear-AutomateNOWDomain`,
 
-`Confirm-AutomateNOWServiceManagerTemplate`
+`Compare-AutomateNOWCodeRepositoryConflictItem`,
 
-`Confirm-AutomateNOWSession`
+`Confirm-AutomateNOWCodeRepository`,
 
-`Confirm-AutomateNOWTaskTemplate`
+`Confirm-AutomateNOWScheduleTemplate`,
 
-`Confirm-AutomateNOWWorkflowTemplate`
+`Confirm-AutomateNOWServiceManagerTemplate`,
 
-`Connect-AutomateNOW`
+`Confirm-AutomateNOWSession`,
 
-`Copy-AutomateNOWAdhocReport`
+`Confirm-AutomateNOWTaskTemplate`,
 
-`Copy-AutomateNOWAgent`
+`Confirm-AutomateNOWWorkflowTemplate`,
 
-`Copy-AutomateNOWApproval`
+`Connect-AutomateNOW`,
 
-`Copy-AutomateNOWBusinessView`
+`ConvertFrom-AutomateNOWContextVariable`,
 
-`Copy-AutomateNOWCalendar`
+`Copy-AutomateNOWAdhocReport`,
 
-`Copy-AutomateNOWDataSource`
+`Copy-AutomateNOWAgent`,
 
-`Copy-AutomateNOWDomain`
+`Copy-AutomateNOWAnomaly`,
 
-`Copy-AutomateNOWEndpoint`
+`Copy-AutomateNOWApproval`,
 
-`Copy-AutomateNOWEvent`
+`Copy-AutomateNOWBusinessView`,
 
-`Copy-AutomateNOWLock`
+`Copy-AutomateNOWCalendar`,
 
-`Copy-AutomateNOWMetric`
+`Copy-AutomateNOWDataSource`,
 
-`Copy-AutomateNOWNotificationChannel`
+`Copy-AutomateNOWDomain`,
 
-`Copy-AutomateNOWNotificationGroup`
+`Copy-AutomateNOWEndpoint`,
 
-`Copy-AutomateNOWNotificationMessageTemplate`
+`Copy-AutomateNOWEvent`,
 
-`Copy-AutomateNOWPhysicalResource`
+`Copy-AutomateNOWLock`,
 
-`Copy-AutomateNOWResultMapping`
+`Copy-AutomateNOWMetric`,
 
-`Copy-AutomateNOWScheduleTemplate`
+`Copy-AutomateNOWNotificationChannel`,
 
-`Copy-AutomateNOWSemaphore`
+`Copy-AutomateNOWNotificationGroup`,
 
-`Copy-AutomateNOWServerNode`
+`Copy-AutomateNOWNotificationMessageTemplate`,
 
-`Copy-AutomateNOWServiceManagerTemplate`
+`Copy-AutomateNOWPhysicalResource`,
 
-`Copy-AutomateNOWStock`
+`Copy-AutomateNOWResultMapping`,
 
-`Copy-AutomateNOWTaskTemplate`
+`Copy-AutomateNOWScheduleTemplate`,
 
-`Copy-AutomateNOWTimeWindow`
+`Copy-AutomateNOWSecurityRole`,
 
-`Copy-AutomateNOWUserReport`
+`Copy-AutomateNOWSecurityRoleDomain`,
 
-`Copy-AutomateNOWVariable`
+`Copy-AutomateNOWSemaphore`,
 
-`Copy-AutomateNOWWorkflowTemplate`
+`Copy-AutomateNOWServerNode`,
 
-`Copy-AutomateNOWWorkspace`
+`Copy-AutomateNOWServiceManagerTemplate`,
 
-`Deny-AutomateNOWCodeRepositoryMergeRequest`
+`Copy-AutomateNOWStock`,
 
-`Disconnect-AutomateNOW`
+`Copy-AutomateNOWTaskTemplate`,
 
-`Dismount-AutomateNOWServerNode`
+`Copy-AutomateNOWTimeWindow`,
 
-`Edit-AutomateNOWCodeRepositoryObjectSource`
+`Copy-AutomateNOWUserReport`,
 
-`Edit-AutomateNOWDataSourceItem`
+`Copy-AutomateNOWVariable`,
 
-`Export-AutomateNOWAdhocReport`
+`Copy-AutomateNOWWorkflowTemplate`,
 
-`Export-AutomateNOWAgent`
+`Copy-AutomateNOWWorkspace`,
 
-`Export-AutomateNOWApproval`
+`Deny-AutomateNOWCodeRepositoryMergeRequest`,
 
-`Export-AutomateNOWAuditLog`
+`Disconnect-AutomateNOW`,
 
-`Export-AutomateNOWBusinessView`
+`Dismount-AutomateNOWServerNode`,
 
-`Export-AutomateNOWCalendar`
+`Edit-AutomateNOWCodeRepositoryObjectSource`,
 
-`Export-AutomateNOWCodeRepository`
+`Edit-AutomateNOWDataSourceItem`,
 
-`Export-AutomateNOWCodeRepositoryObjectSource`
+`Export-AutomateNOWAdhocReport`,
 
-`Export-AutomateNOWContextVariable`
+`Export-AutomateNOWAgent`,
 
-`Export-AutomateNOWDataSource`
+`Export-AutomateNOWAnomaly`,
 
-`Export-AutomateNOWDataSourceItem`
+`Export-AutomateNOWApproval`,
 
-`Export-AutomateNOWDomain`
+`Export-AutomateNOWAuditLog`,
 
-`Export-AutomateNOWEndpoint`
+`Export-AutomateNOWBusinessView`,
 
-`Export-AutomateNOWEvent`
+`Export-AutomateNOWCalendar`,
 
-`Export-AutomateNOWFolder`
+`Export-AutomateNOWCodeRepository`,
 
-`Export-AutomateNOWIcon`
+`Export-AutomateNOWCodeRepositoryObjectSource`,
 
-`Export-AutomateNOWLock`
+`Export-AutomateNOWContextVariable`,
 
-`Export-AutomateNOWMetric`
+`Export-AutomateNOWDataSource`,
 
-`Export-AutomateNOWNotification`
+`Export-AutomateNOWDataSourceItem`,
 
-`Export-AutomateNOWNotificationChannel`
+`Export-AutomateNOWDomain`,
 
-`Export-AutomateNOWNotificationGroup`
+`Export-AutomateNOWEndpoint`,
 
-`Export-AutomateNOWNotificationGroupMember`
+`Export-AutomateNOWEvent`,
 
-`Export-AutomateNOWNotificationMessageTemplate`
+`Export-AutomateNOWFolder`,
 
-`Export-AutomateNOWPhysicalResource`
+`Export-AutomateNOWIcon`,
 
-`Export-AutomateNOWProcessingEventLog`
+`Export-AutomateNOWLock`,
 
-`Export-AutomateNOWResultMapping`
+`Export-AutomateNOWMetric`,
 
-`Export-AutomateNOWSchedule`
+`Export-AutomateNOWNotification`,
 
-`Export-AutomateNOWScheduleTemplate`
+`Export-AutomateNOWNotificationChannel`,
 
-`Export-AutomateNOWSecurityEventLog`
+`Export-AutomateNOWNotificationGroup`,
 
-`Export-AutomateNOWSemaphore`
+`Export-AutomateNOWNotificationGroupMember`,
 
-`Export-AutomateNOWSemaphoreTimestamp`
+`Export-AutomateNOWNotificationMessageTemplate`,
 
-`Export-AutomateNOWServerNode`
+`Export-AutomateNOWPhysicalResource`,
 
-`Export-AutomateNOWServiceManager`
+`Export-AutomateNOWProcessingEventLog`,
 
-`Export-AutomateNOWServiceManagerTemplate`
+`Export-AutomateNOWResultMapping`,
 
-`Export-AutomateNOWStock`
+`Export-AutomateNOWSchedule`,
 
-`Export-AutomateNOWTag`
+`Export-AutomateNOWScheduleTemplate`,
 
-`Export-AutomateNOWTask`
+`Export-AutomateNOWSecurityAccessToken`,
 
-`Export-AutomateNOWTaskTemplate`
+`Export-AutomateNOWSecurityEventLog`,
 
-`Export-AutomateNOWTimeTrigger`
+`Export-AutomateNOWSecurityRole`,
 
-`Export-AutomateNOWTimeWindow`
+`Export-AutomateNOWSecurityRoleDomain`,
 
-`Export-AutomateNOWTimeZone`
+`Export-AutomateNOWSecurityRoleUser`,
 
-`Export-AutomateNOWUser`
+`Export-AutomateNOWSecUser`,
 
-`Export-AutomateNOWUserReport`
+`Export-AutomateNOWSemaphore`,
 
-`Export-AutomateNOWVariable`
+`Export-AutomateNOWSemaphoreTimestamp`,
 
-`Export-AutomateNOWVariableTimestamp`
+`Export-AutomateNOWServerNode`,
 
-`Export-AutomateNOWWorkflow`
+`Export-AutomateNOWServerNodeEndpoint`,
 
-`Export-AutomateNOWWorkflowTemplate`
+`Export-AutomateNOWServiceManager`,
 
-`Export-AutomateNOWWorkspace`
+`Export-AutomateNOWServiceManagerTemplate`,
 
-`Find-AutomateNOWObjectReferral`
+`Export-AutomateNOWStock`,
 
-`Get-AutomateNOWAdhocReport`
+`Export-AutomateNOWTag`,
 
-`Get-AutomateNOWAgent`
+`Export-AutomateNOWTask`,
 
-`Get-AutomateNOWApproval`
+`Export-AutomateNOWTaskTemplate`,
 
-`Get-AutomateNOWAuditLog`
+`Export-AutomateNOWTimeTrigger`,
 
-`Get-AutomateNOWBusinessView`
+`Export-AutomateNOWTimeWindow`,
 
-`Get-AutomateNOWCalendar`
+`Export-AutomateNOWTimeZone`,
 
-`Get-AutomateNOWCodeRepository`
+`Export-AutomateNOWUserReport`,
 
-`Get-AutomateNOWCodeRepositoryBranch`
+`Export-AutomateNOWVariable`,
 
-`Get-AutomateNOWCodeRepositoryConflictItem`
+`Export-AutomateNOWVariableTimestamp`,
 
-`Get-AutomateNOWCodeRepositoryItem`
+`Export-AutomateNOWWorkflow`,
 
-`Get-AutomateNOWCodeRepositoryMergeRequest`
+`Export-AutomateNOWWorkflowTemplate`,
 
-`Get-AutomateNOWCodeRepositoryObjectSource`
+`Export-AutomateNOWWorkspace`,
 
-`Get-AutomateNOWCodeRepositoryTag`
+`Find-AutomateNOWObjectReferral`,
 
-`Get-AutomateNOWContextVariable`
+`Get-AutomateNOWAdhocReport`,
 
-`Get-AutomateNOWDataSource`
+`Get-AutomateNOWAgent`,
 
-`Get-AutomateNOWDomain`
+`Get-AutomateNOWAnomaly`,
 
-`Get-AutomateNOWEndpoint`
+`Get-AutomateNOWApproval`,
 
-`Get-AutomateNOWEvent`
+`Get-AutomateNOWAuditLog`,
 
-`Get-AutomateNOWFolder`
+`Get-AutomateNOWBusinessView`,
 
-`Get-AutomateNOWLock`
+`Get-AutomateNOWCalendar`,
 
-`Get-AutomateNOWMetric`
+`Get-AutomateNOWCodeRepository`,
 
-`Get-AutomateNOWNotification`
+`Get-AutomateNOWCodeRepositoryBranch`,
 
-`Get-AutomateNOWNotificationChannel`
+`Get-AutomateNOWCodeRepositoryConflictItem`,
 
-`Get-AutomateNOWNotificationGroup`
+`Get-AutomateNOWCodeRepositoryMergeRequest`,
 
-`Get-AutomateNOWNotificationGroupMember`
+`Get-AutomateNOWCodeRepositoryObjectSource`,
 
-`Get-AutomateNOWNotificationMessageTemplate`
+`Get-AutomateNOWCodeRepositoryTag`,
 
-`Get-AutomateNOWPhysicalResource`
+`Get-AutomateNOWContextVariable`,
 
-`Get-AutomateNOWProcessingEventLog`
+`Get-AutomateNOWDataSource`,
 
-`Get-AutomateNOWResultMapping`
+`Get-AutomateNOWDomain`,
 
-`Get-AutomateNOWSchedule`
+`Get-AutomateNOWEndpoint`,
 
-`Get-AutomateNOWScheduleTemplate`
+`Get-AutomateNOWEvent`,
 
-`Get-AutomateNOWSecurityEventLog`
+`Get-AutomateNOWFolder`,
 
-`Get-AutomateNOWSemaphore`
+`Get-AutomateNOWLock`,
 
-`Get-AutomateNOWSemaphoreTimestamp`
+`Get-AutomateNOWMetric`,
 
-`Get-AutomateNOWServerNode`
+`Get-AutomateNOWNotification`,
 
-`Get-AutomateNOWServiceManager`
+`Get-AutomateNOWNotificationChannel`,
 
-`Get-AutomateNOWServiceManagerTemplate`
+`Get-AutomateNOWNotificationGroup`,
 
-`Get-AutomateNOWStock`
+`Get-AutomateNOWNotificationGroupMember`,
 
-`Get-AutomateNOWTag`
+`Get-AutomateNOWNotificationMessageTemplate`,
 
-`Get-AutomateNOWTask`
+`Get-AutomateNOWPhysicalResource`,
 
-`Get-AutomateNOWTaskTemplate`
+`Get-AutomateNOWProcessingEventLog`,
 
-`Get-AutomateNOWTimeTrigger`
+`Get-AutomateNOWResultMapping`,
 
-`Get-AutomateNOWTimeWindow`
+`Get-AutomateNOWSchedule`,
 
-`Get-AutomateNOWTimeZone`
+`Get-AutomateNOWScheduleTemplate`,
 
-`Get-AutomateNOWUser`
+`Get-AutomateNOWSecurityEventLog`,
 
-`Get-AutomateNOWUserReport`
+`Get-AutomateNOWSecurityRole`,
 
-`Get-AutomateNOWVariable`
+`Get-AutomateNOWSecUser`,
 
-`Get-AutomateNOWVariableTimestamp`
+`Get-AutomateNOWSemaphore`,
 
-`Get-AutomateNOWWorkflow`
+`Get-AutomateNOWSemaphoreTimestamp`,
 
-`Get-AutomateNOWWorkflowTemplate`
+`Get-AutomateNOWServerNode`,
 
-`Get-AutomateNOWWorkspace`
+`Get-AutomateNOWServiceManager`,
 
-`Import-AutomateNOWIcon`
+`Get-AutomateNOWServiceManagerTemplate`,
 
-`Import-AutomateNOWLocalIcon`
+`Get-AutomateNOWStock`,
 
-`Import-AutomateNOWLocalTimeZone`
+`Get-AutomateNOWTag`,
 
-`Import-AutomateNOWTimeZone`
+`Get-AutomateNOWTask`,
 
-`Invoke-AutomateNOWAdhocReport`
+`Get-AutomateNOWTaskTemplate`,
 
-`Invoke-AutomateNOWAPI`
+`Get-AutomateNOWTimeTrigger`,
 
-`Merge-AutomateNOWCodeRepositoryBranch`
+`Get-AutomateNOWTimeWindow`,
 
-`Merge-AutomateNOWCodeRepositoryConflictItem`
+`Get-AutomateNOWTimeZone`,
 
-`New-AutomateNOWAdhocReport`
+`Get-AutomateNOWUserReport`,
 
-`New-AutomateNOWAgent`
+`Get-AutomateNOWVariable`,
 
-`New-AutomateNOWApproval`
+`Get-AutomateNOWVariableTimestamp`,
 
-`New-AutomateNOWApprovalRule`
+`Get-AutomateNOWWorkflow`,
 
-`New-AutomateNOWBusinessView`
+`Get-AutomateNOWWorkflowTemplate`,
 
-`New-AutomateNOWCalendar`
+`Get-AutomateNOWWorkspace`,
 
-`New-AutomateNOWCodeRepository`
+`Import-AutomateNOWIcon`,
 
-`New-AutomateNOWCodeRepositoryBranch`
+`Import-AutomateNOWLocalIcon`,
 
-`New-AutomateNOWCodeRepositoryTag`
+`Import-AutomateNOWLocalTimeZone`,
 
-`New-AutomateNOWDataSource`
+`Import-AutomateNOWTimeZone`,
 
-`New-AutomateNOWDefaultProcessingTitle`
+`Invoke-AutomateNOWAdhocReport`,
 
-`New-AutomateNOWDomain`
+`Invoke-AutomateNOWAPI`,
 
-`New-AutomateNOWEndpoint`
+`Merge-AutomateNOWCodeRepositoryBranch`,
 
-`New-AutomateNOWEvent`
+`Merge-AutomateNOWCodeRepositoryConflictItem`,
 
-`New-AutomateNOWFolder`
+`New-AutomateNOWAdhocReport`,
 
-`New-AutomateNOWLock`
+`New-AutomateNOWAgent`,
 
-`New-AutomateNOWMetric`
+`New-AutomateNOWAnomaly`,
 
-`New-AutomateNOWNotificationChannel`
+`New-AutomateNOWApproval`,
 
-`New-AutomateNOWNotificationGroup`
+`New-AutomateNOWApprovalRule`,
 
-`New-AutomateNOWNotificationMessageTemplate`
+`New-AutomateNOWBusinessView`,
 
-`New-AutomateNOWPhysicalResource`
+`New-AutomateNOWCalendar`,
 
-`New-AutomateNOWResultMapping`
+`New-AutomateNOWCodeRepository`,
 
-`New-AutomateNOWResultMappingRule`
+`New-AutomateNOWCodeRepositoryBranch`,
 
-`New-AutomateNOWResultMappingRuleCondition`
+`New-AutomateNOWCodeRepositoryTag`,
 
-`New-AutomateNOWResultMappingRuleConditionCriteria`
+`New-AutomateNOWDataSource`,
 
-`New-AutomateNOWScheduleTemplate`
+`New-AutomateNOWDefaultProcessingTitle`,
 
-`New-AutomateNOWSemaphore`
+`New-AutomateNOWDomain`,
 
-`New-AutomateNOWServerDayTimestamp`
+`New-AutomateNOWEndpoint`,
 
-`New-AutomateNOWServerNode`
+`New-AutomateNOWEvent`,
 
-`New-AutomateNOWServiceManagerTemplate`
+`New-AutomateNOWFolder`,
 
-`New-AutomateNOWStock`
+`New-AutomateNOWLock`,
 
-`New-AutomateNOWTag`
+`New-AutomateNOWMetric`,
 
-`New-AutomateNOWTaskTemplate`
+`New-AutomateNOWNotificationChannel`,
 
-`New-AutomateNOWTimeWindow`
+`New-AutomateNOWNotificationGroup`,
 
-`New-AutomateNOWUser`
+`New-AutomateNOWNotificationMessageTemplate`,
 
-`New-AutomateNOWVariable`
+`New-AutomateNOWPhysicalResource`,
 
-`New-AutomateNOWWorkflowTemplate`
+`New-AutomateNOWResultMapping`,
 
-`New-AutomateNOWWorkspace`
+`New-AutomateNOWResultMappingRule`,
 
-`Pop-AutomateNOWLoadBalancerNode`
+`New-AutomateNOWResultMappingRuleCondition`,
 
-`Protect-AutomateNOWEncryptedString`
+`New-AutomateNOWResultMappingRuleConditionCriteria`,
 
-`Publish-AutomateNOWCodeRepository`
+`New-AutomateNOWScheduleTemplate`,
 
-`Push-AutomateNOWLoadBalancerNode`
+`New-AutomateNOWSecurityRole`,
 
-`Read-AutomateNOWBusinessViewItem`
+`New-AutomateNOWSecUser`,
 
-`Read-AutomateNOWDataSourceItem`
+`New-AutomateNOWSemaphore`,
 
-`Read-AutomateNOWIcon`
+`New-AutomateNOWServerDayTimestamp`,
 
-`Read-AutomateNOWScheduleTemplateItem`
+`New-AutomateNOWServerNode`,
 
-`Read-AutomateNOWServerNodeEndpoint`
+`New-AutomateNOWServiceManagerTemplate`,
 
-`Read-AutomateNOWServiceManagerTemplateItem`
+`New-AutomateNOWStock`,
 
-`Read-AutomateNOWWorkflowTemplateItem`
+`New-AutomateNOWTag`,
 
-`Receive-AutomateNOWCodeRepository`
+`New-AutomateNOWTaskTemplate`,
 
-`Remove-AutomateNOWAdhocReport`
+`New-AutomateNOWTimeWindow`,
 
-`Remove-AutomateNOWAgent`
+`New-AutomateNOWVariable`,
 
-`Remove-AutomateNOWApproval`
+`New-AutomateNOWWorkflowTemplate`,
 
-`Remove-AutomateNOWBusinessView`
+`New-AutomateNOWWorkspace`,
 
-`Remove-AutomateNOWBusinessViewItem`
+`Pop-AutomateNOWLoadBalancerNode`,
 
-`Remove-AutomateNOWCalendar`
+`Pop-AutomateNOWServerNodeEndpoint`,
 
-`Remove-AutomateNOWCodeRepository`
+`Protect-AutomateNOWEncryptedString`,
 
-`Remove-AutomateNOWCodeRepositoryBranch`
+`Publish-AutomateNOWCodeRepository`,
 
-`Remove-AutomateNOWCodeRepositoryItem`
+`Push-AutomateNOWLoadBalancerNode`,
 
-`Remove-AutomateNOWCodeRepositoryTag`
+`Push-AutomateNOWServerNodeEndpoint`,
 
-`Remove-AutomateNOWDataSource`
+`Read-AutomateNOWBusinessViewItem`,
 
-`Remove-AutomateNOWDataSourceItem`
+`Read-AutomateNOWCodeRepositoryItem`,
 
-`Remove-AutomateNOWDomain`
+`Read-AutomateNOWDataSourceItem`,
 
-`Remove-AutomateNOWEndpoint`
+`Read-AutomateNOWIcon`,
 
-`Remove-AutomateNOWEvent`
+`Read-AutomateNOWResourceAnomaly`,
 
-`Remove-AutomateNOWFolder`
+`Read-AutomateNOWScheduleTemplateItem`,
 
-`Remove-AutomateNOWLock`
+`Read-AutomateNOWSecurityAccessToken`,
 
-`Remove-AutomateNOWMetric`
+`Read-AutomateNOWSecurityRoleDomain`,
 
-`Remove-AutomateNOWNotification`
+`Read-AutomateNOWSecurityRoleUser`,
 
-`Remove-AutomateNOWNotificationChannel`
+`Read-AutomateNOWServerNodeEndpoint`,
 
-`Remove-AutomateNOWNotificationGroup`
+`Read-AutomateNOWServiceManagerTemplateItem`,
 
-`Remove-AutomateNOWNotificationGroupMember`
+`Read-AutomateNOWWorkflowTemplateItem`,
 
-`Remove-AutomateNOWNotificationMessageTemplate`
+`Receive-AutomateNOWCodeRepository`,
 
-`Remove-AutomateNOWPhysicalResource`
+`Remove-AutomateNOWAdhocReport`,
 
-`Remove-AutomateNOWResultMapping`
+`Remove-AutomateNOWAgent`,
 
-`Remove-AutomateNOWSchedule`
+`Remove-AutomateNOWAnomaly`,
 
-`Remove-AutomateNOWScheduleTemplate`
+`Remove-AutomateNOWApproval`,
 
-`Remove-AutomateNOWScheduleTemplateItem`
+`Remove-AutomateNOWBusinessView`,
 
-`Remove-AutomateNOWSemaphore`
+`Remove-AutomateNOWBusinessViewItem`,
 
-`Remove-AutomateNOWServerNode`
+`Remove-AutomateNOWCalendar`,
 
-`Remove-AutomateNOWServerNodeEndpoint`
+`Remove-AutomateNOWCodeRepository`,
 
-`Remove-AutomateNOWServiceManager`
+`Remove-AutomateNOWCodeRepositoryBranch`,
 
-`Remove-AutomateNOWServiceManagerTemplate`
+`Remove-AutomateNOWCodeRepositoryItem`,
 
-`Remove-AutomateNOWServiceManagerTemplateItem`
+`Remove-AutomateNOWCodeRepositoryTag`,
 
-`Remove-AutomateNOWStock`
+`Remove-AutomateNOWDataSource`,
 
-`Remove-AutomateNOWTag`
+`Remove-AutomateNOWDataSourceItem`,
 
-`Remove-AutomateNOWTask`
+`Remove-AutomateNOWDomain`,
 
-`Remove-AutomateNOWTaskTemplate`
+`Remove-AutomateNOWEndpoint`,
 
-`Remove-AutomateNOWTimeTrigger`
+`Remove-AutomateNOWEvent`,
 
-`Remove-AutomateNOWTimeWindow`
+`Remove-AutomateNOWFolder`,
 
-`Remove-AutomateNOWUser`
+`Remove-AutomateNOWLock`,
 
-`Remove-AutomateNOWUserReport`
+`Remove-AutomateNOWMetric`,
 
-`Remove-AutomateNOWVariable`
+`Remove-AutomateNOWNotification`,
 
-`Remove-AutomateNOWWorkflow`
+`Remove-AutomateNOWNotificationChannel`,
 
-`Remove-AutomateNOWWorkflowTemplate`
+`Remove-AutomateNOWNotificationGroup`,
 
-`Remove-AutomateNOWWorkflowTemplateItem`
+`Remove-AutomateNOWNotificationGroupMember`,
 
-`Remove-AutomateNOWWorkspace`
+`Remove-AutomateNOWNotificationMessageTemplate`,
 
-`Rename-AutomateNOWAdhocReport`
+`Remove-AutomateNOWPhysicalResource`,
 
-`Rename-AutomateNOWAgent`
+`Remove-AutomateNOWResourceAnomaly`,
 
-`Rename-AutomateNOWApproval`
+`Remove-AutomateNOWResultMapping`,
 
-`Rename-AutomateNOWBusinessView`
+`Remove-AutomateNOWSchedule`,
 
-`Rename-AutomateNOWCalendar`
+`Remove-AutomateNOWScheduleTemplate`,
 
-`Rename-AutomateNOWDataSource`
+`Remove-AutomateNOWScheduleTemplateItem`,
 
-`Rename-AutomateNOWDomain`
+`Remove-AutomateNOWSecurityAccessToken`,
 
-`Rename-AutomateNOWEndpoint`
+`Remove-AutomateNOWSecurityRole`,
 
-`Rename-AutomateNOWEvent`
+`Remove-AutomateNOWSecurityRoleDomain`,
 
-`Rename-AutomateNOWLock`
+`Remove-AutomateNOWSecurityRoleUser`,
 
-`Rename-AutomateNOWMetric`
+`Remove-AutomateNOWSecUser`,
 
-`Rename-AutomateNOWNotificationChannel`
+`Remove-AutomateNOWSemaphore`,
 
-`Rename-AutomateNOWNotificationGroup`
+`Remove-AutomateNOWServerNode`,
 
-`Rename-AutomateNOWNotificationMessageTemplate`
+`Remove-AutomateNOWServerNodeEndpoint`,
 
-`Rename-AutomateNOWPhysicalResource`
+`Remove-AutomateNOWServiceManager`,
 
-`Rename-AutomateNOWResultMapping`
+`Remove-AutomateNOWServiceManagerTemplate`,
 
-`Rename-AutomateNOWScheduleTemplate`
+`Remove-AutomateNOWServiceManagerTemplateItem`,
 
-`Rename-AutomateNOWSemaphore`
+`Remove-AutomateNOWStock`,
 
-`Rename-AutomateNOWServerNode`
+`Remove-AutomateNOWTag`,
 
-`Rename-AutomateNOWServiceManagerTemplate`
+`Remove-AutomateNOWTask`,
 
-`Rename-AutomateNOWStock`
+`Remove-AutomateNOWTaskTemplate`,
 
-`Rename-AutomateNOWTaskTemplate`
+`Remove-AutomateNOWTimeTrigger`,
 
-`Rename-AutomateNOWTimeWindow`
+`Remove-AutomateNOWTimeWindow`,
 
-`Rename-AutomateNOWUserReport`
+`Remove-AutomateNOWUserReport`,
 
-`Rename-AutomateNOWVariable`
+`Remove-AutomateNOWVariable`,
 
-`Rename-AutomateNOWWorkflowTemplate`
+`Remove-AutomateNOWWorkflow`,
 
-`Rename-AutomateNOWWorkspace`
+`Remove-AutomateNOWWorkflowTemplate`,
 
-`Resolve-AutomateNOWCodeRepository`
+`Remove-AutomateNOWWorkflowTemplateItem`,
 
-`Resolve-AutomateNOWEndpoinType2JavaScriptDefinition`
+`Remove-AutomateNOWWorkspace`,
 
-`Resolve-AutomateNOWMonitorType2ServerNodeType`
+`Rename-AutomateNOWAdhocReport`,
 
-`Resolve-AutomateNOWSensorType2ServerNodeType`
+`Rename-AutomateNOWAgent`,
 
-`Resolve-AutomateNOWTaskType2ServerNodeType`
+`Rename-AutomateNOWAnomaly`,
 
-`Restart-AutomateNOWSchedule`
+`Rename-AutomateNOWApproval`,
 
-`Restart-AutomateNOWServiceManager`
+`Rename-AutomateNOWBusinessView`,
 
-`Restart-AutomateNOWTask`
+`Rename-AutomateNOWCalendar`,
 
-`Restart-AutomateNOWWorkflow`
+`Rename-AutomateNOWDataSource`,
 
-`Resume-AutomateNOWDomain`
+`Rename-AutomateNOWDomain`,
 
-`Resume-AutomateNOWSchedule`
+`Rename-AutomateNOWEndpoint`,
 
-`Resume-AutomateNOWScheduleTemplate`
+`Rename-AutomateNOWEvent`,
 
-`Resume-AutomateNOWServerNode`
+`Rename-AutomateNOWLock`,
 
-`Resume-AutomateNOWServiceManager`
+`Rename-AutomateNOWMetric`,
 
-`Resume-AutomateNOWServiceManagerTemplate`
+`Rename-AutomateNOWNotificationChannel`,
 
-`Resume-AutomateNOWTask`
+`Rename-AutomateNOWNotificationGroup`,
 
-`Resume-AutomateNOWTaskTemplate`
+`Rename-AutomateNOWNotificationMessageTemplate`,
 
-`Resume-AutomateNOWTimeTrigger`
+`Rename-AutomateNOWPhysicalResource`,
 
-`Resume-AutomateNOWWorkflow`
+`Rename-AutomateNOWResultMapping`,
 
-`Resume-AutomateNOWWorkflowTemplate`
+`Rename-AutomateNOWScheduleTemplate`,
 
-`Select-AutomateNOWCodeRepositoryBranch`
+`Rename-AutomateNOWSecurityRole`,
 
-`Select-AutomateNOWCodeRepositoryTag`
+`Rename-AutomateNOWSemaphore`,
 
-`Send-AutomateNOWCodeRepository`
+`Rename-AutomateNOWServerNode`,
 
-`Set-AutomateNOWAdhocReport`
+`Rename-AutomateNOWServiceManagerTemplate`,
 
-`Set-AutomateNOWAgent`
+`Rename-AutomateNOWStock`,
 
-`Set-AutomateNOWApproval`
+`Rename-AutomateNOWTaskTemplate`,
 
-`Set-AutomateNOWBusinessView`
+`Rename-AutomateNOWTimeWindow`,
 
-`Set-AutomateNOWCodeRepository`
+`Rename-AutomateNOWUserReport`,
 
-`Set-AutomateNOWDataSource`
+`Rename-AutomateNOWVariable`,
 
-`Set-AutomateNOWDomain`
+`Rename-AutomateNOWWorkflowTemplate`,
 
-`Set-AutomateNOWEndpoint`
+`Rename-AutomateNOWWorkspace`,
 
-`Set-AutomateNOWEvent`
+`Resolve-AutomateNOWCodeRepository`,
 
-`Set-AutomateNOWFolder`
+`Resolve-AutomateNOWEndpoinType2JavaScriptDefinition`,
 
-`Set-AutomateNOWLock`
+`Resolve-AutomateNOWMonitorType2ServerNodeType`,
 
-`Set-AutomateNOWMetric`
+`Resolve-AutomateNOWSensorType2ServerNodeType`,
 
-`Set-AutomateNOWNotificationChannel`
+`Resolve-AutomateNOWTaskType2ServerNodeType`,
 
-`Set-AutomateNOWNotificationGroup`
+`Restart-AutomateNOWSchedule`,
 
-`Set-AutomateNOWNotificationGroupMember`
+`Restart-AutomateNOWServiceManager`,
 
-`Set-AutomateNOWNotificationMessageTemplate`
+`Restart-AutomateNOWTask`,
 
-`Set-AutomateNOWPhysicalResource`
+`Restart-AutomateNOWWorkflow`,
 
-`Set-AutomateNOWScheduleTemplate`
+`Resume-AutomateNOWDomain`,
 
-`Set-AutomateNOWSemaphore`
+`Resume-AutomateNOWSchedule`,
 
-`Set-AutomateNOWSemaphoreTimestamp`
+`Resume-AutomateNOWScheduleTemplate`,
 
-`Set-AutomateNOWServiceManagerTemplate`
+`Resume-AutomateNOWServerNode`,
 
-`Set-AutomateNOWStock`
+`Resume-AutomateNOWServiceManager`,
 
-`Set-AutomateNOWTag`
+`Resume-AutomateNOWServiceManagerTemplate`,
 
-`Set-AutomateNOWTaskTemplate`
+`Resume-AutomateNOWTask`,
 
-`Set-AutomateNOWTimeTrigger`
+`Resume-AutomateNOWTaskTemplate`,
 
-`Set-AutomateNOWTimeWindow`
+`Resume-AutomateNOWTimeTrigger`,
 
-`Set-AutomateNOWUser`
+`Resume-AutomateNOWWorkflow`,
 
-`Set-AutomateNOWUserPassword`
+`Resume-AutomateNOWWorkflowTemplate`,
 
-`Set-AutomateNOWUserReport`
+`Select-AutomateNOWCodeRepositoryBranch`,
 
-`Set-AutomateNOWVariable`
+`Select-AutomateNOWCodeRepositoryTag`,
 
-`Set-AutomateNOWVariableTimestamp`
+`Send-AutomateNOWCodeRepository`,
 
-`Set-AutomateNOWWorkflowTemplate`
+`Set-AutomateNOWAdhocReport`,
 
-`Set-AutomateNOWWorkspace`
+`Set-AutomateNOWAgent`,
 
-`Show-AutomateNOWCodeRepositoryConflictItemComparison`
+`Set-AutomateNOWAnomaly`,
 
-`Show-AutomateNOWEndpointType`
+`Set-AutomateNOWApproval`,
 
-`Show-AutomateNOWTaskTemplateType`
+`Set-AutomateNOWBusinessView`,
 
-`Skip-AutomateNOWSchedule`
+`Set-AutomateNOWCodeRepository`,
 
-`Skip-AutomateNOWScheduleTemplate`
+`Set-AutomateNOWDataSource`,
 
-`Skip-AutomateNOWServerNode`
+`Set-AutomateNOWDomain`,
 
-`Skip-AutomateNOWServiceManager`
+`Set-AutomateNOWEndpoint`,
 
-`Skip-AutomateNOWServiceManagerTemplate`
+`Set-AutomateNOWEvent`,
 
-`Skip-AutomateNOWTask`
+`Set-AutomateNOWFolder`,
 
-`Skip-AutomateNOWTaskTemplate`
+`Set-AutomateNOWLock`,
 
-`Skip-AutomateNOWTimeTrigger`
+`Set-AutomateNOWMetric`,
 
-`Skip-AutomateNOWWorkflow`
+`Set-AutomateNOWNotificationChannel`,
 
-`Skip-AutomateNOWWorkflowTemplate`
+`Set-AutomateNOWNotificationGroup`,
 
-`Start-AutomateNOWEvent`
+`Set-AutomateNOWNotificationGroupMember`,
 
-`Start-AutomateNOWScheduleTemplate`
+`Set-AutomateNOWNotificationMessageTemplate`,
 
-`Start-AutomateNOWServerNode`
+`Set-AutomateNOWPhysicalResource`,
 
-`Start-AutomateNOWServiceManagerTemplate`
+`Set-AutomateNOWScheduleTemplate`,
 
-`Start-AutomateNOWTaskTemplate`
+`Set-AutomateNOWSecurityRole`,
 
-`Start-AutomateNOWWorkflowTemplate`
+`Set-AutomateNOWSecurityRoleDomain`,
 
-`Stop-AutomateNOWSchedule`
+`Set-AutomateNOWSecUser`,
 
-`Stop-AutomateNOWServerNode`
+`Set-AutomateNOWSecUserPassword`,
 
-`Stop-AutomateNOWServiceManager`
+`Set-AutomateNOWSemaphore`,
 
-`Stop-AutomateNOWTask`
+`Set-AutomateNOWSemaphoreTimestamp`,
 
-`Stop-AutomateNOWWorkflow`
+`Set-AutomateNOWServerNodeEndpoint`,
 
-`Suspend-AutomateNOWDomain`
+`Set-AutomateNOWServiceManagerTemplate`,
 
-`Suspend-AutomateNOWSchedule`
+`Set-AutomateNOWStock`,
 
-`Suspend-AutomateNOWScheduleTemplate`
+`Set-AutomateNOWTag`,
 
-`Suspend-AutomateNOWServerNode`
+`Set-AutomateNOWTaskTemplate`,
 
-`Suspend-AutomateNOWServiceManager`
+`Set-AutomateNOWTimeTrigger`,
 
-`Suspend-AutomateNOWServiceManagerTemplate`
+`Set-AutomateNOWTimeWindow`,
 
-`Suspend-AutomateNOWTask`
+`Set-AutomateNOWUserReport`,
 
-`Suspend-AutomateNOWTaskTemplate`
+`Set-AutomateNOWVariable`,
 
-`Suspend-AutomateNOWTimeTrigger`
+`Set-AutomateNOWVariableTimestamp`,
 
-`Suspend-AutomateNOWWorkflow`
+`Set-AutomateNOWWorkflowTemplate`,
 
-`Suspend-AutomateNOWWorkflowTemplate`
+`Set-AutomateNOWWorkspace`,
 
-`Switch-AutomateNOWDomain`
+`Show-AutomateNOWCodeRepositoryConflictItemComparison`,
 
-`Sync-AutomateNOWCodeRepository`
+`Show-AutomateNOWEndpointType`,
 
-`Sync-AutomateNOWDomainResource`
+`Show-AutomateNOWTaskTemplateType`,
 
-`Sync-AutomateNOWDomainServerNode`
+`Skip-AutomateNOWSchedule`,
 
-`Test-AutomateNOWUserPassword`
+`Skip-AutomateNOWScheduleTemplate`,
 
-`Trace-AutomateNOWWorkFlow`
+`Skip-AutomateNOWServerNode`,
 
-`Unprotect-AutomateNOWEncryptedString`
+`Skip-AutomateNOWServiceManager`,
 
-`UnPublish-AutomateNOWCodeRepository`
+`Skip-AutomateNOWServiceManagerTemplate`,
 
-`Update-AutomateNOWCodeRepositoryObjectSource`
+`Skip-AutomateNOWTask`,
 
-`Update-AutomateNOWToken`
+`Skip-AutomateNOWTaskTemplate`,
 
-`Wait-AutomateNOWServiceManager`
+`Skip-AutomateNOWTimeTrigger`,
 
-`Wait-AutomateNOWTask`
+`Skip-AutomateNOWWorkflow`,
 
-`Wait-AutomateNOWWorkFlow`
+`Skip-AutomateNOWWorkflowTemplate`,
+
+`Start-AutomateNOWEvent`,
+
+`Start-AutomateNOWScheduleTemplate`,
+
+`Start-AutomateNOWServerNode`,
+
+`Start-AutomateNOWServiceManagerTemplate`,
+
+`Start-AutomateNOWTaskTemplate`,
+
+`Start-AutomateNOWWorkflowTemplate`,
+
+`Stop-AutomateNOWSchedule`,
+
+`Stop-AutomateNOWServerNode`,
+
+`Stop-AutomateNOWServiceManager`,
+
+`Stop-AutomateNOWTask`,
+
+`Stop-AutomateNOWWorkflow`,
+
+`Suspend-AutomateNOWDomain`,
+
+`Suspend-AutomateNOWSchedule`,
+
+`Suspend-AutomateNOWScheduleTemplate`,
+
+`Suspend-AutomateNOWServerNode`,
+
+`Suspend-AutomateNOWServiceManager`,
+
+`Suspend-AutomateNOWServiceManagerTemplate`,
+
+`Suspend-AutomateNOWTask`,
+
+`Suspend-AutomateNOWTaskTemplate`,
+
+`Suspend-AutomateNOWTimeTrigger`,
+
+`Suspend-AutomateNOWWorkflow`,
+
+`Suspend-AutomateNOWWorkflowTemplate`,
+
+`Switch-AutomateNOWDomain`,
+
+`Sync-AutomateNOWCodeRepository`,
+
+`Sync-AutomateNOWDomainResource`,
+
+`Sync-AutomateNOWDomainServerNode`,
+
+`Test-AutomateNOWSecUserPassword`,
+
+`Trace-AutomateNOWProcessing`,
+
+`Unprotect-AutomateNOWEncryptedString`,
+
+`UnPublish-AutomateNOWCodeRepository`,
+
+`Update-AutomateNOWCodeRepositoryObjectSource`,
+
+`Update-AutomateNOWToken`,
+
+`Wait-AutomateNOWSchedule`,
+
+`Wait-AutomateNOWServiceManager`,
+
+`Wait-AutomateNOWTask`,
+
+`Wait-AutomateNOWWorkFlow`,
 
 `Write-AutomateNOWIconData`
