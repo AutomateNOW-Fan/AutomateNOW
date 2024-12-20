@@ -19,7 +19,7 @@ Compatible with AutomateNOW! version 3.3.1.85 HF1
 Install from the PowerShell Gallery 👉 `Install-Module -Name AutomateNOW -Scope CurrentUser`
 <br/><br/>
 ## Usage 🤔
-Use `Connect-AutomateNOW` to establish your session (access token)
+Use `Connect-AutomateNOW` to establish your session
 <br/><br/>
 ## Features 🤓
 
@@ -39,13 +39,13 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 
 ## 1.0.32
 ### Major updates
-+ A single command `Trace-AutomateNOWProcessing` will trace any Task, Workflow, Service Manager or Schedule.
++ A single command `Trace-AutomateNOWProcessing` will trace any Task, Workflow, Service Manager or Schedule (and optionally return back its Context Variables)
 + Security Roles, User Roles & Domain Roles are added and fully supported.
 + Security Access Tokens for API users are fully supported
 
 ### Minor updates
 + You can now easily convert returned context variables into a hash table (or json string) via `ConvertFrom-AutomateNOWContextVariable`
-+ Tracing with the -WaitForExecution parameter now includes the 'WAITING' status along with 'EXECUTING'
++ Tracing with the `-WaitForExecution` parameter now includes the 'WAITING' status along with 'EXECUTING'
 + You can now change the order of ServerNode Endpoint objects within a Node object
 + Bump compatibility to _ANOW version 3.3.1.85 HF1_
 
@@ -59,8 +59,8 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 - Renamed `Get-AutomateNOWCodeRepositoryItem` to `Read-AutomateNOWCodeRepositoryItem`
 - Renamed the parameter `-InactiveUsers` to `-ActiveUsersOnly` for `Get-AutomateNOWSecUser`
 - Renamed `Trace-AutomateNOWWorkflow` to `Trace-AutomateNOWProcessing` (aliases cover Schedules, Service Managers, Tasks & Workflows)
-- Changed the default sortBy from `id` to `dateCreated` for `Get-AutomateNOWSchedule`, `Get-AutomateNOWServiceManager`, `Get-AutomateNOWTask` & `Get-AutomateNOWWorkflow`
-- Added the parameters `-IncludeAPIUsers` and `APIUsersOnly` to `Get-AutomateNOWSecUser`
+- Changed the default value of `-sortBy` from `id` to `dateCreated` within `Get-AutomateNOWSchedule`, `Get-AutomateNOWServiceManager`, `Get-AutomateNOWTask` & `Get-AutomateNOWWorkflow`
+- Added the parameters `-IncludeAPIUsers` and `-APIUsersOnly` to `Get-AutomateNOWSecUser`
 - Added the parameters `-startRow` and `-endRow` to `Get-AutomateNOWDomain`
 - Added the parameters `-startRow` and `-endRow` to `Get-AutomateNOWFolder`
 - Added the parameters `-startRow`, `-endRow` and `-AllDomains` to `Get-AutomateNOWTag`
@@ -68,7 +68,7 @@ Use `Connect-AutomateNOW` to establish your session (access token)
 - Added the parameter `-EventParameters` to `Start-AutomateNOWEvent`
 - Added the parameter `-Folder` to `Get-AutomateNOWScheduleTemplate`, `Get-AutomateNOWServiceManagerTemplate` and `Get-AutomateWorkflowScheduleTemplate`
 - Added new method `GetCurrentTime()` to [ANOWTimeZone]
-- Optimzed and re-organized the Classes.psm1 file significantly. All custom classes are clearly identified.
+- Optimzed and re-organized the **Classes.psm1** file significantly. All custom classes are clearly identified.
 - Many tiny fixes and improvements to the in-line help
 
 ## 1.0.31
