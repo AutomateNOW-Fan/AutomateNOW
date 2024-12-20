@@ -717,6 +717,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Export-AutomateNOWProcessingEventLog`,
 
+`Export-AutomateNOWResourceAnomaly`,
+
 `Export-AutomateNOWResultMapping`,
 
 `Export-AutomateNOWSchedule`,
