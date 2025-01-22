@@ -57,7 +57,7 @@ Enum ANOWCodeRepository_sshKeyLocationType {
 #Region - Enum [CodeRepositoryObjectSourceCode] * Custom Class
 
 Enum ANOWCodeRepositoryObjectSourceCode_domainClassName {
-    AdhocReport; Agent; Anomaly; ApprovalConfiguration; BusinessView; Dashboard; DataSource; Endpoint; Folder; Integration; NotificationChannel; NotificationGroup; NotificationMessageTemplate; ProcessingAction; ProcessingTemplate; Resource; ResultMapping; ServerNode; Tag; UserReport; Workspace;
+    AdhocReport; Agent; Anomaly; ApprovalConfiguration; BusinessView; Dashboard; DataSource; Endpoint; Folder; Integration; NotificationChannel; NotificationGroup; NotificationMessageTemplate; ProcessingAction; ProcessingTemplate; Resource; ResultMapping; ServerNode; ServerNodeGroup; Tag; UserReport; Workspace;
 }
 
 #endregion
@@ -83,6 +83,27 @@ Enum ANOWCommunicationItem_noteStatus {
 Enum ANOWCommunicationItem_noteSourceType {
     USER; PROCESSING; SERVER_NODE; AGENT; RESOURCE;
 }
+
+#endregion
+
+#Region - Enum [DashboardPortlet] * Custom Class
+
+Enum ANOWDashboardPortlet_reportType {
+    InfiniteDashboardFailedTaskListReport; InfiniteDashboardExecutingTaskListReport; InfiniteDashboardCompletedTaskListReport; InfiniteDashboardFailedWorkflowListReport; InfiniteDashboardExecutingWorkflowListReport; InfiniteDashboardCompletedWorkflowListReport; InfiniteDashboardSkewedTaskListReport; InfiniteDashboardCriticalTaskListReport; InfiniteProcessingScorecardChart; InfiniteDashboardServerNodeWeightListReport; InfiniteDashboardServerNodeDeviatedListReport; InfiniteDashboardServerNodeDisconnectedListReport; InfiniteServerNodeGaugeChart; InfiniteDashboardOccupiedStockListReport; InfiniteDashboardEngagedLockListReport; InfiniteMetricScatteredChart; InfiniteMetricGaugeChart; InfiniteMetricHistoryBarChart; InfiniteUserReport;
+}
+
+Enum ANOWDashboardPortlet_mode {
+    PERIOD; LAST_N_STATES;
+}
+
+Enum ANOWDashboardPortlet_aggregationType {
+    AVG; MIN; MAX;
+}
+
+Enum ANOWDashboardPortlet_aggregationPeriod {
+    MIN; HOUR; DAY; WEEK; MONTH;
+}
+
 
 #endregion
 
@@ -795,7 +816,8 @@ Enum ANOWResource_calendarState {
 }
 
 Enum ANOWResource_statisticFunction {
-    AVERAGE; MEDIAN; FIRST_QUARTILE; THIRD_QUARTILE; MIN; MAX; COUNT; MEAN; GEOMETRIC_MEAN; POPULATION_VARIANCE; PRODUCT; SUM_LOG; SUM_SQ; VARIANCE; KURTOSIS; SKEWNESS; STANDARD_DEVIATION;
+    # Need to add CURRENT_VALUE to this manually due to a mistake by the vendor
+    CURRENT_VALUE; AVERAGE; MEDIAN; FIRST_QUARTILE; THIRD_QUARTILE; MIN; MAX; COUNT; MEAN; GEOMETRIC_MEAN; POPULATION_VARIANCE; PRODUCT; SUM_LOG; SUM_SQ; VARIANCE; KURTOSIS; SKEWNESS; STANDARD_DEVIATION;
 }
 
 Enum ANOWResource_lockState {
@@ -827,7 +849,8 @@ Enum ANOWResourceAnomaly_checkValueOperatorType {
 }
 
 Enum ANOWResourceAnomaly_statisticFunction {
-    AVERAGE; MEDIAN; FIRST_QUARTILE; THIRD_QUARTILE; MIN; MAX; COUNT; MEAN; GEOMETRIC_MEAN; POPULATION_VARIANCE; PRODUCT; SUM_LOG; SUM_SQ; VARIANCE; KURTOSIS; SKEWNESS; STANDARD_DEVIATION;
+    # Need to add CURRENT_VALUE to this manually due to a mistake by the vendor
+    CURRENT_VALUE; AVERAGE; MEDIAN; FIRST_QUARTILE; THIRD_QUARTILE; MIN; MAX; COUNT; MEAN; GEOMETRIC_MEAN; POPULATION_VARIANCE; PRODUCT; SUM_LOG; SUM_SQ; VARIANCE; KURTOSIS; SKEWNESS; STANDARD_DEVIATION;
 }
 
 Enum ANOWResourceAnomaly_resourceType {
@@ -948,6 +971,14 @@ Enum ANOWServerNodeEndpoint_endpointType {
 }
 
 Enum ANOWServerNodeEndpoint_serverNodeType {
+    AZURE; AWS; GOOGLE_CLOUD; GOOGLE_DATA_FLOW; AZURE_DATABRICKS; INFORMATICA_CLOUD; UNIX; LINUX; WINDOWS; SOLARIS; HPUX; AIX; OPENVMS; MACOS; AS400; Z_OS; RAINCODE; CTRL_M; OPENTEXT; INFORMATICA; INFORMATICA_WS; SAS; SAS_VIYA; IBM_DATASTAGE; ODI; MS_SSIS; AB_INITIO; SAP_BODI; SKYVIA; TALEND; DBT; DBT_CORE; SAP; SAP_S4_HANA; SAP_S4_HANA_CLOUD; SAP_IBP; JD_EDWARDS; ORACLE_EBS; PEOPLESOFT; MICROSOFT_DYNAMICS; HIVE_QL; GOOGLE_BIG_QUERY; AZURE_SQL_DATA_WAREHOUSE; AZURE_SQL_DATABASE; DASHDB; DB2; MYSQL; NETEZZA; ORACLE; POSTGRESQL; SQL_SERVER; TERADATA; SINGLESTORE; SNOWFLAKE; VERTICA; PRESTO_DB; SYBASE; INFORMIX; H2; FILE_MANAGER; SNMP; HTTP; EMAIL; SOAP_WEB_SERVICE; REST_WEB_SERVICE; INTERNAL; IBM_MQ; RABBIT_MQ; SQS; ACTIVE_MQ; QPID; IBM_SIBUS; HORNETQ; SOLACE; JORAM_MQ; QMQ; ZERO_MQ; KAFKA; PULSAR; AMAZON_KINESIS; GOOGLE_CLOUD_PUB_SUB; MICROSOFT_AZURE_EVENT_HUB; AMQP; XMPP; STOMP; HDFS; REDIS; HADOOP; HIVE; IMPALA; SQOOP; YARN; SPARK; FLUME; FLINK; STORM; OOZIE; AMBARI; ELASTIC_SEARCH; CASSANDRA; SAP_HANA; MONGO_DB; COUCH_DB; COUCH_BASE; DYNAMO_DB; ARANGO_DB; NEO4J; ORIENT_DB; TITAN; ANDROID; IOS; WINDOWS_MOBILE; MICROSOFT_POWER_BI; TABLEAU; BLUE_PRISM; UI_PATH; AUTOMATION_ANYWHERE; WORK_FUSION; PEGA; ROBOT_FRAMEWORK; CONTROL_M; STONEBRANCH; CA_WLA; AUTOMIC_WLA; IBM_WLA; TIDAL; FACEBOOK; INSTAGRAM; TWITTER; YOUTUBE; LINKED_IN; TUMBLR; TIKTOK; REDDIT; TELEGRAM; WHATSAPP; TEAMS; JIRA; SERVICE_NOW; ORACLE_SERVICE_CENTER; BMC_REMEDY; CA_SERVICE_MANAGEMENT; IBM_CONTROL_DESK; HP_OPEN_VIEW_SERVICE_MANAGER; SAP_SOLUTION_MANAGER; AUTOMATE_NOW; APACHE_AIRFLOW; POWER_AUTOMATE; ANSIBLE;
+}
+
+#endregion
+
+#Region - Enum [ServerNodeGroup] * Custom Class
+
+Enum ANOWServerNodeGroup_serverNodeType {
     AZURE; AWS; GOOGLE_CLOUD; GOOGLE_DATA_FLOW; AZURE_DATABRICKS; INFORMATICA_CLOUD; UNIX; LINUX; WINDOWS; SOLARIS; HPUX; AIX; OPENVMS; MACOS; AS400; Z_OS; RAINCODE; CTRL_M; OPENTEXT; INFORMATICA; INFORMATICA_WS; SAS; SAS_VIYA; IBM_DATASTAGE; ODI; MS_SSIS; AB_INITIO; SAP_BODI; SKYVIA; TALEND; DBT; DBT_CORE; SAP; SAP_S4_HANA; SAP_S4_HANA_CLOUD; SAP_IBP; JD_EDWARDS; ORACLE_EBS; PEOPLESOFT; MICROSOFT_DYNAMICS; HIVE_QL; GOOGLE_BIG_QUERY; AZURE_SQL_DATA_WAREHOUSE; AZURE_SQL_DATABASE; DASHDB; DB2; MYSQL; NETEZZA; ORACLE; POSTGRESQL; SQL_SERVER; TERADATA; SINGLESTORE; SNOWFLAKE; VERTICA; PRESTO_DB; SYBASE; INFORMIX; H2; FILE_MANAGER; SNMP; HTTP; EMAIL; SOAP_WEB_SERVICE; REST_WEB_SERVICE; INTERNAL; IBM_MQ; RABBIT_MQ; SQS; ACTIVE_MQ; QPID; IBM_SIBUS; HORNETQ; SOLACE; JORAM_MQ; QMQ; ZERO_MQ; KAFKA; PULSAR; AMAZON_KINESIS; GOOGLE_CLOUD_PUB_SUB; MICROSOFT_AZURE_EVENT_HUB; AMQP; XMPP; STOMP; HDFS; REDIS; HADOOP; HIVE; IMPALA; SQOOP; YARN; SPARK; FLUME; FLINK; STORM; OOZIE; AMBARI; ELASTIC_SEARCH; CASSANDRA; SAP_HANA; MONGO_DB; COUCH_DB; COUCH_BASE; DYNAMO_DB; ARANGO_DB; NEO4J; ORIENT_DB; TITAN; ANDROID; IOS; WINDOWS_MOBILE; MICROSOFT_POWER_BI; TABLEAU; BLUE_PRISM; UI_PATH; AUTOMATION_ANYWHERE; WORK_FUSION; PEGA; ROBOT_FRAMEWORK; CONTROL_M; STONEBRANCH; CA_WLA; AUTOMIC_WLA; IBM_WLA; TIDAL; FACEBOOK; INSTAGRAM; TWITTER; YOUTUBE; LINKED_IN; TUMBLR; TIKTOK; REDDIT; TELEGRAM; WHATSAPP; TEAMS; JIRA; SERVICE_NOW; ORACLE_SERVICE_CENTER; BMC_REMEDY; CA_SERVICE_MANAGEMENT; IBM_CONTROL_DESK; HP_OPEN_VIEW_SERVICE_MANAGER; SAP_SOLUTION_MANAGER; AUTOMATE_NOW; APACHE_AIRFLOW; POWER_AUTOMATE; ANSIBLE;
 }
 
@@ -1707,6 +1738,39 @@ Class ANOWDashboard : ANOW {
 
 #endregion
 
+#region Class - [ANOWDashboardPortlet] * Custom Class
+
+Class ANOWDashboardPortlet : Base {
+    [PSCustomObject]$portletPosition
+    [PSCustomObject]$reportOptions
+
+    ANOWDashboardPortlet() {
+        $this.Init(@{})
+    }
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+    [void] Validate() {
+        If (-not ($this.portletPosition.rowNum -ge 0)) {
+            Throw "The row number is missing from this Dashboard portlet"
+        }
+        ElseIf (-not ($this.portletPosition.colNum -ge 0)) {
+            Throw "The column number is missing from this Dashboard portlet"
+        }
+        ElseIf (-not ($this.portletPosition.position -ge 0)) {
+            Throw "The position number is missing from this Dashboard portlet"
+        }
+        If ($this.reportOptions.reportType -notin [ANOWDashboardPortlet_reportType].GetEnumNames()) {
+            [string]$reportType = $this.reportOptions.reportType
+            Throw "$reportType is not a recognized report type"
+        }
+    }
+}
+
+#endregion
+
 #region Class - [ANOWDataSource]
 
 Class ANOWDataSource : ANOW {
@@ -2206,28 +2270,9 @@ Class ANOWNotificationMessageTemplate : ANOW {
 #region Class - [ANOWProcessing] Tasks, Workflows, Schedules, ServiceManagers, Integrations
 
 Class ANOWProcessing : Base {
-    [int64]$id
     [ANOWDuration]$overallExecutionTime
-    [ANOWProcessing_agentOperatingSystemType]$agentOperatingSystemType
-    [ANOWProcessing_cycleDelayMode]$cycleDelayMode
-    [ANOWProcessing_cycleFailMode]$cycleFailMode
-    [ANOWProcessing_endpointType]$endpointType
-    [ANOWProcessing_integrationType]$integrationType
-    [ANOWProcessing_killMode]$killMode
-    [ANOWProcessing_monitorType]$monitorType
-    [ANOWProcessing_processingStatus]$internalProcessingStatus
-    [ANOWProcessing_processingType]$parentProcessingType
     [ANOWProcessing_processingType]$processingType
-    [ANOWProcessing_sensorType]$sensorType
-    [ANOWProcessing_serverNodeType]$serverNodeType
-    [ANOWProcessing_serviceManagerType]$serviceManagerType
-    [ANOWProcessing_serviceType]$serviceType
-    [ANOWProcessing_taskType]$taskType
     [ANOWProcessing_triggerType]$triggerType
-    [ANOWProcessing_waitingReason]$waitingReason
-    [ANOWProcessing_workflowType]$parentWorkflowType
-    [ANOWProcessing_workflowType]$rootWorkflowType
-    [ANOWProcessing_workflowType]$workflowType
     [ANOWTimeZone]$cycleTimeZone
     [array]$crossDependantTemplates
     [array]$internalActions
@@ -2244,6 +2289,7 @@ Class ANOWProcessing : Base {
     [boolean]$eagerScriptExecution
     [boolean]$evaluationCompleted
     [boolean]$evaluationStarted
+    [boolean]$exitFromScript
     [boolean]$forbidChildrenStart
     [boolean]$forceChronology
     [boolean]$forceCompleted
@@ -2271,14 +2317,18 @@ Class ANOWProcessing : Base {
     [boolean]$hasLateEndCheck
     [boolean]$hasLateStartCheck
     [boolean]$hasNextRestartDate
+    [boolean]$hasNotes
     [boolean]$hasNotStartedCheck
+    [boolean]$hasPendingNotes
     [boolean]$hasPredecessors
     [boolean]$hasResources
     [boolean]$hasRestartScenarios
     [boolean]$hasSuccessors
     [boolean]$hasSynchronizedResources
     [boolean]$highRisk
+    [boolean]$ignoreProcessingStateRegistry
     [boolean]$integrationDefinitionMissing
+    [boolean]$isFinishing
     [boolean]$isFolder
     [boolean]$isProcessing
     [boolean]$isRoot
@@ -2286,8 +2336,10 @@ Class ANOWProcessing : Base {
     [boolean]$keepForcedStatus
     [boolean]$keepResourcesOnFailure
     [boolean]$keepSameLoadBalancerNodeOnRestart
+    [boolean]$keepSameLoadBalancerNodeOnStart
     [boolean]$kill
     [boolean]$lazyLoad
+    [boolean]$lazyLoadCompleted
     [boolean]$loadItemsOnHold
     [boolean]$nodeOverwritten
     [boolean]$noMoreIterations
@@ -2326,25 +2378,9 @@ Class ANOWProcessing : Base {
     [boolean]$wasKilled
     [boolean]$wasLate
     [boolean]$wasPreloaded
-    [datetime]$archiveDate
-    [datetime]$baselineEndTime
-    [datetime]$baselineStartTime
-    [datetime]$cycleLastRestart
-    [datetime]$cycleRestartUntil
     [datetime]$dateCreated
-    [datetime]$endTime
-    [datetime]$finalBaselineEndTime
-    [datetime]$finalBaselineStartTime
-    [datetime]$firstStartTime
-    [datetime]$forecastEndTime
-    [datetime]$forecastStartTime
-    [datetime]$lastRestartDate
     [datetime]$lastUpdated
-    [datetime]$nextRestartDate
     [datetime]$processingTimestamp
-    [datetime]$restartUntil
-    [datetime]$scheduledFireTime
-    [datetime]$startTime
     [float]$percentCompleted
     [float]$percentExecuting
     [float]$percentFailed
@@ -2372,8 +2408,11 @@ Class ANOWProcessing : Base {
     [int64]$duration
     [int64]$estimatedDuration
     [int64]$forecastDuration
+    [int64]$id
     [int64]$logSize
+    [int64]$noteCount
     [int64]$parent
+    [int64]$pendingNoteCount
     [int64]$priority
     [int64]$restartingChildCounter
     [int64]$rootProcessingId
@@ -2382,6 +2421,41 @@ Class ANOWProcessing : Base {
     [int64]$totalDuration
     [int64]$version
     [int64]$weight
+    [Nullable[ANOWProcessing_agentOperatingSystemType]]$agentOperatingSystemType
+    [Nullable[ANOWProcessing_cycleDelayMode]]$cycleDelayMode
+    [Nullable[ANOWProcessing_cycleFailMode]]$cycleFailMode
+    [Nullable[ANOWProcessing_endpointType]]$endpointType
+    [Nullable[ANOWProcessing_exitProcessingStatus]]$exitProcessingStatus
+    [Nullable[ANOWProcessing_integrationType]]$integrationType
+    [Nullable[ANOWProcessing_killMode]]$killMode
+    [Nullable[ANOWProcessing_monitorType]]$monitorType
+    [Nullable[ANOWProcessing_processingStatus]]$internalProcessingStatus
+    [Nullable[ANOWProcessing_processingType]]$parentProcessingType
+    [Nullable[ANOWProcessing_sensorType]]$sensorType
+    [Nullable[ANOWProcessing_serverNodeType]]$serverNodeType
+    [Nullable[ANOWProcessing_serviceManagerType]]$serviceManagerType
+    [Nullable[ANOWProcessing_serviceType]]$serviceType
+    [Nullable[ANOWProcessing_taskType]]$taskType
+    [Nullable[ANOWProcessing_waitingReason]]$waitingReason
+    [Nullable[ANOWProcessing_workflowType]]$parentWorkflowType
+    [Nullable[ANOWProcessing_workflowType]]$rootWorkflowType
+    [Nullable[ANOWProcessing_workflowType]]$workflowType
+    [Nullable[datetime]]$archiveDate
+    [Nullable[datetime]]$baselineEndTime
+    [Nullable[datetime]]$baselineStartTime
+    [Nullable[datetime]]$cycleLastRestart
+    [Nullable[datetime]]$cycleRestartUntil
+    [Nullable[datetime]]$endTime
+    [Nullable[datetime]]$finalBaselineEndTime
+    [Nullable[datetime]]$finalBaselineStartTime
+    [Nullable[datetime]]$firstStartTime
+    [Nullable[datetime]]$forecastEndTime
+    [Nullable[datetime]]$forecastStartTime
+    [Nullable[datetime]]$lastRestartDate
+    [Nullable[datetime]]$nextRestartDate
+    [Nullable[datetime]]$restartUntil
+    [Nullable[datetime]]$scheduledFireTime
+    [Nullable[datetime]]$startTime
     [PSCustomObject]$agentProcessingCommand
     [PSCustomObject]$approvalPendingOperation
     [PSCustomObject]$customFieldValues
@@ -2417,6 +2491,7 @@ Class ANOWProcessing : Base {
     [string]$exitCode
     [string]$exitMessage
     [string]$folder
+    [string]$idtext
     [string]$initialEndpoint
     [string]$inputType
     [string]$integration
@@ -2462,18 +2537,10 @@ Class ANOWProcessing : Base {
     [string]$template
     [string]$timeZone
     [string]$title
+    [string]$type
     [string]$userIp
     [string]$uuid
     [string]$workspace
-    [boolean]$isFinishing
-    [ANOWProcessing_exitProcessingStatus]$exitProcessingStatus
-    [boolean]$exitFromScript
-    [boolean]$hasNotes
-    [boolean]$hasPendingNotes
-    [int64]$noteCount
-    [int64]$pendingNoteCount
-    [boolean]$keepSameLoadBalancerNodeOnStart
-    [string]$type
 
     ANOWProcessing() {
         $this.Init(@{})
@@ -2783,6 +2850,7 @@ Class ANOWProcessingExecutionStatistic : Base {
     [string]$id
     [ANOWProcessingExecutionStatistic_statisticPeriod]$statisticPeriod
     [int64]$durationMin
+    [PSCustomObject]$statisticPeriodId # added in patch 86 (unverified)
 
     ANOWProcessingExecutionStatistic() {
         $this.Init(@{})
@@ -2830,6 +2898,7 @@ Class ANOWProcessingTemplate : ANOW {
     [boolean]$disableManualExecution
     [boolean]$eagerScriptExecution
     [boolean]$highRisk
+    [boolean]$ignoreProcessingStateRegistry
     [boolean]$keepResourcesOnFailure
     [boolean]$lazyLoad
     [boolean]$modifiedVersion
@@ -2966,6 +3035,16 @@ Class ANOWServiceManagerTemplate : ANOWProcessingTemplate {
     }
 }
 
+Class ANOWIntegrationTemplate : ANOWProcessingTemplate {
+    ANOWIntegrationTemplate() {
+        $this.Init(@{})
+    }
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+}
 #endregion
 
 #region Class - [ANOWProcessingTemplateAction]
@@ -3097,6 +3176,7 @@ Class ANOWProcessingTemplateItem : Base {
     [int64]$highRiskThreshold
     [string]$id
     [PSCustomObject]$ignoreCondition
+    [boolean]$ignoreProcessingStateRegistry
     [boolean]$keepResourcesOnFailure
     [datetime]$lastUpdated
     [string]$lastUpdatedBy
@@ -3450,6 +3530,10 @@ Class ANOWResourceComponent : Base {
     [ANOWResourceComponent_resourceType]$resourceType
     [string]$statisticPeriod
     [double]$statisticValue
+    [PSCustomObject]$resourceId
+    [PSCustomObject]$resourceService
+    [PSCustomObject]$resourceTypeId
+    [PSCustomObject]$statisticFunctionId
 
     ANOWResourceComponent() {
         $this.Init(@{})
@@ -3929,7 +4013,7 @@ Class ANOWSecUser : Base {
     [Nullable[datetime]]$lastAccessTokenExpire
     [string]$username
     [boolean]$accountLocked
-    [datetime]$accountValidUntil
+    [Nullable[datetime]]$accountValidUntil
     [string]$email
     [string[]]$domains
     [string]$firstLastName
@@ -4133,6 +4217,50 @@ Class ANOWServerNodeEndpoint : Base {
 
 #endregion
 
+#region Class - [ANOWServerNodeGroup] * Custom Class
+Class ANOWServerNodeGroup : ANOW {
+    [ANOWServerNodeGroup_serverNodeType]$serverNodeType
+    [string[]]$tags
+    [string]$folder
+
+    ANOWServerNodeGroup() {
+        $this.Init(@{})
+    }
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+}
+
+#endregion
+
+#region Class - [ANOWServerNodeGroupItem] * Custom Class
+
+Class ANOWServerNodeGroupItem : Base {
+    [string]$id
+    [string]$lastUpdatedBy
+    [datetime]$dateCreated
+    [datetime]$lastUpdated
+    [ANOWServerNodeGroup]$serverNodeGroup
+    [int32]$sortOrder
+    [string]$userIp
+    [string]$createdBy
+    [string]$domain
+    [string]$serverNode
+
+    ANOWServerNodeGroupItem() {
+        $this.Init(@{})
+    }
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+}
+
+#endregion
+
 #region Class - [ANOWTag]
 
 Class ANOWTag : ANOW {
@@ -4189,7 +4317,7 @@ Class ANOWTimeZone : Base {
         [int64]$raw_offset = $this.rawOffset
         [datetime]$adjusted_time = $current_utc_date.AddMilliseconds($raw_offset)
         If ($this.inDaylightTime -eq $true) {
-            [datetime]$adjusted_time = $adjusted_time.AddMilliseconds($this.dstsavings)
+            [datetime]$adjusted_time = $adjusted_time.AddMilliseconds($this.dstsavings * -1)
         }
         Return $adjusted_time
     }

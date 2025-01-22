@@ -12,7 +12,7 @@ Created by AutomateNOW-Fan
 ```
 ## Efficacy 🧪
 
-Compatible with AutomateNOW! version 3.3.1.85 HF1
+Compatible with AutomateNOW! version 3.3.1.86 HF3
 <br/><br/>
 ## Installation 🏗
 
@@ -36,6 +36,36 @@ Use `Connect-AutomateNOW` to establish your session
 - Edit source code objects with NotePad (Windows only for now)
 <br/><br/>
 ## Change Log 📝
+
+## 1.0.33
+### Major updates
++ Dashboards are added and fully supported
++ Server Node Groups are added and fully supported
++ Runtime Actions are added and mostly supported (the 'Do Action' tab is missing)
+
+### Minor updates
++ Anomalies can now be added to a Metric (i.e. to create a Resource Anomaly object)
++ All 5 types of Event Logs are fully supported (Agent, Domain, Node, Processing & Resource)
++ You can now pass any type of [ANOWProcessTemplate] object to the pipeline of its respective Get function
++ The last remaining object types (domain classes) have been added to Add/Remove Code Repository Item
++ The last remaining object types (domain classes) have been added to Edit Object Source Code
++ Unlocking user accounts is now supported
++ Bump compatibility to _ANOW version 3.3.1.86 HF3_
+
+### Detailed Change Log
+- Added new functions: `Add-AutomateNOWDashboardPortlet`, `Add-AutomateNOWResourceAnomaly`, `Add-AutomateNOWServerNodeGroupItem`, `Copy-AutomateNOWDashboard`, `Copy-AutomateNOWRuntimeAction`, `Copy-AutomateNOWServerNodeGroup`, `Export-AutomateNOWDashboard`, `Export-AutomateNOWRuntimeAction`, `Export-AutomateNOWServerNodeGroup`, `Get-AutomateNOWDashboard`, `Get-AutomateNOWInterface`, `Get-AutomateNOWRuntimeAction`, `Get-AutomateNOWServerNodeGroup`, `New-AutomateNOWDashboard`, `New-AutomateNOWRuntimeAction`, `New-AutomateNOWServerNodeGroup`, `Pop-AutomateNOWDashboard`, `Pop-AutomateNOWServerNodeGroupItem`, `Push-AutomateNOWDashboard`, `Push-AutomateNOWServerNodeGroupItem`, `Read-AutomateNOWDashboardPortlet`, `Read-AutomateNOWServerNodeGroupItem`, `Remove-AutomateNOWDashboard`, `Remove-AutomateNOWDashboardPortlet`, `Remove-AutomateNOWRuntimeAction`, `Remove-AutomateNOWServerNodeGroup`, `Remove-AutomateNOWServerNodeGroupItem`, `Rename-AutomateNOWDashboard`, `Rename-AutomateNOWServerNodeGroup`, `Set-AutomateNOWDashboard`, `Set-AutomateNOWRuntimeAction`, `Set-AutomateNOWServerNodeGroup`, `Unlock-AutomateNOWSecUser`
+- Fixed an issue with `Get-AutomateNOWSchedule` by aligning the nullable properties within the [ANOWProcessing] class
+- Fixed an issue with the GetCurrentTime() method in the [ANOWTimeZone] class. All calculations have been tested
+- Fixed an issue with `Trace-AutomateNOWProcessing` that occurred if the Design Template's taskType was null
+- Fixed an issue with `Get-AutomateNOWSecUser` that occurred if the accountValidUntil was null
+- Fixed an issue with `Get-AutomateNOWWorkflow` where the -ProcessingStatus parameter could sometimes be ignored
+- Added the parameter `-OverrideConnectionRequirement` to `Import-AutomateNOWLocalTimeZone`
+- Renamed `Get-AutomateNOWProcessingEventLog` to `Read-AutomateNOWProcessingEventLog` and fixed some minor issues
+- Renamed `Get-AutomateNOWTimeTrigger` to `Read-AutomateNOWTimeTrigger`
+- Added the remaining object types to `Add-AutomateNOWCodeRepositoryItem`, `Get-AutomateNOWCodeRepositoryObjectSource` and `Remove-AutomateNOWCodeRepositoryItem`
+- Added pipeline capability to `Protect-AutomateNOWEncryptedString` (unsecure strings only) and `Unprotect-AutomateNOWEncryptedString`
+- Updated the Trace function for patch 86 where TRIGGER tasks no longer have a Task Type defined
+- Optimized the Wait functions
 
 ## 1.0.32
 ### Major updates
@@ -520,16 +550,19 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 > Use the built-in help `Get-Help Edit-AutomateNOWDataSourceItem -Examples` to see examples
 
 ### Why doesn't `Get-AutomateNOWContextVariable` include the level of the variable (i.e. Self, Parent or Root)?
-> Use `Trace-AutomateNOWWorkflow` with the `-ReturnContextVariables` parameter to have the level of the variables. It is not possible to determine the level of the variable without also knowing the RunId of the Workflows involved.
+> Use `Trace-AutomateNOWProcessing` with the `-ReturnContextVariables` parameter to have the level of the variables. It is not possible to determine the level of the variable without also knowing the RunId of the Workflows involved.
 
-### I'm tired of seeing the Trigger Items in the results of `Trace-AutomateNOWWorkflow`
+### I'm tired of seeing the Trigger Items in the results of `Trace-AutomateNOWProcessing`
 > Use the `-DoNotIncludeTriggers` parameter
 
-### I need more from `Trace-AutomateNOWWorkflow`. It only returns Workflows which were parented by my Workflow. I need to see everything which could have been launched by my Workflow.
+### I need more from `Trace-AutomateNOWProcessing`. It only returns Workflows which were parented by my Workflow. I need to see *everything* which could have been launched by my Workflow.
 > Use the `-PerformDeepSearch` parameter
 
 ### How do I start a Workflow, wait for it to finish executing and then return all of the related Context Variables in a single command?
-> `Get-AutomateNOWWorkflowTemplate -Id 'WorkflowTemplate1' | Start-AutomateNOWWorkflowTemplate | Trace-AutomateNOWWorkflow -WaitForExecution -ReturnContextVariables`
+> `Get-AutomateNOWWorkflowTemplate -Id 'WorkflowTemplate1' | Start-AutomateNOWWorkflowTemplate | Trace-AutomateNOWProcessing -WaitForExecution -ReturnContextVariables`
+
+### `Trace-AutomateNOWProcessing` doesn't seem to work. It doesn't return all of the processing items that it should be.
+> Try adding the `-IncludeArchived` switch parameter to include searching the archived processing items.
 
 ### How can I see the items that exist in the UI under the Monitoring -> Trigger tab?
 > Use `Get-AutomateNOWSchedule` to retrieve these
@@ -543,6 +576,9 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 > An [ANOWResourceAnomaly] is a class representing what you get when you add an Anomaly to a Metric.
 > Think of [ANOWResourceAnomaly] as synonymous with adding a Task Template to a Workflow Template or a Business View Item to a Business View.
 
+### Why doesn't `Read-AutomateNOWSecurityAccessToken` include the actual security token?
+> `Read-AutomateNOWSecurityAccessToken` will tell you everything else about the security token objects except the actual token. This is by design. You only get to see the token once when it was created with `New-AutomateNOWSecurityAccessToken`.
+
 ## Functions 🛠
 
 `Add-AutomateNOWApprovalRule`,
@@ -551,9 +587,13 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Add-AutomateNOWCodeRepositoryItem`,
 
+`Add-AutomateNOWDashboardPortlet`,
+
 `Add-AutomateNOWDataSourceItem`,
 
 `Add-AutomateNOWNotificationGroupMember`,
+
+`Add-AutomateNOWResourceAnomaly`,
 
 `Add-AutomateNOWResultMappingRule`,
 
@@ -566,6 +606,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Add-AutomateNOWSecurityRoleUser`,
 
 `Add-AutomateNOWServerNodeEndpoint`,
+
+`Add-AutomateNOWServerNodeGroupItem`,
 
 `Add-AutomateNOWServiceManagerTemplateItem`,
 
@@ -607,6 +649,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Copy-AutomateNOWCalendar`,
 
+`Copy-AutomateNOWDashboard`,
+
 `Copy-AutomateNOWDataSource`,
 
 `Copy-AutomateNOWDomain`,
@@ -629,6 +673,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Copy-AutomateNOWResultMapping`,
 
+`Copy-AutomateNOWRuntimeAction`,
+
 `Copy-AutomateNOWScheduleTemplate`,
 
 `Copy-AutomateNOWSecurityRole`,
@@ -638,6 +684,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Copy-AutomateNOWSemaphore`,
 
 `Copy-AutomateNOWServerNode`,
+
+`Copy-AutomateNOWServerNodeGroup`,
 
 `Copy-AutomateNOWServiceManagerTemplate`,
 
@@ -685,6 +733,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Export-AutomateNOWContextVariable`,
 
+`Export-AutomateNOWDashboard`,
+
 `Export-AutomateNOWDataSource`,
 
 `Export-AutomateNOWDataSourceItem`,
@@ -721,6 +771,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Export-AutomateNOWResultMapping`,
 
+`Export-AutomateNOWRuntimeAction`,
+
 `Export-AutomateNOWSchedule`,
 
 `Export-AutomateNOWScheduleTemplate`,
@@ -744,6 +796,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Export-AutomateNOWServerNode`,
 
 `Export-AutomateNOWServerNodeEndpoint`,
+
+`Export-AutomateNOWServerNodeGroup`,
 
 `Export-AutomateNOWServiceManager`,
 
@@ -805,6 +859,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Get-AutomateNOWContextVariable`,
 
+`Get-AutomateNOWDashboard`,
+
 `Get-AutomateNOWDataSource`,
 
 `Get-AutomateNOWDomain`,
@@ -814,6 +870,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Get-AutomateNOWEvent`,
 
 `Get-AutomateNOWFolder`,
+
+`Get-AutomateNOWInterface`,
 
 `Get-AutomateNOWLock`,
 
@@ -831,9 +889,9 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Get-AutomateNOWPhysicalResource`,
 
-`Get-AutomateNOWProcessingEventLog`,
-
 `Get-AutomateNOWResultMapping`,
+
+`Get-AutomateNOWRuntimeAction`,
 
 `Get-AutomateNOWSchedule`,
 
@@ -851,6 +909,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Get-AutomateNOWServerNode`,
 
+`Get-AutomateNOWServerNodeGroup`,
+
 `Get-AutomateNOWServiceManager`,
 
 `Get-AutomateNOWServiceManagerTemplate`,
@@ -862,8 +922,6 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Get-AutomateNOWTask`,
 
 `Get-AutomateNOWTaskTemplate`,
-
-`Get-AutomateNOWTimeTrigger`,
 
 `Get-AutomateNOWTimeWindow`,
 
@@ -917,6 +975,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `New-AutomateNOWCodeRepositoryTag`,
 
+`New-AutomateNOWDashboard`,
+
 `New-AutomateNOWDataSource`,
 
 `New-AutomateNOWDefaultProcessingTitle`,
@@ -949,6 +1009,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `New-AutomateNOWResultMappingRuleConditionCriteria`,
 
+`New-AutomateNOWRuntimeAction`,
+
 `New-AutomateNOWScheduleTemplate`,
 
 `New-AutomateNOWSecurityRole`,
@@ -960,6 +1022,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `New-AutomateNOWServerDayTimestamp`,
 
 `New-AutomateNOWServerNode`,
+
+`New-AutomateNOWServerNodeGroup`,
 
 `New-AutomateNOWServiceManagerTemplate`,
 
@@ -977,25 +1041,37 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `New-AutomateNOWWorkspace`,
 
+`Pop-AutomateNOWDashboard`,
+
 `Pop-AutomateNOWLoadBalancerNode`,
 
 `Pop-AutomateNOWServerNodeEndpoint`,
+
+`Pop-AutomateNOWServerNodeGroupItem`,
 
 `Protect-AutomateNOWEncryptedString`,
 
 `Publish-AutomateNOWCodeRepository`,
 
+`Push-AutomateNOWDashboard`,
+
 `Push-AutomateNOWLoadBalancerNode`,
 
 `Push-AutomateNOWServerNodeEndpoint`,
+
+`Push-AutomateNOWServerNodeGroupItem`,
 
 `Read-AutomateNOWBusinessViewItem`,
 
 `Read-AutomateNOWCodeRepositoryItem`,
 
+`Read-AutomateNOWDashboardPortlet`,
+
 `Read-AutomateNOWDataSourceItem`,
 
 `Read-AutomateNOWIcon`,
+
+`Read-AutomateNOWProcessingEventLog`,
 
 `Read-AutomateNOWResourceAnomaly`,
 
@@ -1009,7 +1085,11 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Read-AutomateNOWServerNodeEndpoint`,
 
+`Read-AutomateNOWServerNodeGroupItem`,
+
 `Read-AutomateNOWServiceManagerTemplateItem`,
+
+`Read-AutomateNOWTimeTrigger`,
 
 `Read-AutomateNOWWorkflowTemplateItem`,
 
@@ -1036,6 +1116,10 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Remove-AutomateNOWCodeRepositoryItem`,
 
 `Remove-AutomateNOWCodeRepositoryTag`,
+
+`Remove-AutomateNOWDashboard`,
+
+`Remove-AutomateNOWDashboardPortlet`,
 
 `Remove-AutomateNOWDataSource`,
 
@@ -1069,6 +1153,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Remove-AutomateNOWResultMapping`,
 
+`Remove-AutomateNOWRuntimeAction`,
+
 `Remove-AutomateNOWSchedule`,
 
 `Remove-AutomateNOWScheduleTemplate`,
@@ -1090,6 +1176,10 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Remove-AutomateNOWServerNode`,
 
 `Remove-AutomateNOWServerNodeEndpoint`,
+
+`Remove-AutomateNOWServerNodeGroup`,
+
+`Remove-AutomateNOWServerNodeGroupItem`,
 
 `Remove-AutomateNOWServiceManager`,
 
@@ -1133,6 +1223,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Rename-AutomateNOWCalendar`,
 
+`Rename-AutomateNOWDashboard`,
+
 `Rename-AutomateNOWDataSource`,
 
 `Rename-AutomateNOWDomain`,
@@ -1162,6 +1254,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Rename-AutomateNOWSemaphore`,
 
 `Rename-AutomateNOWServerNode`,
+
+`Rename-AutomateNOWServerNodeGroup`,
 
 `Rename-AutomateNOWServiceManagerTemplate`,
 
@@ -1237,6 +1331,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Set-AutomateNOWCodeRepository`,
 
+`Set-AutomateNOWDashboard`,
+
 `Set-AutomateNOWDataSource`,
 
 `Set-AutomateNOWDomain`,
@@ -1261,6 +1357,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Set-AutomateNOWPhysicalResource`,
 
+`Set-AutomateNOWRuntimeAction`,
+
 `Set-AutomateNOWScheduleTemplate`,
 
 `Set-AutomateNOWSecurityRole`,
@@ -1276,6 +1374,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Set-AutomateNOWSemaphoreTimestamp`,
 
 `Set-AutomateNOWServerNodeEndpoint`,
+
+`Set-AutomateNOWServerNodeGroup`,
 
 `Set-AutomateNOWServiceManagerTemplate`,
 
@@ -1380,6 +1480,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Test-AutomateNOWSecUserPassword`,
 
 `Trace-AutomateNOWProcessing`,
+
+`Unlock-AutomateNOWSecUser`,
 
 `Unprotect-AutomateNOWEncryptedString`,
 
