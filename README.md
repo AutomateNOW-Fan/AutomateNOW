@@ -12,7 +12,7 @@ Created by AutomateNOW-Fan
 ```
 ## Efficacy 🧪
 
-Compatible with AutomateNOW! version 3.3.1.88 HF1
+Compatible with AutomateNOW! version _3.3.1.88 HF1_
 <br/><br/>
 ## Installation 🏗
 
@@ -44,7 +44,7 @@ Use `Connect-AutomateNOW` to establish your session
 + The menu functionality 👉 **Resource List** is now available with `Get-AutomateNOWResourceList`
 + Processing States are added and fully supported
 + Processing Functions are added and fully supported
-+ Bump compatibility to _ANOW version 3.3.1.88 HF1
++ Bump compatibility to _ANOW version 3.3.1.88 HF1_
 
 ### Minor updates
 + The new Code Repository domainClass `ItemList` from Patch 87 is recognized by `Read-AutomateNOWCodeRepositoryItem`
