@@ -12,7 +12,7 @@ Created by AutomateNOW-Fan
 ```
 ## Efficacy 🧪
 
-Compatible with AutomateNOW! version 3.3.1.86 HF3
+Compatible with AutomateNOW! version 3.3.1.88 HF1
 <br/><br/>
 ## Installation 🏗
 
@@ -36,6 +36,40 @@ Use `Connect-AutomateNOW` to establish your session
 - Edit source code objects with NotePad (Windows only for now)
 <br/><br/>
 ## Change Log 📝
+
+## 1.0.34
+### Major updates
++ All Get functions support filtering by Tags & Folder 🥳
++ The menu functionality -> Processing List is now available with `Get-AutomateNOWProcessingList`
++ The menu functionality -> Resource List is now available with `Get-AutomateNOWResourceList`
++ Processing States are added and fully supported
++ Processing Functions are added and fully supported
++ Bump compatibility to _ANOW version 3.3.1.88 HF1
+
+### Minor updates
++ The new Code Repository domainClass `ItemList` from Patch 87 is recognized by `Read-AutomateNOWCodeRepositoryItem`
++ Rules within an Approval can now be individually removed
++ Rules within a Result Mapping can now be removed
++ Rules within Approvals can now be re-ordered
++ Rules within Result Mappings can now be re-ordered
++ Processing States now include the parent processing template object
++ Tags can now be copied
+
+### Detailed Change Log
+- Added new functions: `Clear-AutomateNOWProcessingStateRegistry`, `Copy-AutomateNOWProcessingFunction`, `Copy-AutomateNOWTag`, `Export-AutomateNOWProcessingFunction`, `Export-AutomateNOWProcessingState`, `Get-AutomateNOWProcessingFunction`, `Get-AutomateNOWProcessingList`, `Get-AutomateNOWProcessingState`, `Get-AutomateNOWResourceList`, `New-AutomateNOWProcessingFunction`, `New-AutomateNOWProcessingState`, `Pop-AutomateNOWApprovalRule`, `Pop-AutomateNOWResultMappingRule`, `Push-AutomateNOWApprovalRule`, `Push-AutomateNOWResultMappingRule`, `Read-AutomateNOWProcessingStateItem`, `Register-AutomateNOWProcessingState`, `Remove-AutomateNOWApprovalRule`, `Remove-AutomateNOWProcessingFunction`, `Remove-AutomateNOWProcessingState`, `Remove-AutomateNOWResultMappingRule`, `Rename-AutomateNOWProcessingFunction`, `Reset-AutomateNOWJWTIssuerToken`, `Set-AutomateNOWProcessingFunction`, `Unregister-AutomateNOWProcessingState`
+- Fixed an issue with `Read-AutomateNOWCodeRepositoryItem` where Server Node Group items were not recognized
+- Fixed an issue with `Set-AutomateNOWRuntimeAction` where Runtime Actions without a rule definition could not be modified
+- Fixed an issue with `Get-AutomateNOWResultMapping` where the definition in the returned results could be empty
+- Fixed an issue with `Get-AutomateNOWResourceList` where the results would not be returned
+- Fixed an ambiguous error message that could occur under `Connect-AutomateNOW` when a non-existent domain was specified
+- Added the parameter `-Id` to `Read-AutomateNOWWorkflowTemplateItem`
+- Added the parameter `-KeepSessionVariable` to `Disconnect-AutomateNOW`
+- Removed the parameter `-All` from `Read-AutomateNOWCodeRepositoryItem` as it is now redundant with Patch 87
+- Removed the parameter `-unsetRules` from `Set-AutomateNOWApproval`
+- Optimized the parameter sets within `Get-AutomateNOWRuntimeAction`
+- Optimized the parameter sets within `Get-AutomateNOWTask`
+- Added more information to the "instance_info" object within the ANOW session variable (e.g. _apiReadDefaultMaxDataPageSize_)
+- Added a custom class [ANOWReferrer] which formalizes the output of `Find-AutomateNOWObjectReferrer`
 
 ## 1.0.33
 ### Major updates
@@ -414,7 +448,7 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 - Enrich the sorting options for all Get functions
 - Export diagrams to PNG
-- Automatic binary file MIME type detection (for Add-AutomateNOWDataSourceItem)
+- Automatic binary file MIME type detection for `Add-AutomateNOWDataSourceItem`
 - Refactor the redundant code
 - Export functions should convert objects containing an object type to JSON strings
 - Ability to action individual items in a code repository instead of applying the action to all items
@@ -425,9 +459,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 - Execute Adhoc Reports where you may not have permission to in the UI
 - List & apply tags, folders etc. on an instance that you may not have permission to in the UI
 - (Psuedo) Rename many object types including Workflow Templates and Task Templates
-- Automatic text file MIME type detection (for Add-AutomateNOWDataSourceItem)
+- Automatic text file MIME type detection for `Add-AutomateNOWDataSourceItem`
 - Specify the theme and ui density at the time of user creation
-- Retrieve all of the items from within a Code Repository using a single command
 - Modify the source code of certain objects that the UI does not offer (e.g. Stocks)
 
 <sub>* things the console does not allow</sub>
@@ -532,9 +565,13 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 ### Why is there a `-Detailed` parameter for the 9 Resource related Get-* functions? What benefit does it provide?
 >- Calendars will include: calculatedDates
+>- Events will include: (unknown)
 >- Locks will include: lockState
->- Stocks will include: (unknown)
->- Time Windows will include: (unknown)
+>- Metrics will include: historicalValues
+>- Physical Resources will include: historicalValues
+>- Semaphores will include: (nothing)
+>- Stocks will include: (nothing)
+>- Time Windows will include: (nothing)
 >- Variables will include: historicalValues
 
 ### How do I rearrange the sort orders of the child nodes in my load balancer node?
@@ -619,6 +656,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Clear-AutomateNOWDomain`,
 
+`Clear-AutomateNOWProcessingStateRegistry`,
+
 `Compare-AutomateNOWCodeRepositoryConflictItem`,
 
 `Confirm-AutomateNOWCodeRepository`,
@@ -671,6 +710,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Copy-AutomateNOWPhysicalResource`,
 
+`Copy-AutomateNOWProcessingFunction`,
+
 `Copy-AutomateNOWResultMapping`,
 
 `Copy-AutomateNOWRuntimeAction`,
@@ -690,6 +731,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Copy-AutomateNOWServiceManagerTemplate`,
 
 `Copy-AutomateNOWStock`,
+
+`Copy-AutomateNOWTag`,
 
 `Copy-AutomateNOWTaskTemplate`,
 
@@ -766,6 +809,10 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Export-AutomateNOWPhysicalResource`,
 
 `Export-AutomateNOWProcessingEventLog`,
+
+`Export-AutomateNOWProcessingFunction`,
+
+`Export-AutomateNOWProcessingState`,
 
 `Export-AutomateNOWResourceAnomaly`,
 
@@ -889,6 +936,14 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Get-AutomateNOWPhysicalResource`,
 
+`Get-AutomateNOWProcessingFunction`,
+
+`Get-AutomateNOWProcessingList`,
+
+`Get-AutomateNOWProcessingState`,
+
+`Get-AutomateNOWResourceList`,
+
 `Get-AutomateNOWResultMapping`,
 
 `Get-AutomateNOWRuntimeAction`,
@@ -1001,6 +1056,10 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `New-AutomateNOWPhysicalResource`,
 
+`New-AutomateNOWProcessingFunction`,
+
+`New-AutomateNOWProcessingState`,
+
 `New-AutomateNOWResultMapping`,
 
 `New-AutomateNOWResultMappingRule`,
@@ -1041,9 +1100,13 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `New-AutomateNOWWorkspace`,
 
+`Pop-AutomateNOWApprovalRule`,
+
 `Pop-AutomateNOWDashboard`,
 
 `Pop-AutomateNOWLoadBalancerNode`,
+
+`Pop-AutomateNOWResultMappingRule`,
 
 `Pop-AutomateNOWServerNodeEndpoint`,
 
@@ -1053,9 +1116,13 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Publish-AutomateNOWCodeRepository`,
 
+`Push-AutomateNOWApprovalRule`,
+
 `Push-AutomateNOWDashboard`,
 
 `Push-AutomateNOWLoadBalancerNode`,
+
+`Push-AutomateNOWResultMappingRule`,
 
 `Push-AutomateNOWServerNodeEndpoint`,
 
@@ -1072,6 +1139,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Read-AutomateNOWIcon`,
 
 `Read-AutomateNOWProcessingEventLog`,
+
+`Read-AutomateNOWProcessingStateItem`,
 
 `Read-AutomateNOWResourceAnomaly`,
 
@@ -1095,6 +1164,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Receive-AutomateNOWCodeRepository`,
 
+`Register-AutomateNOWProcessingState`,
+
 `Remove-AutomateNOWAdhocReport`,
 
 `Remove-AutomateNOWAgent`,
@@ -1102,6 +1173,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Remove-AutomateNOWAnomaly`,
 
 `Remove-AutomateNOWApproval`,
+
+`Remove-AutomateNOWApprovalRule`,
 
 `Remove-AutomateNOWBusinessView`,
 
@@ -1149,9 +1222,15 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Remove-AutomateNOWPhysicalResource`,
 
+`Remove-AutomateNOWProcessingFunction`,
+
+`Remove-AutomateNOWProcessingState`,
+
 `Remove-AutomateNOWResourceAnomaly`,
 
 `Remove-AutomateNOWResultMapping`,
+
+`Remove-AutomateNOWResultMappingRule`,
 
 `Remove-AutomateNOWRuntimeAction`,
 
@@ -1245,6 +1324,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Rename-AutomateNOWPhysicalResource`,
 
+`Rename-AutomateNOWProcessingFunction`,
+
 `Rename-AutomateNOWResultMapping`,
 
 `Rename-AutomateNOWScheduleTemplate`,
@@ -1273,9 +1354,9 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Rename-AutomateNOWWorkspace`,
 
-`Resolve-AutomateNOWCodeRepository`,
+`Reset-AutomateNOWJWTIssuerToken`,
 
-`Resolve-AutomateNOWEndpoinType2JavaScriptDefinition`,
+`Resolve-AutomateNOWCodeRepository`,
 
 `Resolve-AutomateNOWMonitorType2ServerNodeType`,
 
@@ -1356,6 +1437,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Set-AutomateNOWNotificationMessageTemplate`,
 
 `Set-AutomateNOWPhysicalResource`,
+
+`Set-AutomateNOWProcessingFunction`,
 
 `Set-AutomateNOWRuntimeAction`,
 
@@ -1486,6 +1569,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Unprotect-AutomateNOWEncryptedString`,
 
 `UnPublish-AutomateNOWCodeRepository`,
+
+`Unregister-AutomateNOWProcessingState`,
 
 `Update-AutomateNOWCodeRepositoryObjectSource`,
 
