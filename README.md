@@ -614,7 +614,7 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 > Think of [ANOWResourceAnomaly] as synonymous with adding a Task Template to a Workflow Template or a Business View Item to a Business View.
 
 ### Why doesn't `Read-AutomateNOWSecurityAccessToken` include the actual security token?
-> `Read-AutomateNOWSecurityAccessToken` will tell you everything else about the security token objects except the actual token. This is by design. You only get to see the token once when it was created with `New-AutomateNOWSecurityAccessToken`.
+> `Read-AutomateNOWSecurityAccessToken` will tell you everything else about the security token objects except the actual token. This is by design. You only get to see the token once when it was created with `Add-AutomateNOWSecurityAccessToken`.
 
 ## Functions 🛠
 
