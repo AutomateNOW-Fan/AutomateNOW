@@ -40,8 +40,8 @@ Use `Connect-AutomateNOW` to establish your session
 ## 1.0.34
 ### Major updates
 + All Get functions support filtering by Tags & Folder 🥳
-+ The menu functionality -> Processing List is now available with `Get-AutomateNOWProcessingList`
-+ The menu functionality -> Resource List is now available with `Get-AutomateNOWResourceList`
++ The menu functionality 👉 **Processing List** is now available with `Get-AutomateNOWProcessingList`
++ The menu functionality 👉 **Resource List** is now available with `Get-AutomateNOWResourceList`
 + Processing States are added and fully supported
 + Processing Functions are added and fully supported
 + Bump compatibility to _ANOW version 3.3.1.88 HF1
