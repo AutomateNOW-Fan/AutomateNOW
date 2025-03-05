@@ -556,7 +556,7 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 > `Sync-AutomateNOWCodeRepository` -CodeRepository $repository -Force
 
 ### Where are the 5 types of Processing Event Logs in the ANOW UI?
->Use `Get-Help Get-AutomateNOWProcessingEventLog -Full` for some hints on where they all are.
+>Use `Get-Help Read-AutomateNOWProcessingEventLog -Full` for some hints on where they all are.
 
 ### I want to set all values in my Metric to null (i.e. to reset them). How can I do this?
 >It's a two-step process. In any order:
