@@ -40,10 +40,10 @@ Function Connect-AutomateNOW {
     Switch parameter to accomodate instances that use the http protocol (typically on port 8080)
 
     .PARAMETER Quiet
-    Switch parameter to silence the output of the access token (note that this parameter overrides -SkipMOTD)
+    Switch parameter to silence the output of the session details upon login.
 
     .PARAMETER SkipMOTD
-    Switch parameter to suppress the "message of the day". This parameter is ignored if -Quiet is set.
+    Switch parameter to suppress the "message of the day" upon login.
 
     .PARAMETER SkipPreviousSessionCheck
     Switch parameter to override the requirement to disconnect from a previous session before starting a new session on a different instance.
@@ -62,14 +62,14 @@ Function Connect-AutomateNOW {
     Connect-AutomateNOW -Instance 's2.infinitedata.com'
 
     .EXAMPLE
-    Basic login WITH the domain specified. --> This is the recommended standard approach to use when you know the domain that you will want to logon to.
+    Basic login WITH the domain specified. --> This is the recommended standard approach to use when you know the domain that you will want to login to.
 
     Connect-AutomateNOW -Instance 's2.infinitedata.com' -Domain 'Test'
 
     .EXAMPLE
-    Login by providing the Access Token, Refresh Token and Expiration Date. This the recommended approach when developing this module. It's better to include the refresh/expiration to prevent warnings.
+    Login by providing the Access Token, Refresh Token and Expiration Date. This is the recommended approach when developing this module. It's better to include the refresh/expiration to prevent warnings.
 
-    Connect-AutomateNOW -Instance 's2.infinitedata.com' -AccessToken 'ey...' -RefreshToken 'ey...' -ExpirationDate 1700000000000
+    Connect-AutomateNOW -Instance 's2.infinitedata.com' -AccessToken 'ey...' -RefreshToken 'ey...' -ExpirationDate 1900000000000
 
     .EXAMPLE
     Login using the JSON payload from your clipboard. This is the payload from the /authenticate endpoint which can be copied from your browser with Dev Tools. The use case for this approach is one-off connections in front of an audience.
@@ -77,7 +77,7 @@ Function Connect-AutomateNOW {
     Connect-AutomateNOW -Instance 's2.infinitedata.com' -ReadJSONFromClipboard
 
     .EXAMPLE
-    Login by providing only the Access Token. This will throw warnings if a non-API user is logged in this way --> Not recommended
+    Login by providing only the Access Token. This will throw warnings if a non-API user logs in this way --> Not recommended
 
     Connect-AutomateNOW -Instance 's2.infinitedata.com' -AccessToken 'ey...'
 
@@ -98,10 +98,11 @@ Function Connect-AutomateNOW {
 
     .NOTES
     1. If you don't know the available domains then you can exclude the -Domain parameter to see them listed (after you authenticate).
-    2. The -Domain parameter can be skipped if the user has a default domain.
-    3. This module will automatically refresh your token after it is 330 seconds old. (See Update-AutomateNOWToken for more info).
-    4. After you are finished interacting with the ANOW API, you should use Disconnect-AutomateNOW to fully disconnect from the instance and cleanse your PowerShell session.
-    5. You should periodally review and be familiar with the properties available in the global variable $anow_session. There is a wealth of information within.
+    2. The -Domain parameter can be skipped if the user account has a default domain configured (see your administrator).
+    3. This module will automatically refresh your token after it is 330 seconds old (see Update-AutomateNOWToken for more info).
+    4. After you are finished interacting with the ANOW API, you should use Disconnect-AutomateNOW to disconnect from the instance and cleanse your PowerShell session. This doesn't invalidate your token, though.
+    5. You should periodically review and be familiar with the properties available in the global variable $anow_session. There is a wealth of information within.
+    6. For a truly silent logon you must include both the -Quiet and -SkipMOTD parameters.
 
     #>
     [OutputType([string])]
@@ -599,7 +600,7 @@ Function Connect-AutomateNOW {
             }
             Catch {
                 [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Failed to parse the available time zones from [$Instance] into an array of valid ANOWTimeZone class objects due to [$Message]. We were so close! Did something change in InfiniteDATA's code? :-)"
+                Write-Warning -Message "Failed to parse the default time zone from [$Instance] into a valid ANOWTimeZone class object due to [$Message]. We were so close! Did something change in the ANOW code? :-)"
                 Break
             }
             $Error.Clear()
@@ -608,7 +609,7 @@ Function Connect-AutomateNOW {
             }
             Catch {
                 [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Failed to parse the available time zones from [$Instance] into an array of valid ANOWTimeZone class objects due to [$Message]. We were so close! Did something change in InfiniteDATA's code? :-)"
+                Write-Warning -Message "Failed to parse the available time zones from [$Instance] into an array of valid ANOWTimeZone class objects due to [$Message]. We were so close! Did something change in the ANOW code? :-)"
                 Break
             }
             [int32]$available_timezones_count = $available_timezones.count
@@ -747,8 +748,8 @@ Function Connect-AutomateNOW {
         If ($defaultTimeZone.Length -gt 0) {
             $anow_session.Add('user_timezone', $defaultTimeZone)
         }
-        [string]$motd_message = "`r`nWelcome to $application version $applicationVersion"
         If ($SkipMOTD -ne $true) {
+            [string]$motd_message = "`r`nWelcome to $application version $applicationVersion"
             Write-Information -MessageData $motd_message
         }
     }
@@ -1110,6 +1111,10 @@ Function Switch-AutomateNOWDomain {
         Write-Warning -Message "Somehow there is not a valid token confirmed."
         Break
     }
+    If ($Domain.Length -eq 0) {
+        Write-Warning -Message 'Please specify a Domain using the -Domain parameter'
+        Break
+    }
     [string]$Instance = $anow_session.Instance
     If ($anow_session.available_domains -cnotcontains $Domain) {
         [string]$available_domains = $anow_session.available_domains -join ', '
@@ -1299,7 +1304,7 @@ Function Reset-AutomateNOWJWTIssuerToken {
 
 #Region = Object Functions =
 
-#Region - AdhocReports
+#Region - Adhoc Reports
 
 Function Get-AutomateNOWAdhocReport {
     <#
@@ -1802,7 +1807,7 @@ Function New-AutomateNOWAdhocReport {
     If ($Folder.Length -gt 0) {
         $Error.Clear()
         Try {
-            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -2073,7 +2078,7 @@ Function Copy-AutomateNOWAdhocReport {
                 $BodyMetaData.'_dataSource' = 'AdhocReportDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
                 $parameters.Body = $Body
                 $Error.Clear()
                 Try {
@@ -2378,7 +2383,7 @@ Function Remove-AutomateNOWAdhocReport {
         }
         [string]$AdhocReport_id = $AdhocReport.id
         If ($AdhocReport_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($AdhocReport_id)")) -eq $true) {
@@ -3203,7 +3208,7 @@ Function New-AutomateNOWAgent {
     If ($Folder.Length -gt 0) {
         $Error.Clear()
         Try {
-            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -3351,7 +3356,7 @@ Function Remove-AutomateNOWAgent {
         }
         [string]$Agent_id = $Agent.id
         If ($Agent_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Agent_id)")) -eq $true) {
@@ -3577,7 +3582,7 @@ Function Copy-AutomateNOWAgent {
                 $BodyMetaData.'_Agent' = 'AgentAgent'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
                 $parameters.Body = $Body
                 $Error.Clear()
                 Try {
@@ -3749,6 +3754,500 @@ Function Rename-AutomateNOWAgent {
         }
     }
     End {
+    }
+}
+
+#endregion
+
+#Region - Agent Server Nodes
+
+Function Read-AutomateNOWAgentServerNode {
+    <#
+    .SYNOPSIS
+    Reads the Agent Server Node objects from a Server Node within an AutomateNOW! instance
+
+    .DESCRIPTION
+    Reads the Agent Server Node objects from a Server Node within an AutomateNOW! instance
+
+    .PARAMETER Agent
+    Mandatory [ANOWAgent] object. Use Get-AutomateNOWAgent to get this object.
+
+    .PARAMETER ServerNode
+    Optional [ANOWServerNode] object to filter by. Use Get-AutomateNOWServerNode to retrieve 1. You still need to present an [ANOWAgent] object, too.
+
+    .PARAMETER Id
+    36-character GUID of the Agent Server Node object to read. This is normally intended for verifying that the Agent Server Node object exists before deleting it. This parameter can only be used exclusively from the others.
+
+    .PARAMETER startRow
+    Integer to indicate the row to start from. This is intended for when you need to paginate the results. Default is 0.
+
+    .PARAMETER endRow
+    Integer to indicate the row to stop on. This is intended for when you need to paginate the results. Default is 100.
+
+    .PARAMETER sortBy
+    Optional string parameter to sort the results by (may not be used with the Id parameter). Valid choices are: 'serverNodeType'*, 'dateCreated', 'lastUpdated', 'id'
+
+    .PARAMETER Ascending
+    Optional switch parameter which changes the sort order to ascending
+
+    .INPUTS
+    You can send either [ANOWServerAgent] objects or 36-character GUID Id's from [ANOWAgentServerNode] objects (individually or to the pipeline).
+
+    .OUTPUTS
+    An array of one or more [ANOWAgentServerNode] class objects that are linked to the provided [ANOWServerNode] object
+
+    .EXAMPLE
+    Reads the Agent Server Node objects from an Agent named 'Agent1' and returns the results descendingly sorted by dateCreated (one-liner format)
+
+    Get-AutomateNOWAgent -Id 'Agent1' | Read-AutomateNOWAgentServerNode -sortBy dateCreated -Descending
+
+    .EXAMPLE
+    Reads an Agent Server Node object by specific Id using the -Id parameter
+
+    Read-AutomateNOWAgentServerNode -Id 'bdd0ec83-b2bb-484c-968f-dfce73600729'
+
+    .EXAMPLE
+    Reads an Agent Server Node object by specific Id across the pipeline
+
+    'bdd0ec83-b2bb-484c-968f-dfce73600729' | Read-AutomateNOWAgentServerNode
+
+    .EXAMPLE
+    Reads the Agent Server Node object associated with a Server Node named 'ServerNode1' that is attached to an agent named 'Agent1'
+
+    Read-AutomateNOWAgentServerNode -Agent (Get-AutomateNOWAgent -Id 'Agent1') -ServerNode (Get-AutomateNOWServerNode -Id 'ServerNode1')
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [OutputType([ANOWAgentServerNode[]])]
+    [Cmdletbinding(DefaultParameterSetName = 'Default')]
+    Param(
+        [Parameter(Mandatory = $True, ParameterSetName = 'Default', ValueFromPipeline = $True)]
+        [Parameter(Mandatory = $True, ParameterSetName = 'ServerNode', ValueFromPipeline = $True)]
+        [ANOWAgent]$Agent,
+        [Parameter(Mandatory = $True, ParameterSetName = 'ServerNode')]
+        [ANOWServerNode]$ServerNode,
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [int32]$startRow = 0,
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [int32]$endRow = 100,
+        [ValidateScript({ $_ -match '^[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}$' })]
+        [Parameter(Mandatory = $True, ParameterSetName = 'Id', ValueFromPipeline = $true)]
+        [string]$Id,
+        [ValidateSet('serverNodeType', 'dateCreated', 'lastUpdated', 'id', ignoreCase = $false)]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [string]$sortBy = 'serverNodeType',
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [switch]$Descending
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        If ($endRow -le $startRow) {
+            Write-Warning -Message "The endRow must be greater than the startRow. Please try again."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'GET')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.agentStatus.Length -gt 0 -or $Agent.id.Length -gt 0) {
+            If ($_.agentStatus.Length -gt 0) {
+                [ANOWAgent]$Agent = $_
+            }
+            [string]$Agent_id = $Agent.id
+        }
+        If ($_ -match '^[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}$') {
+            [string]$Id = $_
+        }
+        [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
+        $Body.Add('_operationType', 'fetch')
+        If ($Id.Length -gt 0) {
+            $Body.Add('id', $Id)
+        }
+        ElseIf ( $Agent_id.Length -gt 0) {
+            $Body.Add('agent', $Agent_id)
+            If ($ServerNode.id.Length -gt 0) {
+                [string]$ServerNode_simpleid = $ServerNode.simpleId
+                $Body.Add('operator', 'and')
+                $Body.Add('_constructor', 'AdvancedCriteria')
+                $Body.'criteria1' = ('{"fieldName":"serverNode","operator":"equals","value":"' + $ServerNode_simpleid + '"}')
+            }
+            Else {
+                $Body.Add('_startRow', $startRow)
+                $Body.Add('_endRow', $endRow)
+                If ($Descending -eq $true) {
+                    $Body.'_sortBy' = '-' + $sortBy
+                }
+                Else {
+                    $Body.'_sortBy' = $sortBy
+                }
+            }
+        }
+        Else {
+            Write-Warning -Message "Somehow was not able to parse the parameters for Read-AutomateNOWAgentServerNode"
+            Break
+        }
+        $Body.Add('_textMatchStyle', 'exact')
+        [string]$command = '/agentServerNode/read?'
+        $Body.Add('_dataSource', 'AgentServerNodeDataSource')
+        $Body.Add('isc_metaDataPrefix', '_')
+        $Body.Add('isc_dataFormat', 'json')
+        [string]$Body = ConvertTo-QueryString -InputObject $Body
+        [string]$command = ($command + $Body)
+        If ($null -eq $parameters["Command"]) {
+            $parameters.Add('Command', $command)
+        }
+        Else {
+            $parameters.Command = $command
+        }
+        $Error.Clear()
+        Try {
+            [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
+            Break
+        }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 10
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
+        }
+        [int32]$ResultsCount = $results.response.data.count
+        If ($ResultsCount -gt 50000) {
+            Write-Warning -Message "This ServerNode object has over 50,000 endpoints added! This module does not support that yet."
+            Break
+        }
+        If ($ResultsCount -gt 0) {
+            If ($ResultsCount -gt 1 -and $Id.Length -gt 0) {
+                Write-Warning -Message "Wait! There cannot be more then 1 result if the -Id parameter was specified. Something is wrong. Please look into this."
+                Break
+            }
+            $Error.Clear()
+            Try {
+                [ANOWAgentServerNode[]]$AgentServerNodes = ForEach ($result in $results.response.data) {
+                    $result
+                }
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Failed to parse the response into a series of [ANOWAgentServerNode] objects due to [$Message]."
+                Break
+            }
+            If ($AgentServerNodes.Count -gt 0) {
+                Return $AgentServerNodes
+            }
+            Else {
+                Write-Verbose -Message "There are no Agent Server Node objects added to Agent $Agent_id"
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+Function Export-AutomateNOWAgentServerNode {
+    <#
+    .SYNOPSIS
+    Exports the Agent Server Node objects from an instance of AutomateNOW!
+
+    .DESCRIPTION
+    Exports the Agent Server Node objects from an instance of AutomateNOW! to a local .csv file
+
+    .PARAMETER Agent
+    Mandatory [ANOWAgentServerNode] object (Use Read-AutomateNOWAgentServerNode to retrieve them)
+
+    .INPUTS
+    ONLY [ANOWAgentServerNode] objects from the pipeline are accepted
+
+    .OUTPUTS
+    The [ANOWAgentServerNode] objects are exported to the local disk in CSV format
+
+    .EXAMPLE
+    Exports the first page of Agent Server Node objects that are associated with an Agent named 'Agent1'
+
+    Get-AutomateNOWAgent -Id 'Agent1' | Read-AutomateNOWAgentServerNode | Export-AutomateNOWAgentServerNode
+
+    .EXAMPLE
+    Exports a specific Agent Server Node object by its Id
+
+    'bdd0ec83-b2bb-484c-968f-dfce73600729' | Read-AutomateNOWAgentServerNode | Export-AutomateNOWAgentServerNode
+
+    .NOTES
+	You must present [ANOWAgentServerNode] objects to the pipeline to use this function.
+    #>
+
+    [Cmdletbinding(DefaultParameterSetName = 'Pipeline')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true, ParameterSetName = 'Pipeline')]
+        [ANOWAgentServerNode]$AgentServerNode
+    )
+    Begin {
+        [string]$current_time = Get-Date -Format 'yyyyMMddHHmmssfff'
+        [string]$ExportFileName = 'Export-AutomateNOW-AgentServerNodes-' + $current_time + '.csv'
+        [string]$ExportFilePath = ((Get-Location | Select-Object -ExpandProperty Path) + '\' + $ExportFileName)
+        [hashtable]$parameters = @{}
+        $parameters.Add('Path', $ExportFilePath)
+        $parameters.Add('Append', $true)
+        If ($PSVersionTable.PSVersion.Major -eq 5) {
+            $parameters.Add('NoTypeInformation', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [ANOWAgentServerNode]$AgentServerNode = $_
+        }
+        $Error.Clear()
+        Try {
+            $AgentServerNode | Export-CSV @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Export-CSV failed to export the [ANOWAgentServerNode] objects on the pipeline due to [$Message]"
+            Break
+        }
+    }
+    End {
+        $Error.Clear()
+        If ((Test-Path -Path $ExportFilePath) -eq $true) {
+            [System.IO.FileInfo]$fileinfo = Get-Item -Path "$ExportFilePath"
+            [int32]$filelength = $fileinfo.Length
+            [string]$filelength_display = "{0:N0}" -f $filelength
+            Write-Information -MessageData "Created file $ExportFileName ($filelength_display bytes)"
+        }
+    }
+}
+
+Function Dismount-AutomateNOWAgentServerNode {
+    <#
+    .SYNOPSIS
+    Dismounts (detaches) a Node from an Agent on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Dismounts (detaches) a Node from an Agent on an AutomateNOW! instance
+
+    .PARAMETER Agent
+    An [ANOWAgent] object representing the Agent from which the Node will be dismounted (detached).
+
+    .PARAMETER ServerNode
+    An [ANOWServerNode] object representing the Node to be detached from an Agent.
+
+    .PARAMETER Quiet
+    Switch parameter to silence the returned [ANOWServerNode] object
+
+    .PARAMETER Force
+    Force the dismounting without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    One [ANOWAgent] object must be presented along with at least one [ANOWServerNode] object. Nodes can be sent along the pipeline.
+
+    .OUTPUTS
+    Informational message that the Node was detached from the Agent.
+
+    .EXAMPLE
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [ANOWAgent]$Agent,
+        [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
+        [ANOWServerNode]$ServerNode,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [string]$command = ('/serverNode/deleteAgentNode')
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [ANOWServerNode]$ServerNode = $_
+        }
+        [string]$ServerNode_id = $ServerNode.id
+        [string]$Agent_Id = $Agent.Id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ServerNode_id) from $Agent_Id")) -eq $true) {
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.Add('agent', $Agent_Id )
+            $BodyMetaData.Add('id', $ServerNode_id )
+            $BodyMetaData.Add('_operationType', 'remove')
+            $BodyMetaData.Add('_operationId', 'deleteAgentNode')
+            $BodyMetaData.Add('_componentId', 'AgentServerNodeList')
+            $BodyMetaData.Add('_textMatchStyle', 'exact')
+            $BodyMetaData.Add('_dataSource', 'ServerNodeDataSource')
+            $BodyMetaData.Add('isc_metaDataPrefix', '_')
+            $BodyMetaData.Add('isc_dataFormat', 'json')
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            If ($null -eq $parameters.Body) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$ServerNode_id] due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 10
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
+            }
+            If ($Quiet -ne $true) {
+                Write-Information -MessageData "Node $ServerNode_id was dismounted (detached) from $Agent_Id"
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+Function Mount-AutomateNOWAgentServerNode {
+    <#
+    .SYNOPSIS
+    Mounts (attaches) a Node from an Agent on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Mounts (attaches) a Node from an Agent on an AutomateNOW! instance
+
+    .PARAMETER Agent
+    An [ANOWAgent] object representing the Agent to which the Node will be mounted (attached).
+
+    .PARAMETER ServerNode
+    An [ANOWServerNode] object representing the Node to be attached to an Agent.
+
+    .PARAMETER Quiet
+    Switch parameter to silence the returned [ANOWAgentServerNode] object
+
+    .PARAMETER Force
+    Force the mounting without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    One [ANOWAgent] object must be presented along with at least one [ANOWServerNode] object. Nodes can be sent along the pipeline.
+
+    .OUTPUTS
+    An [ANOWAgentServerNode] object showing the successful attachment will be returned.
+
+    .EXAMPLE
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [OutputType([ANOWAgentServerNode])]
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [ANOWAgent]$Agent,
+        [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
+        [ANOWServerNode]$ServerNode,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [string]$command = ('/agentServerNode/create')
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [ANOWServerNode]$ServerNode = $_
+        }
+        [string]$ServerNode_id = $ServerNode.id
+        [string]$Agent_Id = $Agent.Id
+        [string]$ServerNode_Type = $ServerNode.serverNodeType
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ServerNode_id) onto $Agent_Id")) -eq $true) {
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.Add('agent', $Agent_Id )
+            $BodyMetaData.Add('serverNode', $ServerNode_id )
+            $BodyMetaData.Add('serverNodeType', $ServerNode_Type )
+            $BodyMetaData.Add('_operationType', 'add')
+            $BodyMetaData.Add('_textMatchStyle', 'exact')
+            $BodyMetaData.Add('_dataSource', 'AgentServerNodeDataSource')
+            $BodyMetaData.Add('isc_metaDataPrefix', '_')
+            $BodyMetaData.Add('isc_dataFormat', 'json')
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            If ($null -eq $parameters.Body) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$ServerNode_id] due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 10
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
+            }
+            If ($Quiet -ne $true) {
+                Write-Information -MessageData "Node $ServerNode_id ($ServerNode_Type) was mounted (attached) to $Agent_Id"
+                $Error.Clear()
+                Try {
+                    [ANOWAgentServerNode]$AgentServerNode = $results.response.data | Select-Object -First 1
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Failed to parse the result into an [ANOWAgentServerNode] object due to [$Message]."
+                    Break
+                }
+                Return $AgentServerNode
+            }
+        }
+    }
+    End {
+
     }
 }
 
@@ -3942,7 +4441,7 @@ Function Set-AutomateNOWAnomaly {
     The name of the icon library (if you choose to use one). Possible choices are: FAT_COW, FUGUE (note that FONT_AWESOME is not an actual icon library)
 
     .PARAMETER iconCode
-    The name of the icon which matches the chosen library. To see the list of available iconCodes, use Import-AutomateNOWIcon (or Import-AutomateNOWLocalIcon) then try $anow_assets.icon_library."FUGUE"[0..10] to see the names of the first 10 icons from the Fugue library.
+    The name of the icon which matches the chosen library (must be lowercase). To see the list of available iconCodes, use Import-AutomateNOWIcon (or Import-AutomateNOWLocalIcon) then try $anow_assets.icon_library."FUGUE"[0..10] to see the names of the first 10 icons from the Fugue library.
 
     .PARAMETER RemoveIcon
     Switch parameter that will remove the icon configured for this Anomaly.
@@ -4035,6 +4534,7 @@ Function Set-AutomateNOWAnomaly {
         [switch]$UnsetDescription,
         [Parameter(Mandatory = $True, ParameterSetName = 'Icon')]
         [ANOWIcon_IconsOnly]$iconSet,
+        [ValidateScript({ $_ -match '^[a-z0-9-_]{1,}$' })]
         [Parameter(Mandatory = $True, ParameterSetName = 'Icon')]
         [string]$iconCode,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
@@ -4197,7 +4697,7 @@ Function Set-AutomateNOWAnomaly {
             If ($Folder.Length -gt 0) {
                 $Error.Clear()
                 Try {
-                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
                 }
                 Catch {
                     [string]$Message = $_.Exception.Message
@@ -4292,7 +4792,7 @@ Function New-AutomateNOWAnomaly {
     Mandatory string representing a choice between three icon sets. Valid choices are: FAT_COW, FUGUE, FONT_AWESOME
 
     .PARAMETER iconCode
-    The name of the icon which matches the chosen library.
+    The name of the icon which matches the chosen library. Must be lower-case.
 
     .PARAMETER CodeRepository
     Optional name of the code repository to place the Anomaly into.
@@ -4342,6 +4842,7 @@ Function New-AutomateNOWAnomaly {
         [string]$Folder,
         [Parameter(Mandatory = $true, ParameterSetName = 'iconSet')]
         [ANOWIcon_IconsOnly]$iconSet,
+        [ValidateScript({ $_ -match '^[a-z0-9-_]{1,}$' })]
         [Parameter(Mandatory = $true, ParameterSetName = 'iconSet')]
         [string]$iconCode,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
@@ -4418,7 +4919,7 @@ Function New-AutomateNOWAnomaly {
     If ($Folder.Length -gt 0) {
         $Error.Clear()
         Try {
-            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -4647,7 +5148,7 @@ Function Remove-AutomateNOWAnomaly {
         }
         [string]$Anomaly_id = $Anomaly.id
         If ($Anomaly_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Anomaly_id)")) -eq $true) {
@@ -4815,7 +5316,7 @@ Function Copy-AutomateNOWAnomaly {
                 $BodyMetaData.'_dataSource' = 'AnomalyDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description
                 $parameters.Body = $Body
                 $Error.Clear()
                 Try {
@@ -5484,7 +5985,7 @@ Function Remove-AutomateNOWApproval {
         }
         [string]$Approval_id = $Approval.id
         If ($Approval_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Approval_id)")) -eq $true) {
@@ -5723,7 +6224,7 @@ Function Copy-AutomateNOWApproval {
                 $BodyMetaData.'_dataSource' = 'ApprovalConfigurationDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description
                 $parameters.Body = $Body
                 $Error.Clear()
                 Try {
@@ -6718,7 +7219,7 @@ Function Push-AutomateNOWApprovalRule {
 
 #endregion
 
-#Region - AuditLogs
+#Region - Audit Logs
 
 Function Get-AutomateNOWAuditLog {
     <#
@@ -6970,7 +7471,7 @@ Function Export-AutomateNOWAuditLog {
 
 #endregion
 
-#Region - BusinessViews
+#Region - Business Views
 
 Function Get-AutomateNOWBusinessView {
     <#
@@ -7109,7 +7610,12 @@ Function Get-AutomateNOWBusinessView {
         $Body.'isc_dataFormat' = 'json'
         [string]$Body = ConvertTo-QueryString -InputObject $Body
         [string]$command = ('/businessView/read?' + $Body)
-        $parameters.Add('command', $command)
+        If ($null -ne $parameters.command) {
+            $parameters.command = $command
+        }
+        Else {
+            $parameters.Add('command', $command)
+        }
         $Error.Clear()
         Try {
             [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
@@ -7164,7 +7670,7 @@ Function Set-AutomateNOWBusinessView {
     The name of the icon library (if you choose to use one). Possible choices are: FAT_COW, FUGUE (note that FONT_AWESOME is not an actual icon library)
 
     .PARAMETER iconCode
-    The name of the icon which matches the chosen library. To see the list of available iconCodes, use Import-AutomateNOWIcon (or Import-AutomateNOWLocalIcon) then try $anow_assets.icon_library."FUGUE"[0..10] to see the names of the first 10 icons from the Fugue library.
+    The name of the icon which matches the chosen library. Must be lower-case. To see the list of available iconCodes, use Import-AutomateNOWIcon (or Import-AutomateNOWLocalIcon) then try $anow_assets.icon_library."FUGUE"[0..10] to see the names of the first 10 icons from the Fugue library.
 
     .PARAMETER RemoveIcon
     Switch parameter that will remove the icon configured for this Business View.
@@ -7253,6 +7759,7 @@ Function Set-AutomateNOWBusinessView {
         [switch]$UnsetDescription,
         [Parameter(Mandatory = $false, ParameterSetName = 'Icon')]
         [ANOWIcon_IconsOnly]$iconSet,
+        [ValidateScript({ $_ -match '^[a-z0-9-_]{1,}$' })]
         [Parameter(Mandatory = $false, ParameterSetName = 'Icon')]
         [string]$iconCode,
         [Parameter(Mandatory = $false, ParameterSetName = 'Icon')]
@@ -7394,7 +7901,7 @@ Function Set-AutomateNOWBusinessView {
             ElseIf ($Folder.Length -gt 0) {
                 $Error.Clear()
                 Try {
-                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
                 }
                 Catch {
                     [string]$Message = $_.Exception.Message
@@ -7562,7 +8069,7 @@ Function New-AutomateNOWBusinessView {
     Mandatory string representing a choice between three icon sets. Valid choices are: FAT_COW, FUGUE, FONT_AWESOME
 
     .PARAMETER iconCode
-    The name of the icon which matches the chosen library.
+    The name of the icon which matches the chosen library. Must be lower-case.
 
     .PARAMETER CodeRepository
     Optional name of the code repository to place the Business View into.
@@ -7606,6 +8113,7 @@ Function New-AutomateNOWBusinessView {
         [string]$Folder,
         [Parameter(Mandatory = $true, ParameterSetName = 'iconSet')]
         [ANOWIcon_IconsOnly]$iconSet,
+        [ValidateScript({ $_ -match '^[a-z0-9-_]{1,}$' })]
         [Parameter(Mandatory = $true, ParameterSetName = 'iconSet')]
         [string]$iconCode,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
@@ -7674,7 +8182,7 @@ Function New-AutomateNOWBusinessView {
     If ($Folder.Length -gt 0) {
         $Error.Clear()
         Try {
-            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -7828,7 +8336,7 @@ Function Remove-AutomateNOWBusinessView {
         }
         [string]$BusinessView_id = $BusinessView.id
         If ($BusinessView_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($BusinessView_id)")) -eq $true) {
@@ -8054,7 +8562,7 @@ Function Copy-AutomateNOWBusinessView {
                 $BodyMetaData.'_dataSource' = 'BusinessViewDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
                 $parameters.Body = $Body
                 $Error.Clear()
                 Try {
@@ -8250,7 +8758,7 @@ Function Rename-AutomateNOWBusinessView {
 
 #endregion
 
-#Region - BusinessViewItems
+#Region - BusinessView Items
 
 Function Read-AutomateNOWBusinessViewItem {
     <#
@@ -8346,7 +8854,7 @@ Function Read-AutomateNOWBusinessViewItem {
         $BodyMetaData.Add('isc_dataFormat', 'json')
         [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
         [string]$command = ('/businessViewItem/read' + '?' + $Body)
-        If ($null -eq $parameters.'Command') {
+        If ($null -eq $parameters["Command"]) {
             $parameters.Add('Command', $command)
         }
         Else {
@@ -8600,7 +9108,7 @@ Function Add-AutomateNOWBusinessViewItem {
             $BodyMetaData.'_dataSource' = 'BusinessViewItemDataSource'
             $BodyMetaData.'isc_metaDataPrefix' = '_'
             $BodyMetaData.'isc_dataFormat' = 'json'
-            $Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
             If ($null -eq $parameters.Body) {
                 $parameters.Add('Body', $Body)
             }
@@ -9186,7 +9694,7 @@ Function New-AutomateNOWCalendar {
     If ($Folder.Length -gt 0) {
         $Error.Clear()
         Try {
-            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -9354,7 +9862,7 @@ Function Remove-AutomateNOWCalendar {
         }
         [string]$Calendar_id = $Calendar.id
         If ($Calendar_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Calendar_id)")) -eq $true) {
@@ -9580,7 +10088,7 @@ Function Copy-AutomateNOWCalendar {
                 $BodyMetaData.'_dataSource' = 'ResourceDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
                 $parameters.Body = $Body
                 $Error.Clear()
                 Try {
@@ -9776,7 +10284,7 @@ Function Rename-AutomateNOWCalendar {
 
 #endregion
 
-#Region - CodeRepositories
+#Region - Code Repositories
 
 Function Get-AutomateNOWCodeRepository {
     <#
@@ -10189,7 +10697,7 @@ Function Set-AutomateNOWCodeRepository {
             If ($Folder.Length -gt 0) {
                 $Error.Clear()
                 Try {
-                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
                 }
                 Catch {
                     [string]$Message = $_.Exception.Message
@@ -10550,7 +11058,7 @@ Function New-AutomateNOWCodeRepository {
             If ($Folder.Length -gt 0) {
                 $Error.Clear()
                 Try {
-                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
                 }
                 Catch {
                     [string]$Message = $_.Exception.Message
@@ -10582,7 +11090,7 @@ Function New-AutomateNOWCodeRepository {
             }
             Else {
                 $Body.'sshKeyLocationType' = $sshKeyLocationType
-                $Body.'sshKey' = $sshKey
+                $Body.'sshKey' = $sshKeyPath
                 If ($sshKeyPassPhrase.Length -gt 0) {
                     $Body.'sshKeyPassphrase' = $encrypted_sshKeyPassPhrase
                 }
@@ -10626,7 +11134,7 @@ Function New-AutomateNOWCodeRepository {
             # Note this code is untested
             $Error.Clear()
             Try {
-                [ANOWCodeRepository]$CodeRepository = $results.response.data
+                [ANOWCodeRepository]$CodeRepository = $results.response.data | Select-Object -First 1
             }
             Catch {
                 [string]$Message = $_.Exception.Message
@@ -10636,7 +11144,6 @@ Function New-AutomateNOWCodeRepository {
             If ($Quiet -ne $True) {
                 Return $CodeRepository
             }
-            # Note the above code is untested
         }
     }
     End {
@@ -10778,7 +11285,7 @@ Function Remove-AutomateNOWCodeRepository {
         }
         [string]$CodeRepository_Id = $CodeRepository.Id
         If ($CodeRepository_Id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         ## Do not tamper with this code. It ensures that we are not trying to remove a local Code Repository that doesn't exist
@@ -11611,7 +12118,7 @@ Function Resolve-AutomateNOWCodeRepository {
 
 #endregion
 
-#Region - CodeRepository Branches
+#Region - Code Repository Branches
 
 Function Get-AutomateNOWCodeRepositoryBranch {
 
@@ -11961,7 +12468,7 @@ Function Remove-AutomateNOWCodeRepositoryBranch {
         }
         [string]$CodeRepository_Id = $CodeRepository.Id
         If ($CodeRepository_Id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If ($Branch.Length -eq 0) {
@@ -12329,7 +12836,7 @@ Function Merge-AutomateNOWCodeRepositoryBranch {
 
 #endregion
 
-#Region - CodeRepository Conflict Items
+#Region - Code Repository Conflict Items
 
 Function Get-AutomateNOWCodeRepositoryConflictItem {
     <#
@@ -13043,7 +13550,7 @@ Function Merge-AutomateNOWCodeRepositoryConflictItem {
 
 #endregion
 
-#Region - CodeRepository Items
+#Region - Code Repository Items
 
 Function Read-AutomateNOWCodeRepositoryItem {
 
@@ -13612,7 +14119,7 @@ Function Remove-AutomateNOWCodeRepositoryItem {
         }
         [string]$Item_simpleId = $Item.simpleId
         If ($Item_simpleId.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         [string]$Item_Domain = $Item.domain
@@ -14191,7 +14698,7 @@ Function Deny-AutomateNOWCodeRepositoryMergeRequest {
 
 #endregion
 
-#Region - CodeRepository Object Source Code
+#Region - Code Repository Object Source Code
 
 Function Get-AutomateNOWCodeRepositoryObjectSource {
     <#
@@ -15154,7 +15661,7 @@ Function Edit-AutomateNOWCodeRepositoryObjectSource {
 
 #endregion
 
-#Region - CodeRepository Tags
+#Region - Code Repository Tags
 
 Function Get-AutomateNOWCodeRepositoryTag {
 
@@ -15484,7 +15991,7 @@ Function Remove-AutomateNOWCodeRepositoryTag {
         }
         [string]$CodeRepository_Id = $CodeRepository.Id
         If ($CodeRepository_Id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         ## Do not tamper with this code. It ensures that we are not trying to remove a git tag that doesn't exist
@@ -15802,7 +16309,12 @@ Function Get-AutomateNOWContextVariable {
         [string]$command = ($command + $Body)
         [string]$Instance = $anow_session.Instance
         [hashtable]$parameters = @{}
-        $parameters.Add('Command', $command)
+        If ($null -eq $parameters["Command"]) {
+            $parameters.Add('Command', $command)
+        }
+        Else {
+            $parameters.Command = $command
+        }
         $parameters.Add('Method', 'GET')
         $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
         $parameters.Add('Instance', $Instance)
@@ -15831,7 +16343,7 @@ Function Get-AutomateNOWContextVariable {
         }
         If ($ContextVariables_count -gt 0) {
             If ($PreviewOnly -ne $true) {
-                $FormattedContextVariables = ForEach ($ContextVariable in $results.response.data) {
+                [PSCustomObject[]]$FormattedContextVariables = ForEach ($ContextVariable in $results.response.data) {
                     [int32]$ContextVariableValuePreview_Length = $ContextVariable.valuePreview.Length
                     If ($ContextVariableValuePreview_Length -eq 128) {
                         If (($ContextVariable.valuePreview.substring(125, 3)) -eq '...') {
@@ -16010,13 +16522,13 @@ Function ConvertFrom-AutomateNOWContextVariable {
 	The collection of Context Variables must all have unique names otherwise an exception will be thrown.
 
     #>
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'JsonString')]
     Param(
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [ANOWProcessingContextVariable]$ContextVariable,
         [Parameter(Mandatory = $true, ParameterSetName = 'HashTable')]
         [switch]$AsHashTable,
-        [Parameter(Mandatory = $true, ParameterSetName = 'JsonString')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'JsonString')]
         [switch]$AsJsonString,
         [Parameter(Mandatory = $true, ParameterSetName = 'CSV')]
         [switch]$AsCSV,
@@ -16342,7 +16854,7 @@ Function Set-AutomateNOWDashboard {
     The name of the icon library (if you choose to use one). Possible choices are: FAT_COW, FUGUE (note that FONT_AWESOME is not an actual icon library)
 
     .PARAMETER iconCode
-    The name of the icon which matches the chosen library. To see the list of available iconCodes, use Import-AutomateNOWIcon (or Import-AutomateNOWLocalIcon) then try $anow_assets.icon_library."FUGUE"[0..10] to see the names of the first 10 icons from the Fugue library.
+    The name of the icon which matches the chosen library. Must be lower-case. To see the list of available iconCodes, use Import-AutomateNOWIcon (or Import-AutomateNOWLocalIcon) then try $anow_assets.icon_library."FUGUE"[0..10] to see the names of the first 10 icons from the Fugue library.
 
     .PARAMETER RemoveIcon
     Switch parameter that will remove the icon configured for this Dashboard.
@@ -16416,6 +16928,7 @@ Function Set-AutomateNOWDashboard {
         [int32]$NumberOfRows,
         [Parameter(Mandatory = $true, ParameterSetName = 'Icon')]
         [ANOWIcon_IconsOnly]$iconSet,
+        [ValidateScript({ $_ -match '^[a-z0-9-_]{1,}$' })]
         [Parameter(Mandatory = $true, ParameterSetName = 'Icon')]
         [string]$iconCode,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
@@ -16623,7 +17136,7 @@ Function Set-AutomateNOWDashboard {
             If ($Folder.Length -gt 0) {
                 $Error.Clear()
                 Try {
-                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
                 }
                 Catch {
                     [string]$Message = $_.Exception.Message
@@ -16732,7 +17245,7 @@ Function New-AutomateNOWDashboard {
     Mandatory string representing a choice between three icon sets. Valid choices are: FAT_COW, FUGUE, FONT_AWESOME
 
     .PARAMETER iconCode
-    The name of the icon which matches the chosen library.
+    The name of the icon which matches the chosen library. Must be lower-case.
 
     .PARAMETER CodeRepository
     Optional name of the code repository to place the Dashboard into.
@@ -16780,6 +17293,7 @@ Function New-AutomateNOWDashboard {
         [string]$Folder,
         [Parameter(Mandatory = $true, ParameterSetName = 'iconSet')]
         [ANOWIcon_IconsOnly]$iconSet,
+        [ValidateScript({ $_ -match '^[a-z0-9-_]{1,}$' })]
         [Parameter(Mandatory = $true, ParameterSetName = 'iconSet')]
         [string]$iconCode,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
@@ -16849,7 +17363,7 @@ Function New-AutomateNOWDashboard {
     If ($Folder.Length -gt 0) {
         $Error.Clear()
         Try {
-            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -17365,7 +17879,7 @@ Function Copy-AutomateNOWDashboard {
                 $BodyMetaData.'_dataSource' = 'DashboardDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
                 $parameters.Body = $Body
                 $Error.Clear()
                 Try {
@@ -17855,32 +18369,33 @@ Function Read-AutomateNOWDashboardPortlet {
         [PSCustomObject]$DashboardDefinition = $Dashboard.dashboardDefinition
         If ($DashboardDefinition.portlets.count -eq 0) {
             Write-Warning -Message "$Dashboard_Id does not have any Dashboard portlets yet. Use Add-AutomateNOWDashboardPortlet to add some."
-            Break
         }
-        $Error.Clear()
-        Try {
-            [ANOWDashboardPortlet[]]$portlets = $DashboardDefinition.portlets
-        }
-        Catch {
-            [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Failed to parse the Dashboard portlets from $Dashboard_Id into [ANOWDashboardPortlet] objects due to [$Message]."
-            Break
-        }
-        If ($Title.Length -gt 0) {
-            [ANOWDashboardPortlet[]]$portlets = $portlets | Where-Object { $_.reportOptions.title -eq "$Title" }
-        }
-        $Error.Clear()
-        Try {
-            ForEach ($portlet in $portlets) {
-                $portlet.Validate()
+        Else {
+            $Error.Clear()
+            Try {
+                [ANOWDashboardPortlet[]]$portlets = $DashboardDefinition.portlets
             }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Failed to parse the Dashboard portlets from $Dashboard_Id into [ANOWDashboardPortlet] objects due to [$Message]."
+                Break
+            }
+            If ($Title.Length -gt 0) {
+                [ANOWDashboardPortlet[]]$portlets = $portlets | Where-Object { $_.reportOptions.title -eq "$Title" }
+            }
+            $Error.Clear()
+            Try {
+                ForEach ($portlet in $portlets) {
+                    $portlet.Validate()
+                }
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Failed to validate the Dashboard portlets from $Dashboard_Id due to [$Message]."
+                Break
+            }
+            Return $portlets
         }
-        Catch {
-            [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Failed to validate the Dashboard portlets from $Dashboard_Id due to [$Message]."
-            Break
-        }
-        Return $portlets
     }
     End {
 
@@ -19007,7 +19522,7 @@ Function Remove-AutomateNOWDataSource {
         }
         [string]$DataSource_id = $DataSource.id
         If ($DataSource_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($DataSource_id)")) -eq $true) {
@@ -19079,6 +19594,12 @@ Function Set-AutomateNOWDataSource {
 
     .PARAMETER UnsetTags
     A switch parameter that will remove the Tags from the Task Template
+
+    .PARAMETER CodeRepository
+    Optional [ANOWCodeRepository] object to place the Data Source into.
+
+    .PARAMETER UnsetCodeRepository
+    A switch parameter that will remove the Data Source from its current code repository.
 
     .PARAMETER DataType
     These settings are currently unexplained in the documentation. The valid choices are: STRING*; NUMBER; TIMESTAMP; TIME; DATE; OBJECT;
@@ -19155,13 +19676,17 @@ Function Set-AutomateNOWDataSource {
         [Parameter(Mandatory = $false)]
         [string]$Description,
         [Parameter(Mandatory = $false)]
+        [string]$Folder,
+        [Parameter(Mandatory = $false)]
+        [switch]$UnsetFolder,
+        [Parameter(Mandatory = $false)]
         [string[]]$Tags,
         [Parameter(Mandatory = $false)]
         [switch]$UnsetTags,
         [Parameter(Mandatory = $false)]
-        [string]$Folder,
+        [ANOWCodeRepository]$CodeRepository,
         [Parameter(Mandatory = $false)]
-        [switch]$UnsetFolder,
+        [switch]$UnsetCodeRepository,
         [Parameter(Mandatory = $false)]
         [switch]$Force
     )
@@ -19229,7 +19754,7 @@ Function Set-AutomateNOWDataSource {
             If ($Folder.Length -gt 0) {
                 $Error.Clear()
                 Try {
-                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
                 }
                 Catch {
                     [string]$Message = $_.Exception.Message
@@ -19286,6 +19811,13 @@ Function Set-AutomateNOWDataSource {
                 Write-Verbose -Message "Removing tags [$tags_display] from $DataSource_id"
                 $BodyMetaData.'tags' = $null
                 $include_properties += 'tags'
+            }
+            If ($CodeRepository.Id.Length -gt 0) {
+                [string]$CodeRepository_Id = $CodeRepository.Id
+                $BodyMetaData.'codeRepository' = $CodeRepository_Id
+            }
+            ElseIf ($UnsetCodeRepository -eq $true) {
+                $BodyMetaData.'codeRepository' = $null
             }
             If ($DataType.Length -gt 0) {
                 $BodyMetaData.'dataType' = $DataType
@@ -19535,7 +20067,7 @@ Function Copy-AutomateNOWDataSource {
                 $BodyMetaData.'_dataSource' = 'DataSourceDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
                 $parameters.Body = $Body
                 $Error.Clear()
                 Try {
@@ -19714,7 +20246,7 @@ Function Rename-AutomateNOWDataSource {
 
 #endregion
 
-#Region - DataSourceItems
+#Region - DataSource Items
 
 Function Read-AutomateNOWDataSourceItem {
     <#
@@ -20489,7 +21021,7 @@ Function Remove-AutomateNOWDataSourceItem {
         }
         [string]$DataSourceItem_id = $DataSourceItem.id
         If ($DataSourceItem_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If ($DataSourceItem -is [ANOWLocalDictionaryRecord]) {
@@ -20652,7 +21184,7 @@ Function Edit-AutomateNOWDataSourceItem {
         }
         [string]$DataSourceItem_id = $DataSourceItem.id
         If ($DataSourceItem_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($DataSourceItem_id)")) -eq $true) {
@@ -20873,6 +21405,1871 @@ Function Edit-AutomateNOWDataSourceItem {
     }
     End {
 
+    }
+}
+
+#endregion
+
+#Region - Deleted Domains
+
+Function Get-AutomateNOWDeletedDomain {
+    <#
+    .SYNOPSIS
+    Gets the deleted domains from an instance of AutomateNOW!
+
+    .DESCRIPTION
+    Gets the deleted domains from an instance of AutomateNOW!
+
+    .PARAMETER Id
+    Optional string array to specify the Id (or name) of the deleted domain to retrieve.
+
+    .PARAMETER startRow
+    An optional int32 representing what row to start the download from. This is intended for multi-page transfers.
+
+    .PARAMETER endRow
+    An optional int32 representing how many rows of data to receive. The default is 100. This is ideal for testing when you only want a few items.
+
+    .INPUTS
+    Accepts a string Id (or a series of them)
+
+    .OUTPUTS
+    An array of [ANOWDeletedDomain] class objects
+
+    .EXAMPLE
+    Gets the first page of Deleted Domains
+
+    Get-AutomateNOWDeletedDomain
+
+    .EXAMPLE
+    Gets a Deleted Domain by Id named 'Domain1'
+
+    Get-AutomateNOWDeletedDomain -Id 'Domain1'
+
+    .EXAMPLE
+    Gets the first page of deleted domains
+
+    Get-AutomateNOWDeletedDomain
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [OutputType([ANOWDomain[]])]
+    [Cmdletbinding( DefaultParameterSetName = 'Default')]
+    Param(
+        [Parameter(Mandatory = $false, ParameterSetName = 'Id', ValueFromPipeline = $true)]
+        [string]$Id,
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [int32]$startRow = 0,
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [int32]$endRow = 100
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'GET')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+        [string]$command = '/deletedDomain/read?'
+    }
+    Process {
+        [System.Collections.Specialized.OrderedDictionary]$BodyObject = [System.Collections.Specialized.OrderedDictionary]@{}
+        If ($_.Length -gt 0 -or $Id.Length -gt 0) {
+            If ($_.Length -gt 0) {
+                [string]$domain_id = $_
+            }
+            Else {
+                [string]$domain_id = $Id
+            }
+            [string]$textMatchStyle = 'exactCase'
+            $BodyObject.'id' = $domain_id
+            $BodyObject.'_operationId' = 'read'
+        }
+        Else {
+            $BodyObject.'_startRow' = $startRow
+            $BodyObject.'_endRow' = $endRow
+            [string]$textMatchStyle = 'exact'
+        }
+        $BodyObject.'_operationType' = 'fetch'
+        $BodyObject.'_textMatchStyle' = $textMatchStyle
+        $BodyObject.'_componentId' = 'DeletedDomainList'
+        $BodyObject.'_dataSource' = 'DeletedDomainDataSource'
+        $BodyObject.'isc_metaDataPrefix' = '_'
+        $BodyObject.'isc_dataFormat' = 'json'
+        [string]$Body = ConvertTo-QueryString -InputObject $BodyObject
+        [string]$command = ($command + $Body)
+        If ($null -ne $parameters["Command"]) {
+            $parameters.'Command' = $command
+        }
+        Else {
+            $parameters.Add('Command', $command)
+        }
+        $Error.Clear()
+        Try {
+            [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
+            Break
+        }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 10
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
+        }
+        $Error.Clear()
+        If ($results.response.data.count -gt 0) {
+            $Error.Clear()
+            Try {
+                [ANOWDeletedDomain[]]$DeletedDomains = $results.response.data
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Failed to parse the response into [ANOWDeletedDomain] objects due to [$Message]."
+                Break
+            }
+            Return $DeletedDomains
+        }
+    }
+    End {
+
+    }
+}
+
+Function Export-AutomateNOWDeletedDomain {
+    <#
+    .SYNOPSIS
+    Exports the deleted domains from an instance of AutomateNOW! This is not the same as downloading the deleted domain!
+
+    .DESCRIPTION
+    Exports the domains from an instance of AutomateNOW! to a local .csv file
+
+    .PARAMETER DeletedDomain
+    Mandatory [ANOWDeletedDomain] object (Use Get-AutomateNOWDeletedDomain to retrieve them)
+
+    .INPUTS
+    ONLY [ANOWDeletedDomain] objects from the pipeline are accepted
+
+    .OUTPUTS
+    The [ANOWDeletedDomain] objects are exported to the local disk in CSV format
+
+    .EXAMPLE
+    Get-AutomateNOWDeletedDomain | Export-AutomateNOWDeletedDomain
+
+    .EXAMPLE
+    Get-AutomateNOWDeletedDomain -Id 'Domain1' | Export-AutomateNOWDeletedDomain
+
+    .EXAMPLE
+    'Domain1', 'Domain2' | Get-AutomateNOWDeletedDomain | Export-AutomateNOWDeletedDomain
+
+    .NOTES
+	You must present [ANOWDomain] objects to the pipeline to use this function.
+    #>
+
+    [Cmdletbinding(DefaultParameterSetName = 'Pipeline')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true, ParameterSetName = 'Pipeline')]
+        [ANOWDeletedDomain]$DeletedDomain
+    )
+    Begin {
+        [string]$current_time = Get-Date -Format 'yyyyMMddHHmmssfff'
+        [string]$ExportFileName = 'Export-AutomateNOW-DeletedDomains-' + $current_time + '.csv'
+        [string]$ExportFilePath = ((Get-Location | Select-Object -ExpandProperty Path) + '\' + $ExportFileName)
+        [hashtable]$parameters = @{}
+        $parameters.Add('Path', $ExportFilePath)
+        $parameters.Add('Append', $true)
+        If ($PSVersionTable.PSVersion.Major -eq 5) {
+            $parameters.Add('NoTypeInformation', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [ANOWDeletedDomain]$DeletedDomain = $_
+        }
+        $Error.Clear()
+        Try {
+            $DeletedDomain | Export-CSV @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Export-CSV failed to export the [ANOWDeletedDomain] object on the pipeline due to [$Message]"
+            Break
+        }
+    }
+    End {
+        $Error.Clear()
+        If ((Test-Path -Path $ExportFilePath) -eq $true) {
+            [System.IO.FileInfo]$fileinfo = Get-Item -Path "$ExportFilePath"
+            [int32]$filelength = $fileinfo.Length
+            [string]$filelength_display = "{0:N0}" -f $filelength
+            Write-Information -MessageData "Created file $ExportFileName ($filelength_display bytes)"
+        }
+    }
+}
+
+Function Save-AutomateNOWDeletedDomain {
+    <#
+    .SYNOPSIS
+    Downloads and saves a Deleted Domain from an AutomateNOW! instance and writes it .json file.
+
+    .DESCRIPTION
+    Downloads and saves a Deleted Domain from an AutomateNOW! instance and writes it .json file.
+
+    .PARAMETER DeletedDomain
+    An [ANOWDeletedDomain] object representing the Deleted Domain to be downloaded to .json file.
+
+    .PARAMETER DestinationFilepath
+    Optional path for the .json export file to be written to. Use this if you want the exported JSON file to be written somewhere other than the current path.
+
+    .PARAMETER OverwriteExportFile
+    Switch parameter that will force the exported file to be overwritten if it exists
+
+    .INPUTS
+    ONLY [ANOWDeletedDomain] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    A verbose information message will be sent indicating success
+
+    .EXAMPLE
+    Saves a Deleted Domain named 'Domain1' to disk
+
+    Get-AutomateNOWDeletedDomain -Id 'Domain1' | Save-AutomateNOWDeletedDomain
+
+    .EXAMPLE
+    Saves the first page of Deleted Domains to disk while overwriting the exported file if it exists
+
+    Get-AutomateNOWDeletedDomain | Save-AutomateNOWDeletedDomain -OverwriteExportFile
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [Cmdletbinding()]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
+        [ANOWDeletedDomain]$DeletedDomain,
+        [ValidateScript({ (Test-Path -Path "$_") -eq $true })]
+        [Parameter(Mandatory = $false)]
+        [string]$DestinationPath,
+        [Parameter(Mandatory = $false)]
+        [switch]$OverwriteExportFile
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [ANOWDeletedDomain]$DeletedDomain = $_
+        }
+        [int64]$DeletedDomain_DataSize = $DeletedDomain.dataSize
+        If ($DeletedDomain_DataSize -eq 0) {
+            Write-Warning -Message "Somehow this Deleted Domain has a datasize of 0? Something is wrong..."
+            Break
+        }
+        If ($DeletedDomain_DataSize -lt 1024) {
+            [string]$DeletedDomain_DisplaySize = ("$DeletedDomain_DataSize" + ' B')
+        }
+        ElseIf ($DeletedDomain_DataSize -lt 1048576) {
+            [string]$DeletedDomain_DataSize = [math]::Round(($DeletedDomain_DataSize / 1024), 2)
+            [string]$DeletedDomain_DisplaySize = ("$DeletedDomain_DataSize" + ' kB')
+        }
+        Else {
+            [string]$DeletedDomain_DataSize = [math]::Round(($DeletedDomain_DataSize / 1048576), 2)
+            [string]$DeletedDomain_DisplaySize = ("$DeletedDomain_DataSize" + ' MB')
+        }
+        [string]$DeletedDomain_id = $DeletedDomain.id
+        ## Begin warning ##
+        ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
+        $Error.Clear()
+        Try {
+            [ANOWDeletedDomain]$current_DeletedDomain = Get-AutomateNOWDeletedDomain -Id $DeletedDomain_id
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWDeletedDomain failed to check if the Deleted Domain [$DeletedDomain_id] existed under Save-AutomateNOWDeletedDomain due to [$Message]."
+            Break
+        }
+        If ($current_DeletedDomain.id.length -eq 0) {
+            Write-Warning -Message "The Deleted Domain you specified does not seem to exist (under Save-AutomateNOWDeletedDomain)"
+            Break
+        }
+        ## End warning ##
+        Write-Information -MessageData "Downloading Deleted Domain [$DeletedDomain_id] with expected filesize: $DeletedDomain_DisplaySize"
+        [string]$command = ('/deletedDomain/downloadFile?id=' + $DeletedDomain_id)
+        If ($null -ne $parameters["Command"]) {
+            $parameters.'command' = $command
+        }
+        Else {
+            $parameters.Add('Command', $command)
+        }
+        $Error.Clear()
+        Try {
+            [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$DeletedDomain_id] due to [$Message]."
+            Break
+        }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 10
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
+        }
+        $Error.Clear()
+        Try {
+            [string]$DeletedDomain_JSON = $results | ConvertTo-Json -Compress -Depth 100
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "ConvertTo-Json failed to convert the download of [$DeletedDomain_id] to JSON due to [$Message]."
+            Break
+        }
+        If ($DestinationPath.Length -eq 0) {
+            [string]$DestinationPath = '.'
+        }
+        [string]$outgoing_filename = ($DeletedDomain_id + '.json')
+        [string]$ExportFilePath = Join-Path -Path $DestinationPath -ChildPath $outgoing_filename
+        [boolean]$outgoing_file_exists = Test-Path -Path "$ExportFilePath"
+        If ($outgoing_file_exists -eq $true -and $OverwriteExportFile -ne $true) {
+            Write-Warning -Message "The export file $outgoing_filename already exists at $DestinationPath. Use the -OverwriteExportFile switch parameter to bypass this exception and overwrite the file."
+            Break
+        }
+        $Error.Clear()
+        [hashtable]$parameters2 = @{}
+        $parameters2.Add('InputObject', $DeletedDomain_JSON)
+        $parameters2.Add('Path', $ExportFilePath)
+        $parameters2.Add('NoNewLine', $true)
+        If ($OverwriteExportFile -eq $true) {
+            $parameters2.Add('Force', $true)
+        }
+        Try {
+            Out-File @parameters2
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Out-File failed to write the outgoing file [$outgoing_filename] to disk (under Save-AutomateNOWDeletedDomain) due to [$Message]."
+            Break
+        }
+        $Error.Clear()
+        If ((Test-Path -Path $ExportFilePath) -eq $true) {
+            [System.IO.FileInfo]$fileinfo = Get-Item -Path "$ExportFilePath"
+            [int32]$filelength = $fileinfo.Length
+            [string]$filelength_display = "{0:N0}" -f $filelength
+            Write-Information -MessageData "Successfully saved Deleted Domain [$DeletedDomain_id] to disk as: $outgoing_filename - $filelength_display bytes"
+        }
+    }
+    End {
+
+    }
+}
+
+#endregion
+
+#Region - Deleted Objects
+
+Function Get-AutomateNOWDeletedObject {
+    <#
+    .SYNOPSIS
+    Gets the Deleted Objects from an AutomateNOW! instance
+
+    .DESCRIPTION
+    Gets the Deleted Objects from an AutomateNOW! instance
+
+    .PARAMETER Id
+    Optional CASE-SENSITIVE string containing the 36-character GUID (Id) of the specific Deleted Object
+
+    .PARAMETER itemId
+    Optional CASE-SENSITIVE string containing the ItemId of the specific Deleted Object. This is the same as the Id of the object before it was deleted.
+
+    .PARAMETER DeletedBy
+    Optional CASE-SENSITIVE string containing the DeletedBy of the specific Deleted Object. This is the Id of the user that deleted the object.
+
+    .PARAMETER ItemType
+    Optional string to filter by domain class. See enum ANOWCodeRepositoryObjectSourceCode_domainClassName for valid values.
+
+    .PARAMETER startRow
+    Integer to indicate the row to start from. This is intended for when you need to paginate the results. Default is 0.
+
+    .PARAMETER endRow
+    Integer to indicate the row to stop on. This is intended for when you need to paginate the results. Default is 100.
+
+    .PARAMETER Folder
+    Optional string to filter by a particular Folder (case-sensitive)
+
+    .PARAMETER Tags
+    Optional string array of Tags to filter by. Note that by default only one Tag needs to be present. Use the -AllTags switch parameter to require all Tags.
+
+    .PARAMETER AllTags
+    Optional switch parameter to indicate that all Tags must be present.
+
+    .INPUTS
+    Inputs are not required. This function accepts one more strings representing the GUID (Id) of the Deleted Object or the ItemType can be specified.
+
+    .OUTPUTS
+    An array of one or more [ANOWDeletedObject] class objects
+
+    .EXAMPLE
+    Gets the first page of Deleted Objects
+
+    Get-AutomateNOWDeletedObject
+
+    .EXAMPLE
+    Gets the first 10,000 Deleted Objects
+
+    Get-AutomateNOWDeletedObject -startRow 0 -endRow 10000
+
+    .EXAMPLE
+    Gets a specific Deleted Object by its Id
+
+    Get-AutomateNOWDeletedObject -Id '3a6db63b-d590-4b53-9921-966f279fd501'
+
+    .EXAMPLE
+    Gets a specific Deleted Object by its itemId
+
+    Get-AutomateNOWDeletedObject -itemId 'MyScript'
+
+    .EXAMPLE
+    Gets the first 10,000 Deleted Objects of type Endpoint
+
+    Get-AutomateNOWDeletedObject -itemType Endpoint -startRow 0 -endRow 10000
+
+    .EXAMPLE
+    Gets the first page of Deleted Objects of type Tag deleted by 'User1'
+
+    Get-AutomateNOWDeletedObject -itemType Tag -DeletedBy 'User1'
+
+    .EXAMPLE
+    Gets the first 10,000 Deleted Objects that were deleted by 'User1'
+
+    Get-AutomateNOWDeletedObject -DeletedBy 'User1' -startRow 0 -endRow 10000
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [OutputType([ANOWDeletedObject[]])]
+    [Cmdletbinding(DefaultParameterSetName = 'All')]
+    Param(
+        [ValidateScript({ $_ -cmatch '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' })]
+        [Parameter(Mandatory = $True, ParameterSetName = 'Id', ValueFromPipeline = $true)]
+        [string]$Id,
+        [Parameter(Mandatory = $True, ParameterSetName = 'ItemId')]
+        [string]$itemId,
+        [Parameter(Mandatory = $False, ParameterSetName = 'All')]
+        [string]$DeletedBy,
+        [Parameter(Mandatory = $False, ParameterSetName = 'All')]
+        [ANOWCodeRepositoryObjectSourceCode_domainClassName]$ItemType,
+        [Parameter(Mandatory = $False, ParameterSetName = 'All')]
+        [int32]$startRow = 0,
+        [Parameter(Mandatory = $False, ParameterSetName = 'All')]
+        [int32]$endRow = 100,
+        [Parameter(Mandatory = $False, ParameterSetName = 'All')]
+        [string]$Folder,
+        [Parameter(Mandatory = $False, ParameterSetName = 'All')]
+        [string[]]$Tags,
+        [Parameter(Mandatory = $False, ParameterSetName = 'All')]
+        [switch]$AllTags
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        If ($Tags.Count -le 1 -and $AllTags -eq $true) {
+            Write-Warning -Message "Please do not use -AllTags unless you are specifying two or more Tags."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'GET')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+        If ($AllLoadBalancers -eq $true -and $AllChildNodes -eq $true) {
+            Write-Warning -Message "You can't request only load balancer and then only load balancer nodes in the same request. Please choose one or the other."
+            Break
+        }
+    }
+    Process {
+        [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
+        If (($_.Length -gt 0 -or $Id.Length -gt 0) ) {
+            If ($_.Length -gt 0) {
+                $Body.'id' = $_
+            }
+            Else {
+                $Body.'id' = $Id
+            }
+            [string]$textMatchStyle = 'exactCase'
+        }
+        ElseIf ($itemId.Length -gt 0) {
+            $Body.'itemId' = $itemId
+            [string]$textMatchStyle = 'exactCase'
+        }
+        Else {
+            $Body.'operator' = 'and'
+            $Body.'_componentId' = 'DeletedObjectsList'
+            $Body.'_startRow' = $startRow
+            $Body.'_endRow' = $endRow
+            [string]$textMatchStyle = 'substring'
+            If ($ItemType.Length -gt 0 -or $DeletedBy.Length -gt 0) {
+                $Body.'_constructor' = 'AdvancedCriteria'
+                $Body.'_operationId' = 'read'
+                If ($ItemType.Length -gt 0) {
+                    $Body.'criteria1' = ('{"fieldName":"domainClass","operator":"iContains","value":"' + $ItemType + '"}')
+                }
+                If ($DeletedBy.Length -gt 0) {
+                    $Body.'criteria2' = ('{"fieldName":"deletedBy","operator":"equals","value":"' + $DeletedBy + '"}')
+                }
+            }
+        }
+        $Body.'_operationId' = 'read'
+        $Body.'_operationType' = 'fetch'
+        $Body.'_textMatchStyle' = $textMatchStyle
+        $Body.'_dataSource' = 'DeletedObjectDataSource'
+        $Body.'isc_metaDataPrefix' = '_'
+        $Body.'isc_dataFormat' = 'json'
+        [string]$Body = ConvertTo-QueryString -InputObject $Body
+        [string]$command = ('/deletedObject/read?' + $Body)
+        If ($null -eq $parameters["Command"]) {
+            $parameters.Add('Command', $command)
+        }
+        Else {
+            $parameters.Command = $command
+        }
+        $Error.Clear()
+        Try {
+            [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
+            Break
+        }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 10
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
+        }
+        $Error.Clear()
+        Try {
+            [ANOWDeletedObject[]]$DeletedObjects = $results.response.data
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Failed to parse the response into a series of [ANOWDeleteObject] objects due to [$Message]."
+            Break
+        }
+        If ($DeletedObjects.Count -gt 0) {
+            If ($Folder.Length -gt 0 -or $Tags.Count -gt 0) {
+                [PSCustomObject[]]$DeletedObjectDefinitionCache = $DeletedObjects | ForEach-Object { [PSCustomObject]@{ Id = $_.Id; Definition = ( $_.definition -replace '"Failed":', '"FAILED":' | ConvertFrom-Json ); } }
+                [PSCustomObject[]]$DeletedObjectDefinitionCache = $DeletedObjectDefinitionCache | ForEach-Object { [PSCustomObject]@{ Id = $_.Id; Definition = $_.definition ; Folder = $_.definition.Folder; Tags = $_.definition.Tags; } }
+                If ($Folder.Length -gt 0) {
+                    [PSCustomObject[]]$DeletedObjectDefinitionCache = $DeletedObjectDefinitionCache | Where-Object { $_.Folder -ceq $Folder }
+                }
+                If ($Tags.Count -gt 0) {
+                    If ($AllTags -eq $true) {
+                        [int32]$Tags_Count = $Tags.Count
+                        [PSCustomObject[]]$DeletedObjectDefinitionCache = $DeletedObjectDefinitionCache | Where-Object { ( Compare-Object -ReferenceObject ($_.Tags) -DifferenceObject $Tags -IncludeEqual | Where-Object { $_.SideIndicator -eq '==' } | Measure-Object | Select-Object -ExpandProperty Count ) -ge $Tags_Count }
+                    }
+                    Else {
+                        [PSCustomObject[]]$DeletedObjectDefinitionCache = $DeletedObjectDefinitionCache | Where-Object { ( Compare-Object -ReferenceObject ($_.Tags) -DifferenceObject $Tags -IncludeEqual | Where-Object { $_.SideIndicator -eq '==' } | Measure-Object | Select-Object -ExpandProperty Count ) -gt 0 }
+                    }
+                }
+                If ($DeletedObjectDefinitionCache.Count -gt 0) {
+                    [ANOWDeletedObject[]]$DeletedObjects = $DeletedObjects | Where-Object { $_.id -in ($DeletedObjectDefinitionCache.id) }
+                }
+            }
+            Return $DeletedObjects
+        }
+    }
+    End {
+
+    }
+}
+
+Function Export-AutomateNOWDeletedObject {
+    <#
+    .SYNOPSIS
+    Exports the Deleted Objects from an instance of AutomateNOW!
+
+    .DESCRIPTION
+    Exports the Deleted Objects from an instance of AutomateNOW! to a local .csv file
+
+    .PARAMETER DeletedObject
+    Mandatory [ANOWDeletedObject] object (Use Get-AutomateNOWDeletedObject to retrieve them)
+
+    .INPUTS
+    ONLY [ANOWDeletedObject] objects from the pipeline are accepted
+
+    .OUTPUTS
+    The [ANOWDeletedObject] objects are exported to the local disk in CSV format
+
+    .EXAMPLE
+    Get-AutomateNOWDeletedObject | Export-AutomateNOWDeletedObject
+
+    .EXAMPLE
+    Get-AutomateNOWDeletedObject -Id '776db63b-d590-4b53-9921-966f279fd502' | Export-AutomateNOWDeletedObject
+
+    .EXAMPLE
+    '3a6db63b-d590-4b53-9921-966f279fd501', '776db63b-d590-4b53-9921-966f279fd502' | Get-AutomateNOWDeletedObject | Export-AutomateNOWDeletedObject
+
+    .EXAMPLE
+    Get-AutomateNOWDeletedObject -itemType Endpoint | Export-AutomateNOWDeletedObject
+
+    .NOTES
+	You must present [ANOWDeletedObject] objects to the pipeline to use this function.
+    #>
+
+    [Cmdletbinding(DefaultParameterSetName = 'Pipeline')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true, ParameterSetName = 'Pipeline')]
+        [ANOWDeletedObject]$DeletedObject
+    )
+    Begin {
+        [string]$current_time = Get-Date -Format 'yyyyMMddHHmmssfff'
+        [string]$ExportFileName = 'Export-AutomateNOW-DeletedObjects-' + $current_time + '.csv'
+        [string]$ExportFilePath = ((Get-Location | Select-Object -ExpandProperty Path) + '\' + $ExportFileName)
+        [hashtable]$parameters = @{}
+        $parameters.Add('Path', $ExportFilePath)
+        $parameters.Add('Append', $true)
+        If ($PSVersionTable.PSVersion.Major -eq 5) {
+            $parameters.Add('NoTypeInformation', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [ANOWDeletedObject]$DeletedObject = $_
+        }
+        $Error.Clear()
+        Try {
+            $DeletedObject | Export-CSV @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Export-CSV failed to export the [ANOWDeletedObject] object on the pipeline due to [$Message]"
+            Break
+        }
+    }
+    End {
+        $Error.Clear()
+        If ((Test-Path -Path $ExportFilePath) -eq $true) {
+            [System.IO.FileInfo]$fileinfo = Get-Item -Path "$ExportFilePath"
+            [int32]$filelength = $fileinfo.Length
+            [string]$filelength_display = "{0:N0}" -f $filelength
+            Write-Information -MessageData "Created file $ExportFileName ($filelength_display bytes)"
+        }
+    }
+}
+
+Function Remove-AutomateNOWDeletedObject {
+    <#
+    .SYNOPSIS
+    Removes (permanently deletes) a Deleted Object from the Recycle Bin of an AutomateNOW! instance
+
+    .DESCRIPTION
+    Removes (permanently deletes) a Deleted Object from the Recycle Bin of an AutomateNOW! instance
+
+    .PARAMETER DeletedObject
+    An [ANOWDeletedObject] object representing the Deleted Object to be permanently deleted.
+
+    .PARAMETER Force
+    Force the removal (permanent deletion) without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    ONLY [ANOWDeletedObject] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    None. The status will be written to the console with Write-Verbose.
+
+    .EXAMPLE
+    Removes (permanently deletes) the first page of Deleted Objects
+
+    Get-AutomateNOWDeletedObject | Remove-AutomateNOWDeletedObject
+
+    .EXAMPLE
+    Removes (permanently deletes) 2 specific Deleted Objects by Id across the pipeline
+
+    '3a6db63b-d590-4b53-9921-966f279fd501', '776db63b-d590-4b53-9921-966f279fd502' | Get-AutomateNOWDeletedObject | Remove-AutomateNOWDeletedObject
+
+    .EXAMPLE
+    Forcibly removes (permanently deletes) the first page of Deleted Objects of type Endpoint
+
+    Get-AutomateNOWDeletedObject -itemType Endpoint | Remove-AutomateNOWDeletedObject -Force
+
+    .EXAMPLE
+    Forcibly removes (permanently deletes) the first page of Deleted Objects that were deleted by 'User1'
+
+    Get-AutomateNOWDeletedObject -DeletedBy 'User1' | Remove-AutomateNOWDeletedObject -Force
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
+        [ANOWDeletedObject]$DeletedObject,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [string]$command = '/deletedObject/delete'
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [ANOWDeletedObject]$DeletedObject = $_
+        }
+        [string]$DeletedObject_id = $DeletedObject.id
+        If ($DeletedObject_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
+            Break
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($DeletedObject_id)")) -eq $true) {
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.'id' = $DeletedObject_id
+            $BodyMetaData.'_operationId' = 'delete'
+            $BodyMetaData.'_textMatchStyle' = 'exact'
+            $BodyMetaData.'_operationType' = 'remove'
+            $BodyMetaData.'_dataSource' = 'DeletedObjectDataSource'
+            $BodyMetaData.'isc_metaDataPrefix' = '_'
+            $BodyMetaData.'isc_dataFormat' = 'json'
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            If ($null -eq $parameters["Body"]) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$DeletedObject_id] due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 10
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
+            }
+            Write-Verbose -Message "Deleted Object $DeletedObject_id was permanently deleted"
+        }
+    }
+    End {
+
+    }
+}
+
+Function Restore-AutomateNOWDeletedObject {
+    <#
+    .SYNOPSIS
+    Restores (undeletes) a Deleted Object from an AutomateNOW! instance
+
+    .DESCRIPTION
+    Restores (undeletes) a Deleted Object from an AutomateNOW! instance
+
+    .PARAMETER DeletedObject
+    An [ANOWDeletedObject] object representing the object to be restored (undeleted).
+
+    .PARAMETER Force
+    Switch parameter that forces the restore without confirmation. This is equivalent to -Confirm:$false
+
+    .PARAMETER Quiet
+    Switch parameter to silence the output of the restored [ANOWDeletedObject] object.
+
+    .INPUTS
+    ONLY [ANOWDeletedObject] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    An [ANOWDeletedObject] object representing the object that was restored will be returned.
+
+    .EXAMPLE
+    Forcibly and quietly restores (undeletes) an object formerly known as 'DeletedObject1'
+
+    Get-AutomateNOWDeletedObject -itemId 'DeletedObject1' | Restore-AutomateNOWDeletedObject -Force -Quiet
+
+    .EXAMPLE
+    Restores (undeleted) the first page of Deleted Objects that were deleted by a user named 'User1'
+
+    Get-AutomateNOWDeletedObject -DeletedBy 'User1' | Restore-AutomateNOWDeletedObject
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    If an object with the same name (Id) already exists then this API call will fail with the message "Object already exists. Undelete is cancelled."
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
+        [ANOWDeletedObject]$DeletedObject,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [string]$command = '/deletedObject/undelete'
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [ANOWDeletedObject]$DeletedObject = $_
+        }
+        [string]$DeletedObject_id = $DeletedObject.id
+        If ($DeletedObject_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
+            Break
+        }
+        [string]$DeletedObject_itemId = $DeletedObject.itemId
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$DeletedObject_id ($DeletedObject_itemId)?")) -eq $true) {
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.'id' = $DeletedObject_id
+            $BodyMetaData.'_operationId' = 'undelete'
+            $BodyMetaData.'_textMatchStyle' = 'exact'
+            $BodyMetaData.'_operationType' = 'remove'
+            $BodyMetaData.'_dataSource' = 'DeletedObjectDataSource'
+            $BodyMetaData.'isc_metaDataPrefix' = '_'
+            $BodyMetaData.'isc_dataFormat' = 'json'
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            If ($null -eq $parameters["Body"]) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$DeletedObject_id] due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 10
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
+            }
+            Write-Verbose -Message "Deleted Object $DeletedObject_id was successfully restored"
+            $Error.Clear()
+            Try {
+                [ANOWDeletedObject]$DeletedObject = $results.response.data[0]
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Failed to parse the response into an [ANOWDeleteObject] object due to [$Message]."
+                Break
+            }
+            If ($Quiet -ne $true) {
+                Return $DeletedObject
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+#endregion
+
+#Region - Design Templates
+
+Function Get-AutomateNOWDesignTemplate {
+    <#
+    .SYNOPSIS
+    Gets the Design Template Objects from an AutomateNOW! instance
+
+    .DESCRIPTION
+    Gets the Design Template Objects from an AutomateNOW! instance
+
+    .PARAMETER Id
+    Optional string containing the Id of the specific Design Template
+
+    .PARAMETER startRow
+    Integer to indicate the row to start from. This is intended for when you need to paginate the results. Default is 0.
+
+    .PARAMETER endRow
+    Integer to indicate the row to stop on. This is intended for when you need to paginate the results. Default is 100.
+
+    .PARAMETER sortBy
+    Optional string parameter to sort the results by (may not be used with the Id parameter). Valid choices are: id*, dateCreated, lastUpdated, createdBy, defaultTemplate, processingType, serverNodeType, taskType, designTemplateType
+
+    .PARAMETER Descending
+    Optional switch parameter to sort in descending order
+
+    .INPUTS
+    A single Id or a string of Id's across the pipeline will be accepted.
+
+    .OUTPUTS
+    Either one or more [ANOWDesignTemplate] objects
+
+    .EXAMPLE
+    Gets the first page of Design Template objects
+
+    Get-AutomateNOWDesignTemplate
+
+    .EXAMPLE
+    Gets a single Design Template named 'DesignTemplate1'
+
+    Get-AutomateNOWDesignTemplate -Id 'DesignTemplate1'
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [OutputType([ANOWDesignTemplate[]])]
+    [Cmdletbinding(DefaultParameterSetName = 'Default')]
+    Param(
+        [Parameter(Mandatory = $True, ParameterSetName = 'Id', ValueFromPipeline = $true)]
+        [string]$Id,
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [int32]$startRow = 0,
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [int32]$endRow = 100,
+        [ValidateSet('id', 'dateCreated', 'lastUpdated', 'createdBy', 'defaultTemplate', 'processingType', 'serverNodeType', 'taskType', 'designTemplateType', IgnoreCase = $false)]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Public')]
+        [string]$sortBy = 'id',
+        [Parameter(Mandatory = $False, ParameterSetName = 'Public')]
+        [switch]$Descending
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'GET')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+        If ($AllLoadBalancers -eq $true -and $AllChildNodes -eq $true) {
+            Write-Warning -Message "You can't request only load balancer and then only load balancer nodes in the same request. Please choose one or the other."
+            Break
+        }
+    }
+    Process {
+        [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
+        If (($_.Length -gt 0 -or $Id.Length -gt 0) ) {
+            If ($_.Length -gt 0) {
+                $Body.'id' = $_
+            }
+            Else {
+                $Body.'id' = $Id
+            }
+            [string]$textMatchStyle = 'exactCase'
+        }
+        ElseIf ($itemId.Length -gt 0) {
+            $Body.'itemId' = $itemId
+            [string]$textMatchStyle = 'exactCase'
+        }
+        Else {
+            $Body.'_constructor' = 'AdvancedCriteria'
+            $Body.'operator' = 'and'
+            $Body.'_componentId' = 'DesignTemplateList'
+            $Body.'_startRow' = $startRow
+            $Body.'_endRow' = $endRow
+            [string]$textMatchStyle = 'exact'
+            If ($Descending -eq $true) {
+                $Body.'_sortBy' = '-' + $sortBy
+            }
+            Else {
+                $Body.'_sortBy' = $sortBy
+            }
+        }
+        $Body.'_operationId' = 'DesignTemplateDataSource_fetch'
+        $Body.'_operationType' = 'fetch'
+        $Body.'_textMatchStyle' = $textMatchStyle
+        $Body.'_dataSource' = 'DesignTemplateDataSource'
+        $Body.'isc_metaDataPrefix' = '_'
+        $Body.'isc_dataFormat' = 'json'
+        [string]$Body = ConvertTo-QueryString -InputObject $Body
+        [string]$command = ('/designTemplate/read?' + $Body)
+        If ($null -eq $parameters["Command"]) {
+            $parameters.Add('Command', $command)
+        }
+        Else {
+            $parameters.Command = $command
+        }
+        $Error.Clear()
+        Try {
+            [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
+            Break
+        }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 10
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
+        }
+        $Error.Clear()
+        Try {
+            [ANOWDesignTemplate[]]$DesignTemplates = $results.response.data
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Failed to parse the response into a series of [ANOWDesignTemplate] objects due to [$Message]."
+            Break
+        }
+        If ($DesignTemplates.Count -gt 0) {
+            Return $DesignTemplates
+        }
+    }
+    End {
+
+    }
+}
+
+Function Set-AutomateNOWDesignTemplate {
+    <#
+    .SYNOPSIS
+    Changes the settings of a Design Template on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Changes the settings of a Design Template on an AutomateNOW! instance
+
+    .PARAMETER ServerNodeEndpoint
+    An [ANOWDesignTemplate] object representing the Design Template to be modified.
+
+    .PARAMETER SetAsDefault
+    A [boolean] parameter indicating if the Default status of the Design Template should be true or false.
+
+    .PARAMETER Description
+    Optional description of the Design Template (may not exceed 255 characters).
+
+    .PARAMETER templateDefinition
+    Optional PSCustomObject to replace the current templateDefinition with (as JSON). You should use Edit-AutomateNOWDesignTemplate instead if you want to modify the templateDefinition.
+
+    .PARAMETER Quiet
+    An optional switch parameter that silences the output of this function
+
+    .PARAMETER Force
+    Force the change without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    ONLY [ANOWDesignTemplate] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    The modified [ANOWDesignTemplate] object will be returned
+
+    .EXAMPLE
+    Quietly changes the weight property (to 3) inside of the template definition within a Design Template named 'DesignTemplate1' (multi-line format)
+
+    $design_template = Get-AutomateNOWDesignTemplate -Id 'DesignTemplate1'
+    $template_definition = $design_template.templateDefinition
+    $template_definition.weight = 3
+    $design_template | Set-AutomateNOWDesignTemplate -templateDefinition $template_definition -Quiet
+
+    .EXAMPLE
+    Quietly and forcefully changes the description on a Design Template named 'DesignTemplate1' (one-liner format)
+
+    Get-AutomateNOWDesignTemplate -Id 'DesignTemplate1' | Set-AutomateNOWDesignTemplate -Description 'New Description' -Force -Quiet
+
+    .EXAMPLE
+    Forcefully removes the default status from a Design Template named 'DesignTemplate1' (one-liner format)
+
+    Set-AutomateNOWDesignTemplate -DesignTemplate (Get-AutomateNOWDesignTemplate -Id 'DesignTemplate1') -SetAsDefault $false -Force
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    The -SetAsDefault parameter cannot be combined with -Description or -templateDefinition
+
+    #>
+    [Cmdletbinding(DefaultParameterSetName = 'Default', SupportsShouldProcess = $true, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true, ParameterSetName = 'Default', ValueFromPipeline = $True)]
+        [Parameter(Mandatory = $true, ParameterSetName = 'SetDefault', ValueFromPipeline = $True)]
+        [ANOWDesignTemplate]$DesignTemplate,
+        [Parameter(Mandatory = $false, ParameterSetName = 'SetDefault')]
+        [Nullable[boolean]]$SetAsDefault,
+        [ValidateScript({ $_.Length -le 255 })]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
+        [string]$Description,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
+        [PSCustomObject]$templateDefinition,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        If ($SetAsDefault -eq $true) {
+            [string]$command = '/designTemplate/setDefault'
+        }
+        ElseIf ($SetAsDefault -eq $false) {
+            [string]$command = '/designTemplate/unsetDefault'
+        }
+        Else {
+            [string]$command = '/designTemplate/update'
+        }
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [ANOWDesignTemplate]$DesignTemplate = $_
+        }
+        [string]$DesignTemplate_id = $DesignTemplate.id
+        If ($DesignTemplate.serviceManagerType.Length -gt 0) {
+            [string]$DesignTemplateType = $DesignTemplate.serviceManagerType
+            [string]$DesignTemplateSummary = "Service Manager Templates of type: $DesignTemplateType"
+        }
+        ElseIf ($DesignTemplate.workflowType.Length -gt 0) {
+            [string]$DesignTemplateType = $DesignTemplate.workflowType
+            [string]$DesignTemplateSummary = "Workflow Templates of type: $DesignTemplateType"
+        }
+        ElseIf ($DesignTemplate.triggerType.Length -gt 0) {
+            [string]$DesignTemplateType = $DesignTemplate.processingType
+            [string]$DesignTemplateSummary = "Schedule Templates of type: $DesignTemplateType"
+        }
+        ElseIf ($DesignTemplate.taskType.Length -gt 0) {
+            [string]$DesignTemplateType = $DesignTemplate.taskType
+            [string]$DesignTemplateSummary = "Task Templates of type: $DesignTemplateType"
+        }
+        Else {
+            Write-Warning -Message "Somehow could not determine the type of Processing Template for $DesignTemplate_id"
+            Break
+        }
+        If ($SetAsDefault -eq $true -and $DesignTemplate.defaultTemplate -eq $true) {
+            Write-Warning -Message "$DesignTemplate_id is already the default Design Template for $DesignTemplateSummary (No action is required)"
+            Break
+        }
+        ElseIf ($SetAsDefault -eq $false -and $DesignTemplate.defaultTemplate -eq $false) {
+            Write-Warning -Message "$DesignTemplate_id is already not the default Design Template for $DesignTemplateSummary (No action is required)"
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$DesignTemplate_id")) -eq $true) {
+            ## Begin warning ##
+            ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
+            $Error.Clear()
+            Try {
+                [boolean]$DesignTemplate_exists = ($null -eq (Get-AutomateNOWDesignTemplate -Id $DesignTemplate_id))
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Get-AutomateNOWDesignTemplate failed to check if the Design Template [$DesignTemplate_id] under Set-AutomateNOWDesignTemplate already existed due to [$Message]."
+                Break
+            }
+            If ($DesignTemplate_exists -eq $true) {
+                Write-Warning -Message "There is not a Design Template named $DesignTemplate_id"
+                Break
+            }
+            ## End warning ##
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            If ($SetAsDefault -eq $true) {
+                $BodyMetaData.'_operationId' = 'setDefault'
+            }
+            ElseIf ($SetAsDefault -eq $false) {
+                $BodyMetaData.'_operationId' = 'unsetDefault'
+            }
+            $BodyMetaData.'id' = $DesignTemplate_id
+            If ($Description.Length -gt 0) {
+                $BodyMetaData.'description' = $Description
+            }
+            If ($null -ne $templateDefinition) {
+                $Error.Clear()
+                Try {
+                    [string]$templateDefinition_JSON = $templateDefinition | ConvertTo-Json -Depth 100 -Compress
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "ConvertTo-Json failed to convert the provided templateDefinition object due to [$Message]."
+                    Break
+                }
+                $BodyMetaData.'templateDefinition' = $templateDefinition_JSON
+            }
+            $BodyMetaData.'_operationType' = 'update'
+            $BodyMetaData.'_textMatchStyle' = 'exact'
+            $BodyMetaData.'_dataSource' = 'DesignTemplateDataSource'
+            $BodyMetaData.'isc_metaDataPrefix' = '_'
+            $BodyMetaData.'isc_dataFormat' = 'json'
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            If ($null -eq $parameters.Body) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$DesignTemplate_id] due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 10
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
+            }
+            Write-Verbose -Message "Design Template $DesignTemplate_id was successfully updated"
+            $Error.Clear()
+            Try {
+                [ANOWDesignTemplate]$Modified_DesignTemplate = $results.response.data | Select-Object -First 1
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Failed to parse the successful result of Set-AutomateNOWDesignTemplate to an [ANOWDesignTemplate] object due to [$Message]."
+                Break
+            }
+            If ($Quiet -ne $true) {
+                Return $Modified_DesignTemplate
+            }
+        }
+    }
+    End {
+    }
+}
+
+Function New-AutomateNOWDesignTemplate {
+    <#
+    .SYNOPSIS
+    Creates a Design Template within an AutomateNOW! instance
+
+    .DESCRIPTION
+    Creates a Design Template within an AutomateNOW! instance and returns back the newly created [ANOWDesignTemplate] object
+
+    .PARAMETER Id
+    Mandatory name of the Design Template. For example: 'DesignTemplate1'. This value may not contain the domain in brackets.
+
+    .PARAMETER ProcessingTemplate
+    Mandatory [ANOWProcessingTemplate] object. Use Get-AutomateNOWTaskTemplate (Workflow Template, Service Manager Template or Schedule Template) to retrieve them
+
+    .PARAMETER Description
+    Optional description of the Design Template (may not exceed 255 characters).
+
+    .PARAMETER Quiet
+    Optional switch to suppress the return of the newly created object
+
+    .INPUTS
+    None. You cannot pipe objects to New-AutomateNOWDesignTemplate.
+
+    .OUTPUTS
+    An [ANOWDesignTemplate] object representing the newly created DesignTemplate
+
+    .EXAMPLE
+    Creates a new Design Template named 'DesignTemplate1' based on a Task Template named 'TaskTemplate1'
+    
+    New-AutomateNOWDesignTemplate -Id 'DesignTemplate1' -Description 'the description' -ProcessingTemplate (Get-AutomateNOWTaskTemplate -id 'TaskTemplate1')
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    Only Processing Template objects are supported despite there being indicators that some other design template types may be supported.
+
+    #>
+    [OutputType([ANOWDesignTemplate])]
+    [Cmdletbinding()]
+    Param(
+        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [Parameter(Mandatory = $true)]
+        [string]$Id,
+        [Parameter(Mandatory = $true)]
+        [ANOWProcessingTemplate]$ProcessingTemplate,
+        [Parameter(Mandatory = $false, HelpMessage = "Enter a descriptive string between 0 and 255 characters in length. UTF8 characters are accepted.")]
+        [ValidateScript({ $_.Length -le 255 })]
+        [string]$Description,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+        Write-Warning -Message "Somehow there is not a valid token confirmed."
+        Break
+    }
+    ## Begin warning ##
+    ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
+    $Error.Clear()
+    Try {
+        [boolean]$DesignTemplate_exists = ($null -ne (Get-AutomateNOWDesignTemplate -Id $Id))
+    }
+    Catch {
+        [string]$Message = $_.Exception.Message
+        Write-Warning -Message "Get-AutomateNOWDesignTemplate failed to check if the Design Template [$Id] already existed due to [$Message]."
+        Break
+    }
+    If ($DesignTemplate_exists -eq $true) {
+        [string]$current_domain = $anow_session.header.domain
+        Write-Warning -Message "There is already an DesignTemplate named [$Id] in [$current_domain]. Please check into this."
+        Break
+    }
+    ## End warning ##
+    [string]$ProcessingTemplate_Id = $ProcessingTemplate.id
+    [string]$oldValues = ('{"recordId":"' + $ProcessingTemplate_Id + '","domainClass":"ProcessingTemplate"}')
+    [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+    $BodyMetaData.Add('id', $Id)
+    If ($Description.Length -gt 0) {
+        $BodyMetaData.Add('description', $Description)
+    }
+    $BodyMetaData.Add('recordId', $ProcessingTemplate_Id)
+    $BodyMetaData.Add('domainClass', 'ProcessingTemplate')
+    $BodyMetaData.'_textMatchStyle' = 'exact'
+    $BodyMetaData.'_operationType' = 'add'
+    $BodyMetaData.'_oldValues' = $oldValues
+    $BodyMetaData.'_componentId' = 'DesignTemplateCreateWindow_form'
+    $BodyMetaData.'_dataSource' = 'DesignTemplateDataSource'
+    $BodyMetaData.'isc_metaDataPrefix' = '_'
+    $BodyMetaData.'isc_dataFormat' = 'json'
+    [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+    [string]$command = '/designTemplate/create'
+    [hashtable]$parameters = @{}
+    $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+    $parameters.Add('Command', $command)
+    $parameters.Add('Method', 'POST')
+    $parameters.Add('Body', $Body)
+    If ($anow_session.NotSecure -eq $true) {
+        $parameters.Add('NotSecure', $true)
+    }
+    [string]$parameters_display = $parameters | ConvertTo-Json -Compress
+    $Error.Clear()
+    Try {
+        [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+    }
+    Catch {
+        [string]$Message = $_.Exception.Message
+        Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] with parameters $parameters_display due to [$Message]."
+        Break
+    }
+    [int32]$response_code = $results.response.status
+    If ($response_code -ne 0) {
+        [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 10
+        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+        Break
+    }
+    $Error.Clear()
+    Try {
+        [ANOWDesignTemplate]$DesignTemplate = $results.response.data | Select-Object -First 1
+    }
+    Catch {
+        [string]$Message = $_.Exception.Message
+        Write-Warning -Message "Failed to create [ANOWDesignTemplate] object due to [$Message]."
+        Break
+    }
+    If ($DesignTemplate.id.Length -eq 0) {
+        Write-Warning -Message "Somehow the newly created [ANOWDesignTemplate] object is empty!"
+        Break
+    }
+    If ($Quiet -ne $true) {
+        Return $DesignTemplate
+    }
+}
+
+Function Export-AutomateNOWDesignTemplate {
+    <#
+    .SYNOPSIS
+    Exports the Design Template objects from an instance of AutomateNOW!
+
+    .DESCRIPTION
+    Exports the Design Template objects from an instance of AutomateNOW! to a local .csv file
+
+    .PARAMETER DesignTemplate
+    Mandatory [ANOWDesignTemplate] object (Use Get-AutomateNOWDesignTemplate to retrieve them)
+
+    .INPUTS
+    ONLY [ANOWDesignTemplate] objects from the pipeline are accepted
+
+    .OUTPUTS
+    The [ANOWDesignTemplate] objects are exported to the local disk in CSV format
+
+    .EXAMPLE
+    Exports the first page of Design Template objects
+
+    Get-AutomateNOWDesignTemplate | Export-AutomateNOWDesignTemplate
+
+    .EXAMPLE
+    Exports a single Design Template by id
+
+    Get-AutomateNOWDesignTemplate -Id 'DesignTemplate1' | Export-AutomateNOWDesignTemplate
+
+    .EXAMPLE
+    Exports a series of Design Template objects by Id across the pipeline
+
+    'DesignTemplate1', 'DesignTemplate2' | Get-AutomateNOWDesignTemplate | Export-AutomateNOWDesignTemplate
+
+    .NOTES
+	You must present [ANOWDesignTemplate] objects to the pipeline to use this function.
+    #>
+
+    [Cmdletbinding(DefaultParameterSetName = 'Pipeline')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true, ParameterSetName = 'Pipeline')]
+        [ANOWDesignTemplate]$DesignTemplate
+    )
+    Begin {
+        [string]$current_time = Get-Date -Format 'yyyyMMddHHmmssfff'
+        [string]$ExportFileName = 'Export-AutomateNOW-DesignTemplates-' + $current_time + '.csv'
+        [string]$ExportFilePath = ((Get-Location | Select-Object -ExpandProperty Path) + '\' + $ExportFileName)
+        [hashtable]$parameters = @{}
+        $parameters.Add('Path', $ExportFilePath)
+        $parameters.Add('Append', $true)
+        If ($PSVersionTable.PSVersion.Major -eq 5) {
+            $parameters.Add('NoTypeInformation', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [ANOWDesignTemplate]$DesignTemplate = $_
+        }
+        $Error.Clear()
+        Try {
+            $DesignTemplate | Export-CSV @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Export-CSV failed to export the [ANOWDesignTemplate] object on the pipeline due to [$Message]"
+            Break
+        }
+    }
+    End {
+        $Error.Clear()
+        If ((Test-Path -Path $ExportFilePath) -eq $true) {
+            [System.IO.FileInfo]$fileinfo = Get-Item -Path "$ExportFilePath"
+            [int32]$filelength = $fileinfo.Length
+            [string]$filelength_display = "{0:N0}" -f $filelength
+            Write-Information -MessageData "Created file $ExportFileName ($filelength_display bytes)"
+        }
+    }
+}
+
+Function Remove-AutomateNOWDesignTemplate {
+    <#
+    .SYNOPSIS
+    Removes a Design Template from an AutomateNOW! instance
+
+    .DESCRIPTION
+    Removes a Design Template from an AutomateNOW! instance
+
+    .PARAMETER DesignTemplate
+    An [ANOWDesignTemplate] object representing the Design Template to be deleted.
+
+    .PARAMETER Force
+    Force the removal without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    ONLY [ANOWDesignTemplate] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    None. The status will be written to the console with Write-Verbose.
+
+    .EXAMPLE
+    Remove a single DesignTemplate named 'DesignTemplate1'
+
+    Get-AutomateNOWDesignTemplate -Id 'DesignTemplate1'| Remove-AutomateNOWDesignTemplate
+
+    .EXAMPLE
+    Forcefully removes a series of DesignTemplate objects by sending their name (Id) across the pipeline.
+
+    'DesignTemplate1', 'DesignTemplate2' | Get-AutomateNOWDesignTemplate | Remove-AutomateNOWDesignTemplate -Force
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $false, ValueFromPipeline = $True)]
+        [ANOWDesignTemplate]$DesignTemplate,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [string]$command = '/designTemplate/delete'
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [ANOWDesignTemplate]$DesignTemplate = $_
+        }
+        [string]$DesignTemplate_id = $DesignTemplate.id
+        If ($DesignTemplate_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
+            Break
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($DesignTemplate_id)")) -eq $true) {
+            [string]$oldvalues = $DesignTemplate.CreateOldValues()
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.'id' = $DesignTemplate.id
+            $BodyMetaData.'_textMatchStyle' = 'exact'
+            $BodyMetaData.'_operationType' = 'remove'
+            $BodyMetaData.'_oldValues' = $oldvalues
+            $BodyMetaData.'_componentId' = 'DesignTemplateList'
+            $BodyMetaData.'_dataSource' = 'DesignTemplateDataSource'
+            $BodyMetaData.'isc_metaDataPrefix' = '_'
+            $BodyMetaData.'isc_dataFormat' = 'json'
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            If ($null -eq $parameters["Body"]) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$DesignTemplate_id] due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 10
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
+            }
+            Write-Verbose -Message "Design Template [$DesignTemplate_id] successfully removed"
+        }
+    }
+    End {
+
+    }
+}
+
+Function Copy-AutomateNOWDesignTemplate {
+    <#
+    .SYNOPSIS
+    Copies a Design Template object from an AutomateNOW! instance
+
+    .DESCRIPTION
+    Copies a Design Template object from an AutomateNOW! instance.
+
+    .PARAMETER DesignTemplate
+    Mandatory [ANOWDesignTemplate] object to be copied.
+
+    .PARAMETER NewId
+    The name (Id) of the new Design Template object. The new Id must be unique (per domain). It may consist only of letters, numbers, underscore, dot or hypen.
+
+    .PARAMETER Force
+    Force the copy without confirmation. This is equivalent to -Confirm:$false
+
+    .PARAMETER Quiet
+    Optional switch to suppress the return of the newly created object.
+
+    .INPUTS
+    ONLY [ANOWDesignTemplate] object is accepted. Pipeline support is intentionally unavailable.
+
+    .OUTPUTS
+    The newly created [ANOWDesignTemplate] object will be emitted. Use the -Quiet parameter to suppress this.
+
+    .EXAMPLE
+    Creates a copy of a DesignTemplate named 'DesignTemplate1' to 'DesignTemplate2'
+    $DesignTemplate1 = Get-AutomateNOWDesignTemplate -Id 'DesignTemplate1'
+    Copy-AutomateNOWDesignTemplate -DesignTemplate $DesignTemplate1 -NewId 'DesignTemplate2'
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global DesignTemplate.
+
+    AutomateNOW object id's can never change, but we can copy the object to a new id and it will (typically) include all of the items therein.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [ANOWDesignTemplate]$DesignTemplate,
+        [Parameter(Mandatory = $true)]
+        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [string]$NewId,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        ## Begin warning ##
+        ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
+        $Error.Clear()
+        Try {
+            [boolean]$DesignTemplate_exists = ($null -ne (Get-AutomateNOWDesignTemplate -Id $NewId))
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWDesignTemplate failed to check if the Design Template object [$NewId] already existed due to [$Message]."
+            Break
+        }
+        If ($DesignTemplate_exists -eq $true) {
+            [string]$current_domain = $anow_session.header.domain
+            Write-Warning -Message "There is already a Design Template object named [$NewId] in [$current_domain]. You may not proceed."
+            [boolean]$PermissionToProceed = $false
+        }
+        ## End warning ##
+        [string]$command = '/designTemplate/copy'
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($PermissionToProceed -ne $false) {
+            [string]$DesignTemplate_oldId = $DesignTemplate.id
+            [string]$DesignTemplate_simpleId = $DesignTemplate.simpleId
+            If ($DesignTemplate_oldId -eq $NewId) {
+                Write-Warning -Message "The new id cannot be the same as the old id."
+                Break
+            }
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the DesignTemplate $($DesignTemplate_simpleId) to $($NewId)?")) -eq $true) {
+                [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+                $BodyMetaData.'oldId' = $DesignTemplate_oldId
+                $BodyMetaData.'domain' = $DesignTemplate.domain
+                $BodyMetaData.'id' = $NewId
+                $BodyMetaData.'_operationType' = 'add'
+                $BodyMetaData.'_operationId' = 'copy'
+                $BodyMetaData.'_textMatchStyle' = 'exact'
+                $BodyMetaData.'_dataSource' = 'DesignTemplateDataSource'
+                $BodyMetaData.'isc_metaDataPrefix' = '_'
+                $BodyMetaData.'isc_dataFormat' = 'json'
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+                $parameters.Body = $Body
+                $Error.Clear()
+                Try {
+                    [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$DesignTemplate_oldId] due to [$Message]."
+                    Break
+                }
+                [int32]$response_code = $results.response.status
+                If ($response_code -ne 0) {
+                    [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 10
+                    Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                    Break
+                }
+                $Error.Clear()
+                Try {
+                    [ANOWDesignTemplate]$NewDesignTemplate = $results.response.data[0]
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Failed to create copied [ANOWDesignTemplate] object [$NewId] due to [$Message]."
+                    Break
+                }
+                If ($NewDesignTemplate.id.Length -eq 0) {
+                    Write-Warning -Message "Somehow the newly created (copied) [ANOWDesignTemplate] object [$NewId] is empty!"
+                    Break
+                }
+                If ($Quiet -ne $true) {
+                    Return $NewDesignTemplate
+                }
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+Function Rename-AutomateNOWDesignTemplate {
+    <#
+    .SYNOPSIS
+    Renames a Design Template object on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Performs a psuedo-rename operations of a Design Template object from an AutomateNOW! instance by copying it first and then deleting the source. This function merely combines Copy-AutomateNOWDesignTemplate and Remove-AutomateNOWDesignTemplate therefore it is to be considered destructive.
+
+    .PARAMETER DesignTemplate
+    An [ANOWDesignTemplate] object representing the Design Template object to be renamed.
+
+    .PARAMETER NewId
+    Mandatory string indicating the new id or name of the Design Template object. The Id is the same as a primary key, it must be unique. The console will provide the old Id + '_COPY' in the UI when making a copy. The Id is limited to 1024 characters.
+
+    .PARAMETER Force
+    Force the renaming without confirmation. This is equivalent to -Confirm:$false
+
+    .PARAMETER Quiet
+    Optional switch to suppress the return of the newly renamed object.
+
+    .INPUTS
+    ONLY [ANOWDesignTemplate] objects are accepted. There is intentionally no support for the pipeline.
+
+    .OUTPUTS
+    The newly renamed [ANOWDesignTemplate] object will be returned.
+
+    .EXAMPLE
+    Renames a Design Template object from 'DesignTemplate1' to 'DesignTemplate2' in a multi-line format
+
+    $DesignTemplate = Get-AutomateNOWDesignTemplate -Id 'DesignTemplate1'
+    Rename-AutomateNOWDesignTemplate -DesignTemplate $DesignTemplate -NewId 'DesignTemplate2'
+
+    .EXAMPLE
+    Renames a Design Template object from 'DesignTemplate1' to 'DesignTemplate2' in a single-line format
+
+    Rename-AutomateNOWDesignTemplate -DesignTemplate (Get-AutomateNOWDesignTemplate -Id 'DesignTemplate1') -NewId 'DesignTemplate2'
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global DesignTemplate.
+
+    When renaming, you may only specify a different Id (name).
+    #>
+    [OutputType([ANOWDesignTemplate])]
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [ANOWDesignTemplate]$DesignTemplate,
+        [Parameter(Mandatory = $true)]
+        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [string]$NewId,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        ## Begin standard warning ##
+        ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
+        $Error.Clear()
+        Try {
+            [boolean]$new_DesignTemplate_exists = ($null -ne (Get-AutomateNOWDesignTemplate -Id $NewId))
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWDesignTemplate failed to check if the Design Template object [$NewId] already existed due to [$Message]."
+            Break
+        }
+        If ($new_DesignTemplate_exists -eq $true) {
+            [string]$current_domain = $anow_session.header.domain
+            Write-Warning -Message "There is already a Design Template object named [$NewId] in [$current_domain]. You may not proceed."
+            [boolean]$PermissionToProceed = $false
+        }
+        #[string]$DesignTemplate_id = $DesignTemplate.id
+        [string]$DesignTemplate_id = $DesignTemplate.simpleId
+        $Error.Clear()
+        Try {
+            [boolean]$old_DesignTemplate_exists = ($null -ne (Get-AutomateNOWDesignTemplate -Id $DesignTemplate_id))
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWDesignTemplate failed to check if the Design Template object [$DesignTemplate_id] already existed due to [$Message]."
+            Break
+        }
+        If ($old_DesignTemplate_exists -eq $false) {
+            [string]$current_domain = $anow_session.header.domain
+            Write-Warning -Message "There is not a Design Template object named [$DesignTemplate_id] in [$current_domain]. You may not proceed."
+            [boolean]$PermissionToProceed = $false
+        }
+        ## End standard warning ##
+    }
+    Process {
+        If ($PermissionToProceed -ne $false) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($DesignTemplate_id)")) -eq $true) {
+                $Error.Clear()
+                Try {
+                    [ANOWDesignTemplate]$new_DesignTemplate = Copy-AutomateNOWDesignTemplate -DesignTemplate $DesignTemplate -NewId $NewId -Force
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Copy-AutomateNOWDesignTemplate failed to create a new Design Template object [$NewId] as Part 1 of the renaming process due to [$Message]."
+                    Break
+                }
+                If ($new_DesignTemplate.simpleId -eq $NewId) {
+                    Write-Verbose -Message "Part 1: Design Template object [$DesignTemplate_id] successfully copied to [$NewId]"
+                }
+                Else {
+                    Write-Warning -Message "Somehow the first phase (Copy-AutomateNOWDesignTemplate) failed. Please look into this."
+                    Break
+                }
+                $Error.Clear()
+                Try {
+                    Remove-AutomateNOWDesignTemplate -DesignTemplate $DesignTemplate -Force
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Remove-AutomateNOWDesignTemplate failed to remove Design Template object [$DesignTemplate_id] as Part 2 of the renaming process due to [$Message]."
+                    Break
+                }
+                Write-Verbose -Message "Part 2: Design Template object [$DesignTemplate_id] removed"
+                Write-Verbose -Message "Task [$DesignTemplate_id] successfully renamed to [$NewId]"
+                If ($Quiet -ne $true) {
+                    Return $DesignTemplate
+                }
+            }
+        }
+        Else {
+            Write-Warning -Message "No action was taken because either the source object didn't exist or the new object already existed"
+        }
+    }
+    End {
     }
 }
 
@@ -21120,7 +23517,7 @@ Function Set-AutomateNOWDomain {
     The name of the icon library (if you choose to use one). Possible choices are: FAT_COW, FUGUE and FONT_AWESOME.
 
     .PARAMETER iconCode
-    The name of the icon which matches the chosen library.
+    The name of the icon which matches the chosen library. Must be lower-case.
 
     .PARAMETER Force
     Force the change without confirmation. This is equivalent to -Confirm:$false
@@ -21218,6 +23615,7 @@ Function Set-AutomateNOWDomain {
         [switch]$unsetToolbarBackgroundColor,
         [Parameter(Mandatory = $true, ParameterSetName = 'WithIcon')]
         [ANOWIcon_iconSet]$iconSet,
+        [ValidateScript({ $_ -match '^[a-z0-9-_]{1,}$' })]
         [Parameter(Mandatory = $true, ParameterSetName = 'WithIcon')]
         [string]$iconCode,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
@@ -21608,7 +24006,7 @@ Function New-AutomateNOWDomain {
     Optional name of the icon library to use. Possible choices are: FAT_COW, FUGUE and FONT_AWESOME.
 
     .PARAMETER iconCode
-    Mandatory (if you use -iconSet) name of the icon which matches the chosen icon library.
+    Mandatory (if you use -iconSet) name of the icon which matches the chosen icon library. Must be lower-case.
 
     .PARAMETER textColor
     Optional custom RGB value (in hex) of the Domain's foreground (text) color or use 'transparent'. You must include the # character and it is case sensitive. Example: #FF00FF
@@ -21651,6 +24049,7 @@ Function New-AutomateNOWDomain {
         [string]$Description,
         [Parameter(Mandatory = $true, ParameterSetName = 'WithIcon')]
         [ANOWIcon_iconSet]$iconSet,
+        [ValidateScript({ $_ -match '^[a-z0-9-_]{1,}$' })]
         [Parameter(Mandatory = $true, ParameterSetName = 'WithIcon')]
         [string]$iconCode,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
@@ -21868,7 +24267,7 @@ Function Copy-AutomateNOWDomain {
                 $BodyMetaData.'_dataSource' = 'DomainDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
                 $parameters.Body = $Body
                 $Error.Clear()
                 Try {
@@ -22135,7 +24534,7 @@ Function Remove-AutomateNOWDomain {
         }
         [string]$Domain_id = $Domain.id
         If ($Domain_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("ARE YOU SURE YOU WANT TO DELETE THE DOMAIN $($Domain_id)?")) -eq $true) {
@@ -22810,7 +25209,7 @@ Function Read-AutomateNOWSecurityRoleDomain {
         $BodyMetaData.Add('isc_dataFormat', 'json')
         [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
         [string]$command = ('/secRoleDomain/read' + '?' + $Body)
-        If ($null -eq $parameters.'Command') {
+        If ($null -eq $parameters["Command"]) {
             $parameters.Add('Command', $command)
         }
         Else {
@@ -25310,7 +27709,7 @@ Function New-AutomateNOWEndpoint {
     If ($Folder.Length -gt 0) {
         $Error.Clear()
         Try {
-            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -25837,7 +28236,7 @@ Function Copy-AutomateNOWEndpoint {
                 $BodyMetaData.'_dataSource' = 'EndpointDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
                 $parameters.Body = $Body
                 $Error.Clear()
                 Try {
@@ -26094,7 +28493,7 @@ Function Remove-AutomateNOWEndpoint {
         }
         [string]$Endpoint_id = $Endpoint.id
         If ($Endpoint_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Endpoint_id)")) -eq $true) {
@@ -26826,7 +29225,7 @@ Function New-AutomateNOWEvent {
     If ($Folder.Length -gt 0) {
         $Error.Clear()
         Try {
-            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -26980,7 +29379,7 @@ Function Remove-AutomateNOWEvent {
         }
         [string]$Event_id = $Event.id
         If ($Event_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Event_id)")) -eq $true) {
@@ -27206,7 +29605,7 @@ Function Copy-AutomateNOWEvent {
                 $BodyMetaData.'_dataSource' = 'ResourceDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
                 $parameters.Body = $Body
                 $Error.Clear()
                 Try {
@@ -27510,7 +29909,7 @@ Function Start-AutomateNOWEvent {
         $BodyMetaData.'_dataSource' = 'ResourceDataSource'
         $BodyMetaData.'isc_metaDataPrefix' = '_'
         $BodyMetaData.'isc_dataFormat' = 'json'
-        $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties parameters
+        [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties parameters
         $parameters.Body = $Body
         $Error.Clear()
         Try {
@@ -27594,6 +29993,9 @@ Function Read-AutomateNOWProcessingEventLog {
     .PARAMETER Agent
     Mandatory (ONLY IF AGENT CATEGORY IS SELECTED) [ANOWAgent] object that corresponds to the Agent you wish to retrieve the event logs from.
 
+    .PARAMETER Processing
+    Optional (ONLY IF PROCESSING CATEGORY IS SELECTED) [ANOWProcessingTemplate] object that corresponds to the Node you wish to retrieve the event logs about. Use Get-AutomateNOWTaskTemplate, Get-AutomateNOWWorkflowTemplate, Get-AutomateNOWScheduleTemplate or Get-AutomateNOWServiceManagerTemplate to fetch these.
+
     .PARAMETER ServerNode
     Optional (ONLY IF SERVER_NODE CATEGORY IS SELECTED) [ANOWServerNode] object that corresponds to the Node you wish to retrieve the event logs about.
 
@@ -27620,7 +30022,7 @@ Function Read-AutomateNOWProcessingEventLog {
 
     Read-AutomateNOWProcessingEventLog -Category SERVER_NODE
 
-     .EXAMPLE
+    .EXAMPLE
     Gets the first 100 Server Node Processing Events (i.e. log entries) for a specific node named ServerNode1
 
     Read-AutomateNOWProcessingEventLog -ServerNode (Get-AutomateNOWServerNode -Id 'ServerNode1')
@@ -27938,6 +30340,12 @@ Function Get-AutomateNOWFolder {
     .PARAMETER Id
     Optional string containing the id (name) of the folder to fetch. Omit this parameter to get the first page of Folders.
 
+    .PARAMETER sortBy
+    Optional string parameter to sort the results by (may not be used with the Id parameter). Valid choices are: id*, createdBy, dateCreated, description, codeRepository
+
+    .PARAMETER Descending
+    Optional switch parameter to sort in descending order
+
     .PARAMETER startRow
     An optional int32 representing what row to start the download from. This is intended for multi-page transfers.
 
@@ -27962,15 +30370,24 @@ Function Get-AutomateNOWFolder {
     Gets two Folders by sending their names across the pipeline in a string array
     'Folder1', 'Folder2' | Get-AutomateNOWFolder
 
+    .EXAMPLE
+    Gets the first page of Folders sorted by dateCreated
+    Get-AutomateNOWFolder -sortBy dateCreated
+
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
 
     #>
     [OutputType([ANOWFolder[]])]
-    [Cmdletbinding()]
+    [Cmdletbinding( DefaultParameterSetName = 'Default')]
     Param(
-        [Parameter(Mandatory = $False, ValueFromPipeline = $true)]
+        [Parameter(Mandatory = $True, ParameterSetName = 'Id', ValueFromPipeline = $true)]
         [string]$Id,
+        [ValidateSet('id', 'createdBy', 'dateCreated', 'description', 'codeRepository', IgnoreCase = $false)]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [string]$sortBy = 'id',
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [switch]$Descending,
         [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
         [int32]$startRow = 0,
         [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
@@ -27992,17 +30409,21 @@ Function Get-AutomateNOWFolder {
         [System.Collections.Specialized.OrderedDictionary]$BodyObject = [System.Collections.Specialized.OrderedDictionary]@{}
         If ($_.Length -gt 0 -or $Id.Length -gt 0) {
             If ($_.Length -gt 0 ) {
-                $BodyObject.'id' = $_
+                [string]$Id = $_
             }
-            Else {
-                $BodyObject.'id' = $Id
-                [string]$textMatchStyle = 'exactCase'
-            }
+            $BodyObject.'id' = $Id
+            [string]$textMatchStyle = 'exactCase'
         }
         Else {
             $BodyObject.'_startRow' = $startRow
             $BodyObject.'_endRow' = $endRow
             [string]$textMatchStyle = 'substring'
+            If ($Descending -eq $true) {
+                $BodyObject.'_sortBy' = '-' + $sortBy
+            }
+            Else {
+                $BodyObject.'_sortBy' = $sortBy
+            }
         }
         $BodyObject.'_operationType' = 'fetch'
         $BodyObject.'_textMatchStyle' = $textMatchStyle
@@ -28012,7 +30433,12 @@ Function Get-AutomateNOWFolder {
         $BodyObject.'isc_dataFormat' = 'json'
         [string]$Body = ConvertTo-QueryString -InputObject $BodyObject
         [string]$command = ($command + $Body)
-        $parameters.Add('Command', $command)
+        If ($null -eq $parameters["Command"]) {
+            $parameters.Add('Command', $command)
+        }
+        Else {
+            $parameters.Command = $command
+        }
         $Error.Clear()
         Try {
             [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
@@ -28110,7 +30536,7 @@ Function Set-AutomateNOWFolder {
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
             Try {
-                lder_exists = ($null -eq (Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000_id))
+                lder_exists = ($null -eq (Get-AutomateNOWFolder -Id $Folder_id))
             }
             Catch {
                 [string]$Message = $_.Exception.Message
@@ -28446,7 +30872,7 @@ Function Remove-AutomateNOWFolder {
         }
         [string]$Folder_id = $Folder.id
         If ($Folder_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Folder_id)")) -eq $true) {
@@ -29713,7 +32139,7 @@ Function New-AutomateNOWLock {
     If ($Folder.Length -gt 0) {
         $Error.Clear()
         Try {
-            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -29867,7 +32293,7 @@ Function Remove-AutomateNOWLock {
         }
         [string]$Lock_id = $Lock.id
         If ($Lock_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Lock_id)")) -eq $true) {
@@ -30093,7 +32519,7 @@ Function Copy-AutomateNOWLock {
                 $BodyMetaData.'_dataSource' = 'ResourceDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
                 $parameters.Body = $Body
                 $Error.Clear()
                 Try {
@@ -30283,6 +32709,342 @@ Function Rename-AutomateNOWLock {
         }
     }
     End {
+    }
+}
+
+#endregion
+
+#Region - Menu Customizations`
+
+Function Get-AutomateNOWMenuCustomization {
+    <#
+    .SYNOPSIS
+    Gets the Menu Customization Objects from an AutomateNOW! instance
+
+    .DESCRIPTION
+    Gets the Menu Customization Objects from an AutomateNOW! instance
+
+    .PARAMETER Id
+    Optional CASE-SENSITIVE string containing the 36-character GUID (Id) of the Menu Customimzation Object
+
+    .PARAMETER startRow
+    Integer to indicate the row to start from. This is intended for when you need to paginate the results. Default is 0.
+
+    .PARAMETER endRow
+    Integer to indicate the row to stop on. This is intended for when you need to paginate the results. Default is 100.
+
+    .PARAMETER sortBy
+    Optional string parameter to sort the results by (may not be used with the Id parameter). Valid choices are: id*, name, iconCode, dateCreated, lastUpdated, createdBy, lastUpdatedBy
+
+    .PARAMETER Descending
+    Optional switch parameter to sort in descending order
+
+    .INPUTS
+    A single Id or a string of Id's across the pipeline will be accepted.
+
+    .OUTPUTS
+    Either one or more [ANOWMenuCustomization] objects
+
+    .EXAMPLE
+    Gets the first page of Menu Customization objects
+
+    Get-AutomateNOWMenuCustomization
+
+    .EXAMPLE
+    Gets a single Menu Customization by its Id
+
+    Get-AutomateNOWMenuCustomization -Id '875787b5-37e4-4717-80ef-05967bcc5abb'
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [OutputType([ANOWDeletedObject[]])]
+    [Cmdletbinding(DefaultParameterSetName = 'Default')]
+    Param(
+        [Parameter(Mandatory = $True, ParameterSetName = 'Id', ValueFromPipeline = $true)]
+        [string]$Id,
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [int32]$startRow = 0,
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [int32]$endRow = 100,
+        [ValidateSet('id', 'name', 'iconCode', 'dateCreated', 'lastUpdated', 'createdBy', 'lastUpdatedBy', IgnoreCase = $false)]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [string]$sortBy = 'id',
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [switch]$Descending
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'GET')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+        If ($AllLoadBalancers -eq $true -and $AllChildNodes -eq $true) {
+            Write-Warning -Message "You can't request only load balancer and then only load balancer nodes in the same request. Please choose one or the other."
+            Break
+        }
+    }
+    Process {
+        [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
+        If (($_.Length -gt 0 -or $Id.Length -gt 0) ) {
+            If ($_.Length -gt 0) {
+                $Body.'id' = $_
+            }
+            Else {
+                $Body.'id' = $Id
+            }
+            [string]$textMatchStyle = 'exactCase'
+        }
+        ElseIf ($itemId.Length -gt 0) {
+            $Body.'itemId' = $itemId
+            [string]$textMatchStyle = 'exactCase'
+        }
+        Else {
+            $Body.'operator' = 'and'
+            $Body.'_componentId' = 'DomainProcessingTypeList'
+            $Body.'_startRow' = $startRow
+            $Body.'_endRow' = $endRow
+            [string]$textMatchStyle = 'substring'
+            If ($Descending -eq $true) {
+                $Body.'_sortBy' = '-' + $sortBy
+            }
+            Else {
+                $Body.'_sortBy' = $sortBy
+            }
+        }
+        $Body.'_operationId' = 'read'
+        $Body.'_operationType' = 'fetch'
+        $Body.'_textMatchStyle' = $textMatchStyle
+        $Body.'_dataSource' = 'DomainProcessingTypeDataSource'
+        $Body.'isc_metaDataPrefix' = '_'
+        $Body.'isc_dataFormat' = 'json'
+        [string]$Body = ConvertTo-QueryString -InputObject $Body
+        [string]$command = ('/domainProcessingType/read?' + $Body)
+        If ($null -eq $parameters["Command"]) {
+            $parameters.Add('Command', $command)
+        }
+        Else {
+            $parameters.Command = $command
+        }
+        $Error.Clear()
+        Try {
+            [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
+            Break
+        }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 10
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
+        }
+        $Error.Clear()
+        [ANOWMenuCustomization[]]$MenuCustomizations = ForEach ($result in $results.response.data) {
+            If ($result.integration.length -gt 0) {
+                [string]$Integration_Id = $result.integration
+                Try {
+                    $result.integration = Get-AutomateNOWInterface -Id $Integration_Id
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Get-AutomateNOWInterface failed to help parse the response into a series of [ANOWMenuCustomization] objects due to [$Message]."
+                    Break
+                }
+            }
+            $result
+        }
+        If ($MenuCustomizations.Count -gt 0) {
+            Return $MenuCustomizations
+        }
+    }
+    End {
+
+    }
+}
+
+Function Export-AutomateNOWMenuCustomization {
+    <#
+    .SYNOPSIS
+    Exports the Menu Customization objects from an instance of AutomateNOW!
+
+    .DESCRIPTION
+    Exports the Menu Customization objects from an instance of AutomateNOW! to a local .csv file
+
+    .PARAMETER MenuCustomization
+    Mandatory [ANOWMenuCustomization] object (Use Get-AutomateNOWMenuCustomization to retrieve them)
+
+    .INPUTS
+    ONLY [ANOWMenuCustomization] objects from the pipeline are accepted
+
+    .OUTPUTS
+    The [ANOWMenuCustomization] objects are exported to the local disk in CSV format
+
+    .EXAMPLE
+    Exports the first page of Menu Customization objects
+
+    Get-AutomateNOWMenuCustomization | Export-AutomateNOWMenuCustomization
+
+    .EXAMPLE
+    Exports a single Menu Customization by id
+
+    Get-AutomateNOWMenuCustomization -Id '875787b5-37e4-4717-80ef-05967bcc5abb' | Export-AutomateNOWMenuCustomization
+
+    .EXAMPLE
+    Exports a series of Menu Customization objects by Id across the pipeline
+
+    'e0586d27-f20b-436d-9dcd-cda3b06ddc39', 'acd0d418-37af-449f-a3b0-98c8d30bdae7', '875787b5-37e4-4717-80ef-05967bcc5aba' | Get-AutomateNOWMenuCustomization | Export-AutomateNOWMenuCustomization
+
+    .NOTES
+	You must present [ANOWMenuCustomization] objects to the pipeline to use this function.
+    #>
+
+    [Cmdletbinding(DefaultParameterSetName = 'Pipeline')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true, ParameterSetName = 'Pipeline')]
+        [ANOWMenuCustomization]$MenuCustomization
+    )
+    Begin {
+        [string]$current_time = Get-Date -Format 'yyyyMMddHHmmssfff'
+        [string]$ExportFileName = 'Export-AutomateNOW-MenuCustomizations-' + $current_time + '.csv'
+        [string]$ExportFilePath = ((Get-Location | Select-Object -ExpandProperty Path) + '\' + $ExportFileName)
+        [hashtable]$parameters = @{}
+        $parameters.Add('Path', $ExportFilePath)
+        $parameters.Add('Append', $true)
+        If ($PSVersionTable.PSVersion.Major -eq 5) {
+            $parameters.Add('NoTypeInformation', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [ANOWMenuCustomization]$MenuCustomization = $_
+        }
+        $Error.Clear()
+        Try {
+            $MenuCustomization | Export-CSV @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Export-CSV failed to export the [ANOWMenuCustomization] object on the pipeline due to [$Message]"
+            Break
+        }
+    }
+    End {
+        $Error.Clear()
+        If ((Test-Path -Path $ExportFilePath) -eq $true) {
+            [System.IO.FileInfo]$fileinfo = Get-Item -Path "$ExportFilePath"
+            [int32]$filelength = $fileinfo.Length
+            [string]$filelength_display = "{0:N0}" -f $filelength
+            Write-Information -MessageData "Created file $ExportFileName ($filelength_display bytes)"
+        }
+    }
+}
+
+Function Remove-AutomateNOWMenuCustomization {
+    <#
+    .SYNOPSIS
+    Removes a Menu Customization from an AutomateNOW! instance
+
+    .DESCRIPTION
+    Removes a Menu Customization from an AutomateNOW! instance
+
+    .PARAMETER MenuCustomization
+    An [ANOWMenuCustomization] object representing the Menu Customization to be deleted.
+
+    .PARAMETER Force
+    Force the removal without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    ONLY [ANOWMenuCustomization] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    None. The status will be written to the console with Write-Verbose.
+
+    .EXAMPLE
+    Remove a single MenuCustomization by Id
+
+    Get-AutomateNOWMenuCustomization -Id '375787b5-37e4-4117-80ef-05967bcc5abb' | Remove-AutomateNOWMenuCustomization
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $false, ValueFromPipeline = $True)]
+        [ANOWMenuCustomization]$MenuCustomization,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [string]$command = '/domainProcessingType/delete'
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [ANOWMenuCustomization]$MenuCustomization = $_
+        }
+        [string]$MenuCustomization_id = $MenuCustomization.id
+        If ($MenuCustomization_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
+            Break
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($MenuCustomization_id)")) -eq $true) {
+            [string]$oldvalues = $MenuCustomization.CreateOldValues()
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.'id' = $MenuCustomization.id
+            $BodyMetaData.'_textMatchStyle' = 'exact'
+            $BodyMetaData.'_operationType' = 'remove'
+            $BodyMetaData.'_oldValues' = $oldvalues
+            $BodyMetaData.'_componentId' = 'DomainProcessingTypeList'
+            $BodyMetaData.'_dataSource' = 'DomainProcessingTypeDataSource'
+            $BodyMetaData.'isc_metaDataPrefix' = '_'
+            $BodyMetaData.'isc_dataFormat' = 'json'
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            If ($null -eq $parameters["Body"]) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$MenuCustomization_id] due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 10
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
+            }
+            Write-Verbose -Message "Menu Customization [$MenuCustomization_id] successfully removed"
+        }
+    }
+    End {
+
     }
 }
 
@@ -31225,7 +33987,7 @@ Function New-AutomateNOWMetric {
     If ($Folder.Length -gt 0) {
         $Error.Clear()
         Try {
-            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -31379,7 +34141,7 @@ Function Remove-AutomateNOWMetric {
         }
         [string]$Metric_id = $Metric.id
         If ($Metric_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Metric_id)")) -eq $true) {
@@ -31605,7 +34367,7 @@ Function Copy-AutomateNOWMetric {
                 $BodyMetaData.'_dataSource' = 'ResourceDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
                 $parameters.Body = $Body
                 $Error.Clear()
                 Try {
@@ -31801,6 +34563,842 @@ Function Rename-AutomateNOWMetric {
 
 #endregion
 
+#Region - Migrations
+
+Function Export-AutomateNOWMigration {
+    <#
+    .SYNOPSIS
+    Exports an object using the Migration feature on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Exports an object using the Migration feature on an AutomateNOW! instance
+
+    .PARAMETER ScheduleTemplate
+    [ANOWScheduleTemplate] object to export. Use Get-AutomateNOWScheduleTemplate to obtain these objects. This is an ALIAS parameter for the ProcessingTemplate parameter.
+
+    .PARAMETER ProcessingTemplate
+    [ANOWProcessingTemplate] object to export. Do not send a Schedule Template to this parameter. Use Get-AutomateNOWProcessingTemplate (or Get-AutomateNOWTaskTemplate, Get-AutomateNOWWorkflowTemplate, Get-AutomateNOWServiceManagerTemplate) to obtain these objects.
+
+    .PARAMETER BusinessView
+    [ANOWBusinessView] object to export. Use Get-AutomateNOWBusinessview to obtain these objects.
+
+    .PARAMETER ResultMapping
+    [ANOWResultMapping] object to export. Use Get-AutomateNOWResultMapping to obtain these objects.
+
+    .PARAMETER Interface
+    [ANOWIntegration] object to export. Use Get-AutomateNOWIntegration to obtain these objects.
+
+    .PARAMETER ServerNode
+    [ANOWServerNode] object to export. Use Get-AutomateNOWServerNode to obtain these objects.
+
+    .PARAMETER ServerNodeGroup
+    [ANOWServerNodeGroup] object to export. Use Get-AutomateNOWServerNodeGroup to obtain these objects.
+
+    .PARAMETER Agent
+    [ANOWAgent] object to export. Use Get-AutomateNOWAgent to obtain these objects.
+
+    .PARAMETER Endpoint
+    [ANOWEndpoint] object to export. Use Get-AutomateNOWEndpoint to obtain these objects.
+
+    .PARAMETER Resource
+    [ANOWResource] object to export. There are 9 types of resources (Calendar, Event, Lock, Metric, PhysicalResource, Semaphore, Stock, TimeWindow, Variable). Use the respective Get function to obtain the object. For example, use Get-AutomateNOWStock to obtain a Stock.
+
+    .PARAMETER DataSource
+    [ANOWDataSource] object to export. Use Get-AutomateNOWDataSource to obtain these objects.
+
+    .PARAMETER Anomaly
+    [ANOWAnomaly] object to export. Use Get-AutomateNOWAnomaly to obtain these objects.
+
+    .PARAMETER Workspace
+    [ANOWWorkspace] object to export. Use Get-AutomateNOWWorkspace to obtain these objects.
+
+    .PARAMETER CodeRepository
+    [ANOWcodeRepository] object to export. Use Get-AutomateNOWCodeRepository to obtain these objects.
+
+    .PARAMETER Approval
+    [ANOWApproval] object to export. Use Get-AutomateNOWApproval to obtain these objects.
+
+    .PARAMETER NotificationGroup
+    [ANOWNotificationGroup] object to export. Use Get-AutomateNOWNotificationGroup to obtain these objects.
+
+    .PARAMETER NotificationChannel
+    [ANOWNotificationChannel] object to export. Use Get-AutomateNOWNotificationChannel to obtain these objects.
+
+    .PARAMETER NotificationMessageTemplate
+    [ANOWNotificationMessageTemplate] object to export. Use Get-AutomateNOWNotificationMessageTemplate to obtain these objects.
+
+    .PARAMETER Dashboard
+    [ANOWDashboard] object to export. Use Get-AutomateNOWDashboard to obtain these objects.
+
+    .PARAMETER AdhocReport
+    [ANOWAdhocReport] object to export. Use Get-AutomateNOWAdhocReport to obtain these objects.
+
+    .PARAMETER UserReport
+    [ANOWUserReport] object to export. Use Get-AutomateNOWUserReport to obtain these objects.
+
+    .PARAMETER RuntimeAction
+    [ANOWProcessingAction] object to export. Use Get-AutomateNOWRuntimeAction to obtain these objects.
+
+    .PARAMETER Tag
+    [ANOWTag] object to export. Use Get-AutomateNOWTag to obtain these objects.
+
+    .PARAMETER Folder
+    [ANOWFolder] object to export. Use Get-AutomateNOWFolder to obtain these objects.
+
+    .PARAMETER DesignTemplate
+    [ANOWDesignTemplate] object to export. Use Get-AutomateNOWDesignTemplate to obtain these objects.
+
+    .PARAMETER MenuCustomization
+    [ANOWMenuCustomization] object to export. Use Get-AutomateNOWMenuCustomization to obtain these objects.
+
+    .PARAMETER ViewSetup
+    [ANOWViewSetup] object to export. Use Get-AutomateNOWViewSetup to obtain these objects.
+
+    .PARAMETER SecUser
+    [ANOWSecUser] object to export. Use Get-AutomateNOWSecUser to obtain these objects.
+
+    .PARAMETER SecRole
+    [ANOWSecRole] object to export. Use Get-AutomateNOWSecRole to obtain these objects.
+
+    .PARAMETER ProcessingFunction
+    [ANOWProcessingFunction] object to export. Use Get-AutomateNOWProcessingFunction to obtain these objects.
+
+    .PARAMETER Domain
+    [ANOWDomain] object to export. Use Get-AutomateNOWDomain to obtain these objects.
+
+    .PARAMETER deepProcessingTemplateExport
+    Switch parameter to enable 'Deep Processing Export' which provides 'Recursively include workflows' subitems definitions'
+
+    .PARAMETER includeProcessingServerNodes
+    Switch parameter to enable 'Include Processing Server Nodes' which provides 'Include items Server Nodes definitions'
+
+    .PARAMETER includeProcessingResultMapping
+    Switch parameter to enable 'Include Processing Result Mapping' which provides 'Include items Result Mapping definitions'
+
+    .PARAMETER includeVersionControlHistory
+    Switch parameter to enable 'Include Version Control' which provides 'Include version control history data'
+
+    .PARAMETER includeDocumentation
+    Switch parameter to enable 'Include Documentation' which provides 'Include items' documentation'
+
+    .PARAMETER deepWorkspaceExport
+    Switch parameter to enable 'Deep Workspace Export' which provides 'Include all processing templates belonging to selected workspaces'
+
+    .PARAMETER deepBusinessViewExport
+    Switch parameter to enable 'Deep Business View Export' which provides 'Include all items belonging to selected business views'
+
+    .PARAMETER deepServerNodeExport
+    Switch parameter to enable 'Deep Server Node Export' which provides 'Export Agents, Nodes and Load Balancers with all their subitems'
+
+    .PARAMETER deepResourceExport
+    Switch parameter to enable 'Deep Resource Export' which provides 'Include values and time-index states'
+
+    .PARAMETER ManualFilename
+    Optional manual filename for the export. Only use this if you do not want to use the automatically generated filename provided by the ANOW API. Do not combine this parameter with -DoNotIncludeObjectTypeInFileName.
+
+    .PARAMETER DestinationFilepath
+    Optional path for the outgoing exported file to be written to. Use this if you want the exported JSON file to be written somewhere other than the current path.
+
+    .PARAMETER OverwriteExportFile
+    Switch parameter that will force the exported file to be overwritten if it exists
+
+    .PARAMETER DoNotIncludeObjectTypeInFileName
+    Switch parameter that will prevent the type of object from being included in the automatically generated filename. Use this switch when you want the filename to appear exactly the same as it would from the console. This parameter may not be combined with -ManualFilename.
+
+    .INPUTS
+    Accepts the following types of ANOW objects: Anomaly, Approval, BusinessView, Calendar, Dashboard, Endpoint, Event, Interface, Lock, Metric, NotificationMessageTemplate, PhysicalResource, ResultMapping, ScheduleTemplate, Semaphore, ServerNode, ServiceManagerTemplate, Stock, TaskTemplate, TimeWindow, UserReport, Variable, WorkflowTemplate, Workspace
+
+    .OUTPUTS
+    A .json file will be written to disk. This is byte-for-byte identical the output received from the ANOW console.
+
+    .EXAMPLE
+    Exports the first page of Schedule Templates (one-liner format)
+
+    Get-AutomateNOWScheduleTemplate | Export-AutomateNOWMigration
+
+    .EXAMPLE
+    Exports the first page of Processing Templates. That means Task Templates, Workflow Templates and ServiceManager Templates. (one-liner format)
+
+    Get-AutomateNOWProcessingTemplate | Export-AutomateNOWMigration
+
+    .EXAMPLE
+    Exports the first page of Resource objects that have a Tag named 'Tag1' (one-liner format)
+
+    Get-AutomateNOWResourceList -Tags 'Tag1' | Export-AutomateNOWMigration
+
+    .EXAMPLE
+    Exports three resources (a Metric, a Stock and a Lock) named 'Metric1', 'Stock1', 'Lock1' (one-liner format)
+
+    'Metric1', 'Stock1', 'Lock1' | Get-AutomateNOWResourceList | Export-AutomateNOWMigration
+
+    .EXAMPLE
+    Exports a Workspace named 'Workspace1' (multi-line format)
+
+    $workspace = Get-AutomateNOWWorkspace -Id 'Workspace1'
+    Export-AutomateNOWMigration -Workspace $workspace
+
+    .EXAMPLE
+    Exports a Workspace named 'Workspace1' (one-liner format)
+
+    Get-AutomateNOWWorkspace -Id 'Workspace1' | Export-AutomateNOWMigration
+
+    .EXAMPLE
+    Exports two Runtime Actions by their Id (one-liner format)
+    '823fd7ea-3106-40f7-acd3-f33cdd26b7e4','c7558d17-34ee-47a0-9737-648bb6912356' | Get-AutomateNOWRuntimeAction | Export-AutomateNOWMigration
+
+    .EXAMPLE
+    Exports a single Runtime Action by its simpleId (multi-line format)
+
+    $runtime_action = Get-AutomateNOWRuntimeAction -simpleId 'RuntimeAction1'
+    $runtime_action | Export-AutomateNOWMigration
+
+    .EXAMPLE
+    Exports the first page for all 31 types of objects. Note that Schedule Templates are included with Processing Templates
+
+    Get-AutomateNOWAdhocReport | Export-AutomateNOWMigration
+    Get-AutomateNOWAgent | Export-AutomateNOWMigration
+    Get-AutomateNOWAnomaly | Export-AutomateNOWMigration
+    Get-AutomateNOWApproval | Export-AutomateNOWMigration
+    Get-AutomateNOWBusinessView | Export-AutomateNOWMigration
+    Get-AutomateNOWCodeRepository | Export-AutomateNOWMigration
+    Get-AutomateNOWDashboard | Export-AutomateNOWMigration
+    Get-AutomateNOWDataSource | Export-AutomateNOWMigration
+    Get-AutomateNOWDesignTemplate | Export-AutomateNOWMigration
+    Get-AutomateNOWDomain | Export-AutomateNOWMigration                      # --> requires full admin
+    Get-AutomateNOWEndpoint | Export-AutomateNOWMigration
+    Get-AutomateNOWFolder | Export-AutomateNOWMigration
+    Get-AutomateNOWInterface | Export-AutomateNOWMigration
+    Get-AutomateNOWMenuCustomization | Export-AutomateNOWMigration
+    Get-AutomateNOWNotificationChannel | Export-AutomateNOWMigration
+    Get-AutomateNOWNotificationGroup | Export-AutomateNOWMigration
+    Get-AutomateNOWNotificationMessageTemplate | Export-AutomateNOWMigration
+    Get-AutomateNOWRuntimeAction | Export-AutomateNOWMigration
+    Get-AutomateNOWProcessingFunction | Export-AutomateNOWMigration          # --> requires full admin
+    Get-AutomateNOWProcessingTemplate | Export-AutomateNOWMigration
+    Get-AutomateNOWCalendar | Export-AutomateNOWMigration
+    Get-AutomateNOWResultMapping | Export-AutomateNOWMigration
+    Get-AutomateNOWScheduleTemplate | Export-AutomateNOWMigration
+    Get-AutomateNOWSecUser | Export-AutomateNOWMigration                     # --> requires full admin
+    Get-AutomateNOWSecurityRole | Export-AutomateNOWMigration                # --> requires full admin
+    Get-AutomateNOWServerNode | Export-AutomateNOWMigration
+    Get-AutomateNOWServerNodeGroup | Export-AutomateNOWMigration
+    Get-AutomateNOWTag | Export-AutomateNOWMigration
+    Get-AutomateNOWUserReport | Export-AutomateNOWMigration
+    Get-AutomateNOWWorkspace | Export-AutomateNOWMigration
+    Get-AutomateNOWViewSetup | Export-AutomateNOWMigration
+
+    .EXAMPLE
+    Exports a Workflow Template named 'WorkflowTemplate1' with version control history.
+
+    Get-AutomateNOWWorkflowTemplate -Id 'WorkflowTemplate1' | Export-AutomateNOWMigration -includeVersionControlHistory
+
+    .EXAMPLE
+    Exports a Workflow Template named 'WorkflowTemplate1' with all extra options enabled (not recommended)
+
+    Get-AutomateNOWWorkflowTemplate -Id 'WorkflowTemplate1' | Export-AutomateNOWMigration -deepProcessingTemplateExport -includeProcessingServerNodes -includeProcessingResultMapping -includeVersionControlHistory -includeDocumentation -deepWorkspaceExport -deepBusinessViewExport -deepServerNodeExport -deepResourceExport
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    The -ScheduleTemplate parameter is an alias for the -ProcessingTemplate parameter.
+
+    Verbose mode will include a one-line message containing the names of all exported objects.
+
+    Some object types require full admin rights to export (domain admin rights will not be sufficient).
+    #>
+    [Cmdletbinding()]
+    Param(
+        [Alias('ScheduleTemplate')]
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'ProcessingTemplate')] # Processing Templates
+        [ANOWProcessingTemplate]$ProcessingTemplate,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'BusinessView')] # Business Views
+        [ANOWBusinessView]$BusinessView,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'ResultMapping')] # Result Mappings
+        [ANOWResultMapping]$ResultMapping,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'Integration')] # Integrations
+        [ANOWIntegration]$Integration,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'ServerNode')] # Server Nodes
+        [ANOWServerNode]$ServerNode,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'ServerNodeGroup')] # Server Node Groups
+        [ANOWServerNodeGroup]$ServerNodeGroup,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'Agent')] # Agents
+        [ANOWAgent]$Agent,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'Endpoint')] # Endpoints
+        [ANOWEndpoint]$Endpoint,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'Resource')] # Resources
+        [ANOWResource]$Resource,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'DataSource')] # DataSources
+        [ANOWDataSource]$DataSource,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'Anomaly')] # Anomalies
+        [ANOWAnomaly]$Anomaly,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'Workspace')] # Workspaces
+        [ANOWWorkspace]$Workspace,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'CodeRepository')] # Code Repositories
+        [ANOWCodeRepository]$CodeRepository,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'Approval')] # Approvals
+        [ANOWApproval]$Approval,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'NotificationGroup')] # Notification Groups
+        [ANOWNotificationGroup]$NotificationGroup,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'NotificationChannel')] # Notification Channels
+        [ANOWNotificationChannel]$NotificationChannel,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'NotificationMessageTemplate')] # Notification Templates
+        [ANOWNotificationMessageTemplate]$NotificationMessageTemplate,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'Dashboard')] # Dashboards
+        [ANOWDashboard]$Dashboard,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'AdhocReport')] # Adhoc Reports
+        [ANOWAdhocReport]$AdhocReport,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'UserReport')] # User Reports
+        [ANOWUserReport]$UserReport,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'RuntimeAction')] # Runtime Actions
+        [ANOWProcessingAction]$RuntimeAction,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'Tag')] # Tags
+        [ANOWTag]$Tag,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'Folder')] # Folders
+        [ANOWFolder]$Folder,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'DesignTemplate')] # Design Templates
+        [ANOWDesignTemplate]$DesignTemplate,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'MenuCustomization')] # Menu Customizations
+        [ANOWMenuCustomization]$MenuCustomization,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'ViewSetup')] # View Setups
+        [ANOWViewSetup]$ViewSetup,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'SecUser')] # Sec Users
+        [ANOWSecUser]$SecUser,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'SecRole')] # Sec Roles
+        [ANOWSecRole]$SecRole,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'ProcessingFunction')] # Processing Functions
+        [ANOWProcessingFunction]$ProcessingFunction,
+        [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'Domain')] # Domains
+        [ANOWDomain]$Domain,
+        [Parameter(Mandatory = $false)]
+        [switch]$deepProcessingTemplateExport,
+        [Parameter(Mandatory = $false)]
+        [switch]$includeProcessingServerNodes,
+        [Parameter(Mandatory = $false)]
+        [switch]$includeProcessingResultMapping,
+        [Parameter(Mandatory = $false)]
+        [switch]$includeVersionControlHistory,
+        [Parameter(Mandatory = $false)]
+        [switch]$includeDocumentation,
+        [Parameter(Mandatory = $false)]
+        [switch]$deepWorkspaceExport,
+        [Parameter(Mandatory = $false)]
+        [switch]$deepBusinessViewExport,
+        [Parameter(Mandatory = $false)]
+        [switch]$deepServerNodeExport,
+        [Parameter(Mandatory = $false)]
+        [switch]$deepResourceExport,
+        [Parameter(Mandatory = $false)]
+        [string]$ManualFilename,
+        [ValidateScript({ (Test-Path -Path "$_") -eq $true })]
+        [Parameter(Mandatory = $false)]
+        [string]$DestinationPath,
+        [Parameter(Mandatory = $false)]
+        [boolean]$OverwriteExportFile,
+        [Parameter(Mandatory = $false)]
+        [switch]$DoNotIncludeObjectTypeInFileName
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        If ($DoNotIncludeObjectTypeInFileName -eq $true -and $ManualFilename.Length -gt 0) {
+            Write-Warning -Message "Please do not combine with -DoNotIncludeObjectTypeInFileName with -ManualFilename"
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'POST')
+        [string]$ContentType = 'application/x-www-form-urlencoded; charset=UTF-8'
+        $parameters.Add('ContentType', $ContentType)
+        $parameters.Add('NoHeaders', $true)
+        $parameters.Add('JustGiveMeJSON', $true)
+        If ($ManualFilename.Length -eq 0) {
+            $parameters.Add('IncludeAttachmentFilename', $true)
+        }
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+        If ($anow_session.current_domain.Length -eq 0) {
+            Write-Warning -Message "Somehow the current ANOW domain could not be determined."
+            Break
+        }
+        If ($anow_session.AccessToken.Length -eq 0) {
+            Write-Warning -Message 'Somehow the current ANOW access token could not be determined. Unlike other functions, Export-AutomateNOWMigration requires the access token to be included in the body payload as well.'
+            Break
+        }
+        If ($DestinationPath.Length -gt 0) {
+            If ($DestinationPath[-1] -in @('/', '\')) {
+                Write-Warning -Message "Please do not include any trailing slashes in the destination path."
+                Break
+            }
+        }
+        [System.Collections.ArrayList]$ObjectList = New-Object -TypeName System.Collections.ArrayList
+    }
+    Process {
+        If ($_ -is [ANOWScheduleTemplate] -or $ProcessingTemplate.processingType -eq 'TRIGGER') {
+            [string]$ObjectType = 'ProcessingTemplate'
+            [boolean]$IsScheduleTemplate = $true
+            If ($ProcessingTemplate.id.Length -gt 0) {
+                [string]$ObjectId = $ProcessingTemplate.id
+            }
+            Else {
+                [string]$ObjectId = $_.id
+            }
+            [void]$ObjectList.Add($ObjectId)
+        }
+        ElseIf ($_ -is [ANOWProcessingTemplate] -or $ProcessingTemplate.Id.Length -gt 0) {
+            [string]$ObjectType = 'ProcessingTemplate'
+            If ($ProcessingTemplate.id.Length -gt 0) {
+                [string]$ObjectId = $ProcessingTemplate.id
+            }
+            Else {
+                [string]$ObjectId = $_.id
+            }
+            [void]$ObjectList.Add($ObjectId)
+        }
+        ElseIf ($_ -is [ANOWBusinessView] -or $BusinessView.Id.Length -gt 0) {
+            [string]$ObjectType = 'BusinessView'
+            If ($ResultMapping.id.Length -gt 0) {
+                [string]$ObjectId = $BusinessView.id
+            }
+            Else {
+                [string]$ObjectId = $_.id
+            }
+            [void]$ObjectList.Add($ObjectId)
+        }
+        ElseIf ($_ -is [ANOWResultMapping] -or $ResultMapping.Id.Length -gt 0) {
+            [string]$ObjectType = 'ResultMapping'
+            If ($ResultMapping.id.Length -gt 0) {
+                [string]$ObjectId = $ResultMapping.id
+            }
+            Else {
+                [string]$ObjectId = $_.id
+            }
+            [void]$ObjectList.Add($ObjectId)
+        }
+        ElseIf ($_ -is [ANOWIntegration] -or $Integration.Id.Length -gt 0) {
+            [string]$ObjectType = 'Integration'
+            If ($Integration.id.Length -gt 0) {
+                [string]$ObjectId = $Integration.id
+            }
+            Else {
+                [string]$ObjectId = $_.id
+            }
+            [void]$ObjectList.Add($ObjectId)
+        }
+        ElseIf ($_ -is [ANOWServerNode] -or $ServerNode.Id.Length -gt 0) {
+            [string]$ObjectType = 'ServerNode'
+            If ($ServerNode.id.Length -gt 0) {
+                [string]$ObjectId = $ServerNode.id
+            }
+            Else {
+                [string]$ObjectId = $_.id
+            }
+            [void]$ObjectList.Add($ObjectId)
+        }
+        ElseIf ($_ -is [ANOWServerNodeGroup] -or $?.Id.Length -gt 0) {
+            [string]$ObjectType = 'ServerNodeGroup'
+            If ($ServerNodeGroup.id.Length -gt 0) {
+                [string]$ObjectId = $ServerNodeGroup.id
+            }
+            Else {
+                [string]$ObjectId = $_.id
+            }
+            [void]$ObjectList.Add($ObjectId)
+        }
+        ElseIf ($_ -is [ANOWAgent] -or $Agent.Id.Length -gt 0) {
+            [string]$ObjectType = 'Agent'
+            If ($Agent.id.Length -gt 0) {
+                [string]$ObjectId = $Agent.id
+            }
+            Else {
+                [string]$ObjectId = $_.id
+            }
+            [void]$ObjectList.Add($ObjectId)
+        }
+        ElseIf ($_ -is [ANOWEndpoint] -or $Endpoint.Id.Length -gt 0) {
+            [string]$ObjectType = 'Endpoint'
+            If ($Endpoint.id.Length -gt 0) {
+                [string]$ObjectId = $Endpoint.id
+            }
+            Else {
+                [string]$ObjectId = $_.id
+            }
+            [void]$ObjectList.Add($ObjectId)
+        }
+        ElseIf ($_ -is [ANOWResource] -or $Resource.Id.Length -gt 0) {
+            [string]$ObjectType = 'Resource'
+            If ($Resource.id.Length -gt 0) {
+                [string]$ObjectId = $Resource.id
+            }
+            Else {
+                [string]$ObjectId = $_.id
+            }
+            [void]$ObjectList.Add($ObjectId)
+        }
+        ElseIf ($_ -is [ANOWDataSource] -or $DataSource.Id.Length -gt 0) {
+            [string]$ObjectType = 'DataSource'
+            If ($DataSource.id.Length -gt 0) {
+                [string]$ObjectId = $DataSource.id
+            }
+            Else {
+                [string]$ObjectId = $_.id
+            }
+            [void]$ObjectList.Add($ObjectId)
+        }
+        ElseIf ($_ -is [ANOWAnomaly] -or $Anomaly.Id.Length -gt 0) {
+            [string]$ObjectType = 'Anomaly'
+            If ($Anomaly.id.Length -gt 0) {
+                [string]$ObjectId = $Anomaly.id
+            }
+            Else {
+                [string]$ObjectId = $_.id
+            }
+            [void]$ObjectList.Add($ObjectId)
+        }
+        ElseIf ($_ -is [ANOWWorkspace] -or $Workspace.Id.Length -gt 0) {
+            [string]$ObjectType = 'Workspace'
+            If ($Workspace.id.Length -gt 0) {
+                [string]$ObjectId = $Workspace.id
+            }
+            Else {
+                [string]$ObjectId = $_.id
+            }
+            [void]$ObjectList.Add($ObjectId)
+        }
+        ElseIf ($_ -is [ANOWCodeRepository] -or $CodeRepository.Id.Length -gt 0) {
+            [string]$ObjectType = 'CodeRepository'
+            If ($CodeRepository.id.Length -gt 0) {
+                [string]$ObjectId = $CodeRepository.id
+            }
+            Else {
+                [string]$ObjectId = $_.id
+            }
+            [void]$ObjectList.Add($ObjectId)
+        }
+        ElseIf ($_ -is [ANOWApproval] -or $Approval.Id.Length -gt 0) {
+            [string]$ObjectType = 'ApprovalConfiguration'
+            If ($Approval.id.Length -gt 0) {
+                [string]$ObjectId = $Approval.id
+            }
+            Else {
+                [string]$ObjectId = $_.id
+            }
+            [void]$ObjectList.Add($ObjectId)
+        }
+        ElseIf ($_ -is [ANOWNotificationGroup] -or $NotificationGroup.Id.Length -gt 0) {
+            [string]$ObjectType = 'NotificationGroup'
+            If ($NotificationGroup.id.Length -gt 0) {
+                [string]$ObjectId = $NotificationGroup.id
+            }
+            Else {
+                [string]$ObjectId = $_.id
+            }
+            [void]$ObjectList.Add($ObjectId)
+        }
+        ElseIf ($_ -is [ANOWNotificationChannel] -or $NotificationChannel.Id.Length -gt 0) {
+            [string]$ObjectType = 'NotificationChannel'
+            If ($NotificationChannel.id.Length -gt 0) {
+                [string]$ObjectId = $NotificationChannel.id
+            }
+            Else {
+                [string]$ObjectId = $_.id
+            }
+            [void]$ObjectList.Add($ObjectId)
+        }
+        ElseIf ($_ -is [ANOWNotificationMessageTemplate] -or $NotificationMessageTemplate.Id.Length -gt 0) {
+            [string]$ObjectType = 'NotificationMessageTemplate'
+            If ($NotificationMessageTemplate.id.Length -gt 0) {
+                [string]$ObjectId = $NotificationMessageTemplate.id
+            }
+            Else {
+                [string]$ObjectId = $_.id
+            }
+            [void]$ObjectList.Add($ObjectId)
+        }
+        ElseIf ($_ -is [ANOWDashboard] -or $Dashboard.Id.Length -gt 0) {
+            [string]$ObjectType = 'Dashboard'
+            If ($Dashboard.id.Length -gt 0) {
+                [string]$ObjectId = $Dashboard.id
+            }
+            Else {
+                [string]$ObjectId = $_.id
+            }
+            [void]$ObjectList.Add($ObjectId)
+        }
+        ElseIf ($_ -is [ANOWAdhocReport] -or $AdhocReport.Id.Length -gt 0) {
+            [string]$ObjectType = 'AdhocReport'
+            If ($AdhocReport.id.Length -gt 0) {
+                [string]$ObjectId = $AdhocReport.id
+            }
+            Else {
+                [string]$ObjectId = $_.id
+            }
+            [void]$ObjectList.Add($ObjectId)
+        }
+        ElseIf ($_ -is [ANOWUserReport] -or $UserReport.Id.Length -gt 0) {
+            [string]$ObjectType = 'UserReport'
+            If ($UserReport.id.Length -gt 0) {
+                [string]$ObjectId = $UserReport.id
+            }
+            Else {
+                [string]$ObjectId = $_.id
+            }
+            [void]$ObjectList.Add($ObjectId)
+        }
+        ElseIf ($_ -is [ANOWProcessingAction] -or $RuntimeAction.Id.Length -gt 0) {
+            [string]$ObjectType = 'ProcessingAction'
+            If ($RuntimeAction.id.Length -gt 0) {
+                [string]$ObjectId = $RuntimeAction.id
+            }
+            Else {
+                [string]$ObjectId = $_.id
+            }
+            [void]$ObjectList.Add($ObjectId)
+        }
+        ElseIf ($_ -is [ANOWTag] -or $Tag.Id.Length -gt 0) {
+            [string]$ObjectType = 'Tag'
+            If ($Tag.id.Length -gt 0) {
+                [string]$ObjectId = $Tag.id
+            }
+            Else {
+                [string]$ObjectId = $_.id
+            }
+            [void]$ObjectList.Add($ObjectId)
+        }
+        ElseIf ($_ -is [ANOWFolder] -or $Folder.Id.Length -gt 0) {
+            [string]$ObjectType = 'Folder'
+            If ($Folder.id.Length -gt 0) {
+                [string]$ObjectId = $Folder.id
+            }
+            Else {
+                [string]$ObjectId = $_.id
+            }
+            [void]$ObjectList.Add($ObjectId)
+        }
+        ElseIf ($_ -is [ANOWDesignTemplate] -or $DesignTemplate.Id.Length -gt 0) {
+            [string]$ObjectType = 'DesignTemplate'
+            If ($DesignTemplate.id.Length -gt 0) {
+                [string]$ObjectId = $DesignTemplate.id
+            }
+            Else {
+                [string]$ObjectId = $_.id
+            }
+            [void]$ObjectList.Add($ObjectId)
+        }
+        ElseIf ($_ -is [ANOWMenuCustomization] -or $MenuCustomization.Id.Length -gt 0) {
+            [string]$ObjectType = 'DomainProcessingType'
+            If ($MenuCustomization.id.Length -gt 0) {
+                [string]$ObjectId = $MenuCustomization.id
+            }
+            Else {
+                [string]$ObjectId = $_.id
+            }
+            [void]$ObjectList.Add($ObjectId)
+        }
+        ElseIf ($_ -is [ANOWViewSetup] -or $ViewSetup.Id.Length -gt 0) {
+            [string]$ObjectType = 'ViewSetup'
+            If ($ViewSetup.id.Length -gt 0) {
+                [string]$ObjectId = $ViewSetup.id
+            }
+            Else {
+                [string]$ObjectId = $_.id
+            }
+            [void]$ObjectList.Add($ObjectId)
+        }
+        ElseIf ($_ -is [ANOWSecUser] -or $SecUser.Id.Length -gt 0) {
+            [string]$ObjectType = 'SecUser'
+            If ($SecUser.id.Length -gt 0) {
+                [string]$ObjectId = $SecUser.id
+            }
+            Else {
+                [string]$ObjectId = $_.id
+            }
+            [void]$ObjectList.Add($ObjectId)
+        }
+        ElseIf ($_ -is [ANOWSecRole] -or $SecRole.Id.Length -gt 0) {
+            [string]$ObjectType = 'SecRole'
+            If ($SecRole.id.Length -gt 0) {
+                [string]$ObjectId = $SecRole.id
+            }
+            Else {
+                [string]$ObjectId = $_.id
+            }
+            [void]$ObjectList.Add($ObjectId)
+        }
+        ElseIf ($_ -is [ANOWProcessingFunction] -or $ProcessingFunction.Id.Length -gt 0) {
+            [string]$ObjectType = 'ProcessingFunction'
+            If ($ProcessingFunction.id.Length -gt 0) {
+                [string]$ObjectId = $ProcessingFunction.id
+            }
+            Else {
+                [string]$ObjectId = $_.id
+            }
+            [void]$ObjectList.Add($ObjectId)
+        }
+        ElseIf ($_ -is [ANOWDomain] -or $Domain.Id.Length -gt 0) {
+            [string]$ObjectType = 'Domain'
+            If ($Domain.id.Length -gt 0) {
+                [string]$ObjectId = $Domain.id
+            }
+            Else {
+                [string]$ObjectId = $_.id
+            }
+            [void]$ObjectList.Add($ObjectId)
+        }
+        Else {
+            Write-Warning -Message "Unable to determine input object. Please specify a supported object type. See the in-line help for more information."
+            Break
+        }
+    }
+    End {
+        [int32]$ObjectListCount = $ObjectList.Count
+        If ($ObjectListCount -eq 0) {
+            Write-Warning -Message "There are zero objects to export. Please check what happened."
+            Break
+        }
+        [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
+        [string]$ObjectListString = $ObjectList -join ','
+        $Body.$ObjectType = $ObjectListString
+        $Body.'domain' = $anow_session.current_domain
+        $Body.'access_token' = $anow_session.AccessToken
+        If ($deepProcessingTemplateExport -eq $true) {
+            $Body.'deepProcessingTemplateExport' = 'true'
+        }
+        If ($includeProcessingServerNodes -eq $true) {
+            $Body.'includeProcessingServerNodes' = 'true'
+        }
+        If ($includeProcessingResultMapping -eq $true) {
+            $Body.'includeProcessingResultMapping' = 'true'
+        }
+        If ($includeVersionControlHistory -eq $true) {
+            $Body.'includeVersionControlHistory' = 'true'
+        }
+        If ($includeDocumentation -eq $true) {
+            $Body.'includeDocumentation' = 'true'
+        }
+        If ($deepWorkspaceExport -eq $true) {
+            $Body.'deepWorkspaceExport' = 'true'
+        }
+        If ($deepBusinessViewExport -eq $true) {
+            $Body.'deepBusinessViewExport' = 'true'
+        }
+        If ($deepServerNodeExport -eq $true) {
+            $Body.'deepServerNodeExport' = 'true'
+        }
+        If ($deepResourceExport -eq $true) {
+            $Body.'deepResourceExport' = 'true'
+        }
+        [string]$Body = ConvertTo-QueryString -InputObject $Body
+        [string]$command = ('/migration/exportSelected')
+        If ($null -eq $parameters["Command"]) {
+            $parameters.Add('Command', $command)
+        }
+        Else {
+            $parameters.Command = $command
+        }
+        If ($null -eq $parameters["Body"]) {
+            $parameters.Add('Body', $Body)
+        }
+        Else {
+            $parameters.Body = $Body
+        }
+        $Error.Clear()
+        Try {
+            If ($ManualFilename.Length -gt 0) {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+                If ($results -match '^\{.{1,}\}$') {
+                    Write-Warning -Message "Exporting $ObjectType ($ObjectListString) failed due to $results"
+                    Break
+                }
+                [int32]$response_code = $results.response.status
+                If ($response_code -ne 0) {
+                    [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 10
+                    Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                    Break
+                }
+            }
+            Else {
+                [PSCustomObject[]]$initial_results = Invoke-AutomateNOWAPI @parameters
+                [PSCustomObject]$results = $initial_results | Select-Object -Skip 0 -First 1
+                If ($results -match '^\{.{1,}\}$') {
+                    Write-Warning -Message "Exporting $ObjectType ($ObjectListString) failed due to $results"
+                    Break
+                }
+                [int32]$response_code = $results.response.status
+                If ($response_code -ne 0) {
+                    [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 10
+                    Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                    Break
+                }
+                [string]$outgoing_filename = $initial_results | Select-Object -Skip 1 -First 1
+                If ($DoNotIncludeObjectTypeInFileName -ne $true) {
+                    [array]$underscore_matches = $outgoing_filename | Select-String '_' -AllMatches | ForEach-Object { $_.matches }
+                    If ($underscore_matches.count -ne 8) {
+                        Write-Warning -Message "Somehow the automatic filename generation failed (under Export-AutomateNOWMigration)"
+                        Break
+                    }
+                    [int32]$index_location = $underscore_matches | Select-Object -First 1 -Skip 2 | Select-Object -ExpandProperty index
+                    If ($ObjectType -eq 'ProcessingTemplate' -and $IsScheduleTemplate -eq $true) {
+                        [string]$ObjectType = 'ScheduleTemplate'
+                    }
+                    [string]$outgoing_filename = $outgoing_filename.Insert(($index_location + 1), ( $ObjectType + '_'))
+                }
+            }
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] while running Export-AutomateNOWMigration due to [$Message]."
+            Break
+        }
+        If ($ManualFilename.Length -gt 0) {
+            [string]$outgoing_filename = $ManualFilename
+        }
+        If ($outgoing_filename.Length -eq 0) {
+            Write-Warning -Message "Somehow the outgoing filename is empty. Please look into how this happened."
+            Break
+        }
+        Else {
+            Write-Verbose -Message "Received filename from the ANOW API for the export: $outgoing_filename"
+        }
+        If ($DestinationPath.Length -eq 0) {
+            $DestinationPath = '.'
+        }
+        [string]$ExportFilePath = Join-Path -Path $DestinationPath -ChildPath $outgoing_filename
+        [boolean]$outgoing_file_exists = Test-Path -Path "$ExportFilePath"
+        If ($outgoing_file_exists -eq $true -and $OverwriteExportFile -ne $true) {
+            Write-Warning -Message "The export file $outgoing_filename already exists at $DestinationPath. Use the -OverwriteExportFile switch parameter to bypass this exception and overwrite the file."
+            Break
+        }
+        $Error.Clear()
+        $parameters = @{}
+        $parameters.Add('InputObject', $results)
+        $parameters.Add('Path', $ExportFilePath)
+        $parameters.Add('NoNewLine', $true)
+        If ($OverwriteExportFile -eq $true) {
+            $parameters.Add('Force', $true)
+        }
+        Try {
+            Out-File @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Out-File failed to write the outgoing file [$outgoing_filename] to disk under Export-AutomateNOWMigration due to [$Message]."
+            Break
+        }
+        $Error.Clear()
+        If ((Test-Path -Path $ExportFilePath) -eq $true) {
+            [System.IO.FileInfo]$fileinfo = Get-Item -Path "$ExportFilePath"
+            [int32]$filelength = $fileinfo.Length
+            [string]$filelength_display = "{0:N0}" -f $filelength
+            Write-Information -MessageData "[$ObjectListCount] objects of type [$ObjectType] were exported to: $outgoing_filename ($filelength_display bytes)"
+            Write-Verbose -Message "The list of object names that were exported: $ObjectListString"
+        }
+    }
+}
+
+#endregion
+
 #Region - Notifications
 
 Function Get-AutomateNOWNotification {
@@ -31908,7 +35506,7 @@ Function Get-AutomateNOWNotification {
         $Body.'isc_dataFormat' = 'json'
         [string]$Body = ConvertTo-QueryString -InputObject $Body
         [string]$command = ('/notification/read?' + $Body)
-        If ($null -eq $parameters.'command') {
+        If ($null -eq $parameters["Command"]) {
             $parameters.Add('command', $command)
         }
         Else {
@@ -31972,7 +35570,7 @@ Function Export-AutomateNOWNotification {
     .EXAMPLE
     Exports a series of Notifications from an array of Id's sent across the pipeline
 
-    @( 1, 2, 3, 10033, 10034 ) | Get-AutomateNOWNotification | Export-AutomateNOWNotification
+    1, 2, 3, 10033, 10034 | Get-AutomateNOWNotification | Export-AutomateNOWNotification
 
     .NOTES
 	
@@ -32075,7 +35673,7 @@ Function Remove-AutomateNOWNotification {
         }
         [int64]$Notification_id = $Notification.id
         If ($Notification_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Notification_id)")) -eq $true) {
@@ -32089,7 +35687,7 @@ Function Remove-AutomateNOWNotification {
             $BodyMetaData.'_dataSource' = 'NotificationDataSource'
             $BodyMetaData.'isc_metaDataPrefix' = '_'
             $BodyMetaData.'isc_dataFormat' = 'json'
-            $Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
             If ($null -eq $parameters.Body) {
                 $parameters.Add('Body', $Body)
             }
@@ -32261,7 +35859,12 @@ Function Get-AutomateNOWNotificationChannel {
         $Body.'isc_dataFormat' = 'json'
         [string]$Body = ConvertTo-QueryString -InputObject $Body
         [string]$command = ('/notificationChannel/read?' + $Body)
-        $parameters.Add('command', $command)
+        If ($null -eq $parameters["Command"]) {
+            $parameters.Add('Command', $command)
+        }
+        Else {
+            $parameters.Command = $command
+        }
         $Error.Clear()
         Try {
             [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
@@ -32494,7 +36097,7 @@ Function Set-AutomateNOWNotificationChannel {
             If ($Folder.Length -gt 0) {
                 $Error.Clear()
                 Try {
-                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
                 }
                 Catch {
                     [string]$Message = $_.Exception.Message
@@ -32786,7 +36389,7 @@ Function New-AutomateNOWNotificationChannel {
     If ($Folder.Length -gt 0) {
         $Error.Clear()
         Try {
-            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -32933,7 +36536,7 @@ Function Remove-AutomateNOWNotificationChannel {
         }
         [string]$NotificationChannel_id = $NotificationChannel.id
         If ($NotificationChannel_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($NotificationChannel_id)")) -eq $true) {
@@ -33158,7 +36761,7 @@ Function Copy-AutomateNOWNotificationChannel {
                 $BodyMetaData.'_dataSource' = 'NotificationChannelDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
                 $parameters.Body = $Body
                 $Error.Clear()
                 Try {
@@ -33473,7 +37076,12 @@ Function Get-AutomateNOWNotificationGroup {
         $Body.'isc_dataFormat' = 'json'
         [string]$Body = ConvertTo-QueryString -InputObject $Body
         [string]$command = ('/notificationGroup/read?' + $Body)
-        $parameters.Add('command', $command)
+        If ($null -eq $parameters["Command"]) {
+            $parameters.Add('Command', $command)
+        }
+        Else {
+            $parameters.Command = $command
+        }
         $Error.Clear()
         Try {
             [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
@@ -33651,7 +37259,7 @@ Function Set-AutomateNOWNotificationGroup {
             If ($Folder.Length -gt 0) {
                 $Error.Clear()
                 Try {
-                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
                 }
                 Catch {
                     [string]$Message = $_.Exception.Message
@@ -33936,7 +37544,7 @@ Function New-AutomateNOWNotificationGroup {
     If ($Folder.Length -gt 0) {
         $Error.Clear()
         Try {
-            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -34083,7 +37691,7 @@ Function Remove-AutomateNOWNotificationGroup {
         }
         [string]$NotificationGroup_id = $NotificationGroup.id
         If ($NotificationGroup_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($NotificationGroup_id)")) -eq $true) {
@@ -34309,7 +37917,7 @@ Function Copy-AutomateNOWNotificationGroup {
                 $BodyMetaData.'_dataSource' = 'NotificationGroupDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
                 $parameters.Body = $Body
                 $Error.Clear()
                 Try {
@@ -34600,7 +38208,7 @@ Function Get-AutomateNOWNotificationGroupMember {
         $Body.'isc_dataFormat' = 'json'
         [string]$Body = ConvertTo-QueryString -InputObject $Body
         [string]$command = ('/notificationGroupMember/read?' + $Body)
-        If ($null -eq $parameters.'command') {
+        If ($null -eq $parameters["Command"]) {
             $parameters.Add('command', $command)
         }
         Else {
@@ -35236,7 +38844,7 @@ Function Remove-AutomateNOWNotificationGroupMember {
         }
         [string]$NotificationGroupMember_id = $NotificationGroupMember.id
         If ($NotificationGroupMember_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         ## Begin warning ##
@@ -35440,7 +39048,12 @@ Function Get-AutomateNOWNotificationMessageTemplate {
         $Body.'isc_dataFormat' = 'json'
         [string]$Body = ConvertTo-QueryString -InputObject $Body
         [string]$command = ('/notificationMessageTemplate/read?' + $Body)
-        $parameters.Add('command', $command)
+        If ($null -eq $parameters["Command"]) {
+            $parameters.Add('Command', $command)
+        }
+        Else {
+            $parameters.Command = $command
+        }
         $Error.Clear()
         Try {
             [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
@@ -35652,7 +39265,7 @@ Function Set-AutomateNOWNotificationMessageTemplate {
             If ($Folder.Length -gt 0) {
                 $Error.Clear()
                 Try {
-                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
                 }
                 Catch {
                     [string]$Message = $_.Exception.Message
@@ -35963,7 +39576,7 @@ Function New-AutomateNOWNotificationMessageTemplate {
     If ($Folder.Length -gt 0) {
         $Error.Clear()
         Try {
-            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -36110,7 +39723,7 @@ Function Remove-AutomateNOWNotificationMessageTemplate {
         }
         [string]$NotificationMessageTemplate_id = $NotificationMessageTemplate.id
         If ($NotificationMessageTemplate_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($NotificationMessageTemplate_id)")) -eq $true) {
@@ -36335,7 +39948,7 @@ Function Copy-AutomateNOWNotificationMessageTemplate {
                 $BodyMetaData.'_dataSource' = 'NotificationMessageTemplateDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
                 $parameters.Body = $Body
                 $Error.Clear()
                 Try {
@@ -37309,7 +40922,7 @@ Function New-AutomateNOWPhysicalResource {
     If ($Folder.Length -gt 0) {
         $Error.Clear()
         Try {
-            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -37463,7 +41076,7 @@ Function Remove-AutomateNOWPhysicalResource {
         }
         [string]$PhysicalResource_id = $PhysicalResource.id
         If ($PhysicalResource_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($PhysicalResource_id)")) -eq $true) {
@@ -37689,7 +41302,7 @@ Function Copy-AutomateNOWPhysicalResource {
                 $BodyMetaData.'_dataSource' = 'ResourceDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
                 $parameters.Body = $Body
                 $Error.Clear()
                 Try {
@@ -37885,6 +41498,848 @@ Function Rename-AutomateNOWPhysicalResource {
 
 #endregion
 
+#Region - Processing
+
+Function Wait-AutomateNOWProcessing {
+    <#
+    .SYNOPSIS
+    Waits for a Processing Item (Task, Workflow, Schedule or Service Manager) to complete executing on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Waits for a Processing Item (Task, Workflow, Schedule or Service Manager) to complete executing on an AutomateNOW! instance
+
+    .PARAMETER Processing
+    An [ANOWProcessing] object representing the Processing Item to wait for. Use Get-AutomateNOWTask, Get-AutomateNOWWorkflow, Get-AutomateNOWSchedule or Get-AutomateNOWServiceManager to fetch these
+
+    .PARAMETER WaitForExecutionInterval
+    Optional int32 number of times (intervals) to wait for executing. The default value is 60.
+
+    .PARAMETER WaitForExecutionDuration
+    Optional int32 number of seconds to wait for executing between each interval. The default value is 10.
+
+    .PARAMETER Quiet
+    Switch parameter to silence the Write-Progress progress meter that appears by default
+
+    .INPUTS
+    ONLY [ANOWProcessing] objects are accepted (including from the pipeline) (this means Tasks, Workflows, Schedules and Service Managers)
+
+    .OUTPUTS
+    The [ANOWProcessing] will be returned once it is no longer in the EXECUTING state or when the intervals deplete
+
+    .EXAMPLE
+    Waits for an already started Workflow with a RunId of 12345678
+
+    Get-AutomateNOWWorkflow -Id 12345678 | Wait-AutomateNOWProcessing
+
+    .EXAMPLE
+    Starts a Task Template named 'TaskTemplate1' without parameters and waits for it
+
+    Get-AutomateNOWTaskTemplate -Id 'TaskTemplate1' | Start-AutomateNOWTaskTemplate | Wait-AutomateNOWProcessing
+
+    .EXAMPLE
+    Quietly waits for an already started Workflow with a RunId of 12345678 along with specifying a custom interval and delay time
+
+    12345678 | Get-AutomateNOWWorkflow | Wait-AutomateNOWProcessing -WaitForExecutionInterval 23 -WaitForExecutionInterval 5 -Quiet
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [CmdletBinding()]
+    [Alias('Wait-AutomateNOWSchedule', 'Wait-AutomateNOWServiceManager', 'Wait-AutomateNOWTask', 'Wait-AutomateNOWWorkflow')]
+    Param(
+        [ValidateScript({ $_.processingStatus -eq 'EXECUTING' -or $_.processingStatus -eq 'WAITING' })]
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [ANOWProcessing]$Processing,
+        [Parameter(Mandatory = $false)]
+        [int32]$WaitForExecutionInterval = 60,
+        [Parameter(Mandatory = $false)]
+        [int32]$WaitForExecutionDuration = 10,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+    }
+    Process {
+        If ($_.Id.Length -gt 0) {
+            [ANOWProcessing]$Processing = $_
+        }
+        [int64]$Processing_Id = $Processing.Id
+        $Error.Clear()
+        Try {
+            [ANOWProcessing]$Processing = Get-AutomateNOWProcessingList -Id $Processing_Id
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWProcessingList failed to retrieve [$Processing_id] (under Wait-AutomateNOWProcessing) due to [$Message]."
+            Break
+        }
+        If ($Processing.processingStatus -eq 'EXECUTING' -or $Processing.processingStatus -eq 'WAITING') {
+            [string]$Processing_Name = $Processing.Name
+            [int32]$loop = 1
+            While ( ($Processing.processingStatus -eq 'EXECUTING' -or $Processing.processingStatus -eq 'WAITING') -and ($loop -lt $WaitForExecutionInterval)) {
+                If ($Quiet -ne $true) {
+                    Write-Progress -Activity "Waiting [$WaitForExecutionDuration] seconds for RunId [$Processing_Id] to complete executing" -Status "Loop $loop of $WaitForExecutionInterval" -CurrentOperation "$Processing_Name" -PercentComplete ($loop / $WaitForExecutionInterval * 100)
+                }
+                Start-Sleep -Seconds $WaitForExecutionDuration
+                $Error.Clear()
+                Try {
+                    [ANOWProcessing]$Processing = Get-AutomateNOWProcessingList -Id $Processing_Id
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Get-AutomateNOWProcessingList failed to retrieve [$Processing_id] (under Wait-AutomateProcessing) due to [$Message]."
+                    Break
+                }
+                $loop++
+            }
+            If ($Quiet -ne $true) {
+                Write-Progress -Activity "Waiting has completed for RunId [$Processing_Id]" -Status "$WaitForExecutionInterval loops were completed" -Completed
+            }
+            [ANOWProcessing_processingStatus]$Processing_processingStatus = $Processing.processingStatus
+            If ($loop -ge $WaitForExecutionInterval -and ($Processing.processingStatus -eq 'EXECUTING' -or $Processing.processingStatus -eq 'WAITING')) {
+                Write-Warning -Message "After $WaitForExecutionInterval attempts of $WaitForExecutionDuration seconds each, $Processing_Id is still in EXECUTING status"
+            }
+            Write-Verbose -Message "Returning $Processing_Id which is in the [$Processing_processingStatus] status"
+        }
+        Return $Processing
+    }
+    End {
+
+    }
+}
+
+Function Trace-AutomateNOWProcessing {
+    <#
+    .SYNOPSIS
+    Traces a Workflow based on its parentage on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Traces a Workflow based on its parentage on an AutomateNOW! instance. This function is intended only for Workflows.
+
+    .PARAMETER Id
+    Mandatory option of the int64 Run Id of the Workflow that you wish to trace.
+
+    .PARAMETER Workflow
+    Mandatory option to supply the [ANOWProcessing] object that you wish to trace. Do not send WorkflowTemplates here!
+
+    .PARAMETER WaitForExecution
+    Optional switch parameter to enable 'Waiting for execution...' loops. Use with caution. Default is 60 intervals at 10 seconds each.
+
+    .PARAMETER WorkflowSortBy
+    Optional string to supply the property to sort by. Valid values are: dateCreated*, sortOrder, endTime, firstStartTime, startTime, duration
+
+    .PARAMETER DoNotIncludeTriggers
+    Optional switch parameter to exclude the trigger items from the final result.
+
+    .PARAMETER PerformDeepSearch
+    Optional switch parameter to include searching for Workflows that were launched by one of the Workflows in the trace. Note, this may add a considerable number of items to the output.
+
+    .PARAMETER ReturnContextVariables
+    Optional switch parameter to replace the workflows in the output with the context variables instead.
+
+    .PARAMETER DefaultPause
+    Optional number of milliseconds to pause between each Workflow lookup. The default is 100. If you want to simulate the behavior of the console exactly then set this to 0 for no delays between Workflow lookups.
+
+    .PARAMETER NoStats
+    Optional switch to suppress the showing of stats (time elapsed) for the trace. This parameter is ignored if -Quiet is specified.
+
+    .PARAMETER WaitForExecutionDuration
+    Optional int32 number of seconds to wait for executing between each interval. The default value is 10.
+
+    .PARAMETER WaitForExecutionInterval
+    Optional int32 number of times (intervals) to wait for executing. The default value is 60.
+
+    .PARAMETER IncludeArchived
+    Optional switch parameter removes the filter for archived items thus both archived and non-archived items will be returned.
+
+    .PARAMETER OnlyArchived
+    Optional switch parameter filters out non-archived items thus only archived items will be returned.
+
+    .PARAMETER pendingCharacter
+    Optional 1-character string to change how the "waiting" status appears. The default character is an asterisk *.
+
+    .PARAMETER Quiet
+    .Optional switch that will suppress the Write-Information outputs during the course of the trace.
+
+    .INPUTS
+    Accepts either a numeric RunId in the -Id parameter or an [ANOWProcessing] object. Either can be presented via the pipeline.
+
+    .OUTPUTS
+    The output will be either an array of whole [ANOWProcessing] objects (formatted or unformatted) or the output will be an array of just the RunId's of the Workflows.
+
+    .EXAMPLE
+    Traces a workflow (by Id) with the RunId of 1234567 and a sort order of endTime
+
+    Trace-AutomateNOWProcessing -Id 1234567 -WorkflowSortBy endTime
+
+    .EXAMPLE
+    Traces a workflow (by Id) with the RunId of 1234567 and using the pipeline with the default sort order (dateCreated)
+
+    1234567 | Trace-AutomateNOWProcessing
+
+    .EXAMPLE
+    Traces a workflow (by object) with the RunId of 1234567 while excluding the trigger items from the output and sorting in the same order that the console uses (sortOrder).
+
+    Get-AutomateNOWWorkflow -Id 1234567 | Trace-AutomateNOWProcessing -DoNotIncludeTriggers -WorkflowSortBy sortOrder
+
+    .EXAMPLE
+    Traces (and waits for) a workflow (by object) with the RunId of 1234567 using the pipeline and returns the Context Variables instead of the Workflows
+
+    1234567 | Get-AutomateNOWWorkflow | Trace-AutomateNOWProcessing -ReturnContextVariables -WaitForExecution
+
+    .EXAMPLE
+    Quietly starts a Workflow and deep traces it while waiting for execution and ignoring trigger items.
+
+    Get-AutomateNOWWorkflowTemplate -Id 'Worflow1' | Start-AutomateNOWWorkflowTemplate | Trace-AutomateNOWProcessing -WaitForExecution -PerformDeepSearch -DoNotIncludeTriggers -ReturnContextVariables -Quiet
+
+    .EXAMPLE
+    Starts a Task Template ('TaskTemplate1') with parameters, waits for execution to complete and returns the context variables (one-liner format)
+
+    Get-AutomateNOWTaskTemplate -Id 'TaskTemplate1' | Start-AutomateNOWTaskTemplate -TaskParameters @{parameter1 = "value1"; parameter2 = "value2";} | Trace-AutomateNOWTask -WaitForExecution -ReturnContextVariables
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    This function uses an inner function to ensure that the output does not contain any duplicates. Help to re-write this to be more efficient would be welcomed!
+
+    All sorting has a secondary sort by id. This is most applicable when sorting by sortOrder property while including triggers.The default sort order of the console is sortOrder but the default sort order for this function is dateCreated.
+
+    This function only supports [ANOWProcessing] objects through the pipeline. Id's must be specified individually.
+
+    #>
+    [CmdletBinding()]
+    [Alias('Trace-AutomateNOWSchedule', 'Trace-AutomateNOWServiceManager', 'Trace-AutomateNOWTask', 'Trace-AutomateNOWWorkflow')]
+    Param(
+        [Parameter(Mandatory = $True, ParameterSetName = 'Id', ValueFromPipeline = $true)]
+        [int64]$Id,
+        [Parameter(Mandatory = $True, ParameterSetName = 'Processing', ValueFromPipeline = $true)]
+        [ANOWProcessing]$Processing,
+        [Parameter(Mandatory = $False)]
+        [switch]$WaitForExecution,
+        [Parameter(Mandatory = $False)]
+        [int32]$WaitForExecutionDuration = 10,
+        [Parameter(Mandatory = $False)]
+        [int32]$WaitForExecutionInterval = 60,
+        [ValidateSet('dateCreated', 'sortOrder', 'id', 'endTime', 'firstStartTime', 'startTime', 'duration', IgnoreCase = $false)]
+        [Parameter(Mandatory = $False)]
+        [string]$ProcessingSortBy = 'dateCreated',
+        [Parameter(Mandatory = $False)]
+        [switch]$DoNotIncludeTriggers,
+        [Parameter(Mandatory = $False)]
+        [switch]$PerformDeepSearch,
+        [Parameter(Mandatory = $False)]
+        [switch]$ReturnContextVariables,
+        [Parameter(Mandatory = $False)]
+        [switch]$ReturnRunIds,
+        [Parameter(Mandatory = $False)]
+        [switch]$NoStats,
+        [Parameter(Mandatory = $False)]
+        [int32]$DefaultPause = 100,
+        [Parameter(Mandatory = $False)]
+        [switch]$IncludeArchived,
+        [Parameter(Mandatory = $False)]
+        [switch]$OnlyArchived,
+        [ValidateScript({ $_.length -eq 1 })]
+        [Parameter(Mandatory = $False)]
+        [string]$pendingCharacter = '*',
+        [Parameter(Mandatory = $False)]
+        [switch]$Quiet
+    )
+    Begin {
+        Function Search-AutomateNOWProcessing {
+            [Cmdletbinding()]
+            Param(
+                [Parameter(Mandatory = $True, ParameterSetName = 'Id', ValueFromPipeline = $true)]
+                [int64]$Id,
+                [Parameter(Mandatory = $True, ParameterSetName = 'Processing', ValueFromPipeline = $true)]
+                [ANOWProcessing]$Processing,
+                [Parameter(Mandatory = $False)]
+                [array]$items,
+                [Parameter(Mandatory = $False)]
+                [int32]$DefaultPause = 100,
+                [Parameter(Mandatory = $False)]
+                [switch]$PerformDeepSearch,
+                [Parameter(Mandatory = $False)]
+                [switch]$IncludeArchived,
+                [Parameter(Mandatory = $False)]
+                [switch]$OnlyArchived,
+                [ValidateScript({ $_.length -eq 1 })]
+                [Parameter(Mandatory = $False)]
+                [string]$pendingCharacter = '*'
+            )
+            Begin {
+                If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+                    Write-Warning -Message "Somehow there is not a valid token confirmed."
+                    Break
+                }
+                [hashtable]$parameters = @{}
+                $parameters.Add('Method', 'POST')
+                $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+                If ($anow_session.NotSecure -eq $true) {
+                    $parameters.Add('NotSecure', $true)
+                }
+                If ($ReturnContextVariables -eq $true -and $ReturnRunIds -eq $true) {
+                    Write-Warning -Message "You cannot use -ReturnContextVariables with -ReturnRunIds. Please choose one or the other."
+                    Break
+                }
+            }
+            Process {
+                [int32]$items_count = $global:items.count
+                Write-Verbose -Message "Current items count: $items_count"
+                Write-Debug -Message "Current items count: $items_count"
+                If ((($_ -is [int64]) -or ($Id -gt 0)) -and ($Id -notin $global:items.id)) {
+                    If ($Id -gt 0) {
+                        [int64]$current_id = $Id
+                    }
+                    Else {
+                        [int64]$current_id = $_
+                    }
+                    If ($global:items.Id -notcontains $current_id) {
+                        [hashtable]$parameters = @{}
+                        $parameters.Add('Id', $current_id)
+                        If ($IncludeArchived -eq $true) {
+                            $parameters.Add('IncludeArchived', $true)
+                        }
+                        If ($OnlyArchived -eq $true) {
+                            $parameters.Add('OnlyArchived', $true)
+                        }
+                        #[string]$processingType = $Processing.processingType
+                        #If ($processingType -in ('WORKFLOW', 'TASK', 'TRIGGER', 'SERVICE')) {
+                        $Error.Clear()
+                        Try {
+                            [ANOWProcessing]$Processing = Get-AutomateNOWProcessingList @parameters
+                        }
+                        Catch {
+                            [string]$Message = $_.Exception.Message
+                            Write-Warning -Message "Get-AutomateNOWTask failed (under Search-AutomateNOWProcessing) due to [$Message]."
+                            Break
+                        }
+                        #}
+                        #Else {
+                        #    Write-Warning -Message "$current_id has a processingType of $processingType which is not recognized!"
+                        #    Break
+                        #}
+                        If ($Processing.Id.Length -gt 0 -and $global:items.Id -notcontains $Processing.Id) {
+                            [string]$item_id = $Processing.Id
+                            [int32]$items_count = $global:items.Count
+                            If ($items_count -gt 0) {
+                                [array]$global:items = @($global:items) + @($Processing)
+                            }
+                            Else {
+                                [array]$global:items = @($Processing)
+                            }
+                            [int32]$items_count = $global:items.Count
+                            Write-Verbose -Message "Adding $item_id ($items_count items accumulated) to the collection (1)"
+                            Write-Debug -Message "Adding $item_id ($items_count items accumulated) to the collection (1)"
+                        }
+                    }
+                }
+                ElseIf ($_ -is [ANOWProcessing]) {
+                    [ANOWProcessing]$Processing = $_
+                }
+                ElseIf ($Processing.Id.Length -gt 0) {
+                    #this space intentionally left blank
+                }
+                ElseIf ($Id -in $global:items.id) {
+                    $Error.Clear()
+                    Try {
+                        [ANOWProcessing]$Processing = ($global:items | Where-Object { $_.Id -eq $Id })
+                    }
+                    Catch {
+                        [string]$Message = $_.Exception.Message
+                        Write-Warning -Message "Failed to create a single [ANOWProcessing] object from the traced items due to [$Message]. Note, that this function is in experimental status. Please report steps to reproduce to the author."
+                        Break
+                    }
+                }
+                Else {
+                    Write-Warning -Message "Somehow was unable to determine the object type that was passed to the pipeline of Search-AutomateNOWProcessing"
+                    Break
+                }
+                [int32]$items_count = $global:items.Count
+                If ($items_count -eq 0 -and $null -eq $Processing -and $Id -gt 0) {
+                    Write-Warning -Message "Apparently the RunId you provided [$Id] does not exist on this instance. Are you sure you are in the correct ANOW domain?"
+                    Break
+                }
+                If ($Processing.Id -gt 0 -and $global:items.Id -notcontains $Processing.Id) {
+                    [int64]$item_id = $Processing.Id
+                    [array]$global:items = @($global:items) + @($Processing)
+                    [int32]$items_count = $global:items.Count
+                    Write-Verbose -Message "Adding $item_id ($items_count items accumulated) to the collection (2)"
+                    Write-Debug -Message "Adding $item_id ($items_count items accumulated) to the collection (2)"
+                }
+                [int64]$RunId = $Processing.Id
+                If ($null -ne $Processing.processingStatus) {
+                    [ANOWProcessing_processingStatus]$Processing_processingStatus = $Processing.processingStatus
+                }
+                Else {
+                    [ANOWProcessing_processingStatus]$Processing_processingStatus = 'WAITING'
+                }
+                If (($Processing_processingStatus -eq 'EXECUTING' -or $Processing_processingStatus -eq 'WAITING' -or $null -eq $Processing_processingStatus) -and $WaitForExecution -eq $true) {
+                    [hashtable]$parameters = @{}
+                    $parameters.Add('Processing', $Processing)
+                    $parameters.Add('WaitForExecutionInterval', $WaitForExecutionInterval)
+                    $parameters.Add('WaitForExecutionDuration', $WaitForExecutionDuration)
+                    If ($Quiet -eq $true) {
+                        $parameters.Add('Quiet', $true)
+                    }
+                    Write-Verbose -Message "Initating wait for $RunId"
+                    Write-Debug -Message "Initating wait for $RunId"
+                    $Error.Clear()
+                    Try {
+                        [ANOWProcessing]$Processing = Wait-AutomateNOWProcessing @parameters
+                    }
+                    Catch {
+                        [string]$Message = $_.Exception.Message
+                        Write-Warning -Message "Wait-AutomateNOWProcessing failed to wait for RunId $RunId due to [$Message]."
+                        Break
+                    }
+                    [ANOWProcessing_processingStatus]$Processing_processingStatus = $Processing.processingStatus
+                    If ($Processing_processingStatus -eq 'EXECUTING' -or $Processing_processingStatus -eq 'WAITING') {
+                        Write-Warning -Message "$RunId was still executing (or waiting) after pause intervals were exhausted!"
+                    }
+                }
+                ElseIf (($Processing_processingStatus -eq 'EXECUTING' -or $Processing_processingStatus -eq 'WAITING') -and $WaitForExecution -ne $true -and $ReturnContextVariables -eq $true) {
+                    If ($Quiet -ne $true) {
+                        Write-Warning -Message "Warning: $RunId is still executing (or waiting) but you requested Context Variables. As a result, you may not receive all of the Context Variables that you were expecting. Use -WaitForExecution or -Quiet to suppress this warning."
+                    }
+                }
+                [hashtable]$parameters = @{}
+                $Error.Clear()
+                Try {
+                    [ANOWProcessing_processingType]$processingType = $Processing.processingType
+                    If ($null -ne $Processing.taskType) {
+                        [ANOWProcessing_taskType]$taskType = $Processing.taskType
+                    }
+                    ElseIf ( $null -ne $Processing.triggerType.Length -gt 0) {
+                        [ANOWProcessing_triggerType]$triggerType = $Processing.triggerType
+                    }
+                    Else {
+                        [string]$taskType = 'n/a'
+                    }
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Somehow failed to extract the processingType from a Processing object due to [$Message]."
+                    Break
+                }
+                If ($Quiet -ne $true) {
+                    Write-Host $pendingCharacter -NoNewLine
+                }
+                [int32]$items_count = $global:items.count
+                If ($Processing.triggerType.Length -gt 0) {
+                    Write-Verbose -Message "Tracing $RunId ($items_count items accumulated) ($processingType of type $triggerType)"
+                    Write-Debug -Message "Tracing $RunId ($items_count items accumulated) ($processingType of type $triggerType)"
+                }
+                Else {
+                    Write-Verbose -Message "Tracing $RunId ($items_count items accumulated) ($processingType of type $taskType)"
+                    Write-Debug -Message "Tracing $RunId ($items_count items accumulated) ($processingType of type $taskType)"
+                }
+                If ($processingType -eq 'TRIGGER' -and (($taskType -eq 'PROCESSING_OBSERVER') -or ($triggerType.length -gt 0))) {
+                    If ($taskType -eq 'PROCESSING_OBSERVER') {
+                        Write-Verbose -Message "$RunId is the Processing Observer (Trigger)"
+                        Write-Debug -Message "$RunId is the Processing Observer (Trigger)"
+                    }
+                    Else {
+                        Write-Verbose -Message "$RunId is the starting trigger ($triggerType type)"
+                        Write-Debug -Message "$RunId is the starting trigger ($triggerType type)"
+                    }
+                    [string]$nextProperty = 'Id'
+                    $parameters.Add('Id', $RunId)
+                    $parameters.Add('ItemsOnly', $true)
+                }
+                ElseIf ($processingType -eq 'TASK' -and $taskType -eq 'TRIGGER_ITEM') {
+                    Write-Verbose -Message "$RunId is the follow-up Trigger Item Task"
+                    Write-Verbose -Message "$RunId is the follow-up Trigger Item Task"
+                    [boolean]$isProcessing = $Processing.isProcessing
+                    [int64]$exitCode = $Processing.exitCode
+                    [ANOWProcessing_processingStatus]$processingStatus = $Processing.processingStatus
+                    If ($isProcessing -eq $false -and $exitCode -eq 0) {
+                        If ($processingStatus -in @('WAITING', 'READY')) {
+                            Write-Verbose -Message "Skipping $RunId because it is in a state of $processingStatus"
+                            Write-Debug -Message "Skipping $RunId because it is in a state of $processingStatus"
+                            [string]$nextProperty = 'Id'
+                            $parameters.Add('Id', $RunId)
+                            $parameters.Add('ItemsOnly', $true)
+                        }
+                        Else {
+                            Write-Warning -Message "How can $RunId (a TRIGGER_ITEM) be in a state of isProcessing = false and processingStatus is $processingStatus instead of (WAITING or READY)?"
+                            Break
+                        }
+                    }
+                    Else {
+                        [string]$nextProperty = 'exitCode'
+                        If ($exitCode -eq 0) {
+                            Write-Warning -Message "Somehow $RunId (a TRIGGER_ITEM) didn't have an exit code. (processingStatus = $processingStatus) Please look into this..."
+                            Break
+                        }
+                        $parameters.Add('Id', $exitCode)
+                    }
+                }
+                Else {
+                    [string]$nextProperty = 'Id'
+                    $parameters.Add('Id', $RunId)
+                    $parameters.Add('ItemsOnly', $true)
+                }
+                If ($IncludeArchived -eq $true) {
+                    $parameters.Add('IncludeArchived', $true)
+                }
+                If ($OnlyArchived -eq $true) {
+                    $parameters.Add('OnlyArchived', $true)
+                }
+                [string]$parameters_display = $parameters | ConvertTo-Json -Compress
+                Write-Verbose -Message "Sending the following parameters to Get-AutomateNOWProcessingList: $parameters_display"
+                Write-Verbose -Message "Pausing for [$DefaultPause] milliseconds before proceeding to trace $RunId..."
+                Start-Sleep -Milliseconds $DefaultPause
+                $Error.Clear()
+                Try {
+                    [ANOWProcessing[]]$new_items = Get-AutomateNOWProcessingList @parameters
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Get-AutomateNOWProcessingList failed to retrieve $RunId (under Search-AutomateNOWProcessing) due to [$Message]."
+                    Break
+                }
+                [array]$new_items = $new_items | Where-Object { $_.Id -notin $global:items.Id }
+                [int32]$new_items_count = $new_items.count
+                If ($new_items_count -eq 1 -and (($new_items.processingType -eq 'TRIGGER' -and ($new_items.taskType -eq 'PROCESSING_OBSERVER' -or $new_items.taskType -eq 'n/a' )) -or ($new_items.processingType -eq 'TASK' -and $new_items.taskType -eq 'TRIGGER_ITEM' ))) {
+                    [int64]$current_id = $new_items.Id
+                    [int64]$NextId = $new_items."$nextProperty"
+                    If ($NextId -eq 0) {
+                        Write-Warning -Message "Somehow a starting trigger, a trigger_item or a processing_observer ($current_id) has no child exit code!"
+                        Break
+                    }
+                    ElseIf ($NextId -in $global:items.Id) {
+                        Write-Verbose -Message "Skipping $NextId because it is already in the collection..." # Note: This check may not be needed
+                        Write-Debug -Message "Skipping $NextId because it is already in the collection..." # Note: This check may not be needed
+                    }
+                    Else {
+                        [int32]$items_count = $global:items.count
+                        Write-Verbose -Message "Adding $NextId ($items_count items accumulated) to the next trace"
+                        Write-Debug -Message "Adding $NextId ($items_count items accumulated) to the next trace"
+                        [hashtable]$parameters = @{}
+                        $parameters.Add('Id', $NextId)
+                        $parameters.Add('Items', $global:items)
+                        If ($PerformDeepSearch -eq $true) {
+                            $parameters.Add('PerformDeepSearch', $true)
+                        }
+                        If ($IncludeArchived -eq $true) {
+                            $parameters.Add('IncludeArchived', $true)
+                        }
+                        If ($OnlyArchived -eq $true) {
+                            $parameters.Add('OnlyArchived', $true)
+                        }
+                        $Error.Clear()
+                        Try {
+                            Search-AutomateNOWProcessing @parameters
+                        }
+                        Catch {
+                            [string]$Message = $_.Exception.Message
+                            [string]$parameters_display = $parameters | ConvertTo-Json -Compress
+                            Write-Warning -Message "Search-AutomateNOWProcessing failed (#1) regarding `$NextId $NextId due to [$Message]. Full parameters were: $parameters_display"
+                            Break
+                        }
+                    }
+                }
+                ElseIf ($new_items_count -gt 0 -or $PerformDeepSearch -eq $true) {
+                    If ($PerformDeepSearch -eq $true) {
+                        Write-Verbose -Message "Pausing for [$DefaultPause] milliseconds before proceeding to deep search $RunId"
+                        Write-Debug -Message "Pausing for [$DefaultPause] milliseconds before proceeding to deep search $RunId"
+                        Start-Sleep -Milliseconds $DefaultPause
+                        [hashtable]$parameters = @{}
+                        $parameters.Add('LaunchedById', $RunId)
+                        If ($IncludeArchived -eq $true) {
+                            $parameters.Add('IncludeArchived', $true)
+                        }
+                        If ($OnlyArchived -eq $true) {
+                            $parameters.Add('OnlyArchived', $true)
+                        }
+                        $Error.Clear()
+                        Try {
+                            [array]$new_launched_by_items = Get-AutomateNOWProcessingList @parameters
+                        }
+                        Catch {
+                            [string]$Message = $_.Exception.Message
+                            Write-Warning -Message "Get-AutomateNOWProcessingList failed (during deep search for $RunId) due to [$Message]."
+                            Break
+                        }
+                        [array]$new_launched_by_items = $new_launched_by_items | Where-Object { $_.Id -notin $global:items.Id }
+                        [int32]$new_launched_by_items_count = $new_launched_by_items.Count
+                        If ($new_launched_by_items_count -gt 0) {
+                            Write-Verbose -Message "Found $new_launched_by_items_count new Processing items that will be added to the trace"
+                            Write-Debug -Message "Found $new_launched_by_items_count new Processing items that will be added to the trace"
+                            ForEach ($new_launched_by_item in $new_launched_by_items) {
+                                [int64]$new_launchedby_id = $new_launched_by_item.Id
+                                If ($global:items.Id -notcontains $new_launchedby_id) {
+                                    [int32]$items_count = $global:items.count
+                                    Write-Verbose -Message "Adding $new_launchedby_id ($items_count items accumulated) to the trace list (launchedById)"
+                                    Write-Debug -Message "Adding $new_launchedby_id ($items_count items accumulated) to the trace list (launchedById)"
+                                    [array]$global:items = @($global:items) + @($new_launched_by_item)
+                                    [hashtable]$parameters = @{}
+                                    $parameters.Add('Id', $new_launchedby_id)
+                                    $parameters.Add('Items', $global:items)
+                                    If ($PerformDeepSearch -eq $true) {
+                                        $parameters.Add('PerformDeepSearch', $true)
+                                    }
+                                    If ($IncludeArchived -eq $true) {
+                                        $parameters.Add('IncludeArchived', $true)
+                                    }
+                                    If ($OnlyArchived -eq $true) {
+                                        $parameters.Add('OnlyArchived', $true)
+                                    }
+                                    $Error.Clear()
+                                    Try {
+                                        Search-AutomateNOWProcessing @parameters
+                                    }
+                                    Catch {
+                                        [string]$Message = $_.Exception.Message
+                                        Write-Warning -Message "Search-AutomateNOWProcessing failed (#2) due to [$Message]."
+                                        Break
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    [array]$new_items = $new_items | Where-Object { $_.Id -notin $global:items.Id }
+                    ForEach ($new_item in $new_items) {
+                        [int64]$new_item_id = $new_item.id
+                        [int32]$items_count = $global:items.count
+                        If ($Quiet -ne $true) {
+                            Write-Host $pendingCharacter -NoNewLine
+                        }
+                        Write-Verbose -Message "Adding $new_item_id ($items_count items accumulated) to the trace list (new items)"
+                        Write-Debug -Message "Adding $new_item_id ($items_count items accumulated) to the trace list (new items)"
+                        [array]$global:items = @($global:items) + @($new_item)
+                        [hashtable]$parameters = @{}
+                        $parameters.Add('Id', $new_item_id)
+                        $parameters.Add('Items', $global:items)
+                        If ($PerformDeepSearch -eq $true) {
+                            $parameters.Add('PerformDeepSearch', $true)
+                        }
+                        If ($IncludeArchived -eq $true) {
+                            $parameters.Add('IncludeArchived', $true)
+                        }
+                        If ($OnlyArchived -eq $true) {
+                            $parameters.Add('OnlyArchived', $true)
+                        }
+                        $Error.Clear()
+                        Try {
+                            Search-AutomateNOWProcessing @parameters
+                        }
+                        Catch {
+                            [string]$Message = $_.Exception.Message
+                            Write-Warning -Message "Search-AutomateNOWProcessing failed (#3) due to [$Message]."
+                            Break
+                        }
+                    }
+                }
+                Else {
+                    [int32]$items_count = $global:items.Count
+                    If ($items_count -gt 0) {
+                        Write-Verbose -Message "$items_count items are in the queue"
+                        Write-Debug -Message "$items_count items are in the queue"
+                        [int64[]]$unique_item_ids = $global:items.id | Sort-Object -Unique
+                        [ANOWProcessing[]]$unique_items = ForEach ($unique_item_id in $unique_item_ids) {
+                            $global:items | Where-Object { $_.Id -eq $unique_item_id | Select-Object -First 1 }
+                        }
+                        [int32]$unique_items_count = $unique_items.Count
+                        If ($unique_items_count -lt $items_count) {
+                            Write-Verbose -Message "The items account was reduced from $items_count to $unique_items_count"
+                            Write-Debug -Message "The items account was reduced from $items_count to $unique_items_count"
+                        }
+                        Return $unique_items
+                    }
+                }
+            }
+            End {
+                [int32]$items_count = $global:items.count
+                Write-Verbose -Message "End running with $items_count items accrued"
+                Write-Debug -Message "End running with $items_count items accrued"
+                [int64[]]$unique_item_ids = $global:items.id | Sort-Object -Unique
+                [ANOWProcessing[]]$unique_items = ForEach ($unique_item_id in $unique_item_ids) {
+                    $global:items | Where-Object { $_.Id -eq $unique_item_id | Select-Object -First 1 }
+                }
+                [int32]$unique_items_count = $unique_items.Count
+                If ($unique_items_count -lt $items_count) {
+                    Write-Verbose -Message "Reduced items accrued from $items_count to $unique_items_count"
+                    Write-Debug -Message "Reduced items accrued from $items_count to $unique_items_count"
+                }
+                Return $unique_items
+            }
+        }
+    }
+    Process {
+        $global:items = @()
+        [hashtable]$parameters = @{}
+        If (($Id -gt 0) -or ($_ -is [int64] -or $_ -is [int32])) {
+            If ($Id -gt 0) {
+                [int64]$original_id = $Id
+            }
+            Else {
+                [int64]$original_id = $Id
+            }
+            $parameters.Add('Id', $original_id)
+        }
+        ElseIf (($Processing.Id -gt 0) -or ($_.Id -gt 0)) {
+            If ($Processing.Id -gt 0) {
+                [int64]$original_id = $Processing.Id
+                $parameters.Add('Processing', $Processing)
+            }
+            Else {
+                [int64]$original_id = $_.Id
+                $parameters.Add('Processing', $_)
+            }
+        }
+        Else {
+            Write-Warning -Message "Somehow was unable to determine the starting Id to start this trace from. How can that happen? Are you debugging?"
+            Break
+        }
+        If ($Quiet -ne $true) {
+            Write-Host "Tracing $original_id $pendingCharacter" -NoNewLine
+        }
+        Write-Verbose -Message "Tracing $original_id (1 item accumulated) (first)"
+        Write-Debug -Message "Tracing $original_id (1 item accumulated) (first)"
+        $parameters.Add('DefaultPause', $DefaultPause)
+        If ($PerformDeepSearch -eq $true) {
+            $parameters.Add('PerformDeepSearch', $true)
+        }
+        If ($IncludeArchived -eq $true) {
+            $parameters.Add('IncludeArchived', $true)
+        }
+        If ($OnlyArchived -eq $true) {
+            $parameters.Add('OnlyArchived', $true)
+        }
+        [System.Diagnostics.Stopwatch]$stopwatch = [System.Diagnostics.Stopwatch]::new()
+        $stopwatch.Start()
+        [array]$returned_items = Search-AutomateNOWProcessing @parameters
+        [int32]$returned_items_count = $returned_items.Count
+        If ($returned_items_count -gt 0) {
+            [int64[]]$unique_ids = @($returned_items.Id | Sort-Object -Unique)
+            [array]$formatted_items = ForEach ($Id in $unique_ids) {
+                $returned_items | Where-Object { $_.Id -eq $Id } | Select-Object -First 1
+            }
+            [int32]$formatted_items_count = $formatted_items.count
+            [string]$object_label = 'Processing object'
+            If ($formatted_items_count -eq 0) {
+                Write-Warning -Message "Somehow the returned items were lost after formatting! Please look into this or contact the author with steps to reproduce if you were not debugging."
+                Break
+            }
+            Else {
+                If ($DoNotIncludeTriggers -eq $true) {
+                    [array]$formatted_items = ($formatted_items | Where-Object { $_.Id -notin ($formatted_items | Where-Object { (($_.processingType -eq 'TRIGGER') -and ($_.taskType -eq 'PROCESSING_OBSERVER' -or $null -eq $_.taskType)) -or (($_.processingType -eq 'TASK') -and ($_.taskType -eq 'TRIGGER_ITEM')) } | Select-Object -ExpandProperty Id) }) #this line of code really needs to be optimized :-)
+                }
+                [array]$formatted_items = $formatted_items | Sort-Object -Property $ProcessingSortBy, 'id'
+                [int32]$formatted_items_count = $formatted_items.count
+                If ($formatted_items_count -gt 0) {
+                    If ($ReturnContextVariables -ne $true) {
+                        If ($ReturnRunIds -eq $true) {
+                            [array]$formatted_items = @($formatted_items.Id)
+                            [string]$object_label = 'RunId'
+                        }
+                        Write-Verbose -Message "Returning [$formatted_items_count] [$object_label]'s sorted by [$ProcessingSortBy] (traced from $original_id)"
+                        Write-Debug -Message "Returning [$formatted_items_count] [$object_label]'s sorted by [$ProcessingSortBy] (traced from $original_id)"
+                    }
+                    Else {
+                        [int64[]]$IdArray = @($formatted_items.Id)
+                        [string]$IdArray_display = $IdArray | ConvertTo-JSON -Compress
+                        Write-Verbose -Message "Fetching $formatted_items_count Context Variables (from RunId's: $IdArray_display)"
+                        Write-Debug -Message "Fetching $formatted_items_count Context Variables (from RunId's: $IdArray_display)"
+                        $Error.Clear()
+                        Try {
+                            [ANOWProcessingContextVariable[]]$context_variables = Get-AutomateNOWContextVariable -RunId $IdArray -startRow 0 -endRow 10000
+                        }
+                        Catch {
+                            [string]$Message = $_.Exception.Message
+                            Write-Warning -Message "Get-AutomateNOWContextVariable failed (under Trace-AutomateNOWProcessing) due to [$Message]."
+                            Break
+                        }
+                        [int64[]]$root_ids = $formatted_items | Where-Object { $_.ancestorpath.count -eq 0 } | Where-Object { $_.Id -gt 0 } | Select-Object -ExpandProperty Id
+                        [int32]$context_variables_count = $context_variables.count
+                        Write-Verbose -Message "Fetched $context_variables_count Context Variables"
+                        Write-Debug -Message "Fetched $context_variables_count Context Variables"
+                        If ($context_variables_count -gt 0) {
+                            [array]$formatted_variables = ForEach ($variable in $context_variables) {
+                                [int64]$current_variable_processingId = $variable.processing
+                                [ANOWProcessing]$current_workflow = $formatted_items | Where-Object { $_.Id -eq $current_variable_processingId } | Select-Object -First 1
+                                [int64]$rootProcessingId = $current_workflow.rootProcessingId
+                                [int64]$parent = $current_workflow.parent
+                                [string]$ancestorPath = $current_workflow.ancestorPath
+                                [boolean]$isRoot = $current_workflow.isRoot
+                                [int32]$ancestorCount = $(If ($ancestorPath.Length -gt 0) { ($ancestorPath -split ',') | Measure-Object | Select-Object -ExpandProperty Count -EA 0 })
+                                If ($current_variable_processingId -in $root_ids) {
+                                    [string]$scope = 'Root'
+                                }
+                                ElseIf ($rootProcessingId -eq $parent) {
+                                    [string]$scope = 'Parent'
+                                }
+                                Else {
+                                    [string]$scope = 'Self'
+                                }
+                                [PSCustomObject]@{ scope = $scope; name = $variable.name; value = $variable.valuePreview; processing = $variable.processing; id = $variable.id; rootProcessingId = $rootProcessingId; parent = $parent; ancestorPath = $ancestorPath; ancestorCount = $ancestorCount; isRoot = $isRoot; }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Else {
+            Write-Verbose -Message "There were no returned items when tracing from [$original_id]"
+            Write-Debug -Message "There were no returned items when tracing from [$original_id]"
+        }
+        $stopwatch.Stop()
+        [decimal]$elapsed_seconds = [math]::Round($stopwatch.elapsed.TotalSeconds, 2)
+        If ($Quiet -ne $true) {
+            If ($NoStats -ne $true) {
+                If ($formatted_items_count -gt 0) {
+                    [decimal]$average_time_per_item = [math]::Round(($elapsed_seconds / $formatted_items_count), 2)
+                }
+                Else {
+                    [decimal]$average_time_per_item = 0
+                }
+                If ($null -eq $context_variables_count) {
+                    [int32]$context_variables_count = 0
+                }
+                If ($elapsed_seconds -lt 60) {
+                    If ($Quiet -ne $true) {
+                        Write-Information -MessageData "Trace $original_id completed: $formatted_items_count processing items in $elapsed_seconds sec. ($average_time_per_item sec. each). $context_variables_count context variables were returned."
+                    }
+                    ElseIf ($elapsed_seconds -lt 3600) {
+                        [decimal]$elapsed_minutes = [math]::Round(($elapsed_seconds / 60), 2)
+                        [int32]$elapsed_seconds = ($elapsed_seconds - ($elapsed_minutes * 60))
+                        If ($elapsed_minutes -gt 0) {
+                            Write-Information -MessageData "Trace $original_id completed: $formatted_items_count processing items in 1 minute and $elapsed_seconds sec. ($average_time_per_item sec. each). $context_variables_count context variables were returned."
+                        }
+                        Else {
+                            Write-Information -MessageData "Trace $original_id completed: $formatted_items_count processing items in $elapsed_minutes min. ($average_time_per_item sec. each). $context_variables_count context variables were returned."
+                        }
+                    }
+                    Else {
+                        [decimal]$elapsed_hours = [math]::Round(($elapsed_seconds / 3600), 2)
+                        If ($elapsed_hours -gt 0) {
+                            Write-Information -MessageData "Trace $original_id completed: $formatted_items_count workflows in $elapsed_elapsed hour(s) ($average_time_per_item sec. each). $context_variables_count context variables were returned. This trace took entirely too much time. Please look into this."
+                        }
+                    }
+                }
+            }
+        }
+        If ($formatted_items_count -gt 0 -and $ReturnContextVariables -ne $true) {
+            Return $formatted_items
+        }
+        If ($context_variables_count -gt 0 -and $ReturnContextVariables -eq $true) {
+            Return $formatted_variables
+        }
+    }
+    End {
+
+    }
+}
+
+#endregion
+
 #Region - Processing List (Menu Specialty)
 
 Function Get-AutomateNOWProcessingList {
@@ -37895,11 +42350,17 @@ Function Get-AutomateNOWProcessingList {
     .DESCRIPTION
     Gets the Processing List from an AutomateNOW! instance
 
+    .PARAMETER Id
+    Optional int64 parameter to limit the result to a single result by Id. This parameter cannot be combined with other parameters.
+
     .PARAMETER sortBy
     Optional string parameter to sort the results by (may not be used with the Id parameter). Valid choices are: 'id', 'processingType','template', 'dateCreated', 'firstStartTime', 'lastUpdated', 'launchedByName', 'launchedById', 'exitProcessingStatus', 'rootTemplate', 'endTime', 'processingStatus', 'startTime', 'processingTimestamp', 'processingLaunchType'
 
     .PARAMETER Descending
     Optional switch parameter to sort in descending order
+
+    .PARAMETER ItemsOnly
+    Optional switch parameter that modifies the -Id parameter set to provide the executed child Items within the Workflow. This switch completely changes the output of this function and may only be used in conjuntion with the -Id parameter.
 
     .PARAMETER startRow
     Optional integer to indicate the row to start from. This is intended for when you need to paginate the results. Default is 0.
@@ -37919,6 +42380,9 @@ Function Get-AutomateNOWProcessingList {
     .PARAMETER Tags
     Optional string array of Tags to filter by. Note that the 'containsAny' operator will be used.
 
+    .PARAMETER isProcessing
+    Optional switch parameter that enables the requirement for the processing items to be considering "isProcessing". Setting this parameter to $true delivers the functionality of the Processing List menu functionality, otherwise this function is equivalent to this function into Get-AutomateNOWProcessing.
+
     .OUTPUTS
     An array of one or more [ANOWProcessing] class objects
 
@@ -37934,127 +42398,160 @@ Function Get-AutomateNOWProcessingList {
 
     Unlike most Get/Read functions, there is no default sort order. The UI probably does this for performance reasons.
 
+    You must include the -isProcessing switch parameter to fully emulate the menu function.
+
     #>
     [OutputType([ANOWProcessing[]])]
-    [Cmdletbinding()]
+    [Cmdletbinding( DefaultParameterSetName = 'Default')]
     Param(
+        [Parameter(Mandatory = $True, ParameterSetName = 'Id', ValueFromPipeline = $true)]
+        [string]$Id,
         [ValidateSet('id', 'processingType', 'template', 'dateCreated', 'firstStartTime', 'lastUpdated', 'launchedByName', 'launchedById', 'exitProcessingStatus', 'rootTemplate', 'endTime', 'processingStatus', 'startTime', 'processingTimestamp', 'processingLaunchType')]
-        [Parameter(Mandatory = $False)]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
         [string]$sortBy,
-        [Parameter(Mandatory = $False)]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
         [switch]$Descending,
-        [Parameter(Mandatory = $False)]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Id')]
+        [switch]$ItemsOnly,
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
         [int32]$startRow = 0,
-        [Parameter(Mandatory = $False)]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
         [int32]$endRow = 100,
-        [Parameter(Mandatory = $False)]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
         [switch]$IncludeArchived,
-        [Parameter(Mandatory = $False)]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
         [switch]$OnlyArchived,
-        [Parameter(Mandatory = $False)]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
         [string]$Folder,
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [string[]]$Tags,
         [Parameter(Mandatory = $False)]
-        [string[]]$Tags
+        [switch]$isProcessing
     )
-    If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
-        Write-Warning -Message "Somehow there is not a valid token confirmed."
-        Break
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        If ($endRow -le $startRow) {
+            Write-Warning -Message "The endRow must be greater than the startRow. Please try again."
+            Break
+        }
+        If ($Descending -eq $true -and $sortBy.Length -eq 0) {
+            Write-Warning -Message "You must include the -sortBy parameter when -Descending is used"
+            Break
+        }
+        [string]$command = ('/processing/read')
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
     }
-    If ($endRow -le $startRow) {
-        Write-Warning -Message "The endRow must be greater than the startRow. Please try again."
-        Break
-    }
-    If ($Descending -eq $true -and $sortBy.Length -eq 0) {
-        Write-Warning -Message "You must include the -sortBy parameter when -Descending is used"
-        Break
-    }
-    [string]$command = ('/processing/read')
-    [hashtable]$parameters = @{}
-    $parameters.Add('Command', $command)
-    $parameters.Add('Method', 'POST')
-    $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
-    If ($anow_session.NotSecure -eq $true) {
-        $parameters.Add('NotSecure', $true)
-    }
-    [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
-    $BodyMetaData.'_constructor' = 'AdvancedCriteria'
-    $BodyMetaData.'operator' = 'and'
-    $BodyMetaData.'_startRow' = $startRow
-    $BodyMetaData.'_endRow' = $endRow
-    $BodyMetaData.'_textMatchStyle' = 'substring'
-    $BodyMetaData.'_operationType' = 'fetch'
-    $BodyMetaData.'_componentId' = 'ProcessingList'
-    If ($sortBy.Length -gt 0) {
-        If ($Descending -eq $true) {
-            $BodyMetaData.'_sortBy' = '-' + $sortBy
+    Process {
+        [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+        If (($_.Length -gt 0 -or $Id.Length -gt 0) -and $ItemsOnly -ne $true) {
+            If ( $_.Length -gt 0 ) {
+                [string]$Id = $_
+            }
+            $BodyMetaData.'id' = $Id
+            $BodyMetaData.'_operationId' = 'read'
+            [string]$textMatchStyle = 'exactCase'
         }
         Else {
-            $BodyMetaData.'_sortBy' = $sortBy
+            $BodyMetaData.'_constructor' = 'AdvancedCriteria'
+            $BodyMetaData.'operator' = 'and'
+            $BodyMetaData.'_startRow' = $startRow
+            $BodyMetaData.'_endRow' = $endRow
+            $BodyMetaData.'_operationType' = 'fetch'
+            [string]$componentId = 'ProcessingList'
+            [string]$textMatchStyle = 'substring'
+            If ($sortBy.Length -gt 0) {
+                If ($Descending -eq $true) {
+                    $BodyMetaData.'_sortBy' = '-' + $sortBy
+                }
+                Else {
+                    $BodyMetaData.'_sortBy' = $sortBy
+                }
+            }
+            If ($isProcessing -eq $true) {
+                $BodyMetaData.'criteria1' = '{"fieldName":"isProcessing","operator":"equals","value":true}'
+            }
+            If ($OnlyArchived -eq $true) {
+                $BodyMetaData.'criteria2' = '{"fieldName":"archived","operator":"equals","value":true}'
+            }
+            ElseIf ($IncludeArchived -ne $true) {
+                $BodyMetaData.'criteria2' = '{"fieldName":"archived","operator":"equals","value":false}'
+            }
+            If ($ItemsOnly -eq $true -and $Id -gt 0) {
+                $BodyMetaData.'criteria3' = '{"fieldName":"parent","value":"' + $Id + '","operator":"equals"}'
+                [string]$componentId = 'ProcessingItemList'
+            }
+            If ($Folder.Length -gt 0) {
+                $BodyMetaData.'criteria4' = ('{"fieldName":"folder","operator":"equals","value":"' + $Folder + '"}')
+            }
+            If ($Tags.Count -gt 0) {
+                If ($Tags.Count -gt 1) {
+                    $Error.Clear()
+                    Try {
+                        [string]$TagString = $Tags | ConvertTo-Json -Compress
+                    }
+                    Catch {
+                        [string]$Message = $_.Exception.Message
+                        Write-Warning -Message "ConvertTo-Json failed to convert the provided tag names under Get-AutomateNOWProcessingList due to [$Message]."
+                        Break
+                    }
+                }
+                Else {
+                    [string]$TagString = $Tags
+                }
+                $BodyMetaData.'criteria5' = ('{"fieldName":"tags","operator":"containsAny","value":' + $TagString + '}')
+            }
         }
-    }
-    $BodyMetaData.'criteria1' = '{"fieldName":"isProcessing","operator":"equals","value":true}'
-    If ($OnlyArchived -eq $true) {
-        $BodyMetaData.'criteria2' = '{"fieldName":"archived","operator":"equals","value":true}'
-    }
-    ElseIf ($IncludeArchived -ne $true) {
-        $BodyMetaData.'criteria2' = '{"fieldName":"archived","operator":"equals","value":false}'
-    }
-    If ($Folder.Length -gt 0) {
-        $BodyMetaData.'criteria3' = ('{"fieldName":"folder","operator":"equals","value":"' + $Folder + '"}')
-    }
-    If ($Tags.Count -gt 0) {
-        If ($Tags.Count -gt 1) {
-            $Error.Clear()
-            Try {
-                [string]$TagString = $Tags | ConvertTo-Json -Compress
-            }
-            Catch {
-                [string]$Message = $_.Exception.Message
-                Write-Warning -Message "ConvertTo-Json failed to convert the provided tag names under Get-AutomateNOWProcessingList due to [$Message]."
-                Break
-            }
+        $BodyMetaData.'_componentId' = $componentId
+        $BodyMetaData.'_dataSource' = 'ProcessingDataSource'
+        $BodyMetaData.'_textMatchStyle' = $textMatchStyle
+        $BodyMetaData.'isc_metaDataPrefix' = '_'
+        $BodyMetaData.'isc_dataFormat' = 'json'
+        [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+        If ($null -eq $parameters.Body) {
+            $parameters.Add('Body', $Body)
         }
         Else {
-            [string]$TagString = $Tags
+            $parameters.Body = $Body
         }
-        $BodyMetaData.'criteria4' = ('{"fieldName":"tags","operator":"containsAny","value":' + $TagString + '}')
+        $Error.Clear()
+        Try {
+            [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
+            Break
+        }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 10
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
+        }
+        $Error.Clear()
+        Try {
+            [ANOWProcessing[]]$Processing = $results.response.data
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Failed to parse the response into a series of [ANOWProcessing] objects due to [$Message]."
+            Break
+        }
+        If ($Processing.Count -gt 0) {
+            Return $Processing
+        }
     }
-    $BodyMetaData.'_dataSource' = 'ProcessingDataSource'
-    $BodyMetaData.'isc_metaDataPrefix' = '_'
-    $BodyMetaData.'isc_dataFormat' = 'json'
-    [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
-    If ($null -eq $parameters.Body) {
-        $parameters.Add('Body', $Body)
-    }
-    Else {
-        $parameters.Body = $Body
-    }
-    $Error.Clear()
-    Try {
-        [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
-    }
-    Catch {
-        [string]$Message = $_.Exception.Message
-        Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
-        Break
-    }
-    [int32]$response_code = $results.response.status
-    If ($response_code -ne 0) {
-        [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 10
-        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
-        Break
-    }
-    $Error.Clear()
-    Try {
-        [ANOWProcessing[]]$Processing = $results.response.data
-    }
-    Catch {
-        [string]$Message = $_.Exception.Message
-        Write-Warning -Message "Failed to parse the response into a series of [ANOWProcessing] objects due to [$Message]."
-        Break
-    }
-    If ($Processing.Count -gt 0) {
-        Return $Processing
+    End {
+
     }
 }
 
@@ -38152,7 +42649,6 @@ Function Get-AutomateNOWProcessingFunction {
             $Body.'_startRow' = $startRow
             $Body.'_endRow' = $endRow
             $Body.'_componentId' = 'ProcessingFunctionList'
-            #$Body.'_operationId' = 'readByDomain'
             [string]$textMatchStyle = 'subString'
         }
         $Body.'_operationType' = 'fetch'
@@ -38168,7 +42664,7 @@ Function Get-AutomateNOWProcessingFunction {
         $Body.'isc_dataFormat' = 'json'
         [string]$Body = ConvertTo-QueryString -InputObject $Body
         [string]$command = ('/processingFunction/read?' + $Body)
-        If ($null -eq $parameters.'command') {
+        If ($null -eq $parameters["Command"]) {
             $parameters.Add('command', $command)
         }
         Else {
@@ -38557,7 +43053,7 @@ Function Remove-AutomateNOWProcessingFunction {
         }
         [string]$ProcessingFunction_id = $ProcessingFunction.id
         If ($ProcessingFunction_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ProcessingFunction_id)")) -eq $true) {
@@ -38788,7 +43284,7 @@ Function Copy-AutomateNOWProcessingFunction {
                 $BodyMetaData.'_dataSource' = 'ProcessingFunctionDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
                 $parameters.Body = $Body
                 $Error.Clear()
                 Try {
@@ -39096,7 +43592,7 @@ Function Get-AutomateNOWProcessingState {
         $Body.'isc_dataFormat' = 'json'
         [string]$Body = ConvertTo-QueryString -InputObject $Body
         [string]$command = ('/processingState/read?' + $Body)
-        If ($null -eq $parameters.'command') {
+        If ($null -eq $parameters["Command"]) {
             $parameters.Add('command', $command)
         }
         Else {
@@ -39434,7 +43930,7 @@ Function New-AutomateNOWProcessingState {
         [PSCustomObject]$UpdatedProcessingState = $results.response.data | Select-Object -First 1 | Select-Object -ExcludeProperty parentTemplate, processingTemplate
         $UpdatedProcessingState | Add-Member -MemberType NoteProperty -Name processingTemplate -Value $ProcessingTemplate
         If ( $parentTemplate.id.Length -gt 0 ) {
-            $UpdatedProcessingState = $UpdatedProcessingState | Add-Member -MemberType NoteProperty -Name parentTemplate -Value $parentTemplate
+            [PSCustomObject]$UpdatedProcessingState = $UpdatedProcessingState | Add-Member -MemberType NoteProperty -Name parentTemplate -Value $parentTemplate
         }
         [ANOWProcessingState]$UpdatedProcessingState = $UpdatedProcessingState
     }
@@ -39503,7 +43999,7 @@ Function Remove-AutomateNOWProcessingState {
         }
         [int64]$ProcessingState_id = $ProcessingState.id
         If ($ProcessingState_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ProcessingState_id)")) -eq $true) {
@@ -40200,6 +44696,420 @@ Function Clear-AutomateNOWProcessingStateRegistry {
 
 #endregion
 
+#Region - Processing Template (Menu Specialty)
+
+Function Get-AutomateNOWProcessingTemplate {
+    <#
+    .SYNOPSIS
+    Gets the Processing Templates from an AutomateNOW! instance
+
+    .DESCRIPTION
+    Gets the Processing Templates from an AutomateNOW! instance (this is a "Menu Speciality" function which means it seeks to emulate a specific list from the API user interface)
+
+    .PARAMETER Id
+    Optional string parameter to limit the result to a single result by Id. This parameter cannot be combined with other parameters.
+
+    .PARAMETER sortBy
+    Optional string parameter to sort the results by. Valid choices are: id*, processingType, simpleId, dateCreated, node, outOfSync, keepResourcesOnFailure, onHold, lastUpdated, highRisk, weight, taskType, userIp, createdBy, lazyLoad, passBy, lastUpdatedBy, durationSum, serverNodeType, eagerScriptExecution, passResourceDependenciesToChildren, owner, checkedOut, estimatedDuration, passActionsToChildren
+
+    .PARAMETER Descending
+    Optional switch parameter to sort in descending order
+
+    .PARAMETER startRow
+    Optional integer to indicate the row to start from. This is intended for when you need to paginate the results. Default is 0.
+
+    .PARAMETER endRow
+    Optional integer to indicate the row to stop on. This is intended for when you need to paginate the results. Default is 100. The console default hard limit is 10,000.
+
+    .PARAMETER Folder
+    Optional string to filter by a particular Folder
+
+    .PARAMETER Tags
+    Optional string array of Tags to filter by. Note that the 'containsAny' operator will be used.
+
+    .PARAMETER Workspace
+    Optional string to filter by a particular Workspace
+
+    .OUTPUTS
+    An array of one or more [ANOWProcessing] class objects
+
+    .EXAMPLE
+    Gets the first page of Processing Templates
+
+    Get-AutomateNOWProcessingTemplate
+
+    .EXAMPLE
+    Gets a Processing Template named 'ProcessingTemplate1'
+
+    Get-AutomateNOWProcessingTemplate -Id 'ProcessingTemplate1'
+
+    .EXAMPLE
+    Gets the first 10,000 Processing Templates within a Folder named 'Folder1'
+
+    Get-AutomateNOWProcessingTemplate -startRow 0 -endRow 10000 -Folder 'Folder1'
+
+    .EXAMPLE
+    Gets the first page of Processing Templates within a Workspace named 'Workspace1'
+
+    Get-AutomateNOWProcessingTemplate -Workspace 'Workspace1'
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    This is a "menu specialty" function meaning that its purpose is to mimic one of the UI buttons. This function returns all types of Processing items. You should try to use the respective processing functions (i.e. Get-AutomateNOWTask, GetAutomateNOWWorkflow, Get-AutomateNOWServiceManager, Get-AutomateNOWSchedule) whenever possible.
+
+    Unlike most Get/Read functions, there is no default sort order. The UI probably does this for performance reasons.
+
+    #>
+    [OutputType([ANOWProcessingTemplate[]])]
+    [Cmdletbinding( DefaultParameterSetName = 'Default')]
+    Param(
+        [Parameter(Mandatory = $True, ParameterSetName = 'Id', ValueFromPipeline = $true)]
+        [string]$Id,
+        [ValidateSet('id', 'processingType', 'simpleId', 'dateCreated', 'node', 'outOfSync', 'keepResourcesOnFailure', 'onHold', 'lastUpdated', 'highRisk', 'weight', 'taskType', 'userIp', 'createdBy', 'lazyLoad', 'passBy', 'lastUpdatedBy', 'durationSum', 'serverNodeType', 'eagerScriptExecution', 'passResourceDependenciesToChildren', 'owner', 'checkedOut', 'estimatedDuration', 'passActionsToChildren', ignoreCase = $false)]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [string]$sortBy = 'id',
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [switch]$Descending,
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [int32]$startRow = 0,
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [int32]$endRow = 100,
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [string]$Folder,
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [string[]]$Tags,
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [string]$Workspace
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        If ($endRow -le $startRow) {
+            Write-Warning -Message "The endRow must be greater than the startRow. Please try again."
+            Break
+        }
+        If ($Descending -eq $true -and $sortBy.Length -eq 0) {
+            Write-Warning -Message "You must include the -sortBy parameter when -Descending is used"
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'GET')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+        If ($_.Length -gt 0 -or $Id.Length -gt 0) {
+            If ( $_.Length -gt 0 ) {
+                [string]$Id = $_
+            }
+            $BodyMetaData.'id' = $Id
+            $BodyMetaData.'_operationId' = 'read'
+            [string]$textMatchStyle = 'exactCase'
+        }
+        Else {
+            [string]$componentId = 'ProcessingTemplateList'
+            $BodyMetaData.'_constructor' = 'AdvancedCriteria'
+            $BodyMetaData.'operator' = 'and'
+            $BodyMetaData.'_startRow' = $startRow
+            $BodyMetaData.'_endRow' = $endRow
+            [string]$textMatchStyle = 'substring'
+            If ($sortBy.Length -gt 0) {
+                If ($Descending -eq $true) {
+                    $BodyMetaData.'_sortBy' = '-' + $sortBy
+                }
+                Else {
+                    $BodyMetaData.'_sortBy' = $sortBy
+                }
+            }
+            $BodyMetaData.'criteria1' = '{"fieldName":"processingType","operator":"inSet","value":["TASK","WORKFLOW","SERVICE"]}'
+            If ($Folder.Length -gt 0) {
+                $BodyMetaData.'criteria2' = ('{"fieldName":"folder","operator":"equals","value":"' + $Folder + '"}')
+            }
+            If ($Tags.Count -gt 0) {
+                If ($Tags.Count -gt 1) {
+                    $Error.Clear()
+                    Try {
+                        [string]$TagString = $Tags | ConvertTo-Json -Compress
+                    }
+                    Catch {
+                        [string]$Message = $_.Exception.Message
+                        Write-Warning -Message "ConvertTo-Json failed to convert the provided tag names under Get-AutomateNOWProcessingTemplate due to [$Message]."
+                        Break
+                    }
+                }
+                Else {
+                    [string]$TagString = $Tags
+                }
+                $BodyMetaData.'criteria3' = ('{"fieldName":"tags","operator":"containsAny","value":' + $TagString + '}')
+            }
+            $BodyMetaData.'_componentId' = $componentId
+        }
+        $BodyMetaData.'_textMatchStyle' = $textMatchStyle
+        $BodyMetaData.'_operationType' = 'fetch'
+        $BodyMetaData.'_dataSource' = 'ProcessingTemplateDataSource'
+        $BodyMetaData.'isc_metaDataPrefix' = '_'
+        $BodyMetaData.'isc_dataFormat' = 'json'
+        [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+        [string]$command = ('/processingTemplate/read?' + $Body)
+        If ($null -eq $parameters["Command"]) {
+            $parameters.Add('command', $command)
+        }
+        Else {
+            $parameters.'command' = $command
+        }
+        $Error.Clear()
+        Try {
+            [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
+            Break
+        }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 10
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
+        }
+        $Error.Clear()
+        Try {
+            [ANOWProcessingTemplate[]]$ProcessingTemplates = $results.response.data
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Failed to parse the response into a series of [ANOWProcessingTemplate] objects due to [$Message]."
+            Break
+        }
+        If ($ProcessingTemplates.Count -gt 0) {
+            Return $ProcessingTemplates
+        }
+    }
+    End {
+
+    }
+}
+
+#endregion
+
+#Region - Processing Trigger Logs
+
+Function Get-AutomateNOWProcessingTriggerLog {
+    <#
+    .SYNOPSIS
+    Gets the Processing Trigger Log objects from an AutomateNOW! instance
+
+    .DESCRIPTION
+    Gets the Processing Trigger Log objects from an AutomateNOW! instance
+
+    .PARAMETER Id
+    Optional string of the specific Id of the Processing Trigger Log that you want to retrieve. Note that this parameter is not required and is exclusive from all other parameters.
+
+    .PARAMETER startRow
+    Optional integer to indicate the row to start from. This is intended for when you need to paginate the results. Default is 0.
+
+    .PARAMETER endRow
+    Optional integer to indicate the row to stop on. This is intended for when you need to paginate the results. Default is 100.
+
+    .PARAMETER sortBy
+    Optional string parameter to sort the results by. Valid choices are: 'dateCreated'*, 'id', 'scheduledFireTime', 'schedulerInstanceId', 'triggerId', 'fireInstanceId'
+
+    .PARAMETER Ascending
+    Optional switch parameter to sort in ascending order
+
+    .INPUTS
+    Accepts a string representing the simple id of the Notification Group from the pipeline or individually (but not an array).
+
+    .OUTPUTS
+    An array of one or more [ANOWProcessingTriggerLog] class objects
+
+    .EXAMPLE
+    Gets the first page of Processing Trigger Log objects
+
+    Get-AutomateNOWProcessingTriggerLog
+
+    .EXAMPLE
+    Gets the first 10,000 Processing Trigger Log objects
+
+    Get-AutomateNOWProcessingTriggerLog -startRow 0 -endRow 10000
+
+    .EXAMPLE
+    Gets a single Processing Trigger Log entry by its Id
+
+    Get-AutomateNOWProcessingTriggerLog -Id '1f2c7591-2ece-2b95-aac8-63b51a98ad6a_1761432500000'
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [OutputType([ANOWProcessingTriggerLog[]])]
+    [Cmdletbinding(DefaultParameterSetName = 'Default')]
+    Param(
+        [Parameter(Mandatory = $True, ParameterSetName = 'Id', ValueFromPipeline = $True)]
+        [string]$id,
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [int32]$startRow = 0,
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [int32]$endRow = 100,
+        [ValidateSet('dateCreated', 'id', 'scheduledFireTime', 'schedulerInstanceId', 'triggerId', 'fireInstanceId', ignoreCase = $false)]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [string]$sortBy = 'dateCreated',
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [switch]$Ascending
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'GET')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
+        If ($_.Length -gt 0 ) {
+            [string]$Id = $_
+        }
+        If ($Id.Length -gt 0) {
+            $Body.'id' = $Id
+            $Body.'_operationId' = 'read'
+            [string]$textMatchStyle = 'exactCase'
+        }
+        Else {
+            $Body.'_startRow' = $startRow
+            $Body.'_endRow' = $endRow
+            $Body.'_componentId' = 'ExecuteProcessingTriggerLogList'
+            [string]$textMatchStyle = 'subString'
+        }
+        $Body.'_operationType' = 'fetch'
+        $Body.'_textMatchStyle' = $textMatchStyle
+        $Body.'_dataSource' = 'ExecuteProcessingTriggerLogDataSource'
+        If ($Ascending -ne $true) {
+            $Body.'_sortBy' = '-' + $sortBy
+        }
+        Else {
+            $Body.'_sortBy' = $sortBy
+        }
+        $Body.'isc_metaDataPrefix' = '_'
+        $Body.'isc_dataFormat' = 'json'
+        [string]$Body = ConvertTo-QueryString -InputObject $Body
+        [string]$command = ('/executeProcessingTriggerLog/read?' + $Body)
+        If ($null -eq $parameters["Command"]) {
+            $parameters.Add('command', $command)
+        }
+        Else {
+            $parameters.'command' = $command
+        }
+        $Error.Clear()
+        Try {
+            [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
+            Break
+        }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 10
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
+        }
+        $Error.Clear()
+        Try {
+            [ANOWProcessingTriggerLog[]]$ProcessingTriggerLogs = $results.response.data
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Failed to parse the response into a series of [ANOWProcessingTriggerLog] objects due to [$Message]."
+            Break
+        }
+        If ($ProcessingTriggerLogs.Count -gt 0) {
+            Return $ProcessingTriggerLogs
+        }
+    }
+    End {
+
+    }
+}
+
+Function Export-AutomateNOWProcessingTriggerLog {
+    <#
+    .SYNOPSIS
+    Exports the Processing Trigger Log entries from an instance of AutomateNOW!
+
+    .DESCRIPTION
+    Exports the Processing Trigger Log entries from an instance of AutomateNOW! to a local .csv file
+
+    .PARAMETER ProcessingTriggerLog
+    Mandatory [ANOWProcessingTriggerLog] object (Use Get-AutomateNOWProcessingTriggerLog to retrieve them)
+
+    .INPUTS
+    ONLY [ANOWProcessingTriggerLog] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    The [ANOWProcessingTriggerLog] objects are exported to the local disk in CSV format
+
+    .EXAMPLE
+    Get-AutomateNOWProcessingTriggerLog | Export-AutomateNOWProcessingTriggerLog
+
+    .NOTES
+	You must present [ANOWProcessingTriggerLog] objects to the pipeline to use this function.
+    #>
+
+    [Cmdletbinding(DefaultParameterSetName = 'Pipeline')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true, ParameterSetName = 'Pipeline')]
+        [ANOWProcessingTriggerLog]$ProcessingTriggerLog
+    )
+    Begin {
+        [string]$current_time = Get-Date -Format 'yyyyMMddHHmmssfff'
+        [string]$ExportFileName = 'Export-AutomateNOW-ProcessingTriggerLog-' + $current_time + '.csv'
+        [string]$ExportFilePath = ((Get-Location | Select-Object -ExpandProperty Path) + '\' + $ExportFileName)
+        [hashtable]$parameters = @{}
+        $parameters.Add('Path', $ExportFilePath)
+        $parameters.Add('Append', $true)
+        $parameters.Add('Delimiter', "`t")
+        If ($PSVersionTable.PSVersion.Major -eq 5) {
+            $parameters.Add('NoTypeInformation', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [ANOWProcessingTriggerLog]$ProcessingTriggerLog = $_
+        }
+        $Error.Clear()
+        Try {
+            $ProcessingTriggerLog | Export-CSV @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Export-CSV failed to export the [ANOWProcessingTriggerLog] object on the pipeline due to [$Message]"
+            Break
+        }
+    }
+    End {
+        $Error.Clear()
+        If ((Test-Path -Path $ExportFilePath) -eq $true) {
+            [System.IO.FileInfo]$fileinfo = Get-Item -Path "$ExportFilePath"
+            [int32]$filelength = $fileinfo.Length
+            [string]$filelength_display = "{0:N0}" -f $filelength
+            Write-Information -MessageData "Created file $ExportFileName ($filelength_display bytes)"
+        }
+    }
+}
+
+#endregion
+
 #Region - Referrals
 
 Function Find-AutomateNOWObjectReferral {
@@ -40789,7 +45699,7 @@ Function Read-AutomateNOWResourceAnomaly {
         $BodyMetaData.Add('isc_dataFormat', 'json')
         [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
         [string]$command = ('/resourceAnomaly/read' + '?' + $Body)
-        If ($null -eq $parameters.'Command') {
+        If ($null -eq $parameters["Command"]) {
             $parameters.Add('Command', $command)
         }
         Else {
@@ -41256,7 +46166,7 @@ Function Add-AutomateNOWResourceAnomaly {
 
 #endregion
 
-#Region - Processing List (Menu Specialty)
+#Region - Resource List (Menu Specialty)
 
 Function Get-AutomateNOWResourceList {
     <#
@@ -41265,6 +46175,9 @@ Function Get-AutomateNOWResourceList {
 
     .DESCRIPTION
     Gets the Resource List from an AutomateNOW! instance
+
+    .PARAMETER Id
+    Optional string parameter to limit the result to a single result by Id. This parameter cannot be combined with other parameters.
 
     .PARAMETER sortBy
     Optional string parameter to sort the results by (may not be used with the Id parameter). Valid choices are: 'id'*, 'tags', 'dateCreated', 'lastUpdated', 'createdBy', 'lastUpdatedBy', 'codeRepository'
@@ -41299,107 +46212,127 @@ Function Get-AutomateNOWResourceList {
 
     #>
     [OutputType([ANOWResource[]])]
-    [Cmdletbinding()]
+    [Cmdletbinding( DefaultParameterSetName = 'Default')]
     Param(
+        [Parameter(Mandatory = $True, ParameterSetName = 'Id', ValueFromPipeline = $true)]
+        [string]$Id,
         [ValidateSet('id', 'tags', 'dateCreated', 'lastUpdated', 'createdBy', 'lastUpdatedBy', 'codeRepository')]
-        [Parameter(Mandatory = $False)]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
         [string]$sortBy = 'id',
-        [Parameter(Mandatory = $False)]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
         [switch]$Descending,
-        [Parameter(Mandatory = $False)]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
         [int32]$startRow = 0,
-        [Parameter(Mandatory = $False)]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
         [int32]$endRow = 100,
-        [Parameter(Mandatory = $False)]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
         [string]$Folder,
-        [Parameter(Mandatory = $False)]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
         [string[]]$Tags
     )
-    If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
-        Write-Warning -Message "Somehow there is not a valid token confirmed."
-        Break
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        If ($endRow -le $startRow) {
+            Write-Warning -Message "The endRow must be greater than the startRow. Please try again."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'GET')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
     }
-    If ($endRow -le $startRow) {
-        Write-Warning -Message "The endRow must be greater than the startRow. Please try again."
-        Break
-    }
-    [hashtable]$parameters = @{}
-    $parameters.Add('Method', 'GET')
-    $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
-    If ($anow_session.NotSecure -eq $true) {
-        $parameters.Add('NotSecure', $true)
-    }
-    [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
-    $BodyMetaData.'_constructor' = 'AdvancedCriteria'
-    $BodyMetaData.'operator' = 'and'
-    If ($Folder.Length -gt 0) {
-        $BodyMetaData.'criteria1' = ('{"fieldName":"folder","operator":"equals","value":"' + $Folder + '"}')
-    }
-    If ($Tags.Count -gt 0) {
-        If ($Tags.Count -gt 1) {
-            $Error.Clear()
-            Try {
-                [string]$TagString = $Tags | ConvertTo-Json -Compress
+    Process {
+        [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+        If ($_.Length -gt 0 -or $Id.Length -gt 0) {
+            If ( $_.Length -gt 0 ) {
+                [string]$Id = $_
             }
-            Catch {
-                [string]$Message = $_.Exception.Message
-                Write-Warning -Message "ConvertTo-Json failed to convert the provided tag names under Get-AutomateNOWResourceList due to [$Message]."
-                Break
-            }
+            $BodyMetaData.'id' = $Id
+            $BodyMetaData.'_operationId' = 'read'
+            [string]$textMatchStyle = 'exactCase'
         }
         Else {
-            [string]$TagString = $Tags
+            $BodyMetaData.'_constructor' = 'AdvancedCriteria'
+            $BodyMetaData.'operator' = 'and'
+            [string]$textMatchStyle = 'substring'
+            If ($Folder.Length -gt 0) {
+                $BodyMetaData.'criteria1' = ('{"fieldName":"folder","operator":"equals","value":"' + $Folder + '"}')
+            }
+            If ($Tags.Count -gt 0) {
+                If ($Tags.Count -gt 1) {
+                    $Error.Clear()
+                    Try {
+                        [string]$TagString = $Tags | ConvertTo-Json -Compress
+                    }
+                    Catch {
+                        [string]$Message = $_.Exception.Message
+                        Write-Warning -Message "ConvertTo-Json failed to convert the provided tag names under Get-AutomateNOWResourceList due to [$Message]."
+                        Break
+                    }
+                }
+                Else {
+                    [string]$TagString = $Tags
+                }
+                $BodyMetaData.'criteria2' = ('{"fieldName":"tags","operator":"containsAny","value":' + $TagString + '}')
+            }
+            $BodyMetaData.'_startRow' = $startRow
+            $BodyMetaData.'_endRow' = $endRow
+            If ($Descending -eq $true) {
+                $BodyMetaData.'_sortBy' = '-' + $sortBy
+            }
+            Else {
+                $BodyMetaData.'_sortBy' = $sortBy
+            }
         }
-        $BodyMetaData.'criteria2' = ('{"fieldName":"tags","operator":"containsAny","value":' + $TagString + '}')
+        $BodyMetaData.'_textMatchStyle' = $textMatchStyle
+        $BodyMetaData.'_operationType' = 'fetch'
+        $BodyMetaData.'_componentId' = 'ResourceList'
+        $BodyMetaData.'_dataSource' = 'ResourceDataSource'
+        $BodyMetaData.'isc_metaDataPrefix' = '_'
+        $BodyMetaData.'isc_dataFormat' = 'json'
+        [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+        [string]$command = ('/resource/read' + '?' + $Body)
+        If ($null -eq $parameters["Command"]) {
+            $parameters.Add('Command', $command)
+        }
+        Else {
+            $parameters.'Command' = $command
+        }
+        $Error.Clear()
+        Try {
+            [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
+            Break
+        }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 10
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
+        }
+        $Error.Clear()
+        Try {
+            [ANOWResource[]]$Resources = $results.response.data
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Failed to parse the response into a series of [ANOWResource] objects due to [$Message]."
+            Break
+        }
+        If ($Resources.Count -gt 0) {
+            Return $Resources
+        }
     }
-    $BodyMetaData.'_startRow' = $startRow
-    $BodyMetaData.'_endRow' = $endRow
-    If ($Descending -eq $true) {
-        $BodyMetaData.'_sortBy' = '-' + $sortBy
-    }
-    Else {
-        $BodyMetaData.'_sortBy' = $sortBy
-    }
-    $BodyMetaData.'_textMatchStyle' = 'substring'
-    $BodyMetaData.'_operationType' = 'fetch'
-    $BodyMetaData.'_componentId' = 'ResourceList'
-    $BodyMetaData.'_dataSource' = 'ResourceDataSource'
-    $BodyMetaData.'isc_metaDataPrefix' = '_'
-    $BodyMetaData.'isc_dataFormat' = 'json'
-    [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
-    [string]$command = ('/resource/read' + '?' + $Body)
-    If ($null -eq $parameters.'Command') {
-        $parameters.Add('Command', $command)
-    }
-    Else {
-        $parameters.'Command' = $command
-    }
-    $Error.Clear()
-    Try {
-        [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
-    }
-    Catch {
-        [string]$Message = $_.Exception.Message
-        Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
-        Break
-    }
-    [int32]$response_code = $results.response.status
-    If ($response_code -ne 0) {
-        [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 10
-        Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
-        Break
-    }
-    $Error.Clear()
-    Try {
-        [ANOWResource[]]$Resources = $results.response.data
-    }
-    Catch {
-        [string]$Message = $_.Exception.Message
-        Write-Warning -Message "Failed to parse the response into a series of [ANOWResource] objects due to [$Message]."
-        Break
-    }
-    If ($Resources.Count -gt 0) {
-        Return $Resources
+    End {
+
     }
 }
 
@@ -41794,7 +46727,7 @@ Function New-AutomateNOWResultMapping {
     If ($Folder.Length -gt 0) {
         $Error.Clear()
         Try {
-            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -42065,7 +46998,7 @@ Function Copy-AutomateNOWResultMapping {
                 $BodyMetaData.'_dataSource' = 'ResultMappingDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
                 $parameters.Body = $Body
                 $Error.Clear()
                 Try {
@@ -42325,7 +47258,7 @@ Function Remove-AutomateNOWResultMapping {
         }
         [string]$ResultMapping_id = $ResultMapping.id
         If ($ResultMapping_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ResultMapping_id)")) -eq $true) {
@@ -43357,14 +48290,14 @@ Function Get-AutomateNOWRuntimeAction {
     Get-AutomateNOWRuntimeAction
 
     .EXAMPLE
-    Gets a single Runtime Action by name
+    Gets a single Runtime Action by simpleId
 
     Get-AutomateNOWRuntimeAction -Id 'RuntimeAction1'
 
     .EXAMPLE
-    Gets a series of Runtime Actions from an array of strings sent across the pipeline
+    Gets a series of Runtime Actions from an array of Id's sent across the pipeline
 
-    'RuntimeAction1', 'RuntimeAction2' | Get-AutomateNOWRuntimeAction
+    '823fd7ea-3106-40f7-acd3-f33cdd26b7s1', '4631b806-9d2c-4d8e-b1e4-e1f685c13939' | Get-AutomateNOWRuntimeAction
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
@@ -43379,7 +48312,7 @@ Function Get-AutomateNOWRuntimeAction {
         [Parameter(Mandatory = $False, ParameterSetName = 'Id', ValueFromPipeline = $true)]
         [string]$Id,
         [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
-        [Parameter(Mandatory = $False, ParameterSetName = 'SimpleId', ValueFromPipeline = $true)]
+        [Parameter(Mandatory = $False, ParameterSetName = 'SimpleId')]
         [string]$simpleId,
         [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
         [int32]$startRow = 0,
@@ -43445,7 +48378,12 @@ Function Get-AutomateNOWRuntimeAction {
         $Body.'isc_dataFormat' = 'json'
         [string]$Body = ConvertTo-QueryString -InputObject $Body
         [string]$command = ('/processingAction/read?' + $Body)
-        $parameters.Add('command', $command)
+        If ($null -eq $parameters["Command"]) {
+            $parameters.Add('Command', $command)
+        }
+        Else {
+            $parameters.Command = $command
+        }
         $Error.Clear()
         Try {
             [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
@@ -44120,8 +49058,10 @@ Function Set-AutomateNOWRuntimeAction {
             }
             # 'Apply To' tab
             If ($null -ne $RuntimeAction.ruleDefinition) {
-                $RuntimeAction.ruleDefinition | Get-Member -MemberType NoteProperty | Measure-Object | Select-Object -ExpandProperty Count
-                [PSCustomObject]$OriginalRuleDefinition = $RuntimeAction.ruleDefinition
+                [int32]$definition_count = $RuntimeAction.ruleDefinition | Get-Member -MemberType NoteProperty | Measure-Object | Select-Object -ExpandProperty Count
+                If ($definition_count -gt 0) {
+                    [PSCustomObject]$OriginalRuleDefinition = $RuntimeAction.ruleDefinition
+                }
             }
             Else {
                 [PSCustomObject]$OriginalRuleDefinition = [PSCustomObject]@{}
@@ -44268,7 +49208,7 @@ Function Set-AutomateNOWRuntimeAction {
             ElseIf ($Folder.Length -gt 0) {
                 $Error.Clear()
                 Try {
-                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
                 }
                 Catch {
                     [string]$Message = $_.Exception.Message
@@ -44586,7 +49526,7 @@ Function Remove-AutomateNOWRuntimeAction {
         }
         [string]$RuntimeAction_id = $RuntimeAction.id
         If ($RuntimeAction_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($RuntimeAction_id)")) -eq $true) {
@@ -44828,7 +49768,7 @@ Function Copy-AutomateNOWRuntimeAction {
                 $BodyMetaData.'_dataSource' = 'ProcessingActionDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, simpleId
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, simpleId
                 $parameters.Body = $Body
                 $Error.Clear()
                 Try {
@@ -45293,7 +50233,7 @@ Function Remove-AutomateNOWSchedule {
         }
         [string]$Schedule_id = $Schedule.id
         If ($Schedule_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess($Schedule_id, 'Archive')) -eq $true) {
@@ -45971,121 +50911,9 @@ Function Skip-AutomateNOWSchedule {
     }
 }
 
-Function Wait-AutomateNOWSchedule {
-    <#
-    .SYNOPSIS
-    Waits for a Schedule to complete executing on an AutomateNOW! instance
-
-    .DESCRIPTION
-    Waits for a Schedule to complete executing on an AutomateNOW! instance
-
-    .PARAMETER Schedule
-    An [ANOWSchedule] object representing the Schedule to wait for
-
-    .PARAMETER WaitForExecutionInterval
-    Optional int32 number of times (intervals) to wait for executing. The default value is 60.
-
-    .PARAMETER WaitForExecutionDuration
-    Optional int32 number of seconds to wait for executing between each interval. The default value is 10.
-
-    .PARAMETER Quiet
-    Switch parameter to silence the Write-Progress progress meter that appears by default
-
-    .INPUTS
-    ONLY [ANOWSchedule] objects are accepted (including from the pipeline)
-
-    .OUTPUTS
-    The [ANOWSchedule] will be returned once it is no longer in the EXECUTING state or when the intervals deplete
-
-    .EXAMPLE
-    Waits for a Schedule with the defalut settings
-
-    Get-AutomateNOWSchedule -Id 12345678 | Wait-AutomateNOWSchedule
-
-    .EXAMPLE
-    Starts a Schedule with the default settings and waits for it
-
-    Get-AutomateNOWSchedule -Id 12345678 | Start-AutomateNOWSchedule | Wait-AutomateNOWSchedule
-
-    .EXAMPLE
-    Quietly waits for a Schedule with custom interval and delay time and waits for it
-
-    12345678 | Get-AutomateNOWSchedule | Wait-AutomateNOWSchedule -WaitForExecutionInterval 23 -WaitForExecutionInterval 5 -Quiet
-
-    .NOTES
-    You must use Connect-AutomateNOW to establish the token by way of global variable.
-
-    #>
-    [CmdletBinding()]
-    Param(
-        [ValidateScript({ $_.processingStatus -eq 'EXECUTING' -or $_.processingStatus -eq 'WAITING' })]
-        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
-        [ANOWSchedule]$Schedule,
-        [Parameter(Mandatory = $false)]
-        [int32]$WaitForExecutionInterval = 60,
-        [Parameter(Mandatory = $false)]
-        [int32]$WaitForExecutionDuration = 10,
-        [Parameter(Mandatory = $false)]
-        [switch]$Quiet
-    )
-    Begin {
-        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
-            Write-Warning -Message "Somehow there is not a valid token confirmed."
-            Break
-        }
-    }
-    Process {
-        If ($_.Id.Length -gt 0) {
-            [ANOWSchedule]$Schedule = $_
-        }
-        [int64]$Schedule_Id = $Schedule.Id
-        $Error.Clear()
-        Try {
-            [ANOWSchedule]$Schedule = Get-AutomateNOWSchedule -Id $Schedule_Id
-        }
-        Catch {
-            [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Get-AutomateNOWSchedule failed to retrieve [$Schedule_id] (under Wait-AutomateNOWSchedule) due to [$Message]."
-            Break
-        }
-        If ($Schedule.processingStatus -eq 'EXECUTING' -or $_.processingStatus -eq 'WAITING' ) {
-            [string]$Schedule_Name = $Schedule.Name
-            [int32]$loop = 1
-            While ( ($Schedule.processingStatus -eq 'EXECUTING' -or $_.processingStatus -eq 'WAITING' ) -and ($loop -lt $WaitForExecutionInterval)) {
-                If ($Quiet -ne $true) {
-                    Write-Progress -Activity "Waiting [$WaitForExecutionDuration] seconds for RunId [$Schedule_Id] to complete executing" -Status "Loop $loop of $WaitForExecutionInterval" -CurrentOperation "$Schedule_Name" -PercentComplete ($loop / $WaitForExecutionInterval * 100)
-                }
-                Start-Sleep -Seconds $WaitForExecutionDuration
-                $Error.Clear()
-                Try {
-                    [ANOWSchedule]$Schedule = Get-AutomateNOWSchedule -Id $Schedule_Id
-                }
-                Catch {
-                    [string]$Message = $_.Exception.Message
-                    Write-Warning -Message "Get-AutomateNOWSchedule failed to retrieve [$Schedule_id] (under Wait-AutomateNOWSchedule) due to [$Message]."
-                    Break
-                }
-                $loop++
-            }
-            If ($Quiet -ne $true) {
-                Write-Progress -Activity "Waiting has completed for RunId [$Schedule_Id]" -Status "$WaitForExecutionInterval loops were completed" -Completed
-            }
-            [ANOWProcessing_processingStatus]$Schedule_processingStatus = $Schedule.processingStatus
-            If ($loop -ge $WaitForExecutionInterval -and ($Schedule.processingStatus -eq 'EXECUTING' -or $Schedule.processingStatus -eq 'WAITING')) {
-                Write-Warning -Message "After $WaitForExecutionInterval attempts of $WaitForExecutionDuration seconds each, $Schedule_Id is still in EXECUTING or WAITING status"
-            }
-            Write-Verbose -Message "Returning $Schedule_Id which is in the [$Schedule_processingStatus] status"
-        }
-        Return $Schedule
-    }
-    End {
-
-    }
-}
-
 #endregion
 
-#Region - ScheduleTemplates (PROCESSING_TEMPLATE)
+#Region - Schedule Templates (PROCESSING_TEMPLATE)
 
 Function Get-AutomateNOWScheduleTemplate {
     <#
@@ -46470,7 +51298,7 @@ Function Set-AutomateNOWScheduleTemplate {
             If ($Folder.Length -gt 0) {
                 $Error.Clear()
                 Try {
-                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
                 }
                 Catch {
                     [string]$Message = $_.Exception.Message
@@ -46808,7 +51636,7 @@ Function New-AutomateNOWScheduleTemplate {
     If ($Folder.Length -gt 0) {
         $Error.Clear()
         Try {
-            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -46966,7 +51794,7 @@ Function Remove-AutomateNOWScheduleTemplate {
         }
         [string]$ScheduleTemplate_id = $ScheduleTemplate.id
         If ($ScheduleTemplate_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ScheduleTemplate_id)")) -eq $true) {
@@ -47188,8 +52016,8 @@ Function Copy-AutomateNOWScheduleTemplate {
                 $BodyMetaData.'_dataSource' = 'ProcessingTemplateDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder
-                $Body = $Body -replace '&tags[0-9]{1,}', '&tags'
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder
+                [string]$Body = $Body -replace '&tags[0-9]{1,}', '&tags'
                 $parameters.Body = $Body
                 $Error.Clear()
                 Try {
@@ -47558,7 +52386,7 @@ Function Start-AutomateNOWScheduleTemplate {
         If ($folder.Length -gt 0) {
             $Error.Clear()
             Try {
-                [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+                [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
             }
             Catch {
                 [string]$Message = $_.Exception.Message
@@ -48202,7 +53030,7 @@ Function Read-AutomateNOWScheduleTemplateItem {
         $BodyMetaData.Add('isc_dataFormat', 'json')
         [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
         [string]$command = ('/processingTemplateItem/read' + '?' + $Body)
-        If ($null -eq $parameters.'Command') {
+        If ($null -eq $parameters["Command"]) {
             $parameters.Add('Command', $command)
         }
         Else {
@@ -48227,6 +53055,7 @@ Function Read-AutomateNOWScheduleTemplateItem {
             $Error.Clear()
             Try {
                 [array]$ProcessingTemplateItems = $results.response.data | Where-Object { $_.sortOrder -ge 0 } | ForEach-Object {
+                    $_.workflow = $ScheduleTemplate
                     If ($_.processingType -eq 'TRIGGER' -or $_.parentProcessingType -eq 'TRIGGER') {
                         [ANOWScheduleTemplateItem]$_
                     }
@@ -48535,7 +53364,7 @@ Function Remove-AutomateNOWScheduleTemplateItem {
         }
         [string]$ProcessingTemplateItem_id = $ProcessingTemplateItem.id
         If ($ProcessingTemplateItem_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If ($ProcessingTemplateItem_id -notmatch '^[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}$') {
@@ -48734,7 +53563,7 @@ Function Read-AutomateNOWSecurityAccessToken {
         $BodyMetaData.Add('isc_dataFormat', 'json')
         [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
         [string]$command = ('/securityAccessToken/read' + '?' + $Body)
-        If ($null -eq $parameters.'Command') {
+        If ($null -eq $parameters["Command"]) {
             $parameters.Add('Command', $command)
         }
         Else {
@@ -49297,7 +54126,7 @@ Function Export-AutomateNOWSecurityEventLog {
 
 #endregion
 
-#Region - SecurityRoles
+#Region - Security Roles
 
 Function Get-AutomateNOWSecurityRole {
     <#
@@ -49316,6 +54145,12 @@ Function Get-AutomateNOWSecurityRole {
     .PARAMETER endRow
     Integer to indicate the row to stop on. This is intended for when you need to paginate the results. Default is 100.
 
+    .PARAMETER IncludeInternalRoles
+    Switch parameter that will include roles marked as "internal". Note that these objects are normally omitted by the UI.
+
+    .PARAMETER OnlyInternalRoles
+    Switch parameter that will fetch only roles marked as "internal". Note that these objects are normally omitted by the UI.
+
     .INPUTS
     Accepts a string representing the simple id of the Security Role from the pipeline or individually (but not an array) or you can specify by start and end rows.
 
@@ -49327,8 +54162,16 @@ Function Get-AutomateNOWSecurityRole {
     Get-AutomateNOWSecurityRole
 
     .EXAMPLE
+    Gets the first page of Security Roles with Internal Roles included
+    Get-AutomateNOWSecurityRole -IncludeInternalRoles
+
+    .EXAMPLE
     Gets a specific Security Role by Id
     Get-AutomateNOWSecurityRole -Id 'SecRole1'
+
+    .EXAMPLE
+    Gets the first page of internal Security Roles
+    Get-AutomateNOWSecurityRole -OnlyInternalRoles
 
     .EXAMPLE
     Gets a series of Security Roles using the pipeline
@@ -49336,6 +54179,8 @@ Function Get-AutomateNOWSecurityRole {
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    Internal roles may not be fetched by Id.
 
     #>
     [OutputType([ANOWSecRole[]])]
@@ -49345,9 +54190,17 @@ Function Get-AutomateNOWSecurityRole {
         [Parameter(Mandatory = $False, ParameterSetName = 'Id', ValueFromPipeline = $true)]
         [string]$Id,
         [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $False, ParameterSetName = 'IncludeInternalRoles')]
+        [Parameter(Mandatory = $False, ParameterSetName = 'OnlyInternalRoles')]
         [int32]$startRow = 0,
         [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
-        [int32]$endRow = 100
+        [Parameter(Mandatory = $False, ParameterSetName = 'IncludeInternalRoles')]
+        [Parameter(Mandatory = $False, ParameterSetName = 'OnlyInternalRoles')]
+        [int32]$endRow = 100,
+        [Parameter(Mandatory = $False, ParameterSetName = 'IncludeInternalRoles')]
+        [switch]$IncludeInternalRoles,
+        [Parameter(Mandatory = $False, ParameterSetName = 'OnlyInternalRoles')]
+        [switch]$OnlyInternalRoles
     )
     Begin {
         If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
@@ -49379,8 +54232,13 @@ Function Get-AutomateNOWSecurityRole {
         Else {
             $Body.Add('operator', 'or')
             $Body.Add('_constructor', 'AdvancedCriteria')
-            $Body.Add('criteria1', '{"fieldName":"internalRole","operator":"equals","value":false}')
-            $Body.Add('criteria2', '{"fieldName":"internalRole","operator":"isNull"}')
+            If ( $IncludeInternalRoles -ne $true -and $OnlyInternalRoles -ne $true ) {
+                $Body.Add('criteria1', '{"fieldName":"internalRole","operator":"equals","value":false}')
+                $Body.Add('criteria2', '{"fieldName":"internalRole","operator":"isNull"}')
+            }
+            ElseIf ( $OnlyInternalRoles -eq $true ) {
+                $Body.Add('criteria1', '{"fieldName":"internalRole","operator":"equals","value":true}')
+            }
             $Body.'_startRow' = $startRow
             $Body.'_endRow' = $endRow
             [string]$textMatchStyle = 'exact'
@@ -49704,7 +54562,7 @@ Function Remove-AutomateNOWSecurityRole {
         }
         [string]$SecurityRole_id = $SecurityRole.id
         If ($SecurityRole_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($SecurityRole_id)")) -eq $true) {
@@ -49872,7 +54730,7 @@ Function Copy-AutomateNOWSecurityRole {
                 $BodyMetaData.'_dataSource' = 'SecRoleDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description
                 $parameters.Body = $Body
                 $Error.Clear()
                 Try {
@@ -50295,7 +55153,7 @@ Function Get-AutomateNOWSecUser {
     [Cmdletbinding(DefaultParameterSetName = 'Default')]
     Param(
         [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
-        [Parameter(Mandatory = $true, ParameterSetName = 'SpecificUser')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'SpecificUser', ValueFromPipeline = $true)]
         [string]$Id,
         [Parameter(Mandatory = $true, ParameterSetName = 'LoggedOnUser')]
         [switch]$LoggedOnUser,
@@ -51345,7 +56203,7 @@ Function Remove-AutomateNOWSecUser {
         }
         [string]$User_id = $User.id
         If ($User_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($User_id)")) -eq $true) {
@@ -51531,7 +56389,7 @@ Function Set-AutomateNOWSecUserPassword {
 
 #endregion
 
-#Region - SecUserRoles
+#Region - SecUser Roles
 
 Function Read-AutomateNOWSecurityRoleUser {
     <#
@@ -51651,7 +56509,7 @@ Function Read-AutomateNOWSecurityRoleUser {
         $BodyMetaData.Add('isc_dataFormat', 'json')
         [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
         [string]$command = ('/secUserRole/read' + '?' + $Body)
-        If ($null -eq $parameters.'Command') {
+        If ($null -eq $parameters["Command"]) {
             $parameters.Add('Command', $command)
         }
         Else {
@@ -52770,7 +57628,7 @@ Function New-AutomateNOWSemaphore {
     If ($Folder.Length -gt 0) {
         $Error.Clear()
         Try {
-            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -52929,7 +57787,7 @@ Function Remove-AutomateNOWSemaphore {
         }
         [string]$Semaphore_id = $Semaphore.id
         If ($Semaphore_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Semaphore_id)")) -eq $true) {
@@ -53155,7 +58013,7 @@ Function Copy-AutomateNOWSemaphore {
                 $BodyMetaData.'_dataSource' = 'ResourceDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
                 $parameters.Body = $Body
                 $Error.Clear()
                 Try {
@@ -53350,7 +58208,7 @@ Function Rename-AutomateNOWSemaphore {
 
 #endregion
 
-#Region - SemaphoreTimestamps
+#Region - Semaphore Timestamps
 
 Function Get-AutomateNOWSemaphoreTimestamp {
     <#
@@ -53833,7 +58691,7 @@ Function Export-AutomateNOWSemaphoreTimestamp {
 
 #endregion
 
-#Region - ServerNodes
+#Region - Server Nodes
 
 Function Get-AutomateNOWServerNode {
     <#
@@ -54268,7 +59126,7 @@ Function New-AutomateNOWServerNode {
     If ($Folder.Length -gt 0) {
         $Error.Clear()
         Try {
-            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -54539,7 +59397,7 @@ Function Copy-AutomateNOWServerNode {
                 $BodyMetaData.'_dataSource' = 'ServerNodeDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
                 $parameters.Body = $Body
                 $Error.Clear()
                 Try {
@@ -54643,7 +59501,7 @@ Function Remove-AutomateNOWServerNode {
         }
         [string]$ServerNode_id = $ServerNode.id
         If ($ServerNode_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ServerNode_id)")) -eq $true) {
@@ -55100,112 +59958,6 @@ Function Stop-AutomateNOWServerNode {
             }
             If ($Quiet -ne $true) {
                 Return $ANOWServerNode
-            }
-        }
-    }
-    End {
-
-    }
-}
-
-Function Dismount-AutomateNOWServerNode {
-    <#
-    .SYNOPSIS
-    Dismounts (detaches) a Node from an Agent on an AutomateNOW! instance
-
-    .DESCRIPTION
-    Dismounts (detaches) a Node from an Agent on an AutomateNOW! instance
-
-    .PARAMETER ServerNode
-    An [ANOWServerNode] object representing the Node to be detached from an Agent.
-
-    .PARAMETER Agent
-    An [ANOWAgent] object representing the Agent from which the Node will be dismounted (detached).
-
-    .PARAMETER Quiet
-    Switch parameter to silence the returned [ANOWServerNode] object
-
-    .PARAMETER Force
-    Force the dismounting without confirmation. This is equivalent to -Confirm:$false
-
-    .INPUTS
-    One [ANOWAgent] object must be presented along with at least one [ANOWServerNode] object. Nodes can be sent along the pipeline.
-
-    .OUTPUTS
-    Informational message that the Node was detached from the Agent.
-
-    .EXAMPLE
-
-    .NOTES
-    You must use Connect-AutomateNOW to establish the token by way of global variable.
-
-    #>
-    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
-    Param(
-        [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
-        [ANOWServerNode]$ServerNode,
-        [Parameter(Mandatory = $true)]
-        [ANOWAgent]$Agent,
-        [Parameter(Mandatory = $false)]
-        [switch]$Quiet,
-        [Parameter(Mandatory = $false)]
-        [switch]$Force
-    )
-    Begin {
-        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
-            Write-Warning -Message "Somehow there is not a valid token confirmed."
-            Break
-        }
-        [string]$command = ('/serverNode/deleteAgentNode')
-        [hashtable]$parameters = @{}
-        $parameters.Add('Command', $command)
-        $parameters.Add('Method', 'POST')
-        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
-        If ($anow_session.NotSecure -eq $true) {
-            $parameters.Add('NotSecure', $true)
-        }
-    }
-    Process {
-        If ($_.id.Length -gt 0) {
-            [ANOWServerNode]$ServerNode = $_
-        }
-        [string]$ServerNode_id = $ServerNode.id
-        [string]$Agent_Id = $Agent.Id
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ServerNode_id) from $Agent_Id")) -eq $true) {
-            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
-            $BodyMetaData.Add('agent', $Agent_Id )
-            $BodyMetaData.Add('id', $ServerNode_id )
-            $BodyMetaData.Add('_operationType', 'remove')
-            $BodyMetaData.Add('_operationId', 'deleteAgentNode')
-            $BodyMetaData.Add('_componentId', 'AgentServerNodeList')
-            $BodyMetaData.Add('_textMatchStyle', 'exact')
-            $BodyMetaData.Add('_dataSource', 'ServerNodeDataSource')
-            $BodyMetaData.Add('isc_metaDataPrefix', '_')
-            $BodyMetaData.Add('isc_dataFormat', 'json')
-            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
-            If ($null -eq $parameters.Body) {
-                $parameters.Add('Body', $Body)
-            }
-            Else {
-                $parameters.Body = $Body
-            }
-            $Error.Clear()
-            Try {
-                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
-            }
-            Catch {
-                [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$ServerNode_id] due to [$Message]."
-                Break
-            }
-            [int32]$response_code = $results.response.status
-            If ($response_code -ne 0) {
-                [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 10
-                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
-                Break
-            }
-            If ($Quiet -ne $true) {
-                Write-Information -MessageData "Node $ServerNode_id was dismounted (detached) from $Agent_Id"
             }
         }
     }
@@ -55867,15 +60619,155 @@ Function Pop-AutomateNOWLoadBalancerNode {
 
 #endregion
 
-#Region - ServerNodeEndpoints
+#Region - Server Node Agents
+
+Function Read-AutomateNOWServerNodeAgent {
+    <#
+    .SYNOPSIS
+    Reads the Agents that a Server Node is attached to on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Reads the Agents that a Server Node is attached to on an AutomateNOW! instance
+
+    .PARAMETER ServerNode
+    Mandatory [ANOWServerNode] object. Use Get-AutomateNOWServerNode to get this object.
+
+    .PARAMETER startRow
+    Integer to indicate the row to start from. This is intended for when you need to paginate the results. Default is 0.
+
+    .PARAMETER endRow
+    Integer to indicate the row to stop on. This is intended for when you need to paginate the results. Default is 100.
+
+    .PARAMETER sortBy
+    Optional string parameter to sort the results by (may not be used with the Id parameter). Valid choices are: sortOrder*, lastUpdatedBy, serverNode, endpointType, serverNodeType, defaultEndpoint, lastUpdated, endpoint, dateCreated, createdBy, id
+
+    .PARAMETER Ascending
+    Optional switch parameter which changes the sort order to ascending
+
+    .INPUTS
+    Accepts [ANOWServerNode] objects either individually or from the pipeline.
+
+    .OUTPUTS
+    An array of one or more [ANOWAgent] class objects that the provided [ANOWServerNode] object is attached to
+
+    .EXAMPLE
+    Returns the Agents that a Server Node named 'ServerNode1' is attached to
+
+    Get-AutomateNOWServerNode -Id 'ServerNode1' | Read-AutomateNOWServerNodeAgent
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [OutputType([ANOWAgent[]])]
+    [Cmdletbinding()]
+    Param(
+        [Parameter(Mandatory = $True, ValueFromPipeline = $True)]
+        [ANOWServerNode]$ServerNode,
+        [Parameter(Mandatory = $False)]
+        [int32]$startRow = 0,
+        [Parameter(Mandatory = $False)]
+        [int32]$endRow = 100,
+        [ValidateSet('id', ignoreCase = $false)]
+        [Parameter(Mandatory = $False)]
+        [string]$sortBy = 'sortOrder'
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        If ($endRow -le $startRow) {
+            Write-Warning -Message "The endRow must be greater than the startRow. Please try again."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'GET')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.Id.Length -gt 0) {
+            [ANOWServerNode]$ServerNode = $_
+            [string]$ServerNode_id = $ServerNode.id
+        }
+        If ($ServerNode.Id.Length -gt 0) {
+            [string]$ServerNode_id = $ServerNode.id
+        }
+        [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
+        $Body.Add('id', $ServerNode_id)
+        $Body.Add('_startRow', $startRow)
+        $Body.Add('_endRow', $endRow)
+        If ($Ascending -eq $true) {
+            $Body.'_sortBy' = $sortBy
+        }
+        Else {
+            $Body.'_sortBy' = '-' + $sortBy
+        }
+        $Body.Add('_textMatchStyle', 'exact')
+        $Body.Add('_operationType', 'fetch')
+        $Body.Add('_operationId', 'readServerNodeAgents')
+        $Body.Add('_componentId', 'ServerNodeAgentList')
+        $Body.Add('_dataSource', 'AgentDataSource')
+        $Body.Add('isc_metaDataPrefix', '_')
+        $Body.Add('isc_dataFormat', 'json')
+        [string]$command = '/agent/readServerNodeAgents/?'
+        [string]$Body = ConvertTo-QueryString -InputObject $Body
+        [string]$command = ($command + $Body)
+        If ($null -eq $parameters["Command"]) {
+            $parameters.Add('Command', $command)
+        }
+        Else {
+            $parameters.Command = $command
+        }
+        $Error.Clear()
+        Try {
+            [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
+            Break
+        }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 10
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
+        }
+        If ($results.response.data.count -gt 0) {
+            $Error.Clear()
+            Try {
+                [ANOWAgent[]]$Agents = $results.response.data
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Failed to parse the response into a series of [ANOWAgent] objects due to [$Message]."
+                Break
+            }
+            Return $Agents
+        }
+        Else {
+            Write-Verbose -Message "Server Node $ServerNode_id did not have attachments to any Agents"
+        }
+    }
+    End {
+
+    }
+}
+
+#endregion
+
+#Region - Server Node Endpoints
 
 Function Read-AutomateNOWServerNodeEndpoint {
     <#
     .SYNOPSIS
-    Reads the ServerNowEndpoints from an AutomateNOW! instance
+    Reads the ServerNode Endpoints from an AutomateNOW! instance
 
     .DESCRIPTION
-    Reads the ServerNowEndpoints from an AutomateNOW! instance
+    Reads the ServerNode Endpoints from an AutomateNOW! instance
 
     .PARAMETER ServerNode
     Mandatory [ANOWServerNode] object. Use Get-AutomateNOWServerNode to get this object.
@@ -55921,7 +60813,7 @@ Function Read-AutomateNOWServerNodeEndpoint {
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
 
-    Run this function with the -All parameter to retrieve all of the ServerNowEndpoints. Use with caution.
+    Run this function with the -All parameter to retrieve all of the ServerNode Endpoints. Use with caution.
 
     #>
     [OutputType([ANOWServerNodeEndpoint[]])]
@@ -56037,7 +60929,7 @@ Function Read-AutomateNOWServerNodeEndpoint {
             }
             $Error.Clear()
             Try {
-                [ANOWServerNodeEndpoint[]]$ServerNowEndpoints = ForEach ($result in $results.response.data) {
+                [ANOWServerNodeEndpoint[]]$ServerNodeEndpoints = ForEach ($result in $results.response.data) {
                     If ($result.serverNode -eq $ServerNode_id) {
                         $result.serverNode = $ServerNode
                     }
@@ -56066,8 +60958,8 @@ Function Read-AutomateNOWServerNodeEndpoint {
                 Write-Warning -Message "Failed to parse the response into a series of [ANOWServerNodeEndpoint] objects due to [$Message]."
                 Break
             }
-            If ($ServerNowEndpoints.Count -gt 0) {
-                Return $ServerNowEndpoints
+            If ($ServerNodeEndpoints.Count -gt 0) {
+                Return $ServerNodeEndpoints
             }
             Else {
                 Write-Verbose -Message "There are no endpoints added to ServerNode $ServerNode_id)"
@@ -56308,7 +61200,7 @@ Function Remove-AutomateNOWServerNodeEndpoint {
         }
         [string]$ServerNodeEndpoint_id = $ServerNodeEndpoint.id
         If ($ServerNodeEndpoint_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If ($ServerNodeEndpoint_id -notmatch '^[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}$') {
@@ -56877,7 +61769,7 @@ Function Pop-AutomateNOWServerNodeEndpoint {
 
 #endregion
 
-#Region - ServerNodeGroups
+#Region - ServerNode Groups
 
 Function Get-AutomateNOWServerNodeGroup {
     <#
@@ -57016,7 +61908,12 @@ Function Get-AutomateNOWServerNodeGroup {
         $Body.'isc_dataFormat' = 'json'
         [string]$Body = ConvertTo-QueryString -InputObject $Body
         [string]$command = ('/serverNodeGroup/read?' + $Body)
-        $parameters.Add('command', $command)
+        If ($null -ne $parameters.command) {
+            $parameters.command = $command
+        }
+        Else {
+            $parameters.Add('command', $command)
+        }
         $Error.Clear()
         Try {
             [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
@@ -57223,7 +62120,7 @@ Function Set-AutomateNOWServerNodeGroup {
             If ($Folder.Length -gt 0) {
                 $Error.Clear()
                 Try {
-                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
                 }
                 Catch {
                     [string]$Message = $_.Exception.Message
@@ -57482,7 +62379,7 @@ Function New-AutomateNOWServerNodeGroup {
     If ($Folder.Length -gt 0) {
         $Error.Clear()
         Try {
-            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -57625,7 +62522,7 @@ Function Remove-AutomateNOWServerNodeGroup {
         }
         [string]$ServerNodeGroup_id = $ServerNodeGroup.id
         If ($ServerNodeGroup_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ServerNodeGroup_id)")) -eq $true) {
@@ -57851,7 +62748,7 @@ Function Copy-AutomateNOWServerNodeGroup {
                 $BodyMetaData.'_dataSource' = 'ServerNodeGroupDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
                 $parameters.Body = $Body
                 $Error.Clear()
                 Try {
@@ -58047,7 +62944,7 @@ Function Rename-AutomateNOWServerNodeGroup {
 
 #endregion
 
-#Region - ServerNodeGroupItems
+#Region - ServerNode Group Items
 
 Function Read-AutomateNOWServerNodeGroupItem {
     <#
@@ -58175,7 +63072,7 @@ Function Read-AutomateNOWServerNodeGroupItem {
         $BodyMetaData.Add('isc_dataFormat', 'json')
         [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
         [string]$command = ('/serverNodeGroupItem/read' + '?' + $Body)
-        If ($null -eq $parameters.'Command') {
+        If ($null -eq $parameters["Command"]) {
             $parameters.Add('Command', $command)
         }
         Else {
@@ -58197,8 +63094,12 @@ Function Read-AutomateNOWServerNodeGroupItem {
             Break
         }
         If ($results.response.data.count -gt 0) {
-            [PSCustomObject[]]$temp_results = $results.response.data | Select-Object -ExcludeProperty serverNodeGroup
-            $temp_results | ForEach-Object { $_ | Add-Member -MemberType NoteProperty -Name serverNodeGroup -Value $ServerNodeGroup -TypeName ANOWServerNodeGroup }
+            [PSCustomObject[]]$temp_results = ForEach ($result in $results.response.data) {
+                [PSCustomObject]$result = $result | Select-Object -ExcludeProperty serverNodeGroup
+                $result | Add-Member -MemberType NoteProperty -Name serverNodeGroup -Value $ServerNodeGroup -TypeName ANOWServerNodeGroup -Force
+                $result
+            }
+            $Error.Clear()
             Try {
                 [ANOWServerNodeGroupItem[]]$ServerNodeGroupItems = $temp_results
             }
@@ -58324,7 +63225,7 @@ Function Add-AutomateNOWServerNodeGroupItem {
             $BodyMetaData.'_dataSource' = 'ServerNodeGroupItemDataSource'
             $BodyMetaData.'isc_metaDataPrefix' = '_'
             $BodyMetaData.'isc_dataFormat' = 'json'
-            $Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
             If ($null -eq $parameters.Body) {
                 $parameters.Add('Body', $Body)
             }
@@ -58735,7 +63636,7 @@ Function Pop-AutomateNOWServerNodeGroupItem {
 
 #endregion
 
-#Region - ServiceManagers (PROCESSING)
+#Region - Service Managers (PROCESSING)
 
 Function Get-AutomateNOWServiceManager {
     <#
@@ -59177,7 +64078,7 @@ Function Remove-AutomateNOWServiceManager {
         }
         [int64]$ServiceManager_id = $ServiceManager.id
         If ($ServiceManager_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess($ServiceManager_id, 'Archive')) -eq $true) {
@@ -59862,121 +64763,9 @@ Function Skip-AutomateNOWServiceManager {
     }
 }
 
-Function Wait-AutomateNOWServiceManager {
-    <#
-    .SYNOPSIS
-    Waits for a ServiceManager to complete executing on an AutomateNOW! instance
-
-    .DESCRIPTION
-    Waits for a ServiceManager to complete executing on an AutomateNOW! instance
-
-    .PARAMETER ServiceManager
-    An [ANOWServiceManager] object representing the ServiceManager to wait for
-
-    .PARAMETER WaitForExecutionInterval
-    Optional int32 number of times (intervals) to wait for executing. The default value is 60.
-
-    .PARAMETER WaitForExecutionDuration
-    Optional int32 number of seconds to wait for executing between each interval. The default value is 10.
-
-    .PARAMETER Quiet
-    Switch parameter to silence the Write-Progress progress meter that appears by default
-
-    .INPUTS
-    ONLY [ANOWServiceManager] objects are accepted (including from the pipeline)
-
-    .OUTPUTS
-    The [ANOWServiceManager] will be returned once it is no longer in the EXECUTING state or when the intervals deplete
-
-    .EXAMPLE
-    Waits for a ServiceManager with the defalut settings
-
-    Get-AutomateNOWServiceManager -Id 12345678 | Wait-AutomateNOWServiceManager
-
-    .EXAMPLE
-    Starts a ServiceManager with the default settings and waits for it
-
-    Get-AutomateNOWServiceManager -Id 12345678 | Start-AutomateNOWServiceManager | Wait-AutomateNOWServiceManager
-
-    .EXAMPLE
-    Quietly waits for a ServiceManager with custom interval and delay time and waits for it
-
-    12345678 | Get-AutomateNOWServiceManager | Wait-AutomateNOWServiceManager -WaitForExecutionInterval 23 -WaitForExecutionInterval 5 -Quiet
-
-    .NOTES
-    You must use Connect-AutomateNOW to establish the token by way of global variable.
-
-    #>
-    [CmdletBinding()]
-    Param(
-        [ValidateScript({ $_.processingStatus -eq 'EXECUTING' -or $_.processingStatus -eq 'WAITING' })]
-        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
-        [ANOWServiceManager]$ServiceManager,
-        [Parameter(Mandatory = $false)]
-        [int32]$WaitForExecutionInterval = 60,
-        [Parameter(Mandatory = $false)]
-        [int32]$WaitForExecutionDuration = 10,
-        [Parameter(Mandatory = $false)]
-        [switch]$Quiet
-    )
-    Begin {
-        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
-            Write-Warning -Message "Somehow there is not a valid token confirmed."
-            Break
-        }
-    }
-    Process {
-        If ($_.Id.Length -gt 0) {
-            [ANOWServiceManager]$ServiceManager = $_
-        }
-        [int64]$ServiceManager_Id = $ServiceManager.Id
-        $Error.Clear()
-        Try {
-            [ANOWServiceManager]$ServiceManager = Get-AutomateNOWServiceManager -Id $ServiceManager_Id
-        }
-        Catch {
-            [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Get-AutomateNOWServiceManager failed to retrieve [$ServiceManager_id] (under Wait-AutomateNOWServiceManager) due to [$Message]."
-            Break
-        }
-        If ($ServiceManager.processingStatus -eq 'EXECUTING' -or $ServiceManager.processingStatus -eq 'WAITING') {
-            [string]$ServiceManager_Name = $ServiceManager.Name
-            [int32]$loop = 1
-            While ( ($ServiceManager.processingStatus -eq 'EXECUTING' -or $ServiceManager.processingStatus -eq 'WAITING') -and ($loop -lt $WaitForExecutionInterval)) {
-                If ($Quiet -ne $true) {
-                    Write-Progress -Activity "Waiting [$WaitForExecutionDuration] seconds for RunId [$ServiceManager_Id] to complete executing" -Status "Loop $loop of $WaitForExecutionInterval" -CurrentOperation "$ServiceManager_Name" -PercentComplete ($loop / $WaitForExecutionInterval * 100)
-                }
-                Start-Sleep -Seconds $WaitForExecutionDuration
-                $Error.Clear()
-                Try {
-                    [ANOWServiceManager]$ServiceManager = Get-AutomateNOWServiceManager -Id $ServiceManager_Id
-                }
-                Catch {
-                    [string]$Message = $_.Exception.Message
-                    Write-Warning -Message "Get-AutomateNOWServiceManager failed to retrieve [$ServiceManager_id] (under Wait-AutomateNOWServiceManager) due to [$Message]."
-                    Break
-                }
-                $loop++
-            }
-            If ($Quiet -ne $true) {
-                Write-Progress -Activity "Waiting has completed for RunId [$ServiceManager_Id]" -Status "$WaitForExecutionInterval loops were completed" -Completed
-            }
-            [ANOWProcessing_processingStatus]$ServiceManager_processingStatus = $ServiceManager.processingStatus
-            If ($loop -ge $WaitForExecutionInterval -and ($ServiceManager.processingStatus -eq 'EXECUTING' -or $ServiceManager.processingStatus -eq 'WAITING')) {
-                Write-Warning -Message "After $WaitForExecutionInterval attempts of $WaitForExecutionDuration seconds each, $ServiceManager_Id is still in EXECUTING status"
-            }
-            Write-Verbose -Message "Returning $ServiceManager_Id which is in the [$ServiceManager_processingStatus] status"
-        }
-        Return $ServiceManager
-    }
-    End {
-
-    }
-}
-
 #endregion
 
-#Region - ServiceManagerTemplates (PROCESSING_TEMPLATE)
+#Region - Service ManagerTemplates (PROCESSING_TEMPLATE)
 
 Function Get-AutomateNOWServiceManagerTemplate {
     <#
@@ -60476,7 +65265,7 @@ Function Set-AutomateNOWServiceManagerTemplate {
             If ($Folder.Length -gt 0) {
                 $Error.Clear()
                 Try {
-                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
                 }
                 Catch {
                     [string]$Message = $_.Exception.Message
@@ -60960,7 +65749,7 @@ Function New-AutomateNOWServiceManagerTemplate {
     If ($Folder.Length -gt 0) {
         $Error.Clear()
         Try {
-            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -61143,7 +65932,7 @@ Function Remove-AutomateNOWServiceManagerTemplate {
         }
         [string]$ServiceManagerTemplate_id = $ServiceManagerTemplate.id
         If ($ServiceManagerTemplate_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ServiceManagerTemplate_id)")) -eq $true) {
@@ -61365,7 +66154,7 @@ Function Copy-AutomateNOWServiceManagerTemplate {
                 $BodyMetaData.'_dataSource' = 'ProcessingTemplateDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData #-IncludeProperties oldId, domain, NewId, description, folder
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData #-IncludeProperties oldId, domain, NewId, description, folder
                 $Body = $Body -replace '&tags[0-9]{1,}', '&tags'
                 $parameters.Body = $Body
                 $Error.Clear()
@@ -61744,7 +66533,7 @@ Function Start-AutomateNOWServiceManagerTemplate {
         If ($folder.Length -gt 0) {
             $Error.Clear()
             Try {
-                [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+                [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
             }
             Catch {
                 [string]$Message = $_.Exception.Message
@@ -62405,7 +67194,7 @@ Function Read-AutomateNOWServiceManagerTemplateItem {
         $BodyMetaData.Add('isc_dataFormat', 'json')
         [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
         [string]$command = ('/processingTemplateItem/read' + '?' + $Body)
-        If ($null -eq $parameters.'Command') {
+        If ($null -eq $parameters["Command"]) {
             $parameters.Add('Command', $command)
         }
         Else {
@@ -62691,7 +67480,7 @@ Function Remove-AutomateNOWServiceManagerTemplateItem {
         }
         [string]$ProcessingTemplateItem_id = $ProcessingTemplateItem.id
         If ($ProcessingTemplateItem_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If ($ProcessingTemplateItem_id -notmatch '^[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}$') {
@@ -63413,7 +68202,7 @@ Function New-AutomateNOWStock {
     If ($Folder.Length -gt 0) {
         $Error.Clear()
         Try {
-            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -63567,7 +68356,7 @@ Function Remove-AutomateNOWStock {
         }
         [string]$Stock_id = $Stock.id
         If ($Stock_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Stock_id)")) -eq $true) {
@@ -63793,7 +68582,7 @@ Function Copy-AutomateNOWStock {
                 $BodyMetaData.'_dataSource' = 'ResourceDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
                 $parameters.Body = $Body
                 $Error.Clear()
                 Try {
@@ -64463,7 +69252,7 @@ Function Remove-AutomateNOWTask {
         }
         [string]$Task_id = $Task.id
         If ($Task_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess($Task_id, 'Archive')) -eq $true) {
@@ -65148,118 +69937,6 @@ Function Skip-AutomateNOWTask {
     }
 }
 
-Function Wait-AutomateNOWTask {
-    <#
-    .SYNOPSIS
-    Waits for a Task to complete executing on an AutomateNOW! instance
-
-    .DESCRIPTION
-    Waits for a Task to complete executing on an AutomateNOW! instance
-
-    .PARAMETER Task
-    An [ANOWTask] object representing the Task to wait for
-
-    .PARAMETER WaitForExecutionInterval
-    Optional int32 number of times (intervals) to wait for executing. The default value is 60.
-
-    .PARAMETER WaitForExecutionDuration
-    Optional int32 number of seconds to wait for executing between each interval. The default value is 10.
-
-    .PARAMETER Quiet
-    Switch parameter to silence the Write-Progress progress meter that appears by default
-
-    .INPUTS
-    ONLY [ANOWTask] objects are accepted (including from the pipeline)
-
-    .OUTPUTS
-    The [ANOWTask] will be returned once it is no longer in the EXECUTING state or when the intervals deplete
-
-    .EXAMPLE
-    Waits for a Task with the defalut settings
-
-    Get-AutomateNOWTask -Id 12345678 | Wait-AutomateNOWTask
-
-    .EXAMPLE
-    Starts a Task with the default settings and waits for it
-
-    Get-AutomateNOWTask -Id 12345678 | Start-AutomateNOWTask | Wait-AutomateNOWTask
-
-    .EXAMPLE
-    Quietly waits for a Task with custom interval and delay time and waits for it
-
-    12345678 | Get-AutomateNOWTask | Wait-AutomateNOWTask -WaitForExecutionInterval 23 -WaitForExecutionInterval 5 -Quiet
-
-    .NOTES
-    You must use Connect-AutomateNOW to establish the token by way of global variable.
-
-    #>
-    [CmdletBinding()]
-    Param(
-        [ValidateScript({ $_.processingStatus -eq 'EXECUTING' -or $_.processingStatus -eq 'WAITING' })]
-        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
-        [ANOWTask]$Task,
-        [Parameter(Mandatory = $false)]
-        [int32]$WaitForExecutionInterval = 60,
-        [Parameter(Mandatory = $false)]
-        [int32]$WaitForExecutionDuration = 10,
-        [Parameter(Mandatory = $false)]
-        [switch]$Quiet
-    )
-    Begin {
-        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
-            Write-Warning -Message "Somehow there is not a valid token confirmed."
-            Break
-        }
-    }
-    Process {
-        If ($_.Id.Length -gt 0) {
-            [ANOWTask]$Task = $_
-        }
-        [int64]$Task_Id = $Task.Id
-        $Error.Clear()
-        Try {
-            [ANOWTask]$Task = Get-AutomateNOWTask -Id $Task_Id
-        }
-        Catch {
-            [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Get-AutomateNOWTask failed to retrieve [$Task_id] (under Wait-AutomateNOWTask) due to [$Message]."
-            Break
-        }
-        If ($Task.processingStatus -eq 'EXECUTING' -or $Task.processingStatus -eq 'WAITING') {
-            [string]$Task_Name = $Task.Name
-            [int32]$loop = 1
-            While ( ($Task.processingStatus -eq 'EXECUTING' -or $Task.processingStatus -eq 'WAITING') -and ($loop -lt $WaitForExecutionInterval)) {
-                If ($Quiet -ne $true) {
-                    Write-Progress -Activity "Waiting [$WaitForExecutionDuration] seconds for RunId [$Task_Id] to complete executing" -Status "Loop $loop of $WaitForExecutionInterval" -CurrentOperation "$Task_Name" -PercentComplete ($loop / $WaitForExecutionInterval * 100)
-                }
-                Start-Sleep -Seconds $WaitForExecutionDuration
-                $Error.Clear()
-                Try {
-                    [ANOWTask]$Task = Get-AutomateNOWTask -Id $Task_Id
-                }
-                Catch {
-                    [string]$Message = $_.Exception.Message
-                    Write-Warning -Message "Get-AutomateNOWTask failed to retrieve [$Task_id] (under Wait-AutomateNOWTask) due to [$Message]."
-                    Break
-                }
-                $loop++
-            }
-            If ($Quiet -ne $true) {
-                Write-Progress -Activity "Waiting has completed for RunId [$Task_Id]" -Status "$WaitForExecutionInterval loops were completed" -Completed
-            }
-            [ANOWProcessing_processingStatus]$Task_processingStatus = $Task.processingStatus
-            If ($loop -ge $WaitForExecutionInterval -and ($Task.processingStatus -eq 'EXECUTING' -or $Task.processingStatus -eq 'WAITING')) {
-                Write-Warning -Message "After $WaitForExecutionInterval attempts of $WaitForExecutionDuration seconds each, $Task_Id is still in EXECUTING status"
-            }
-            Write-Verbose -Message "Returning $Task_Id which is in the [$Task_processingStatus] status"
-        }
-        Return $Task
-    }
-    End {
-
-    }
-}
-
 #endregion
 
 #Region - Tags
@@ -65359,7 +70036,7 @@ Function Get-AutomateNOWTag {
             [string]$command = '/tag/read?'
         }
         [string]$command = ($command + $Body)
-        If ($null -eq $parameters.Command) {
+        If ($null -eq $parameters["Command"]) {
             $parameters.Add('Command', $command)
         }
         Else {
@@ -65418,13 +70095,19 @@ Function Set-AutomateNOWTag {
     The name of the icon library (if you choose to use one). Possible choices are: FAT_COW, FUGUE and FONT_AWESOME.
 
     .PARAMETER iconCode
-    The name of the icon which matches the chosen library.
+    The name of the icon which matches the chosen library. Must be lower-case.
 
     .PARAMETER textColor
     The RGB in hex of the tag's foreground (text) color. You must include the # character and it is case sensitive. Example: #FF00FF
 
     .PARAMETER backgroundColor
     The RGB in hex of the tag's background color. You must include the # character and it is case sensitive. Example: #00FF00
+
+    .PARAMETER CodeRepository
+    Optional [ANOWCodeRepository] object to place the Tag into.
+
+    .PARAMETER UnsetCodeRepository
+    A switch parameter that will remove the Tag from its current code repository.
 
     .PARAMETER Force
     Force the change without confirmation. This is equivalent to -Confirm:$false
@@ -65455,6 +70138,7 @@ Function Set-AutomateNOWTag {
         [string]$Description,
         [Parameter(Mandatory = $true, ParameterSetName = 'WithIcon')]
         [ANOWIcon_iconSet]$iconSet,
+        [ValidateScript({ $_ -match '^[a-z0-9-_]{1,}$' })]
         [Parameter(Mandatory = $true, ParameterSetName = 'WithIcon')]
         [string]$iconCode,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default', HelpMessage = "Enter a hexadecimal RGB (#FF0000) or the word transparent in lower case")]
@@ -65465,6 +70149,10 @@ Function Set-AutomateNOWTag {
         [Parameter(Mandatory = $false, ParameterSetName = 'WithIcon', HelpMessage = "Enter a hexadecimal RGB (#FF0000) or the word transparent in lower case")]
         [ValidateScript( { $_ -cmatch '^#[0-9A-F]{6}$' -or $_ -cmatch '^transparent$' } ) ]
         [string]$backgroundColor = '#FF0000',
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
+        [ANOWCodeRepository]$CodeRepository,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
+        [switch]$UnsetCodeRepository,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [Parameter(Mandatory = $false, ParameterSetName = 'WithIcon')]
         [switch]$Force,
@@ -65520,11 +70208,12 @@ Function Set-AutomateNOWTag {
             Else {
                 $BodyMetaData.'description' = $Tag.description
             }
-            If ($codeRepository.Length -gt 0) {
-                $BodyMetaData.'codeRepository' = $codeRepository
+            If ($CodeRepository.Id.Length -gt 0) {
+                [string]$CodeRepository_Id = $CodeRepository.Id
+                $BodyMetaData.'codeRepository' = $CodeRepository_Id
             }
-            Else {
-                $BodyMetaData.'codeRepository' = $Tag.codeRepository
+            ElseIf ($UnsetCodeRepository -eq $true) {
+                $BodyMetaData.'codeRepository' = $null
             }
             If ($textColor.Length -gt 0) {
                 $BodyMetaData.'textColor' = $textColor
@@ -65681,7 +70370,7 @@ Function New-AutomateNOWTag {
     The name of the icon library (if you choose to use one). Possible choices are: FAT_COW, FUGUE and FONT_AWESOME.
 
     .PARAMETER iconCode
-    The name of the icon which matches the chosen library.
+    The name of the icon which matches the chosen library. Must be lower-case.
 
     .PARAMETER textColor
     The RGB in hex of the tag's foreground (text) color. You must include the # character and it is case sensitive. Example: #FF00FF
@@ -65727,6 +70416,7 @@ Function New-AutomateNOWTag {
         [string]$Description,
         [Parameter(Mandatory = $true, ParameterSetName = 'WithIcon')]
         [ANOWIcon_iconSet]$iconSet,
+        [ValidateScript({ $_ -match '^[a-z0-9-_]{1,}$' })]
         [Parameter(Mandatory = $true, ParameterSetName = 'WithIcon')]
         [string]$iconCode,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
@@ -65916,7 +70606,7 @@ Function Remove-AutomateNOWTag {
         }
         [string]$tag_id = $Tag.id
         If ($tag_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($tag_id)")) -eq $true) {
@@ -66055,7 +70745,7 @@ Function Copy-AutomateNOWTag {
                 $BodyMetaData.'_dataSource' = 'TagDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
                 $parameters.Body = $Body
                 $Error.Clear()
                 Try {
@@ -66098,7 +70788,7 @@ Function Copy-AutomateNOWTag {
 
 #endregion
 
-#Region - TaskTemplates (PROCESSING_TEMPLATE)
+#Region - Task Templates (PROCESSING_TEMPLATE)
 
 Function Get-AutomateNOWTaskTemplate {
     <#
@@ -66121,7 +70811,7 @@ Function Get-AutomateNOWTaskTemplate {
     Optional string representing the type of sensor to return. For example, a file sensor is FILE_SENSOR. This parameter cannot be combined with -monitorType or -taskType.
 
     .PARAMETER sortBy
-    Optional string parameter to sort the results by. Valid choices are: id, processingType, simpleId, dateCreated, node, outOfSync, keepResourcesOnFailure, onHold, lastUpdated, highRisk, weight, taskType, userIp, createdBy, lazyLoad, passBy, lastUpdatedBy, durationSum, serverNodeType, eagerScriptExecution, passResourceDependenciesToChildren, owner, checkedOut, estimatedDuration, passActionsToChildren. Defaults to id.
+    Optional string parameter to sort the results by. Valid choices are: id*, processingType, simpleId, dateCreated, node, outOfSync, keepResourcesOnFailure, onHold, lastUpdated, highRisk, weight, taskType, userIp, createdBy, lazyLoad, passBy, lastUpdatedBy, durationSum, serverNodeType, eagerScriptExecution, passResourceDependenciesToChildren, owner, checkedOut, estimatedDuration, passActionsToChildren
 
     .PARAMETER Descending
     Optional switch parameter to sort in descending order
@@ -66291,7 +70981,7 @@ Function Get-AutomateNOWTaskTemplate {
                 }
             }
             If ($Folder.Length -gt 0) {
-                If ($null -eq (Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000)) {
+                If ($null -eq (Get-AutomateNOWFolder -Id $Folder)) {
                     Write-Warning -Message "The folder [$Folder] does not appear to exist. Please only use existing Folders when filtering."
                     Break
                 }
@@ -66392,6 +71082,12 @@ Function Set-AutomateNOWTaskTemplate {
 
     .PARAMETER UnsetTags
     A switch parameter that will remove the Tags from the Task Template
+
+    .PARAMETER CodeRepository
+    Optional [ANOWCodeRepository] object to place the Data Source into.
+
+    .PARAMETER UnsetCodeRepository
+    A switch parameter that will remove the Data Source from its current code repository.
 
     .PARAMETER Title
     A string representing the "alias" of the Task Template (this property needs a better explanation)
@@ -66547,6 +71243,10 @@ Function Set-AutomateNOWTaskTemplate {
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [switch]$UnsetTags,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
+        [ANOWCodeRepository]$CodeRepository,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
+        [switch]$UnsetCodeRepository,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [string]$Title,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [switch]$UnsetTitle,
@@ -66650,6 +71350,10 @@ Function Set-AutomateNOWTaskTemplate {
         If ($Tags.count -gt 0 -and $UnsetTags -eq $true) {
             Write-Warning -Message "You cannot set the tags and unset them at the same time. Please choose one or the other."
         }
+        If ($UnsetCodeRepository -eq $true -and $CodeRepository.Id.Length -gt 0) {
+            Write-Warning -Message "You cannot set the Code Repository and unset it at the same time. Please choose one or the other."
+            Exit
+        }
         If ($UnsetEndpoint -eq $true -and $Endpoint.id.Length -gt 0) {
             Write-Warning -Message "You cannot set the Endpoint and unset it at the same time. Please choose one or the other."
             Exit
@@ -66708,7 +71412,7 @@ Function Set-AutomateNOWTaskTemplate {
             If ($Folder.Length -gt 0) {
                 $Error.Clear()
                 Try {
-                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
                 }
                 Catch {
                     [string]$Message = $_.Exception.Message
@@ -66765,6 +71469,13 @@ Function Set-AutomateNOWTaskTemplate {
                 Write-Verbose -Message "Removing tags [$tags_display] from [$TaskTemplate_id]"
                 $BodyMetaData.'tags' = $null
                 $include_properties += 'tags'
+            }
+            If ($CodeRepository.Id.Length -gt 0) {
+                [string]$CodeRepository_Id = $CodeRepository.Id
+                $BodyMetaData.'codeRepository' = $CodeRepository_Id
+            }
+            ElseIf ($UnsetCodeRepository -eq $true) {
+                $BodyMetaData.'codeRepository' = $null
             }
             If ($Title.Length -gt 0) {
                 $BodyMetaData.'title' = $Title
@@ -67292,7 +72003,6 @@ Function New-AutomateNOWTaskTemplate {
         Else {
             [string]$TaskType = $TaskType
             [string[]]$ValidServerNodeTypes = Resolve-AutomateNOWTaskType2ServerNodeType -TaskType $TaskType
-            $BodyMetaData.Add('taskType', $TaskType)
         }
         $BodyMetaData.Add('taskType', $TaskType)
     }
@@ -67348,7 +72058,7 @@ Function New-AutomateNOWTaskTemplate {
     If ($Folder.Length -gt 0) {
         $Error.Clear()
         Try {
-            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -67530,7 +72240,7 @@ Function Remove-AutomateNOWTaskTemplate {
         }
         [string]$TaskTemplate_id = $TaskTemplate.id
         If ($TaskTemplate_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($TaskTemplate_id)")) -eq $true) {
@@ -67750,7 +72460,7 @@ Function Copy-AutomateNOWTaskTemplate {
                 $BodyMetaData.'_dataSource' = 'ProcessingTemplateDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder
                 $Body = $Body -replace '&tags[0-9]{1,}', '&tags'
                 $parameters.Body = $Body
                 $Error.Clear()
@@ -68130,7 +72840,7 @@ Function Start-AutomateNOWTaskTemplate {
         If ($folder.Length -gt 0) {
             $Error.Clear()
             Try {
-                [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+                [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
             }
             Catch {
                 [string]$Message = $_.Exception.Message
@@ -68719,6 +73429,9 @@ Function Show-AutomateNOWTaskTemplateType {
     .DESCRIPTION
     Shows all of the available task types for AutomateNOW! in human readable format (this was statically coded and will become outdated!)
 
+    .PARAMETER JustGiveMeTheJSON
+    Switch parameter that returns only the base unformatted JSON without the formatting.
+
     .INPUTS
     None. You cannot pipe objects to Show-AutomateNOWTaskType.
 
@@ -68731,16 +73444,22 @@ Function Show-AutomateNOWTaskTemplateType {
     .NOTES
     This is a stand-alone function which does not require connectivity to the AutomateNOW! console
 
-    There are no parameters yet for this function
     #>
-    [PSCustomObject]$TaskTypesJson = '[{"processingType":"TASK","id":"TASK","name":"Task","icon":"skin/service.png","folder":true},{"folder":true,"id":"CODE","icon":"skin/terminal.gif","name":"Code","parent":"TASK"},{"id":"FILE_PROCESSING","name":"File Processing","icon":"skin/drive-network.png","folder":true,"processingType":"TASK","parent":"TASK"},{"folder":true,"id":"SQL","icon":"skin/database-sql.png","name":"SQL Database","parent":"TASK"},{"folder":true,"id":"NO_SQL","icon":"skin/database-gear.png","name":"NoSQL Database","parent":"TASK"},{"folder":true,"id":"MESSAGE_QUEUE","icon":"skin/queue.png","name":"Message Queue","parent":"TASK"},{"processingType":"TASK","taskType":"SH","id":"SH","icon":"skin/terminal.gif","name":"Shell Task","parent":"CODE"},{"processingType":"TASK","taskType":"AE_SHELL_SCRIPT","id":"AE_SHELL_SCRIPT","icon":"skin/terminal.gif","name":"AE Shell Task","parent":"CODE"},{"processingType":"TASK","taskType":"PYTHON","id":"PYTHON","icon":"skin/python.png","name":"Python Task","parent":"CODE"},{"processingType":"TASK","taskType":"PERL","id":"PERL","icon":"skin/perl.png","name":"Perl Task","parent":"CODE"},{"processingType":"TASK","taskType":"RUBY","id":"RUBY","icon":"skin/ruby.png","name":"Ruby Task","parent":"CODE"},{"processingType":"TASK","taskType":"GROOVY","id":"GROOVY","icon":"skin/groovy.png","name":"Groovy Task","parent":"CODE"},{"processingType":"TASK","taskType":"POWERSHELL","id":"POWERSHELL","icon":"skin/powershell.png","name":"PowerShell Task","parent":"CODE"},{"processingType":"TASK","id":"JAVA","taskType":"JAVA","name":"Java Task","icon":"skin/java.png","parent":"CODE"},{"processingType":"TASK","id":"SCALA","taskType":"SCALA","name":"Scala Task","icon":"skin/scala.png","parent":"CODE"},{"folder":true,"id":"Z_OS","icon":"skin/zos.png","name":"z/OS","parent":"IBM_SERIES"},{"processingType":"TASK","taskType":"Z_OS_DYNAMIC_JCL","id":"Z_OS_DYNAMIC_JCL","icon":"skin/zos.png","name":"z/OS Dynamic JCL","parent":"Z_OS"},{"processingType":"TASK","taskType":"Z_OS_STORED_JCL","id":"Z_OS_STORED_JCL","icon":"skin/zos.png","name":"z/OS Stored JCL","parent":"Z_OS"},{"processingType":"TASK","taskType":"Z_OS_COMMAND","id":"Z_OS_COMMAND","icon":"skin/zos.png","name":"z/OS Command","parent":"Z_OS"},{"folder":true,"id":"AS_400","icon":"skin/ibm_as400.gif","name":"AS/400","parent":"IBM_SERIES"},{"processingType":"TASK","taskType":"AS400_BATCH_JOB","id":"AS400_BATCH_JOB","icon":"skin/ibm_as400.gif","name":"AS/400 Batch Job","parent":"AS_400"},{"processingType":"TASK","taskType":"AS400_PROGRAM_CALL","id":"AS400_PROGRAM_CALL","icon":"skin/ibm_as400.gif","name":"AS/400 Program Call","parent":"AS_400"},{"folder":true,"id":"RAINCODE_JCL","icon":"skin/raincode.ico","name":"Raincode JCL","parent":"IBM_SERIES"},{"processingType":"TASK","taskType":"RAINCODE_DYNAMIC_JCL","id":"RAINCODE_DYNAMIC_JCL","icon":"skin/raincode.ico","name":"Raincode Dynamic JCL","parent":"RAINCODE_JCL"},{"processingType":"TASK","taskType":"RAINCODE_STORED_JCL","id":"RAINCODE_STORED_JCL","icon":"skin/raincode.ico","name":"Raincode Stored JCL","parent":"RAINCODE_JCL"},{"folder":true,"id":"OPENTEXT","icon":"skin/microfocus.png","name":"OpenText JCL","parent":"IBM_SERIES"},{"processingType":"TASK","taskType":"OPENTEXT_DYNAMIC_JCL","id":"OPENTEXT_DYNAMIC_JCL","icon":"skin/microfocus.png","name":"OpenText Dynamic JCL","parent":"OPENTEXT"},{"processingType":"TASK","taskType":"OPENTEXT_STORED_JCL","id":"OPENTEXT_STORED_JCL","icon":"skin/microfocus.png","name":"OpenText Stored JCL","parent":"OPENTEXT"},{"processingType":"TASK","taskType":"RDBMS_STORED_PROCEDURE","id":"RDBMS_STORED_PROCEDURE","icon":"skin/database-gear.png","name":"Stored Procedure Call","parent":"SQL"},{"processingType":"TASK","taskType":"RDBMS_SQL_STATEMENT","id":"RDBMS_SQL_STATEMENT","icon":"skin/database_search.png","name":"RDBMS SQL Statement","parent":"SQL"},{"processingType":"TASK","taskType":"RDBMS_SQL","id":"RDBMS_SQL","icon":"skin/database-sql.png","name":"SQL Script","parent":"SQL"},{"folder":true,"id":"BIG_DATA","icon":"skin/database-gear.png","name":"Big Data","parent":"TASK"},{"folder":true,"id":"REDIS","icon":"skin/redis.png","name":"Redis","parent":"NO_SQL"},{"processingType":"TASK","taskType":"REDIS_SET","id":"REDIS_SET","icon":"skin/redis.png","name":"Redis Set","parent":"REDIS"},{"processingType":"TASK","taskType":"REDIS_GET","id":"REDIS_GET","icon":"skin/redis.png","name":"Redis Get","parent":"REDIS"},{"processingType":"TASK","taskType":"REDIS_DELETE","id":"REDIS_DELETE","icon":"skin/redis.png","name":"Redis Delete","parent":"REDIS"},{"processingType":"TASK","taskType":"REDIS_CLI","id":"REDIS_CLI","icon":"skin/redis.png","name":"Redis Command","parent":"REDIS"},{"processingType":"TASK","id":"HDFS","name":"HDFS","icon":"skin/hadoop.png","parent":"BIG_DATA","folder":true},{"processingType":"TASK","id":"HDFS_UPLOAD_FILE","taskType":"HDFS_UPLOAD_FILE","name":"HDFS Upload File","icon":"skin/hadoop.png","parent":"HDFS"},{"processingType":"TASK","id":"HDFS_APPEND_FILE","taskType":"HDFS_APPEND_FILE","name":"HDFS Append File","icon":"skin/hadoop.png","parent":"HDFS"},{"processingType":"TASK","id":"HDFS_DOWNLOAD_FILE","taskType":"HDFS_DOWNLOAD_FILE","name":"HDFS Download File","icon":"skin/hadoop.png","parent":"HDFS"},{"processingType":"TASK","id":"HDFS_DELETE_FILE","taskType":"HDFS_DELETE_FILE","name":"HDFS Delete File","icon":"skin/hadoop.png","parent":"HDFS"},{"processingType":"TASK","id":"HDFS_CREATE_DIRECTORY","taskType":"HDFS_CREATE_DIRECTORY","name":"HDFS Create Directory","icon":"skin/hadoop.png","parent":"HDFS"},{"processingType":"TASK","id":"HDFS_DELETE_DIRECTORY","taskType":"HDFS_DELETE_DIRECTORY","name":"HDFS Delete Directory","icon":"skin/hadoop.png","parent":"HDFS"},{"processingType":"TASK","id":"HDFS_RENAME","taskType":"HDFS_RENAME","name":"HDFS Rename","icon":"skin/hadoop.png","parent":"HDFS"},{"processingType":"TASK","id":"HIVE","name":"Hive","icon":"skin/hive.png","parent":"BIG_DATA","inactive":"hideInactiveFeatures"},{"processingType":"TASK","id":"IMPALA","name":"Impala","icon":"skin/impala.png","parent":"BIG_DATA","inactive":"hideInactiveFeatures"},{"processingType":"TASK","id":"SQOOP","name":"Sqoop","icon":"skin/sqoop.png","parent":"BIG_DATA","inactive":"hideInactiveFeatures"},{"processingType":"TASK","id":"YARN","name":"Yarn","icon":"skin/hadoop.png","parent":"BIG_DATA","inactive":"hideInactiveFeatures"},{"processingType":"TASK","id":"SPARK","name":"Spark","icon":"skin/spark.png","parent":"BIG_DATA","folder":"hideInactiveFeatures"},{"id":"SPARK_JAVA","taskType":"SPARK_JAVA","name":"Spark Java Job","icon":"skin/spark.png","parent":"SPARK","processingType":"TASK"},{"id":"SPARK_SCALA","taskType":"SPARK_SCALA","name":"Spark Scala Job","icon":"skin/spark.png","parent":"SPARK","processingType":"TASK"},{"id":"SPARK_PYTHON","taskType":"SPARK_PYTHON","name":"Spark Python Job","icon":"skin/spark.png","parent":"SPARK","processingType":"TASK"},{"id":"SPARK_R","taskType":"SPARK_R","name":"Spark R Job","icon":"skin/spark.png","parent":"SPARK","processingType":"TASK"},{"id":"SPARK_SQL","taskType":"SPARK_SQL","name":"Spark SQL Job","icon":"skin/spark.png","parent":"SPARK","processingType":"TASK"},{"processingType":"TASK","id":"FLUME","name":"Flume","icon":"skin/flume.png","parent":"BIG_DATA","inactive":"hideInactiveFeatures"},{"processingType":"TASK","id":"FLINK","name":"Flink","icon":"skin/flink.jpg ","parent":"BIG_DATA","folder":"hideInactiveFeatures"},{"processingType":"TASK","id":"FLINK_RUN_JOB","taskType":"FLINK_RUN_JOB","name":"Flink Run Job","icon":"skin/flink.jpg","parent":"FLINK"},{"processingType":"TASK","id":"FLINK_JAR_UPLOAD","taskType":"FLINK_JAR_UPLOAD","name":"Flink Upload Jar","icon":"skin/flink.jpg","parent":"FLINK"},{"processingType":"TASK","id":"FLINK_JAR_DELETE","taskType":"FLINK_JAR_DELETE","name":"Flink Delete Jar","icon":"skin/flink.jpg","parent":"FLINK"},{"id":"STORM","name":"Storm","icon":"skin/storm.png","parent":"BIG_DATA","inactive":"hideInactiveFeatures"},{"id":"OOZIE","name":"Oozie","icon":"skin/oozie.png","parent":"BIG_DATA","inactive":"hideInactiveFeatures"},{"id":"AMBARI","name":"Ambari","icon":"skin/ambari.png","parent":"BIG_DATA","inactive":"hideInactiveFeatures"},{"id":"MONGO_DB","name":"Mongo DB","icon":"skin/mongodb.gif","parent":"NO_SQL","folder":true},{"id":"MONGO_DB_INSERT","name":"Mongo DB Insert Document","icon":"skin/mongodb.gif","parent":"MONGO_DB","processingType":"TASK","taskType":"MONGO_DB_INSERT"},{"id":"IBM_MQ","icon":"skin/ibm_mq.png","name":"IBM MQ","parent":"MESSAGE_QUEUE"},{"processingType":"TASK","taskType":"IBM_MQ_SEND","id":"IBM_MQ_SEND","icon":"skin/ibm_mq.png","name":"Send IBM MQ Message","parent":"IBM_MQ"},{"processingType":"SERVICE","serviceType":"SENSOR","sensorType":"IBM_MQ_SENSOR","id":"IBM_MQ_SENSOR","icon":"skin/ibm_mq.png","name":"IBM MQ Sensor","parent":"IBM_MQ"},{"id":"RABBIT_MQ","name":"RabbitMQ","icon":"skin/rabbitmq.png","parent":"MESSAGE_QUEUE"},{"processingType":"TASK","taskType":"RABBIT_MQ_SEND","id":"RABBIT_MQ_SEND","name":"Send RabbitMQ Message","icon":"skin/rabbitmq.png","parent":"RABBIT_MQ"},{"processingType":"SERVICE","serviceType":"SENSOR","sensorType":"RABBIT_MQ_SENSOR","id":"RABBIT_MQ_SENSOR","icon":"skin/rabbitmq.png","name":"RabbitMQ Message Sensor","parent":"RABBIT_MQ"},{"id":"KAFKA","name":"Kafka","icon":"skin/kafka.png","parent":"MESSAGE_QUEUE"},{"processingType":"TASK","taskType":"KAFKA_SEND","id":"KAFKA_SEND","name":"Send Kafka Message","icon":"skin/kafka.png","parent":"KAFKA"},{"processingType":"SERVICE","serviceType":"SENSOR","sensorType":"KAFKA_SENSOR","id":"KAFKA_SENSOR","icon":"skin/kafka.png","name":"Kafka Message Sensor","parent":"KAFKA"},{"processingType":"TASK","taskType":"JMS","id":"JMS","icon":"skin/java.png","name":"JMS","parent":"MESSAGE_QUEUE","folder":true},{"processingType":"TASK","taskType":"JMS_SEND","id":"JMS_SEND","icon":"skin/java.png","name":"Send JMS Message","parent":"JMS"},{"processingType":"SERVICE","serviceType":"SENSOR","sensorType":"JMS_SENSOR","id":"JMS_SENSOR","icon":"skin/java.png","name":"JMS Sensor","parent":"JMS"},{"processingType":"TASK","id":"AMQP","icon":"skin/amqp.ico","name":"AMQP","parent":"MESSAGE_QUEUE","folder":true},{"processingType":"TASK","taskType":"AMQP_SEND","id":"AMQP_SEND","icon":"skin/amqp.ico","name":"Send AMQP Message","parent":"AMQP"},{"processingType":"TASK","id":"MQTT","icon":"skin/mqtt.png","name":"MQTT","parent":"MESSAGE_QUEUE","folder":true},{"processingType":"TASK","taskType":"MQTT_SEND","id":"MQTT_SEND","icon":"skin/mqtt.png","name":"Send MQTT Message","parent":"MQTT"},{"id":"XMPP","icon":"skin/xmpp.png","name":"XMPP","parent":"MESSAGE_QUEUE","folder":true},{"processingType":"TASK","taskType":"XMPP_SEND","id":"XMPP_SEND","icon":"skin/xmpp.png","name":"Send XMPP Message","parent":"XMPP"},{"id":"STOMP","icon":"skin/shoe.png","name":"STOMP","parent":"MESSAGE_QUEUE","folder":true},{"processingType":"TASK","taskType":"STOMP_SEND","id":"STOMP_SEND","icon":"skin/shoe.png","name":"Send STOMP Message","parent":"STOMP"},{"processingType":"TASK","taskType":"FILE_TRANSFER","id":"FILE_TRANSFER","icon":"skin/drive-network.png","name":"File Transfer","parent":"FILE_PROCESSING"},{"processingType":"TASK","taskType":"XFTP_COMMAND","id":"XFTP_COMMAND","icon":"skin/drive-network.png","name":"XFTP Command","parent":"FILE_PROCESSING"},{"id":"DATASOURCE_FILE","name":"Data Source","icon":"skin/drive-network.png","folder":true,"parent":"FILE_PROCESSING"},{"id":"DATASOURCE_UPLOAD_FILE","processingType":"TASK","taskType":"DATASOURCE_UPLOAD_FILE","name":"Upload File to Data Source","icon":"skin/drive-upload.png","parent":"DATASOURCE_FILE"},{"id":"DATASOURCE_DOWNLOAD_FILE","processingType":"TASK","taskType":"DATASOURCE_DOWNLOAD_FILE","name":"Download File from Data Source","icon":"skin/drive-download.png","parent":"DATASOURCE_FILE"},{"id":"DATASOURCE_DELETE_FILE","processingType":"TASK","taskType":"DATASOURCE_DELETE_FILE","name":"Delete File from Data Source","icon":"skin/drive_delete.png","parent":"DATASOURCE_FILE"},{"folder":true,"id":"WEB","icon":"skin/world.png","name":"Web","parent":"TASK"},{"folder":true,"id":"EMAIL","icon":"skin/mail.png","name":"Email","parent":"TASK"},{"folder":true,"id":"IBM_SERIES","icon":"skin/ibm.png","name":"IBM Series","parent":"TASK"},{"processingType":"TASK","taskType":"HTTP_REQUEST","id":"HTTP_REQUEST","icon":"skin/http.png","name":"HTTP Request","parent":"WEB"},{"processingType":"TASK","taskType":"REST_WEB_SERVICE_CALL","id":"REST_WEB_SERVICE_CALL","icon":"skin/rest.png","name":"REST Web Service Call","parent":"WEB"},{"processingType":"TASK","taskType":"SOAP_WEB_SERVICE_CALL","id":"SOAP_WEB_SERVICE_CALL","icon":"skin/soap.png","name":"SOAP Web Service Call","parent":"WEB"},{"processingType":"TASK","taskType":"EMAIL_SEND","id":"EMAIL_SEND","icon":"skin/mail.png","name":"Send Email","parent":"EMAIL"},{"processingType":"TASK","taskType":"EMAIL_CONFIRMATION","id":"EMAIL_CONFIRMATION","icon":"skin/mail--pencil.png","name":"Email Confirmation","parent":"EMAIL"},{"processingType":"TASK","taskType":"EMAIL_INPUT","id":"EMAIL_INPUT","icon":"skin/mail-open-table.png","name":"Email Input","parent":"EMAIL"},{"processingType":"SERVICE","serviceType":"SENSOR","sensorType":"EMAIL_SENSOR","id":"EMAIL_SENSOR","icon":"skin/mail.png","name":"Email Sensor","parent":"EMAIL"},{"id":"CLOUD_SERVICES","name":"Cloud Services","icon":"skin/cloud.png","folder":true,"parent":"TASK"},{"id":"AWS","name":"Amazon Web Services","icon":"skin/aws.png","parent":"CLOUD_SERVICES","folder":true},{"id":"AWS_GLUE","name":"Amazon Glue","icon":"skin/aws.png","parent":"AWS","folder":true},{"id":"AWS_GLUE_WORKFLOW","processingType":"TASK","taskType":"AWS_GLUE_WORKFLOW","name":"AWS Glue Workflow","icon":"skin/aws.png","parent":"AWS_GLUE"},{"id":"AWS_GLUE_TRIGGER","processingType":"TASK","taskType":"AWS_GLUE_TRIGGER","name":"AWS Glue Trigger","icon":"skin/aws.png","parent":"AWS_GLUE"},{"id":"AWS_GLUE_CRAWLER","processingType":"TASK","taskType":"AWS_GLUE_CRAWLER","name":"AWS Glue Crawler","icon":"skin/aws.png","parent":"AWS_GLUE"},{"id":"AWS_GLUE_JOB","processingType":"TASK","taskType":"AWS_GLUE_JOB","name":"AWS Glue Job","icon":"skin/aws.png","parent":"AWS_GLUE"},{"id":"AWS_EMR","name":"Amazon EMR","icon":"skin/aws.png","parent":"AWS","folder":true},{"id":"AWS_EMR_WORKFLOW","processingType":"TASK","taskType":"AWS_EMR_WORKFLOW","name":"AWS EMR Workflow","icon":"skin/aws.png","parent":"AWS_EMR"},{"id":"AWS_EMR_ADD_STEPS","processingType":"TASK","taskType":"AWS_EMR_ADD_STEPS","name":"AWS EMR Add Steps","icon":"skin/aws.png","parent":"AWS_EMR"},{"id":"AWS_EMR_CANCEL_STEPS","processingType":"TASK","taskType":"AWS_EMR_CANCEL_STEPS","name":"AWS EMR Cancel Steps","icon":"skin/aws.png","parent":"AWS_EMR"},{"id":"AWS_EMR_TERMINATE_JOB_FLOW","processingType":"TASK","taskType":"AWS_EMR_TERMINATE_JOB_FLOW","name":"AWS EMR Terminate Job Flow","icon":"skin/aws.png","parent":"AWS_EMR"},{"id":"AWS_EMR_CONTAINER_MONITOR","processingType":"SERVICE","serviceType":"MONITOR","monitorType":"AWS_EMR_CONTAINER_MONITOR","name":"AWS EMR Container Monitor","icon":"skin/aws.png","parent":"AWS_EMR"},{"id":"AWS_EMR_JOB_FLOW_MONITOR","processingType":"SERVICE","serviceType":"MONITOR","monitorType":"AWS_EMR_JOB_FLOW_MONITOR","name":"AWS EMR Job Flow Monitor","icon":"skin/aws.png","parent":"AWS_EMR"},{"id":"AWS_EMR_STEP_MONITOR","processingType":"SERVICE","serviceType":"MONITOR","monitorType":"AWS_EMR_STEP_MONITOR","name":"AWS EMR Step Monitor","icon":"skin/aws.png","parent":"AWS_EMR"},{"id":"AWS_EMR_NOTEBOOK_MONITOR","processingType":"SERVICE","serviceType":"MONITOR","monitorType":"AWS_EMR_NOTEBOOK_MONITOR","name":"AWS EMR Notebook Monitor","icon":"skin/aws.png","parent":"AWS_EMR"},{"id":"AWS_EMR_PUT","processingType":"TASK","taskType":"AWS_EMR_PUT","name":"AWS EMR Put","icon":"skin/aws.png","parent":"AWS_EMR"},{"id":"AWS_EMR_GET","processingType":"TASK","taskType":"AWS_EMR_GET","name":"AWS EMR Get","icon":"skin/aws.png","parent":"AWS_EMR"},{"id":"AWS_EMR_START_NOTEBOOK_EXECUTION","processingType":"TASK","taskType":"AWS_EMR_START_NOTEBOOK_EXECUTION","name":"AWS EMR Start Notebook Execution","icon":"skin/aws.png","parent":"AWS_EMR"},{"id":"AWS_EMR_STOP_NOTEBOOK_EXECUTION","processingType":"TASK","taskType":"AWS_EMR_STOP_NOTEBOOK_EXECUTION","name":"AWS EMR Stop Notebook Execution","icon":"skin/aws.png","parent":"AWS_EMR"},{"id":"AWS_EMR_API_COMMAND","processingType":"TASK","taskType":"AWS_EMR_API_COMMAND","name":"AWS EMR API Command","icon":"skin/aws.png","parent":"AWS_EMR"},{"id":"AWS_SAGE_MAKER","name":"Amazon SageMaker","icon":"skin/aws.png","parent":"AWS","folder":true},{"id":"AWS_SAGE_MAKER_ADD_MODEL","processingType":"TASK","taskType":"AWS_SAGE_MAKER_ADD_MODEL","name":"AWS SageMaker Add Model","icon":"skin/aws.png","parent":"AWS_SAGE_MAKER"},{"id":"AWS_SAGE_MAKER_DELETE_MODEL","processingType":"TASK","taskType":"AWS_SAGE_MAKER_DELETE_MODEL","name":"AWS SageMaker Delete Model","icon":"skin/aws.png","parent":"AWS_SAGE_MAKER"},{"id":"AWS_SAGE_MAKER_PROCESSING","processingType":"TASK","taskType":"AWS_SAGE_MAKER_PROCESSING","name":"AWS SageMaker Processing","icon":"skin/aws.png","parent":"AWS_SAGE_MAKER"},{"id":"AWS_SAGE_MAKER_TRAINING","processingType":"TASK","taskType":"AWS_SAGE_MAKER_TRAINING","name":"AWS SageMaker Training","icon":"skin/aws.png","parent":"AWS_SAGE_MAKER"},{"id":"AWS_SAGE_MAKER_TRANSFORM","processingType":"TASK","taskType":"AWS_SAGE_MAKER_TRANSFORM","name":"AWS SageMaker Transform","icon":"skin/aws.png","parent":"AWS_SAGE_MAKER"},{"id":"AWS_SAGE_MAKER_API_COMMAND","processingType":"TASK","taskType":"AWS_SAGE_MAKER_API_COMMAND","name":"AWS SageMaker API Command","icon":"skin/aws.png","parent":"AWS_SAGE_MAKER"},{"id":"AWS_LAMBDA","name":"AWS Lambda","icon":"skin/aws.png","parent":"AWS","folder":true},{"id":"AWS_LAMBDA_INVOKE","name":"AWS Lambda Invoke","icon":"skin/aws.png","parent":"AWS_LAMBDA","processingType":"TASK","taskType":"AWS_LAMBDA_INVOKE"},{"id":"AWS_LAMBDA_CREATE_FUNCTION","name":"AWS Lambda Create Function","icon":"skin/aws.png","parent":"AWS_LAMBDA","processingType":"TASK","taskType":"AWS_LAMBDA_CREATE_FUNCTION"},{"id":"AWS_LAMBDA_DELETE_FUNCTION","name":"AWS Lambda Delete Function","icon":"skin/aws.png","parent":"AWS_LAMBDA","processingType":"TASK","taskType":"AWS_LAMBDA_DELETE_FUNCTION"},{"id":"AWS_EC2","name":"AWS EC2","icon":"skin/aws.png","parent":"AWS","folder":true},{"id":"AWS_EC2_START_INSTANCE","name":"AWS EC2 Start   Instance","icon":"skin/aws.png","parent":"AWS_EC2","processingType":"TASK","taskType":"AWS_EC2_START_INSTANCE"},{"id":"AWS_EC2_STOP_INSTANCE","name":"AWS EC2 Stop Instance","icon":"skin/aws.png","parent":"AWS_EC2","processingType":"TASK","taskType":"AWS_EC2_STOP_INSTANCE"},{"id":"AWS_EC2_TERMINATE_INSTANCE","name":"AWS EC2 Terminate Instance","icon":"skin/aws.png","parent":"AWS_EC2","processingType":"TASK","taskType":"AWS_EC2_TERMINATE_INSTANCE"},{"id":"AWS_EC2_DELETE_VOLUME","name":"AWS EC2 Delete Volume","icon":"skin/aws.png","parent":"AWS_EC2","processingType":"TASK","taskType":"AWS_EC2_DELETE_VOLUME"},{"id":"AWS_S3","name":"AWS S3","icon":"skin/aws.png","parent":"AWS","folder":true},{"id":"AWS_S3_DELETE_OBJECT","name":"AWS S3 Delete Object","icon":"skin/aws.png","parent":"AWS_S3","processingType":"TASK","taskType":"AWS_S3_DELETE_OBJECT"},{"id":"AWS_S3_COPY_OBJECT","name":"AWS S3 Copy Object","icon":"skin/aws.png","parent":"AWS_S3","processingType":"TASK","taskType":"AWS_S3_COPY_OBJECT"},{"id":"AWS_S3_MOVE_OBJECT","name":"AWS S3 Move Object","icon":"skin/aws.png","parent":"AWS_S3","processingType":"TASK","taskType":"AWS_S3_MOVE_OBJECT"},{"id":"AWS_S3_RENAME_OBJECT","name":"AWS S3 Rename Object","icon":"skin/aws.png","parent":"AWS_S3","processingType":"TASK","taskType":"AWS_S3_RENAME_OBJECT"},{"id":"AWS_BATCH","name":"AWS Batch","icon":"skin/aws.png","parent":"AWS","folder":true},{"id":"AWS_BATCH_JOB","name":"AWS Batch Job","icon":"skin/aws.png","parent":"AWS_BATCH","processingType":"TASK","taskType":"AWS_BATCH_JOB"},{"id":"AWS_STEP_FUNCTIONS","name":"AWS Step Functions","icon":"skin/aws.png","parent":"AWS","folder":true},{"id":"AWS_START_STEP_FUNCTION_STATE_MACHINE","name":"AWS Start Step Function State Machine","icon":"skin/aws.png","parent":"AWS_STEP_FUNCTIONS","processingType":"TASK","taskType":"AWS_START_STEP_FUNCTION_STATE_MACHINE"},{"id":"AZURE","name":"Azure","icon":"skin/azure.png","parent":"CLOUD_SERVICES","folder":true,"processingType":"TASK"},{"id":"AZURE_DATA_FACTORY","name":"Azure Data Factory","icon":"skin/azure.png","parent":"AZURE","folder":true,"processingType":"TASK"},{"id":"AZURE_DATA_FACTORY_TRIGGER","processingType":"TASK","taskType":"AZURE_DATA_FACTORY_TRIGGER","name":"Azure Data Factory Trigger","icon":"skin/azure.png","parent":"AZURE_DATA_FACTORY"},{"id":"AZURE_DATA_FACTORY_PIPELINE","processingType":"TASK","taskType":"AZURE_DATA_FACTORY_PIPELINE","name":"Azure Data Factory Pipeline","icon":"skin/azure.png","parent":"AZURE_DATA_FACTORY"},{"id":"AZURE_DATA_LAKE_JOB","processingType":"TASK","taskType":"AZURE_DATA_LAKE_JOB","name":"Azure Data Lake Job","icon":"skin/azure.png","parent":"AZURE"},{"id":"AZURE_DATABRICKS","name":"Azure DataBricks","icon":"skin/azure.png","parent":"AZURE","folder":true},{"id":"AZURE_DATABRICKS_JOB","parent":"AZURE_DATABRICKS","icon":"skin/azure.png","name":"Azure DataBricks Run Job","processingType":"TASK","taskType":"AZURE_DATABRICKS_JOB"},{"id":"AZURE_DATABRICKS_TERMINATE_CLUSTER","parent":"AZURE_DATABRICKS","icon":"skin/azure.png","name":"Azure DataBricks Terminate Cluster","processingType":"TASK","taskType":"AZURE_DATABRICKS_TERMINATE_CLUSTER"},{"id":"AZURE_DATABRICKS_START_CLUSTER","parent":"AZURE_DATABRICKS","icon":"skin/azure.png","name":"Azure DataBricks Start Cluster","processingType":"TASK","taskType":"AZURE_DATABRICKS_START_CLUSTER"},{"processingType":"SERVICE","serviceType":"MONITOR","monitorType":"AZURE_DATABRICKS_CLUSTER_MONITOR","id":"AZURE_DATABRICKS_CLUSTER_MONITOR","icon":"skin/azure.png","name":"Azure DataBricks Cluster Monitor","parent":"AZURE_DATABRICKS"},{"processingType":"TASK","taskType":"AZURE_DATABRICKS_LIST_CLUSTERS","id":"AZURE_DATABRICKS_LIST_CLUSTERS","icon":"skin/azure.png","name":"Azure DataBricks List Clusters","parent":"AZURE_DATABRICKS"},{"processingType":"TASK","taskType":"AZURE_DATABRICKS_DELETE_CLUSTER","id":"AZURE_DATABRICKS_DELETE_CLUSTER","icon":"skin/azure.png","name":"Azure DataBricks Delete Cluster Permanently","parent":"AZURE_DATABRICKS"},{"id":"INFORMATICA_CLOUD","name":"Informatica Cloud","icon":"skin/informatica.ico","parent":"CLOUD_SERVICES","folder":true},{"processingType":"TASK","taskType":"INFORMATICA_CLOUD_TASKFLOW","id":"INFORMATICA_CLOUD_TASKFLOW","icon":"skin/informatica.ico","name":"Informatica Cloud Taskflow","parent":"INFORMATICA_CLOUD"},{"folder":true,"id":"ETL","icon":"skin/etl.png","name":"ETL","parent":"TASK"},{"processingType":"TASK","taskType":"INFORMATICA_WORKFLOW","id":"INFORMATICA_WORKFLOW","icon":"skin/informatica.ico","name":"Informatica Power Center Workflow","parent":"ETL"},{"processingType":"TASK","taskType":"INFORMATICA_WS_WORKFLOW","id":"INFORMATICA_WS_WORKFLOW","icon":"skin/informatica.ico","name":"Informatica Power Center Web Service Workflow","parent":"ETL"},{"processingType":"TASK","taskType":"IBM_DATASTAGE","id":"IBM_DATASTAGE","icon":"skin/ibminfosphere.png","name":"IBM Infosphere DataStage","parent":"ETL"},{"processingType":"TASK","taskType":"MS_SSIS","id":"MS_SSIS","icon":"skin/ssis.png","name":"MS SQL Server Integration Services","parent":"ETL"},{"folder":true,"id":"ORACLE_DATA_INTEGRATOR","icon":"skin/odi.png","name":"Oracle Data Integrator","parent":"ETL"},{"processingType":"TASK","taskType":"ODI_SESSION","id":"ODI_SESSION","icon":"skin/odi.png","name":"ODI Session","parent":"ORACLE_DATA_INTEGRATOR"},{"processingType":"TASK","taskType":"ODI_LOAD_PLAN","id":"ODI_LOAD_PLAN","icon":"skin/odi.png","name":"ODI Load Plan","parent":"ORACLE_DATA_INTEGRATOR"},{"folder":true,"id":"SAS","icon":"skin/sas.png","name":"SAS","parent":"ETL"},{"processingType":"TASK","taskType":"SAS_4GL","id":"SAS_4GL","icon":"skin/sas.png","name":"SAS Dynamic Code","parent":"SAS"},{"processingType":"TASK","taskType":"SAS_DI","id":"SAS_DI","icon":"skin/sas.png","name":"SAS Stored Code","parent":"SAS"},{"processingType":"TASK","taskType":"SAS_JOB","id":"SAS_JOB","icon":"skin/sas.png","name":"SAS Job","parent":"SAS"},{"folder":true,"id":"SAS_VIYA","icon":"skin/sas_viya.png","name":"SAS Viya","parent":"ETL"},{"processingType":"TASK","taskType":"SAS_VIYA_JOB","id":"SAS_VIYA_JOB","icon":"skin/sas_viya.png","name":"SAS Viya Job","parent":"SAS_VIYA"},{"id":"TALEND","parent":"ETL","icon":"[SKINIMG]/skin/talend.png","name":"Talend"},{"processingType":"TASK","taskType":"TALEND_JOB","id":"TALEND_JOB","icon":"[SKINIMG]/skin/talend.png","name":"Talend Job","parent":"TALEND"},{"id":"DBT","parent":"ETL","icon":"[SKINIMG]/skin/dbt.ico","name":"dbt"},{"processingType":"TASK","taskType":"DBT_JOB","id":"DBT_JOB","icon":"[SKINIMG]/skin/dbt.ico","name":"dbt Job","parent":"DBT"},{"folder":true,"id":"ERP","icon":"skin/erp.png","name":"ERP","parent":"TASK"},{"folder":true,"id":"SAP_R3","icon":"skin/sap.png","name":"SAP R/3","parent":"ERP"},{"folder":true,"id":"SAP_R3_JOBS","icon":"skin/sap.png","name":"SAP R/3 Job","parent":"SAP_R3"},{"folder":true,"id":"SAP_R3_OTHER","icon":"skin/sap.png","name":"SAP R/3 Other","parent":"SAP_R3"},{"folder":true,"id":"SAP_4H","icon":"skin/sap.png","name":"SAP S/4HANA","parent":"ERP"},{"folder":true,"id":"SAP_4H_JOBS","icon":"skin/sap.png","name":"SAP 4/HANA Job","parent":"SAP_4H"},{"folder":true,"id":"SAP_4H_OTHER","icon":"skin/sap.png","name":"SAP 4/HANA Other","parent":"SAP_4H"},{"folder":true,"id":"SAP_4HC","icon":"skin/sap.png","name":"SAP S/4HANA Cloud","parent":"ERP"},{"processingType":"TASK","taskType":"SAP_R3_JOB","id":"SAP_R3_JOB","icon":"skin/sap.png","name":"SAP R/3 Job","parent":"SAP_R3_JOBS"},{"processingType":"TASK","taskType":"SAP_R3_VARIANT_CREATE","id":"SAP_R3_VARIANT_CREATE","icon":"skin/sap.png","name":"SAP R/3 Create Variant","parent":"SAP_R3_JOBS"},{"processingType":"TASK","taskType":"SAP_R3_VARIANT_COPY","id":"SAP_R3_VARIANT_COPY","icon":"skin/sap.png","name":"SAP R/3 Copy Variant","parent":"SAP_R3_JOBS"},{"processingType":"TASK","taskType":"SAP_R3_VARIANT_UPDATE","id":"SAP_R3_VARIANT_UPDATE","icon":"skin/sap.png","name":"SAP R/3 Update Variant","parent":"SAP_R3_JOBS"},{"processingType":"TASK","taskType":"SAP_R3_VARIANT_DELETE","id":"SAP_R3_VARIANT_DELETE","icon":"skin/sap.png","name":"SAP R/3 Delete Variant","parent":"SAP_R3_JOBS"},{"processingType":"TASK","taskType":"SAP_R3_RAISE_EVENT","id":"SAP_R3_RAISE_EVENT","icon":"skin/sap.png","name":"SAP R/3 Raise Event","parent":"SAP_R3_OTHER"},{"processingType":"SERVICE","serviceType":"SENSOR","sensorType":"SAP_R3_EVENT_SENSOR","id":"SAP_R3_EVENT_SENSOR","icon":"skin/sap.png","name":"SAP R/3 Event Sensor","parent":"SAP_R3_OTHER"},{"processingType":"TASK","taskType":"SAP_R3_COPY_EXISTING_JOB","id":"SAP_R3_COPY_EXISTING_JOB","icon":"skin/sap.png","name":"SAP R/3 Copy Existing Job","parent":"SAP_R3_JOBS"},{"processingType":"TASK","taskType":"SAP_R3_START_SCHEDULED_JOB","id":"SAP_R3_START_SCHEDULED_JOB","icon":"skin/sap.png","name":"SAP R/3 Start Scheduled Job","parent":"SAP_R3_JOBS"},{"processingType":"TASK","taskType":"SAP_R3_JOB_INTERCEPTOR","id":"SAP_R3_JOB_INTERCEPTOR","icon":"skin/sap.png","name":"SAP R/3 Job Interceptor","parent":"SAP_R3_JOBS"},{"processingType":"TASK","id":"SAP_BW_PROCESS_CHAIN","taskType":"SAP_BW_PROCESS_CHAIN","name":"SAP BW Process Chain","icon":"skin/sap.png","parent":"SAP_R3_OTHER"},{"processingType":"TASK","id":"SAP_ARCHIVE","taskType":"SAP_ARCHIVE","name":"SAP Data Archive","icon":"skin/sap.png","parent":"SAP_R3_OTHER"},{"processingType":"TASK","id":"SAP_FUNCTION_MODULE_CALL","taskType":"SAP_FUNCTION_MODULE_CALL","name":"SAP Function Module Call","icon":"skin/sap.png","parent":"SAP_R3_OTHER"},{"processingType":"TASK","id":"SAP_READ_TABLE","taskType":"SAP_READ_TABLE","name":"SAP Read Table","icon":"skin/sap.png","parent":"SAP_R3_OTHER"},{"processingType":"TASK","id":"SAP_CM_PROFILE_ACTIVATE","taskType":"SAP_CM_PROFILE_ACTIVATE","name":"SAP Activate CM Profile","icon":"skin/sap.png","parent":"SAP_R3_OTHER"},{"processingType":"TASK","id":"SAP_CM_PROFILE_DEACTIVATE","taskType":"SAP_CM_PROFILE_DEACTIVATE","name":"SAP Deactivate CM Profile","icon":"skin/sap.png","parent":"SAP_R3_OTHER"},{"processingType":"TASK","id":"SAP_EXPORT_CALENDAR","taskType":"SAP_EXPORT_CALENDAR","name":"SAP Export Calendar","icon":"skin/sap.png","parent":"SAP_R3_OTHER"},{"processingType":"TASK","id":"SAP_EXPORT_JOB","taskType":"SAP_EXPORT_JOB","name":"SAP Export Job","icon":"skin/sap.png","parent":"SAP_R3_OTHER"},{"processingType":"TASK","id":"SAP_MODIFY_INTERCEPTION_CRITERIA","taskType":"SAP_MODIFY_INTERCEPTION_CRITERIA","name":"SAP R/3 Modify Interception Criteria","icon":"skin/sap.png","parent":"SAP_R3_JOBS"},{"processingType":"SERVICE","serviceType":"SENSOR","sensorType":"SAP_R3_INTERCEPTED_JOB_SENSOR","id":"SAP_R3_INTERCEPTED_JOB_SENSOR","icon":"skin/sap.png","name":"SAP R/3 Intercepted Job Sensor","parent":"SAP_R3_JOBS"},{"processingType":"TASK","taskType":"SAP_4H_JOB","id":"SAP_4H_JOB","icon":"skin/sap.png","name":"SAP 4/H Job","parent":"SAP_4H_JOBS"},{"processingType":"TASK","taskType":"SAP_4H_VARIANT_CREATE","id":"SAP_4H_VARIANT_CREATE","icon":"skin/sap.png","name":"SAP 4/H Create Variant","parent":"SAP_4H_JOBS"},{"processingType":"TASK","taskType":"SAP_4H_VARIANT_COPY","id":"SAP_4H_VARIANT_COPY","icon":"skin/sap.png","name":"SAP 4/H Copy Variant","parent":"SAP_4H_JOBS"},{"processingType":"TASK","taskType":"SAP_4H_VARIANT_UPDATE","id":"SAP_4H_VARIANT_UPDATE","icon":"skin/sap.png","name":"SAP 4/H Update Variant","parent":"SAP_4H_JOBS"},{"processingType":"TASK","taskType":"SAP_4H_VARIANT_DELETE","id":"SAP_4H_VARIANT_DELETE","icon":"skin/sap.png","name":"SAP 4/H Delete Variant","parent":"SAP_4H_JOBS"},{"processingType":"TASK","taskType":"SAP_4H_RAISE_EVENT","id":"SAP_4H_RAISE_EVENT","icon":"skin/sap.png","name":"SAP 4/H Raise Event","parent":"SAP_4H_OTHER"},{"processingType":"SERVICE","serviceType":"SENSOR","sensorType":"SAP_4H_EVENT_SENSOR","id":"SAP_4H_EVENT_SENSOR","icon":"skin/sap.png","name":"SAP 4/H Event Sensor","parent":"SAP_4H_OTHER"},{"processingType":"TASK","taskType":"SAP_4H_COPY_EXISTING_JOB","id":"SAP_4H_COPY_EXISTING_JOB","icon":"skin/sap.png","name":"SAP 4/H Copy Existing Job","parent":"SAP_4H_JOBS"},{"processingType":"TASK","taskType":"SAP_4H_START_SCHEDULED_JOB","id":"SAP_4H_START_SCHEDULED_JOB","icon":"skin/sap.png","name":"SAP 4/H Start Scheduled Job","parent":"SAP_4H_JOBS"},{"processingType":"TASK","taskType":"SAP_4H_JOB_INTERCEPTOR","id":"SAP_4H_JOB_INTERCEPTOR","icon":"skin/sap.png","name":"SAP 4/H Job Interceptor","parent":"SAP_4H_JOBS"},{"processingType":"TASK","id":"SAP_4H_BW_PROCESS_CHAIN","taskType":"SAP_4H_BW_PROCESS_CHAIN","name":"SAP 4/H BW Process Chain","icon":"skin/sap.png","parent":"SAP_4H_OTHER"},{"processingType":"TASK","id":"SAP_4H_ARCHIVE","taskType":"SAP_4H_ARCHIVE","name":"SAP 4/H Data Archive","icon":"skin/sap.png","parent":"SAP_4H_OTHER"},{"processingType":"TASK","id":"SAP_4H_FUNCTION_MODULE_CALL","taskType":"SAP_4H_FUNCTION_MODULE_CALL","name":"SAP 4/H Function Module Call","icon":"skin/sap.png","parent":"SAP_4H_OTHER"},{"processingType":"TASK","id":"SAP_4H_READ_TABLE","taskType":"SAP_4H_READ_TABLE","name":"SAP 4/H Read Table","icon":"skin/sap.png","parent":"SAP_4H_OTHER"},{"processingType":"TASK","id":"SAP_4H_CM_PROFILE_ACTIVATE","taskType":"SAP_4H_CM_PROFILE_ACTIVATE","name":"SAP 4/H Activate CM Profile","icon":"skin/sap.png","parent":"SAP_4H_OTHER"},{"processingType":"TASK","id":"SAP_4H_CM_PROFILE_DEACTIVATE","taskType":"SAP_4H_CM_PROFILE_DEACTIVATE","name":"SAP 4/H Deactivate CM Profile","icon":"skin/sap.png","parent":"SAP_4H_OTHER"},{"processingType":"TASK","id":"SAP_4H_EXPORT_CALENDAR","taskType":"SAP_4H_EXPORT_CALENDAR","name":"SAP 4/H Export Calendar","icon":"skin/sap.png","parent":"SAP_4H_OTHER"},{"processingType":"TASK","id":"SAP_4H_EXPORT_JOB","taskType":"SAP_4H_EXPORT_JOB","name":"SAP 4/H Export Job","icon":"skin/sap.png","parent":"SAP_4H_OTHER"},{"processingType":"TASK","id":"SAP_4H_MODIFY_INTERCEPTION_CRITERIA","taskType":"SAP_4H_MODIFY_INTERCEPTION_CRITERIA","name":"SAP 4/H Modify Interception Criteria","icon":"skin/sap.png","parent":"SAP_4H_JOBS"},{"processingType":"SERVICE","serviceType":"SENSOR","sensorType":"SAP_4H_INTERCEPTED_JOB_SENSOR","id":"SAP_4H_INTERCEPTED_JOB_SENSOR","icon":"skin/sap.png","name":"SAP 4/H Intercepted Job Sensor","parent":"SAP_4H_JOBS"},{"processingType":"SERVICE","serviceType":"MONITOR","monitorType":"SAP_4H_JOB_MONITOR","id":"SAP_4H_JOB_MONITOR","icon":"skin/sap.png","name":"SAP 4/H Job Monitor","parent":"SAP_4H_JOBS"},{"processingType":"TASK","id":"SAP_ODATA_API_CALL","taskType":"SAP_ODATA_API_CALL","name":"SAP ODATA API Call","icon":"skin/sap.png","parent":"SAP_4HC"},{"processingType":"TASK","id":"SAP_IBP_JOB","taskType":"SAP_IBP_JOB","name":"SAP IBP Job","icon":"skin/sap.png","parent":"SAP_4HC"},{"processingType":"TASK","id":"SAP_IBP_CREATE_PROCESS","taskType":"SAP_IBP_CREATE_PROCESS","name":"SAP IBP Create Process","icon":"skin/sap.png","parent":"SAP_4HC","inactive":"hideInactiveFeatures"},{"processingType":"TASK","id":"SAP_IBP_DELETE_PROCESS","taskType":"SAP_IBP_DELETE_PROCESS","name":"SAP IBP Delete Process","icon":"skin/sap.png","parent":"SAP_4HC","inactive":"hideInactiveFeatures"},{"processingType":"TASK","id":"SAP_IBP_SET_PROCESS_STEP_STATUS","taskType":"SAP_IBP_SET_PROCESS_STEP_STATUS","name":"SAP IBP Set Process Job Status","icon":"skin/sap.png","parent":"SAP_4HC","inactive":"hideInactiveFeatures"},{"folder":true,"id":"ORACLE_EBS","icon":"skin/oracle.png","name":"Oracle EBS","parent":"ERP"},{"processingType":"TASK","taskType":"ORACLE_EBS_PROGRAM","id":"ORACLE_EBS_PROGRAM","icon":"skin/oracle.png","name":"Oracle EBS Program","parent":"ORACLE_EBS"},{"processingType":"TASK","taskType":"ORACLE_EBS_REQUEST_SET","id":"ORACLE_EBS_REQUEST_SET","icon":"skin/oracle.png","name":"Oracle EBS Request Set","parent":"ORACLE_EBS"},{"id":"ITSM","folder":true,"icon":"skin/compress_repair.png","name":"ITSM","parent":"TASK"},{"id":"JIRA","parent":"ITSM","icon":"skin/jira.png","name":"Jira","folder":true},{"processingType":"TASK","taskType":"ORACLE_EBS_EXECUTE_PROGRAM","id":"ORACLE_EBS_EXECUTE_PROGRAM","icon":"skin/oracle.png","name":"Oracle EBS Execute Program","parent":"ORACLE_EBS"},{"processingType":"TASK","taskType":"ORACLE_EBS_EXECUTE_REQUEST_SET","id":"ORACLE_EBS_EXECUTE_REQUEST_SET","icon":"skin/oracle.png","name":"Oracle EBS Execute Request Set","parent":"ORACLE_EBS"},{"id":"SERVICE_NOW","parent":"ITSM","icon":"skin/servicenow.png","name":"ServiceNow","folder":true},{"id":"SERVICE_NOW_CREATE_INCIDENT","parent":"SERVICE_NOW","processingType":"TASK","taskType":"SERVICE_NOW_CREATE_INCIDENT","icon":"skin/servicenow.png","name":"ServiceNow Create Incident"},{"id":"SERVICE_NOW_RESOLVE_INCIDENT","parent":"SERVICE_NOW","processingType":"TASK","taskType":"SERVICE_NOW_RESOLVE_INCIDENT","icon":"skin/servicenow.png","name":"ServiceNow Resolve Incident"},{"id":"SERVICE_NOW_CLOSE_INCIDENT","parent":"SERVICE_NOW","processingType":"TASK","taskType":"SERVICE_NOW_CLOSE_INCIDENT","icon":"skin/servicenow.png","name":"ServiceNow Close Incident"},{"id":"SERVICE_NOW_UPDATE_INCIDENT","parent":"SERVICE_NOW","processingType":"TASK","taskType":"SERVICE_NOW_UPDATE_INCIDENT","icon":"skin/servicenow.png","name":"ServiceNow Update Incident"},{"id":"SERVICE_NOW_INCIDENT_STATUS_SENSOR","parent":"SERVICE_NOW","processingType":"SERVICE","serviceType":"SENSOR","sensorType":"SERVICE_NOW_INCIDENT_STATUS_SENSOR","icon":"skin/servicenow.png","name":"ServiceNow Incident Status Sensor"},{"id":"BMC_REMEDY","parent":"ITSM","icon":"skin/bmc.ico","name":"BMC Remedy","folder":true},{"id":"BMC_REMEDY_INCIDENT","parent":"BMC_REMEDY","icon":"skin/bmc.ico","processingType":"TASK","name":"BMC Remedy Incident","taskType":"BMC_REMEDY_INCIDENT"},{"id":"PEOPLESOFT","name":"Peoplesoft","icon":"skin/oracle.png","parent":"ERP","folder":true},{"id":"PEOPLESOFT_APPLICATION_ENGINE_TASK","taskType":"PEOPLESOFT_APPLICATION_ENGINE_TASK","name":"Peoplesoft Application Engine","icon":"skin/oracle.png","parent":"PEOPLESOFT","processingType":"TASK"},{"id":"PEOPLESOFT_COBOL_SQL_TASK","name":"Peoplesoft COBOL SQL","icon":"skin/oracle.png","parent":"PEOPLESOFT"},{"id":"PEOPLESOFT_CRW_ONLINE_TASK","taskType":"PEOPLESOFT_CRW_ONLINE_TASK","name":"Peoplesoft CRW Online","icon":"skin/oracle.png","parent":"PEOPLESOFT","processingType":"TASK"},{"id":"PEOPLESOFT_CRYSTAL_REPORTS_TASK","taskType":"PEOPLESOFT_CRYSTAL_REPORTS_TASK","name":"Peoplesoft Crystal Reports","icon":"skin/oracle.png","parent":"PEOPLESOFT","processingType":"TASK"},{"id":"PEOPLESOFT_CUBE_BUILDER_TASK","taskType":"PEOPLESOFT_CUBE_BUILDER_TASK","name":"Peoplesoft Cube Builder","icon":"skin/oracle.png","parent":"PEOPLESOFT","processingType":"TASK"},{"id":"PEOPLESOFT_NVISION_TASK","taskType":"PEOPLESOFT_NVISION_TASK","name":"Peoplesoft nVision","icon":"skin/oracle.png","parent":"PEOPLESOFT","processingType":"TASK"},{"id":"PEOPLESOFT_SQR_PROCESS_TASK","taskType":"PEOPLESOFT_SQR_PROCESS_TASK","name":"Peoplesoft SQR Process","icon":"skin/oracle.png","parent":"PEOPLESOFT","processingType":"TASK"},{"id":"PEOPLESOFT_SQR_REPORT_TASK","taskType":"PEOPLESOFT_SQR_REPORT_TASK","name":"Peoplesoft SQR Report","icon":"skin/oracle.png","parent":"PEOPLESOFT","processingType":"TASK"},{"id":"PEOPLESOFT_WINWORD_TASK","taskType":"PEOPLESOFT_WINWORD_TASK","name":"Peoplesoft Winword","icon":"skin/oracle.png","parent":"PEOPLESOFT","processingType":"TASK"},{"id":"PEOPLESOFT_JOB_TASK","taskType":"PEOPLESOFT_JOB_TASK","name":"Peoplesoft Job","icon":"skin/oracle.png","parent":"PEOPLESOFT","processingType":"TASK"},{"id":"WLA","folder":true,"icon":"skin/gears.png","name":"Workload Automation","parent":"TASK"},{"id":"AUTOMATE_NOW_TRIGGER_EVENT","parent":"WLA","icon":"skin/favicon.png","name":"AutomateNOW! Trigger Event","processingType":"TASK","taskType":"AUTOMATE_NOW_TRIGGER_EVENT"},{"id":"APACHE_AIRFLOW_RUN_DAG","parent":"WLA","icon":"skin/airflow.png","name":"Run Apache Airflow DAG","processingType":"TASK","taskType":"APACHE_AIRFLOW_RUN_DAG"},{"id":"ANSIBLE_PLAYBOOK","parent":"WLA","icon":"skin/ansible.png","name":"Ansible playbook","processingType":"TASK","taskType":"ANSIBLE_PLAYBOOK"},{"id":"ANSIBLE_PLAYBOOK_PATH","parent":"WLA","icon":"skin/ansible.png","name":"Ansible script","processingType":"TASK","taskType":"ANSIBLE_PLAYBOOK_PATH"},{"folder":true,"id":"CTRL_M","icon":"skin/bmc.png","name":"Ctrl-M","parent":"WLA"},{"id":"CTRLM_ADD_CONDITION","parent":"CTRL_M","icon":"skin/bmc.png","name":"Add Condition","processingType":"TASK","taskType":"CTRLM_ADD_CONDITION"},{"id":"CTRLM_DELETE_CONDITION","parent":"CTRL_M","icon":"skin/bmc.png","name":"Delete Condition","processingType":"TASK","taskType":"CTRLM_DELETE_CONDITION"},{"id":"CTRLM_ORDER_JOB","parent":"CTRL_M","icon":"skin/bmc.png","name":"Order Job","processingType":"TASK","taskType":"CTRLM_ORDER_JOB"},{"id":"CTRLM_CREATE_JOB","parent":"CTRL_M","icon":"skin/bmc.png","name":"Create Job","processingType":"TASK","taskType":"CTRLM_CREATE_JOB"},{"folder":true,"id":"CTRL_M_RESOURCE","icon":"skin/bmc.png","name":"Ctrl-M Resource","parent":"CTRL_M"},{"id":"CTRLM_RESOURCE_TABLE_ADD","parent":"CTRL_M_RESOURCE","icon":"skin/bmc.png","name":"Add resource","processingType":"TASK","taskType":"CTRLM_RESOURCE_TABLE_ADD"},{"id":"CTRLM_RESOURCE_TABLE_UPDATE","parent":"CTRL_M_RESOURCE","icon":"skin/bmc.png","name":"Update resource","processingType":"TASK","taskType":"CTRLM_RESOURCE_TABLE_UPDATE"},{"id":"CTRLM_RESOURCE_TABLE_DELETE","parent":"CTRL_M_RESOURCE","icon":"skin/bmc.png","name":"Update resource","processingType":"TASK","taskType":"CTRLM_RESOURCE_TABLE_DELETE"},{"folder":true,"id":"INTERNAL","icon":"skin/milestone.png","name":"Internal Task"},{"folder":true,"id":"PROCESSING","icon":"skin/gear.png","name":"Processing","parent":"INTERNAL"},{"processingType":"TASK","taskType":"RESTART","id":"RESTART","icon":"skin/restart.png","name":"Restart","parent":"PROCESSING"},{"processingType":"TASK","taskType":"FORCE_COMPLETED","id":"FORCE_COMPLETED","icon":"skin/accept.png","name":"Force Completed","parent":"PROCESSING"},{"processingType":"TASK","taskType":"FORCE_FAILED","id":"FORCE_FAILED","icon":"skin/forceFailed.png","name":"Force Failed","parent":"PROCESSING"},{"processingType":"TASK","taskType":"FORCE_READY","id":"FORCE_READY","icon":"skin/exe.png","name":"Force Launch","parent":"PROCESSING"},{"processingType":"TASK","taskType":"HOLD","id":"HOLD","icon":"skin/hold.png","name":"Hold","parent":"PROCESSING"},{"processingType":"TASK","taskType":"RESUME","id":"RESUME","icon":"skin/resume.png","name":"Resume","parent":"PROCESSING"},{"processingType":"TASK","taskType":"ABORT","id":"ABORT","icon":"skin/kill.png","name":"Abort","parent":"PROCESSING"},{"processingType":"TASK","taskType":"KILL","id":"KILL","icon":"skin/kill.png","name":"Kill","parent":"PROCESSING"},{"processingType":"TASK","taskType":"SKIP_ON","id":"SKIP_ON","icon":"skin/passByOn.png","name":"Skip On","parent":"PROCESSING"},{"processingType":"TASK","taskType":"SKIP_OFF","id":"SKIP_OFF","icon":"skin/passByOff.png","name":"Skip Off","parent":"PROCESSING"},{"processingType":"TASK","taskType":"PROCESSING_ACTION_SKIP_ON","id":"PROCESSING_ACTION_SKIP_ON","icon":"skin/passByOn.png","name":"Skip On Action","parent":"PROCESSING"},{"processingType":"TASK","taskType":"PROCESSING_ACTION_SKIP_OFF","id":"PROCESSING_ACTION_SKIP_OFF","icon":"skin/passByOff.png","name":"Skip Off Action","parent":"PROCESSING"},{"processingType":"TASK","taskType":"ARCHIVE","id":"ARCHIVE","icon":"skin/archive.png","name":"Archive","parent":"PROCESSING"},{"processingType":"TASK","taskType":"SET_PRIORITY","id":"SET_PRIORITY","icon":"skin/numeric_stepper.png","name":"Set Priority","parent":"PROCESSING"},{"processingType":"TASK","taskType":"SET_STATUS_CODE","id":"SET_STATUS_CODE","icon":"skin/sort_number.png","name":"Set Status Code","parent":"PROCESSING"},{"processingType":"TASK","taskType":"SET_CONTEXT_VARIABLE_VALUE","id":"SET_CONTEXT_VARIABLE_VALUE","icon":"skin/pi_math--pencil.png","name":"Set context variable","parent":"PROCESSING"},{"processingType":"TASK","taskType":"SET_CONTEXT_VARIABLE_VALUES","id":"SET_CONTEXT_VARIABLE_VALUES","icon":"skin/pi_math--pencil.png","name":"Set multiple context variables","parent":"PROCESSING"},{"processingType":"TASK","taskType":"PROCESSING_RUN_NOW","id":"PROCESSING_RUN_NOW","icon":"skin/gear.png","name":"Add processing from template","parent":"PROCESSING"},{"processingType":"TASK","taskType":"CHECK_PROCESSING_STATE","id":"CHECK_PROCESSING_STATE","icon":"skin/system-monitor.png","name":"Check processing state","parent":"PROCESSING"},{"processingType":"TASK","taskType":"ADD_TAG","id":"ADD_TAG","icon":"skin/price_tag_plus.png","name":"Add Tag","parent":"PROCESSING"},{"processingType":"TASK","taskType":"REMOVE_TAG","id":"REMOVE_TAG","icon":"skin/price_tag_minus.png","name":"Remove Tag","parent":"PROCESSING"},{"processingType":"TASK","taskType":"SET_FOLDER","id":"SET_FOLDER","icon":"skin/folder.png","name":"Set Folder","parent":"PROCESSING"},{"processingType":"TASK","taskType":"PROCESSING_REGISTER_STATE","id":"PROCESSING_REGISTER_STATE","icon":"skin/system-monitor.png","name":"Register Processing State","parent":"PROCESSING"},{"processingType":"TASK","taskType":"PROCESSING_UNREGISTER_STATE","id":"PROCESSING_UNREGISTER_STATE","icon":"skin/system-monitor.png","name":"Unregister Processing State","parent":"PROCESSING"},{"processingType":"TASK","taskType":"PROCESSING_CLEAR_STATE_REGISTRY","id":"PROCESSING_CLEAR_STATE_REGISTRY","icon":"skin/system-monitor.png","name":"Clear Processing Registry","parent":"PROCESSING"},{"folder":true,"id":"RESOURCE","icon":"skin/traffic-light.png","name":"Resource","parent":"INTERNAL"},{"folder":true,"id":"SET_RESOURCE","icon":"skin/traffic-light--pencil.png","name":"Set Resource","parent":"RESOURCE"},{"processingType":"TASK","id":"SET_SEMAPHORE_STATE","name":"Set semaphore state","icon":"skin/traffic-light--pencil.png","parent":"SET_RESOURCE","taskType":"SET_SEMAPHORE_STATE"},{"processingType":"TASK","id":"SET_TIME_WINDOW_STATE","name":"Set time window state","icon":"skin/clock--pencil.png","parent":"SET_RESOURCE","taskType":"SET_TIME_WINDOW_STATE"},{"processingType":"TASK","id":"SET_STOCK_TOTAL_PERMITS","name":"Set stock total permits","icon":"skin/stock--pencil.png","parent":"SET_RESOURCE","taskType":"SET_STOCK_TOTAL_PERMITS"},{"processingType":"TASK","id":"SET_VARIABLE_VALUE","name":"Set variable","icon":"skin/pi_math--pencil.png","parent":"SET_RESOURCE","taskType":"SET_VARIABLE_VALUE"},{"processingType":"TASK","id":"SET_PHYSICAL_RESOURCE","name":"Set physical resource","icon":"skin/memory.png","parent":"SET_RESOURCE","taskType":"SET_PHYSICAL_RESOURCE"},{"processingType":"TASK","id":"SET_METRIC","name":"Set metric","icon":"skin/gauge.png","parent":"SET_RESOURCE","taskType":"SET_METRIC"},{"processingType":"TASK","id":"TRIGGER_EVENT","name":"Trigger Event","icon":"skin/arrow-out.png","parent":"SET_RESOURCE","taskType":"TRIGGER_EVENT"},{"folder":true,"id":"CHECK_RESOURCE","icon":"skin/traffic-light--check.png","name":"Check Resource","parent":"RESOURCE"},{"processingType":"TASK","id":"CHECK_SEMAPHORE_STATE","name":"Check semaphore state","icon":"skin/traffic-light--check.png","parent":"CHECK_RESOURCE","taskType":"CHECK_SEMAPHORE_STATE"},{"processingType":"TASK","id":"CHECK_TIME_WINDOW_STATE","name":"Check time window state","icon":"skin/clock--check.png","parent":"CHECK_RESOURCE","taskType":"CHECK_TIME_WINDOW_STATE"},{"processingType":"TASK","id":"CHECK_STOCK_AVAILABLE_PERMITS","name":"Check stock available permits","icon":"skin/stock--check.png","parent":"CHECK_RESOURCE","taskType":"CHECK_STOCK_AVAILABLE_PERMITS"},{"processingType":"TASK","id":"CHECK_CALENDAR","name":"Check calendar","icon":"skin/date_control.png","parent":"CHECK_RESOURCE","taskType":"CHECK_CALENDAR"},{"processingType":"TASK","id":"CHECK_STOCK_TOTAL_PERMITS","name":"Check stock total permits","icon":"skin/stock-total--check.png","parent":"CHECK_RESOURCE","taskType":"CHECK_STOCK_TOTAL_PERMITS"},{"processingType":"TASK","id":"CHECK_LOCK_STATE","name":"Check lock state","icon":"skin/lock--check.png","parent":"CHECK_RESOURCE","taskType":"CHECK_LOCK_STATE"},{"processingType":"TASK","id":"CHECK_VARIABLE_VALUE","name":"Check variable value","icon":"skin/pi_math--check.png","parent":"CHECK_RESOURCE","taskType":"CHECK_VARIABLE_VALUE"},{"processingType":"TASK","id":"CHECK_PHYSICAL_RESOURCE","name":"Check physical resource","icon":"skin/memory.png","parent":"CHECK_RESOURCE","taskType":"CHECK_PHYSICAL_RESOURCE"},{"processingType":"TASK","id":"CHECK_METRIC","name":"Check metric","icon":"skin/gauge.png","parent":"CHECK_RESOURCE","taskType":"CHECK_METRIC"},{"processingType":"TASK","taskType":"RESOURCE_ADD_TAG","id":"RESOURCE_ADD_TAG","icon":"skin/price_tag_plus.png","name":"Resource Add Tag","parent":"RESOURCE"},{"processingType":"TASK","taskType":"RESOURCE_REMOVE_TAG","id":"RESOURCE_REMOVE_TAG","icon":"skin/price_tag_minus.png","name":"Resource Remove Tag","parent":"RESOURCE"},{"processingType":"TASK","taskType":"RESOURCE_SET_FOLDER","id":"RESOURCE_SET_FOLDER","icon":"skin/folder.png","name":"Set Resource Folder","parent":"RESOURCE"},{"folder":true,"id":"SERVER_NODE","icon":"skin/servers.png","name":"Server Node","parent":"INTERNAL"},{"processingType":"TASK","taskType":"SERVER_NODE_HOLD","id":"SERVER_NODE_HOLD","icon":"skin/hold.png","name":"Server Node Hold","parent":"SERVER_NODE"},{"processingType":"TASK","taskType":"SERVER_NODE_RESUME","id":"SERVER_NODE_RESUME","icon":"skin/resume.png","name":"Server Node Resume","parent":"SERVER_NODE"},{"processingType":"TASK","taskType":"SERVER_NODE_SKIP_ON","id":"SERVER_NODE_SKIP_ON","icon":"skin/passByOn.png","name":"Server Node Skip On","parent":"SERVER_NODE"},{"processingType":"TASK","taskType":"SERVER_NODE_SKIP_OFF","id":"SERVER_NODE_SKIP_OFF","icon":"skin/passByOff.png","name":"Server Node Skip Off","parent":"SERVER_NODE"},{"processingType":"TASK","taskType":"SERVER_NODE_ABORT_ALL","id":"SERVER_NODE_ABORT_ALL","icon":"skin/kill.png","name":"Server Node Abort All","parent":"SERVER_NODE"},{"processingType":"TASK","taskType":"SERVER_NODE_KILL_ALL","id":"SERVER_NODE_KILL_ALL","icon":"skin/kill.png","name":"Server Node Kill All","parent":"SERVER_NODE"},{"processingType":"TASK","taskType":"SERVER_NODE_STOP","id":"SERVER_NODE_STOP","icon":"skin/stop.png","name":"Server Node Stop","parent":"SERVER_NODE"},{"processingType":"TASK","taskType":"SERVER_NODE_ADD_TAG","id":"SERVER_NODE_ADD_TAG","icon":"skin/price_tag_plus.png","name":"Server Node Add Tag","parent":"SERVER_NODE"},{"processingType":"TASK","taskType":"SERVER_NODE_REMOVE_TAG","id":"SERVER_NODE_REMOVE_TAG","icon":"skin/price_tag_minus.png","name":"Server Node Remove Tag","parent":"SERVER_NODE"},{"processingType":"TASK","taskType":"SERVER_NODE_SET_FOLDER","id":"SERVER_NODE_SET_FOLDER","icon":"skin/folder.png","name":"Server Node Set Folder","parent":"SERVER_NODE"},{"processingType":"TASK","taskType":"SERVER_NODE_SET_TOTAL_WEIGHT_CAPACITY","id":"SERVER_NODE_SET_TOTAL_WEIGHT_CAPACITY","icon":"skin/folder.png","name":"Server Node Set Capacity","parent":"SERVER_NODE"},{"folder":true,"id":"PROCESSING_TEMPLATE","icon":"skin/clock.png","name":"Processing Template","parent":"INTERNAL"},{"processingType":"TASK","taskType":"PROCESSING_TEMPLATE_HOLD","id":"PROCESSING_TEMPLATE_HOLD","icon":"skin/hold.png","name":"Processing Template Hold","parent":"PROCESSING_TEMPLATE"},{"processingType":"TASK","taskType":"PROCESSING_TEMPLATE_RESUME","id":"PROCESSING_TEMPLATE_RESUME","icon":"skin/resume.png","name":"Processing Template Resume","parent":"PROCESSING_TEMPLATE"},{"processingType":"TASK","taskType":"PROCESSING_TEMPLATE_SKIP_ON","id":"PROCESSING_TEMPLATE_SKIP_ON","icon":"skin/passByOn.png","name":"Processing Template Skip On","parent":"PROCESSING_TEMPLATE"},{"processingType":"TASK","taskType":"PROCESSING_TEMPLATE_SKIP_OFF","id":"PROCESSING_TEMPLATE_SKIP_OFF","icon":"skin/passByOff.png","name":"Processing Template Skip Off","parent":"PROCESSING_TEMPLATE"},{"folder":true,"id":"MAINTENANCE","icon":"skin/gear.png","name":"Maintenance","parent":"INTERNAL"},{"processingType":"TASK","taskType":"ARCHIVE_INTERVAL","id":"ARCHIVE_INTERVAL","icon":"skin/archive.png","name":"Archive old processing items","parent":"MAINTENANCE"},{"processingType":"TASK","taskType":"ARCHIVE_CLEANUP","id":"ARCHIVE_CLEANUP","icon":"skin/archive.png","name":"Archive cleanup","parent":"MAINTENANCE"},{"processingType":"TASK","taskType":"RECALCULATE_STATISTICS","id":"RECALCULATE_STATISTICS","icon":"skin/calculator.png","name":"Recalculate Statistic","parent":"MAINTENANCE"},{"processingType":"TASK","taskType":"DESIGN_BACKUP","id":"DESIGN_BACKUP","icon":"skin/drive-download.png","name":"Design Backup","parent":"MAINTENANCE"},{"processingType":"TASK","taskType":"DESIGN_IMPORT","id":"DESIGN_IMPORT","icon":"skin/drive-download.png","name":"Design Import","parent":"MAINTENANCE"},{"folder":true,"id":"OTHER","icon":"skin/alarm.png","name":"Other","parent":"INTERNAL"},{"processingType":"TASK","taskType":"WAIT","id":"WAIT","icon":"skin/alarm.png","name":"Wait","parent":"OTHER"},{"processingType":"TASK","taskType":"CHECK_TIME","id":"CHECK_TIME","icon":"skin/clock.png","name":"Check Time","parent":"OTHER"},{"id":"USER_TASKS","name":"User","icon":"skin/user.png","parent":"INTERNAL","folder":true},{"processingType":"TASK","taskType":"USER_CONFIRM","id":"USER_CONFIRM","icon":"skin/thumbUp.png","name":"User confirmation","parent":"USER_TASKS"},{"processingType":"TASK","taskType":"USER_INPUT","id":"USER_INPUT","icon":"skin/pencil.png","name":"User input","parent":"USER_TASKS"},{"processingType":"TASK","taskType":"NOTIFY_GROUP","id":"NOTIFY_GROUP","icon":"skin/users.png","name":"Notify Group","parent":"USER_TASKS"},{"processingType":"TASK","taskType":"NOTIFY_CHANNEL","id":"NOTIFY_CHANNEL","icon":"skin/mail_server_exim.png","name":"Notify Channel","parent":"USER_TASKS"},{"processingType":"TASK","taskType":"NOTIFY_EMAIL","id":"NOTIFY_EMAIL","icon":"skin/mail.png","name":"Notify Email","parent":"USER_TASKS"},{"processingType":"TASK","taskType":"ADHOC_REPORT_SEND","id":"ADHOC_REPORT_SEND","icon":"skin/table.png","name":"Adhoc Report Send","parent":"USER_TASKS"},{"processingType":"TASK","id":"AE","icon":"skin/terminal.gif","name":"AE","parent":"INTERNAL","folder":true},{"processingType":"TASK","taskType":"AE_SCRIPT","id":"AE_SCRIPT","icon":"skin/terminal.gif","name":"AE Script","parent":"AE"},{"processingType":"WORKFLOW","id":"WORKFLOW","name":"Workflow","icon":"skin/diagram.png","folder":true},{"processingType":"WORKFLOW","workflowType":"STANDARD","id":"STANDARD","icon":"skin/diagram.png","name":"Workflow","parent":"WORKFLOW"},{"processingType":"WORKFLOW","workflowType":"BROADCAST","id":"BROADCAST","icon":"skin/rss.png","name":"Broadcast","parent":"WORKFLOW"},{"processingType":"WORKFLOW","workflowType":"FOR_EACH","id":"FOR_EACH","icon":"skin/ordered_list.png","name":"For Each","parent":"WORKFLOW"},{"processingType":"WORKFLOW","workflowType":"SWITCH","id":"SWITCH","icon":"skin/switch.png","name":"Switch","parent":"WORKFLOW"},{"processingType":"WORKFLOW","workflowType":"CYCLE","id":"CYCLE","icon":"skin/cycle.png","name":"Cycle","parent":"WORKFLOW"},{"processingType":"WORKFLOW","workflowType":"TIME_SERIES","id":"TIME_SERIES","icon":"skin/ui-paginator.png","name":"Time Series","parent":"WORKFLOW"},{"processingType":"SERVICE","serviceType":"SENSOR","sensorType":"FILE_SENSOR","id":"FILE_SENSOR","icon":"skin/fileWatcher.png","name":"File Sensor","parent":"FILE_PROCESSING"},{"processingType":"SERVICE","serviceType":"SENSOR","sensorType":"JIRA_ISSUE_SENSOR","id":"JIRA_ISSUE_SENSOR","icon":"skin/jira.png","name":"Jira Issue Sensor","parent":"JIRA"},{"processingType":"TASK","id":"JIRA_ADD_ISSUE","parent":"JIRA","icon":"skin/jira.png","name":"Jira Add Issue","taskType":"JIRA_ADD_ISSUE"},{"id":"RPA","icon":"skin/robot.png","name":"Robotic Process Automation","parent":"TASK","folder":true},{"processingType":"TASK","id":"UI_PATH","icon":"skin/uipath.ico","name":"UiPath","parent":"RPA","taskType":"UI_PATH"},{"processingType":"TASK","id":"BLUE_PRISM","icon":"skin/blueprism.ico","name":"Blue Prism","parent":"RPA","taskType":"BLUE_PRISM"},{"processingType":"TASK","id":"ROBOT_FRAMEWORK_START_ROBOT","icon":"skin/robotFramework.png","name":"Robot Framework Start Robot","parent":"RPA","taskType":"ROBOT_FRAMEWORK_START_ROBOT"},{"id":"BI","icon":"skin/table_chart.png","name":"Business Intelligence","parent":"TASK","folder":true},{"id":"MICROSOFT_POWER_BI","icon":"skin/table_chart.png","name":"Microsoft Power BI","parent":"BI","folder":true},{"processingType":"TASK","id":"MICROSOFT_POWER_BI_DATASET_REFRESH","icon":"skin/powerBi.ico","name":"Microsoft Power BI Refresh Data Set","parent":"MICROSOFT_POWER_BI","taskType":"MICROSOFT_POWER_BI_DATASET_REFRESH"},{"processingType":"TASK","id":"MICROSOFT_POWER_BI_DATAFLOW_REFRESH","icon":"skin/powerBi.ico","name":"Microsoft Power BI Refresh Data Flow","parent":"MICROSOFT_POWER_BI","taskType":"MICROSOFT_POWER_BI_DATAFLOW_REFRESH"},{"id":"INSTANT_MESSAGING","name":"Instant Messaging","icon":"skin/comment_edit.png","parent":"TASK","folder":true},{"processingType":"TASK","id":"TELEGRAM_MESSAGE","icon":"skin/telegram.png","name":"Telegram Message","parent":"INSTANT_MESSAGING","taskType":"TELEGRAM_MESSAGE"},{"processingType":"TASK","id":"WHATSAPP_MESSAGE","icon":"skin/whatsapp.png","name":"WhatsApp Message","parent":"INSTANT_MESSAGING","taskType":"WHATSAPP_MESSAGE"},{"processingType":"SERVICE","serviceType":"SENSOR","sensorType":"SQL_SENSOR","id":"SQL_SENSOR","icon":"skin/database-sql.png","name":"SQL Sensor","parent":"SQL"},{"processingType":"SERVICE","serviceType":"SENSOR","sensorType":"Z_OS_JES_JOB_SENSOR","id":"Z_OS_JES_JOB_SENSOR","icon":"skin/zos.png","name":"z/OS JES Job Sensor","parent":"Z_OS"},{"processingType":"SERVICE","serviceType":"MONITOR","monitorType":"SH_MONITOR","id":"SH_MONITOR","icon":"skin/terminal.gif","name":"Shell Monitor","parent":"CODE"},{"processingType":"SERVICE","serviceType":"MONITOR","monitorType":"PYTHON_MONITOR","id":"PYTHON_MONITOR","icon":"skin/python.png","name":"Python Monitor","parent":"CODE"},{"processingType":"SERVICE","serviceType":"MONITOR","monitorType":"PERL_MONITOR","id":"PERL_MONITOR","icon":"skin/perl.png","name":"Perl Monitor","parent":"CODE"},{"processingType":"SERVICE","serviceType":"MONITOR","monitorType":"RUBY_MONITOR","id":"RUBY_MONITOR","icon":"skin/ruby.png","name":"Ruby Monitor","parent":"CODE"},{"processingType":"SERVICE","serviceType":"MONITOR","monitorType":"GROOVY_MONITOR","id":"GROOVY_MONITOR","icon":"skin/groovy.png","name":"Groovy Monitor","parent":"CODE"},{"processingType":"SERVICE","serviceType":"MONITOR","monitorType":"POWERSHELL_MONITOR","id":"POWERSHELL_MONITOR","icon":"skin/powershell.png","name":"PowerShell Monitor","parent":"CODE"},{"processingType":"SERVICE","serviceType":"MONITOR","monitorType":"HTTP_MONITOR","id":"HTTP_MONITOR","icon":"skin/http.png","name":"HTTP Monitor","parent":"WEB"},{"folder":true,"id":"OPERATING_SYSTEM_MONITOR","icon":"skin/system-monitor.png","name":"OS Monitors","parent":"TASK"},{"processingType":"SERVICE","serviceType":"MONITOR","monitorType":"SYSTEM_MONITOR","id":"SYSTEM_MONITOR","icon":"skin/memory.png","name":"System Monitor","parent":"OPERATING_SYSTEM_MONITOR"},{"processingType":"SERVICE","serviceType":"MONITOR","monitorType":"SYSTEM_PROCESS_MONITOR","id":"SYSTEM_PROCESS_MONITOR","icon":"skin/system-monitor.png","name":"System Process Monitor","parent":"OPERATING_SYSTEM_MONITOR"},{"processingType":"SERVICE","serviceType":"MONITOR","monitorType":"SAP_R3_JOB_MONITOR","id":"SAP_R3_JOB_MONITOR","icon":"skin/sap.png","name":"SAP R/3 Job Monitor","parent":"SAP_R3_JOBS"},{"id":"SLA","title":"Service Manager","name":"Service Manager","icon":"skin/traffic-light.png","folder":true},{"id":"BUSINESS_VIEW","title":"Business View","icon":"skin/chart_organisation.png","processingType":"SERVICE","serviceType":"SERVICE_MANAGER","serviceManagerType":"BUSINESS_VIEW","name":"Business View"},{"id":"SLA_SERVICE_MANAGER","title":"Service Level Agreement","icon":"skin/traffic-light.png","processingType":"SERVICE","serviceType":"SERVICE_MANAGER","serviceManagerType":"SLA_SERVICE_MANAGER","name":"Service Level Agreement","parent":"SLA"},{"processingType":"SERVICE","serviceType":"MONITOR","monitorType":"PROCESSING_BASELINE_DEVIATION_MONITOR","id":"PROCESSING_BASELINE_DEVIATION_MONITOR","icon":"skin/chart_down_color.png","name":"Baseline Deviation Monitor","parent":"PROCESSING"},{"processingType":"SERVICE","serviceType":"MONITOR","monitorType":"PROCESSING_DEADLINE_MONITOR","id":"PROCESSING_DEADLINE_MONITOR","icon":"skin/chart_stock.png","name":"Processing Deadline Monitor","parent":"SLA"},{"processingType":"TRIGGER","id":"TRIGGER","name":"Trigger","icon":"skin/arrow-out.png","folder":true},{"processingType":"TRIGGER","triggerType":"SCHEDULE","id":"SCHEDULE","icon":"skin/clock.png","name":"Time Schedule","parent":"TRIGGER"},{"processingType":"TRIGGER","triggerType":"USER","id":"USER","icon":"skin/user.png","name":"User","parent":"TRIGGER"},{"processingType":"TRIGGER","triggerType":"EVENT","id":"EVENT","icon":"skin/arrow-out.png","name":"Event Schedule","parent":"TRIGGER"},{"processingType":"TRIGGER","triggerType":"SELF_SERVICE","id":"SELF_SERVICE","icon":"skin/user.png","name":"Self Service","parent":"TRIGGER"},{"parent":"NONEXISTING_ITEM_TO_HIDE_FROM_VIEW","processingType":"TASK","taskType":"TRIGGER_ITEM","id":"TRIGGER_ITEM","name":"Trigger Item","icon":"skin/exe.png","inactive":true},{"processingType":"TASK","taskType":"PROCESSING_OBSERVER","id":"PROCESSING_OBSERVER","icon":"skin/emotion_eye.png","name":"Processing Observer","parent":"NONEXISTING_ITEM_TO_HIDE_FROM_VIEW","inactive":true}]' | ConvertFrom-Json
+    [Cmdletbinding()]
+    Param(
+        [switch]$JustGiveMeTheJSON
+    )
+    [PSCustomObject]$TaskTypesJson = '[{"processingType":"TASK","id":"TASK","name":"Task","icon":"skin/service.png","folder":"true"},{"folder":"true","id":"CODE","icon":"skin/terminal.gif","name":"Code","parent":"TASK"},{"id":"FILE_PROCESSING","name":"File Processing","icon":"skin/drive-network.png","folder":true,"processingType":"TASK","parent":"TASK"},{"folder":"true","id":"SQL","icon":"skin/database-sql.png","name":"SQL Database","parent":"TASK"},{"folder":"true","id":"NO_SQL","icon":"skin/database-gear.png","name":"NoSQL Database","parent":"TASK"},{"folder":"true","id":"MESSAGE_QUEUE","icon":"skin/queue.png","name":"Message Queue","parent":"TASK"},{"processingType":"TASK","taskType":"SH","id":"SH","icon":"skin/terminal.gif","name":"Shell Task","parent":"CODE"},{"processingType":"TASK","taskType":"AE_SHELL_SCRIPT","id":"AE_SHELL_SCRIPT","icon":"skin/terminal.gif","name":"AE Shell Task","parent":"CODE"},{"processingType":"TASK","taskType":"PYTHON","id":"PYTHON","icon":"skin/python.png","name":"Python Task","parent":"CODE"},{"processingType":"TASK","taskType":"PERL","id":"PERL","icon":"skin/perl.png","name":"Perl Task","parent":"CODE"},{"processingType":"TASK","taskType":"RUBY","id":"RUBY","icon":"skin/ruby.png","name":"Ruby Task","parent":"CODE"},{"processingType":"TASK","taskType":"GROOVY","id":"GROOVY","icon":"skin/groovy.png","name":"Groovy Task","parent":"CODE"},{"processingType":"TASK","taskType":"POWERSHELL","id":"POWERSHELL","icon":"skin/powershell.png","name":"PowerShell Task","parent":"CODE"},{"processingType":"TASK","id":"JAVA","taskType":"JAVA","name":"Java Task","icon":"skin/java.png","parent":"CODE"},{"processingType":"TASK","id":"SCALA","taskType":"SCALA","name":"Scala Task","icon":"skin/scala.png","parent":"CODE"},{"folder":"true","id":"IBM_SERIES","icon":"skin/ibm.png","name":"Mainframe/JCL","parent":"TASK"},{"folder":"true","id":"Z_OS","icon":"skin/zos.png","name":"z/OS","parent":"IBM_SERIES"},{"processingType":"TASK","taskType":"Z_OS_DYNAMIC_JCL","id":"Z_OS_DYNAMIC_JCL","icon":"skin/zos.png","name":"z/OS Dynamic JCL","parent":"Z_OS"},{"processingType":"TASK","taskType":"Z_OS_STORED_JCL","id":"Z_OS_STORED_JCL","icon":"skin/zos.png","name":"z/OS Stored JCL","parent":"Z_OS"},{"processingType":"TASK","taskType":"Z_OS_COMMAND","id":"Z_OS_COMMAND","icon":"skin/zos.png","name":"z/OS Command","parent":"Z_OS"},{"folder":"true","id":"RAINCODE_JCL","icon":"skin/raincode.ico","name":"Raincode JCL","parent":"IBM_SERIES"},{"processingType":"TASK","taskType":"RAINCODE_DYNAMIC_JCL","id":"RAINCODE_DYNAMIC_JCL","icon":"skin/raincode.ico","name":"Raincode Dynamic JCL","parent":"RAINCODE_JCL"},{"processingType":"TASK","taskType":"RAINCODE_STORED_JCL","id":"RAINCODE_STORED_JCL","icon":"skin/raincode.ico","name":"Raincode Stored JCL","parent":"RAINCODE_JCL"},{"folder":"true","id":"OPENTEXT","icon":"skin/microfocus.png","name":"OpenText JCL","parent":"IBM_SERIES"},{"processingType":"TASK","taskType":"OPENTEXT_DYNAMIC_JCL","id":"OPENTEXT_DYNAMIC_JCL","icon":"skin/microfocus.png","name":"OpenText Dynamic JCL","parent":"OPENTEXT"},{"processingType":"TASK","taskType":"OPENTEXT_STORED_JCL","id":"OPENTEXT_STORED_JCL","icon":"skin/microfocus.png","name":"OpenText Stored JCL","parent":"OPENTEXT"},{"folder":"true","id":"AS_400","icon":"skin/ibm_as400.gif","name":"IBM i","parent":"TASK"},{"processingType":"TASK","taskType":"AS400_BATCH_JOB","id":"AS400_BATCH_JOB","icon":"skin/ibm_as400.gif","name":"i Batch Job","parent":"AS_400"},{"processingType":"TASK","taskType":"AS400_PROGRAM_CALL","id":"AS400_PROGRAM_CALL","icon":"skin/ibm_as400.gif","name":"i Program Call","parent":"AS_400"},{"processingType":"TASK","taskType":"AS400_COMMAND_CALL","id":"AS400_COMMAND_CALL","icon":"skin/ibm_as400.gif","name":"i Control Language Command","parent":"AS_400"},{"processingType":"TASK","taskType":"AS400_RPA","id":"AS400_RPA","icon":"skin/ibm_as400.gif","name":"i RPA","parent":"AS_400"},{"processingType":"TASK","taskType":"RDBMS_STORED_PROCEDURE","id":"RDBMS_STORED_PROCEDURE","icon":"skin/database-gear.png","name":"Stored Procedure Call","parent":"SQL"},{"processingType":"TASK","taskType":"RDBMS_SQL_STATEMENT","id":"RDBMS_SQL_STATEMENT","icon":"skin/database_search.png","name":"RDBMS SQL Statement","parent":"SQL"},{"processingType":"TASK","taskType":"RDBMS_SQL","id":"RDBMS_SQL","icon":"skin/database-sql.png","name":"SQL Script","parent":"SQL"},{"folder":"true","id":"BIG_DATA","icon":"skin/database-gear.png","name":"Big Data","parent":"TASK"},{"folder":"true","id":"REDIS","icon":"skin/redis.png","name":"Redis","parent":"NO_SQL"},{"processingType":"TASK","taskType":"REDIS_SET","id":"REDIS_SET","icon":"skin/redis.png","name":"Redis Set","parent":"REDIS"},{"processingType":"TASK","taskType":"REDIS_GET","id":"REDIS_GET","icon":"skin/redis.png","name":"Redis Get","parent":"REDIS"},{"processingType":"TASK","taskType":"REDIS_DELETE","id":"REDIS_DELETE","icon":"skin/redis.png","name":"Redis Delete","parent":"REDIS"},{"processingType":"TASK","taskType":"REDIS_CLI","id":"REDIS_CLI","icon":"skin/redis.png","name":"Redis Command","parent":"REDIS"},{"processingType":"TASK","id":"HDFS","name":"HDFS","icon":"skin/hadoop.png","parent":"BIG_DATA","folder":"true"},{"processingType":"TASK","id":"HDFS_UPLOAD_FILE","taskType":"HDFS_UPLOAD_FILE","name":"HDFS Upload File","icon":"skin/hadoop.png","parent":"HDFS"},{"processingType":"TASK","id":"HDFS_APPEND_FILE","taskType":"HDFS_APPEND_FILE","name":"HDFS Append File","icon":"skin/hadoop.png","parent":"HDFS"},{"processingType":"TASK","id":"HDFS_DOWNLOAD_FILE","taskType":"HDFS_DOWNLOAD_FILE","name":"HDFS Download File","icon":"skin/hadoop.png","parent":"HDFS"},{"processingType":"TASK","id":"HDFS_DELETE_FILE","taskType":"HDFS_DELETE_FILE","name":"HDFS Delete File","icon":"skin/hadoop.png","parent":"HDFS"},{"processingType":"TASK","id":"HDFS_CREATE_DIRECTORY","taskType":"HDFS_CREATE_DIRECTORY","name":"HDFS Create Directory","icon":"skin/hadoop.png","parent":"HDFS"},{"processingType":"TASK","id":"HDFS_DELETE_DIRECTORY","taskType":"HDFS_DELETE_DIRECTORY","name":"HDFS Delete Directory","icon":"skin/hadoop.png","parent":"HDFS"},{"processingType":"TASK","id":"HDFS_RENAME","taskType":"HDFS_RENAME","name":"HDFS Rename","icon":"skin/hadoop.png","parent":"HDFS"},{"processingType":"TASK","id":"HIVE","name":"Hive","icon":"skin/hive.png","parent":"BIG_DATA","inactive":"hideInactiveFeatures"},{"processingType":"TASK","id":"IMPALA","name":"Impala","icon":"skin/impala.png","parent":"BIG_DATA","inactive":"hideInactiveFeatures"},{"processingType":"TASK","id":"SQOOP","name":"Sqoop","icon":"skin/sqoop.png","parent":"BIG_DATA","inactive":"hideInactiveFeatures"},{"processingType":"TASK","id":"YARN","name":"Yarn","icon":"skin/hadoop.png","parent":"BIG_DATA","inactive":"hideInactiveFeatures"},{"processingType":"TASK","id":"SPARK","name":"Spark","icon":"skin/spark.png","parent":"BIG_DATA","folder":"hideInactiveFeatures"},{"id":"SPARK_JAVA","taskType":"SPARK_JAVA","name":"Spark Java Job","icon":"skin/spark.png","parent":"SPARK","processingType":"TASK"},{"id":"SPARK_SCALA","taskType":"SPARK_SCALA","name":"Spark Scala Job","icon":"skin/spark.png","parent":"SPARK","processingType":"TASK"},{"id":"SPARK_PYTHON","taskType":"SPARK_PYTHON","name":"Spark Python Job","icon":"skin/spark.png","parent":"SPARK","processingType":"TASK"},{"id":"SPARK_R","taskType":"SPARK_R","name":"Spark R Job","icon":"skin/spark.png","parent":"SPARK","processingType":"TASK"},{"id":"SPARK_SQL","taskType":"SPARK_SQL","name":"Spark SQL Job","icon":"skin/spark.png","parent":"SPARK","processingType":"TASK"},{"processingType":"TASK","id":"FLUME","name":"Flume","icon":"skin/flume.png","parent":"BIG_DATA","inactive":"hideInactiveFeatures"},{"processingType":"TASK","id":"FLINK","name":"Flink","icon":"skin/flink.jpg ","parent":"BIG_DATA","folder":"hideInactiveFeatures"},{"processingType":"TASK","id":"FLINK_RUN_JOB","taskType":"FLINK_RUN_JOB","name":"Flink Run Job","icon":"skin/flink.jpg","parent":"FLINK"},{"processingType":"TASK","id":"FLINK_JAR_UPLOAD","taskType":"FLINK_JAR_UPLOAD","name":"Flink Upload Jar","icon":"skin/flink.jpg","parent":"FLINK"},{"processingType":"TASK","id":"FLINK_JAR_DELETE","taskType":"FLINK_JAR_DELETE","name":"Flink Delete Jar","icon":"skin/flink.jpg","parent":"FLINK"},{"id":"STORM","name":"Storm","icon":"skin/storm.png","parent":"BIG_DATA","inactive":"hideInactiveFeatures"},{"id":"OOZIE","name":"Oozie","icon":"skin/oozie.png","parent":"BIG_DATA","inactive":"hideInactiveFeatures"},{"id":"AMBARI","name":"Ambari","icon":"skin/ambari.png","parent":"BIG_DATA","inactive":"hideInactiveFeatures"},{"id":"MONGO_DB","name":"Mongo DB","icon":"skin/mongodb.gif","parent":"NO_SQL","folder":"true"},{"id":"MONGO_DB_INSERT","name":"Mongo DB Insert Document","icon":"skin/mongodb.gif","parent":"MONGO_DB","processingType":"TASK","taskType":"MONGO_DB_INSERT"},{"id":"IBM_MQ","icon":"skin/ibm_mq.png","name":"IBM MQ","parent":"MESSAGE_QUEUE"},{"processingType":"TASK","taskType":"IBM_MQ_SEND","id":"IBM_MQ_SEND","icon":"skin/ibm_mq.png","name":"Send IBM MQ Message","parent":"IBM_MQ"},{"processingType":"SERVICE","serviceType":"SENSOR","sensorType":"IBM_MQ_SENSOR","id":"IBM_MQ_SENSOR","icon":"skin/ibm_mq.png","name":"IBM MQ Sensor","parent":"IBM_MQ"},{"id":"RABBIT_MQ","name":"RabbitMQ","icon":"skin/rabbitmq.png","parent":"MESSAGE_QUEUE"},{"processingType":"TASK","taskType":"RABBIT_MQ_SEND","id":"RABBIT_MQ_SEND","name":"Send RabbitMQ Message","icon":"skin/rabbitmq.png","parent":"RABBIT_MQ"},{"processingType":"SERVICE","serviceType":"SENSOR","sensorType":"RABBIT_MQ_SENSOR","id":"RABBIT_MQ_SENSOR","icon":"skin/rabbitmq.png","name":"RabbitMQ Message Sensor","parent":"RABBIT_MQ"},{"id":"KAFKA","name":"Kafka","icon":"skin/kafka.png","parent":"MESSAGE_QUEUE"},{"processingType":"TASK","taskType":"KAFKA_SEND","id":"KAFKA_SEND","name":"Send Kafka Message","icon":"skin/kafka.png","parent":"KAFKA"},{"processingType":"SERVICE","serviceType":"SENSOR","sensorType":"KAFKA_SENSOR","id":"KAFKA_SENSOR","icon":"skin/kafka.png","name":"Kafka Message Sensor","parent":"KAFKA"},{"processingType":"TASK","taskType":"JMS","id":"JMS","icon":"skin/java.png","name":"JMS","parent":"MESSAGE_QUEUE","folder":"true"},{"processingType":"TASK","taskType":"JMS_SEND","id":"JMS_SEND","icon":"skin/java.png","name":"Send JMS Message","parent":"JMS"},{"processingType":"SERVICE","serviceType":"SENSOR","sensorType":"JMS_SENSOR","id":"JMS_SENSOR","icon":"skin/java.png","name":"JMS Sensor","parent":"JMS"},{"processingType":"TASK","id":"AMQP","icon":"skin/amqp.ico","name":"AMQP","parent":"MESSAGE_QUEUE","folder":"true"},{"processingType":"TASK","taskType":"AMQP_SEND","id":"AMQP_SEND","icon":"skin/amqp.ico","name":"Send AMQP Message","parent":"AMQP"},{"processingType":"TASK","id":"MQTT","icon":"skin/mqtt.png","name":"MQTT","parent":"MESSAGE_QUEUE","folder":"true"},{"processingType":"TASK","taskType":"MQTT_SEND","id":"MQTT_SEND","icon":"skin/mqtt.png","name":"Send MQTT Message","parent":"MQTT"},{"id":"XMPP","icon":"skin/xmpp.png","name":"XMPP","parent":"MESSAGE_QUEUE","folder":"true"},{"processingType":"TASK","taskType":"XMPP_SEND","id":"XMPP_SEND","icon":"skin/xmpp.png","name":"Send XMPP Message","parent":"XMPP"},{"id":"STOMP","icon":"skin/shoe.png","name":"STOMP","parent":"MESSAGE_QUEUE","folder":"true"},{"processingType":"TASK","taskType":"STOMP_SEND","id":"STOMP_SEND","icon":"skin/shoe.png","name":"Send STOMP Message","parent":"STOMP"},{"processingType":"TASK","taskType":"FILE_TRANSFER","id":"FILE_TRANSFER","icon":"skin/drive-network.png","name":"File Transfer","parent":"FILE_PROCESSING"},{"processingType":"TASK","taskType":"XFTP_COMMAND","id":"XFTP_COMMAND","icon":"skin/drive-network.png","name":"XFTP Command","parent":"FILE_PROCESSING"},{"id":"DATASOURCE_FILE","name":"Data Source","icon":"skin/drive-network.png","folder":"true","parent":"FILE_PROCESSING"},{"id":"DATASOURCE_UPLOAD_FILE","processingType":"TASK","taskType":"DATASOURCE_UPLOAD_FILE","name":"Upload File to Data Source","icon":"skin/drive-upload.png","parent":"DATASOURCE_FILE"},{"id":"DATASOURCE_DOWNLOAD_FILE","processingType":"TASK","taskType":"DATASOURCE_DOWNLOAD_FILE","name":"Download File from Data Source","icon":"skin/drive-download.png","parent":"DATASOURCE_FILE"},{"id":"DATASOURCE_DELETE_FILE","processingType":"TASK","taskType":"DATASOURCE_DELETE_FILE","name":"Delete File from Data Source","icon":"skin/drive_delete.png","parent":"DATASOURCE_FILE"},{"folder":"true","id":"WEB","icon":"skin/world.png","name":"Web","parent":"TASK"},{"folder":"true","id":"EMAIL","icon":"skin/mail.png","name":"Email","parent":"TASK"},{"processingType":"TASK","taskType":"HTTP_REQUEST","id":"HTTP_REQUEST","icon":"skin/http.png","name":"HTTP Request","parent":"WEB"},{"processingType":"TASK","taskType":"REST_WEB_SERVICE_CALL","id":"REST_WEB_SERVICE_CALL","icon":"skin/rest.png","name":"REST Web Service Call","parent":"WEB"},{"processingType":"TASK","taskType":"SOAP_WEB_SERVICE_CALL","id":"SOAP_WEB_SERVICE_CALL","icon":"skin/soap.png","name":"SOAP Web Service Call","parent":"WEB"},{"processingType":"TASK","taskType":"EMAIL_SEND","id":"EMAIL_SEND","icon":"skin/mail.png","name":"Send Email","parent":"EMAIL"},{"processingType":"TASK","taskType":"EMAIL_CONFIRMATION","id":"EMAIL_CONFIRMATION","icon":"skin/mail--pencil.png","name":"Email Confirmation","parent":"EMAIL"},{"processingType":"TASK","taskType":"EMAIL_INPUT","id":"EMAIL_INPUT","icon":"skin/mail-open-table.png","name":"Email Input","parent":"EMAIL"},{"processingType":"SERVICE","serviceType":"SENSOR","sensorType":"EMAIL_SENSOR","id":"EMAIL_SENSOR","icon":"skin/mail.png","name":"Email Sensor","parent":"EMAIL"},{"id":"CLOUD_SERVICES","name":"Cloud Services","icon":"skin/cloud.png","folder":"true","parent":"TASK"},{"id":"AWS","name":"Amazon Web Services","icon":"skin/aws.png","parent":"CLOUD_SERVICES","folder":"true"},{"id":"AWS_GLUE","name":"Amazon Glue","icon":"skin/aws.png","parent":"AWS","folder":"true"},{"id":"AWS_GLUE_WORKFLOW","processingType":"TASK","taskType":"AWS_GLUE_WORKFLOW","name":"AWS Glue Workflow","icon":"skin/aws.png","parent":"AWS_GLUE"},{"id":"AWS_GLUE_TRIGGER","processingType":"TASK","taskType":"AWS_GLUE_TRIGGER","name":"AWS Glue Trigger","icon":"skin/aws.png","parent":"AWS_GLUE"},{"id":"AWS_GLUE_CRAWLER","processingType":"TASK","taskType":"AWS_GLUE_CRAWLER","name":"AWS Glue Crawler","icon":"skin/aws.png","parent":"AWS_GLUE"},{"id":"AWS_GLUE_JOB","processingType":"TASK","taskType":"AWS_GLUE_JOB","name":"AWS Glue Job","icon":"skin/aws.png","parent":"AWS_GLUE"},{"id":"AWS_EMR","name":"Amazon EMR","icon":"skin/aws.png","parent":"AWS","folder":"true"},{"id":"AWS_EMR_WORKFLOW","processingType":"TASK","taskType":"AWS_EMR_WORKFLOW","name":"AWS EMR Workflow","icon":"skin/aws.png","parent":"AWS_EMR"},{"id":"AWS_EMR_ADD_STEPS","processingType":"TASK","taskType":"AWS_EMR_ADD_STEPS","name":"AWS EMR Add Steps","icon":"skin/aws.png","parent":"AWS_EMR"},{"id":"AWS_EMR_CANCEL_STEPS","processingType":"TASK","taskType":"AWS_EMR_CANCEL_STEPS","name":"AWS EMR Cancel Steps","icon":"skin/aws.png","parent":"AWS_EMR"},{"id":"AWS_EMR_TERMINATE_JOB_FLOW","processingType":"TASK","taskType":"AWS_EMR_TERMINATE_JOB_FLOW","name":"AWS EMR Terminate Job Flow","icon":"skin/aws.png","parent":"AWS_EMR"},{"id":"AWS_EMR_CONTAINER_MONITOR","processingType":"SERVICE","serviceType":"MONITOR","monitorType":"AWS_EMR_CONTAINER_MONITOR","name":"AWS EMR Container Monitor","icon":"skin/aws.png","parent":"AWS_EMR"},{"id":"AWS_EMR_JOB_FLOW_MONITOR","processingType":"SERVICE","serviceType":"MONITOR","monitorType":"AWS_EMR_JOB_FLOW_MONITOR","name":"AWS EMR Job Flow Monitor","icon":"skin/aws.png","parent":"AWS_EMR"},{"id":"AWS_EMR_STEP_MONITOR","processingType":"SERVICE","serviceType":"MONITOR","monitorType":"AWS_EMR_STEP_MONITOR","name":"AWS EMR Step Monitor","icon":"skin/aws.png","parent":"AWS_EMR"},{"id":"AWS_EMR_NOTEBOOK_MONITOR","processingType":"SERVICE","serviceType":"MONITOR","monitorType":"AWS_EMR_NOTEBOOK_MONITOR","name":"AWS EMR Notebook Monitor","icon":"skin/aws.png","parent":"AWS_EMR"},{"id":"AWS_EMR_PUT","processingType":"TASK","taskType":"AWS_EMR_PUT","name":"AWS EMR Put","icon":"skin/aws.png","parent":"AWS_EMR"},{"id":"AWS_EMR_GET","processingType":"TASK","taskType":"AWS_EMR_GET","name":"AWS EMR Get","icon":"skin/aws.png","parent":"AWS_EMR"},{"id":"AWS_EMR_START_NOTEBOOK_EXECUTION","processingType":"TASK","taskType":"AWS_EMR_START_NOTEBOOK_EXECUTION","name":"AWS EMR Start Notebook Execution","icon":"skin/aws.png","parent":"AWS_EMR"},{"id":"AWS_EMR_STOP_NOTEBOOK_EXECUTION","processingType":"TASK","taskType":"AWS_EMR_STOP_NOTEBOOK_EXECUTION","name":"AWS EMR Stop Notebook Execution","icon":"skin/aws.png","parent":"AWS_EMR"},{"id":"AWS_EMR_API_COMMAND","processingType":"TASK","taskType":"AWS_EMR_API_COMMAND","name":"AWS EMR API Command","icon":"skin/aws.png","parent":"AWS_EMR"},{"id":"AWS_SAGE_MAKER","name":"Amazon SageMaker","icon":"skin/aws.png","parent":"AWS","folder":"true"},{"id":"AWS_SAGE_MAKER_ADD_MODEL","processingType":"TASK","taskType":"AWS_SAGE_MAKER_ADD_MODEL","name":"AWS SageMaker Add Model","icon":"skin/aws.png","parent":"AWS_SAGE_MAKER"},{"id":"AWS_SAGE_MAKER_DELETE_MODEL","processingType":"TASK","taskType":"AWS_SAGE_MAKER_DELETE_MODEL","name":"AWS SageMaker Delete Model","icon":"skin/aws.png","parent":"AWS_SAGE_MAKER"},{"id":"AWS_SAGE_MAKER_PROCESSING","processingType":"TASK","taskType":"AWS_SAGE_MAKER_PROCESSING","name":"AWS SageMaker Processing","icon":"skin/aws.png","parent":"AWS_SAGE_MAKER"},{"id":"AWS_SAGE_MAKER_TRAINING","processingType":"TASK","taskType":"AWS_SAGE_MAKER_TRAINING","name":"AWS SageMaker Training","icon":"skin/aws.png","parent":"AWS_SAGE_MAKER"},{"id":"AWS_SAGE_MAKER_TRANSFORM","processingType":"TASK","taskType":"AWS_SAGE_MAKER_TRANSFORM","name":"AWS SageMaker Transform","icon":"skin/aws.png","parent":"AWS_SAGE_MAKER"},{"id":"AWS_SAGE_MAKER_API_COMMAND","processingType":"TASK","taskType":"AWS_SAGE_MAKER_API_COMMAND","name":"AWS SageMaker API Command","icon":"skin/aws.png","parent":"AWS_SAGE_MAKER"},{"id":"AWS_LAMBDA","name":"AWS Lambda","icon":"skin/aws.png","parent":"AWS","folder":"true"},{"id":"AWS_LAMBDA_INVOKE","name":"AWS Lambda Invoke","icon":"skin/aws.png","parent":"AWS_LAMBDA","processingType":"TASK","taskType":"AWS_LAMBDA_INVOKE"},{"id":"AWS_LAMBDA_CREATE_FUNCTION","name":"AWS Lambda Create Function","icon":"skin/aws.png","parent":"AWS_LAMBDA","processingType":"TASK","taskType":"AWS_LAMBDA_CREATE_FUNCTION"},{"id":"AWS_LAMBDA_DELETE_FUNCTION","name":"AWS Lambda Delete Function","icon":"skin/aws.png","parent":"AWS_LAMBDA","processingType":"TASK","taskType":"AWS_LAMBDA_DELETE_FUNCTION"},{"id":"AWS_EC2","name":"AWS EC2","icon":"skin/aws.png","parent":"AWS","folder":"true"},{"id":"AWS_EC2_START_INSTANCE","name":"AWS EC2 Start   Instance","icon":"skin/aws.png","parent":"AWS_EC2","processingType":"TASK","taskType":"AWS_EC2_START_INSTANCE"},{"id":"AWS_EC2_STOP_INSTANCE","name":"AWS EC2 Stop Instance","icon":"skin/aws.png","parent":"AWS_EC2","processingType":"TASK","taskType":"AWS_EC2_STOP_INSTANCE"},{"id":"AWS_EC2_TERMINATE_INSTANCE","name":"AWS EC2 Terminate Instance","icon":"skin/aws.png","parent":"AWS_EC2","processingType":"TASK","taskType":"AWS_EC2_TERMINATE_INSTANCE"},{"id":"AWS_EC2_DELETE_VOLUME","name":"AWS EC2 Delete Volume","icon":"skin/aws.png","parent":"AWS_EC2","processingType":"TASK","taskType":"AWS_EC2_DELETE_VOLUME"},{"id":"AWS_S3","name":"AWS S3","icon":"skin/aws.png","parent":"AWS","folder":"true"},{"id":"AWS_S3_DELETE_OBJECT","name":"AWS S3 Delete Object","icon":"skin/aws.png","parent":"AWS_S3","processingType":"TASK","taskType":"AWS_S3_DELETE_OBJECT"},{"id":"AWS_S3_COPY_OBJECT","name":"AWS S3 Copy Object","icon":"skin/aws.png","parent":"AWS_S3","processingType":"TASK","taskType":"AWS_S3_COPY_OBJECT"},{"id":"AWS_S3_MOVE_OBJECT","name":"AWS S3 Move Object","icon":"skin/aws.png","parent":"AWS_S3","processingType":"TASK","taskType":"AWS_S3_MOVE_OBJECT"},{"id":"AWS_S3_RENAME_OBJECT","name":"AWS S3 Rename Object","icon":"skin/aws.png","parent":"AWS_S3","processingType":"TASK","taskType":"AWS_S3_RENAME_OBJECT"},{"id":"AWS_BATCH","name":"AWS Batch","icon":"skin/aws.png","parent":"AWS","folder":"true"},{"id":"AWS_BATCH_JOB","name":"AWS Batch Job","icon":"skin/aws.png","parent":"AWS_BATCH","processingType":"TASK","taskType":"AWS_BATCH_JOB"},{"id":"AWS_STEP_FUNCTIONS","name":"AWS Step Functions","icon":"skin/aws.png","parent":"AWS","folder":"true"},{"id":"AWS_START_STEP_FUNCTION_STATE_MACHINE","name":"AWS Start Step Function State Machine","icon":"skin/aws.png","parent":"AWS_STEP_FUNCTIONS","processingType":"TASK","taskType":"AWS_START_STEP_FUNCTION_STATE_MACHINE"},{"id":"CONTAINER","name":"Container","icon":"skin/container.png","folder":"true","processingType":"TASK","parent":"TASK"},{"id":"DOCKER","name":"Docker","icon":"skin/docker.png","parent":"CONTAINER","folder":"true","processingType":"TASK"},{"id":"DOCKER_START","icon":"skin/docker.png","name":"Start Container","parent":"DOCKER","processingType":"TASK","taskType":"DOCKER_START"},{"id":"DOCKER_STOP","icon":"skin/docker.png","name":"Stop Container","parent":"DOCKER","processingType":"TASK","taskType":"DOCKER_STOP"},{"id":"DOCKER_KILL","icon":"skin/docker.png","name":"Kill Container","parent":"DOCKER","processingType":"TASK","taskType":"DOCKER_KILL"},{"id":"DOCKER_EXEC","icon":"skin/docker.png","name":"Execute Command","parent":"DOCKER","processingType":"TASK","taskType":"DOCKER_EXEC"},{"id":"KUBERNETES","name":"Kubernetes","icon":"skin/kubernetes.png","parent":"CONTAINER","folder":"true","processingType":"TASK"},{"id":"KUBERNETES_CREATE_PERSISTENT_VOLUME_TASK","icon":"skin/kubernetes.png","name":"Create Persistent Volume","parent":"KUBERNETES","processingType":"TASK","taskType":"KUBERNETES_CREATE_PERSISTENT_VOLUME_TASK"},{"id":"KUBERNETES_CREATE_VOLUME_CLAIM_TASK","icon":"skin/kubernetes.png","name":"Create Volume Claim","parent":"KUBERNETES","processingType":"TASK","taskType":"KUBERNETES_CREATE_VOLUME_CLAIM_TASK"},{"id":"KUBERNETES_START_POD_TASK","icon":"skin/kubernetes.png","name":"Start POD","parent":"KUBERNETES","processingType":"TASK","taskType":"KUBERNETES_START_POD_TASK"},{"id":"KUBERNETES_COPY_FILE_TO_POD_TASK","icon":"skin/kubernetes.png","name":"Copy file to POD","parent":"KUBERNETES","processingType":"TASK","taskType":"KUBERNETES_COPY_FILE_TO_POD_TASK"},{"id":"KUBERNETES_RUN_TASK","icon":"skin/kubernetes.png","name":"Execute Command on POD","parent":"KUBERNETES","processingType":"TASK","taskType":"KUBERNETES_RUN_TASK"},{"id":"KUBERNETES_DELETE_POD_TASK","icon":"skin/kubernetes.png","name":"Delete POD","parent":"KUBERNETES","processingType":"TASK","taskType":"KUBERNETES_DELETE_POD_TASK"},{"id":"AZURE","name":"Azure","icon":"skin/azure.png","parent":"CLOUD_SERVICES","folder":"true","processingType":"TASK"},{"id":"AZURE_DATA_FACTORY","name":"Azure Data Factory","icon":"skin/azure.png","parent":"AZURE","folder":"true","processingType":"TASK"},{"id":"AZURE_DATA_FACTORY_TRIGGER","processingType":"TASK","taskType":"AZURE_DATA_FACTORY_TRIGGER","name":"Azure Data Factory Trigger","icon":"skin/azure.png","parent":"AZURE_DATA_FACTORY"},{"id":"AZURE_DATA_FACTORY_PIPELINE","processingType":"TASK","taskType":"AZURE_DATA_FACTORY_PIPELINE","name":"Azure Data Factory Pipeline","icon":"skin/azure.png","parent":"AZURE_DATA_FACTORY"},{"id":"AZURE_DATA_LAKE_JOB","processingType":"TASK","taskType":"AZURE_DATA_LAKE_JOB","name":"Azure Data Lake Job","icon":"skin/azure.png","parent":"AZURE"},{"id":"AZURE_DATABRICKS","name":"Azure DataBricks","icon":"skin/azure.png","parent":"AZURE","folder":"true"},{"id":"AZURE_DATABRICKS_JOB","parent":"AZURE_DATABRICKS","icon":"skin/azure.png","name":"Azure DataBricks Run Job","processingType":"TASK","taskType":"AZURE_DATABRICKS_JOB"},{"id":"AZURE_DATABRICKS_TERMINATE_CLUSTER","parent":"AZURE_DATABRICKS","icon":"skin/azure.png","name":"Azure DataBricks Terminate Cluster","processingType":"TASK","taskType":"AZURE_DATABRICKS_TERMINATE_CLUSTER"},{"id":"AZURE_DATABRICKS_START_CLUSTER","parent":"AZURE_DATABRICKS","icon":"skin/azure.png","name":"Azure DataBricks Start Cluster","processingType":"TASK","taskType":"AZURE_DATABRICKS_START_CLUSTER"},{"processingType":"SERVICE","serviceType":"MONITOR","monitorType":"AZURE_DATABRICKS_CLUSTER_MONITOR","id":"AZURE_DATABRICKS_CLUSTER_MONITOR","icon":"skin/azure.png","name":"Azure DataBricks Cluster Monitor","parent":"AZURE_DATABRICKS"},{"processingType":"TASK","taskType":"AZURE_DATABRICKS_LIST_CLUSTERS","id":"AZURE_DATABRICKS_LIST_CLUSTERS","icon":"skin/azure.png","name":"Azure DataBricks List Clusters","parent":"AZURE_DATABRICKS"},{"processingType":"TASK","taskType":"AZURE_DATABRICKS_DELETE_CLUSTER","id":"AZURE_DATABRICKS_DELETE_CLUSTER","icon":"skin/azure.png","name":"Azure DataBricks Delete Cluster Permanently","parent":"AZURE_DATABRICKS"},{"id":"INFORMATICA_CLOUD","name":"Informatica Cloud","icon":"skin/informatica.ico","parent":"CLOUD_SERVICES","folder":"true"},{"processingType":"TASK","taskType":"INFORMATICA_CLOUD_TASKFLOW","id":"INFORMATICA_CLOUD_TASKFLOW","icon":"skin/informatica.ico","name":"Informatica Cloud Taskflow","parent":"INFORMATICA_CLOUD"},{"folder":"true","id":"ETL","icon":"skin/etl.png","name":"ETL","parent":"TASK"},{"processingType":"TASK","taskType":"INFORMATICA_WORKFLOW","id":"INFORMATICA_WORKFLOW","icon":"skin/informatica.ico","name":"Informatica Power Center Workflow","parent":"ETL"},{"processingType":"TASK","taskType":"INFORMATICA_WS_WORKFLOW","id":"INFORMATICA_WS_WORKFLOW","icon":"skin/informatica.ico","name":"Informatica Power Center Web Service Workflow","parent":"ETL"},{"processingType":"TASK","taskType":"IBM_DATASTAGE","id":"IBM_DATASTAGE","icon":"skin/ibminfosphere.png","name":"IBM Infosphere DataStage","parent":"ETL"},{"processingType":"TASK","taskType":"MS_SSIS","id":"MS_SSIS","icon":"skin/ssis.png","name":"MS SQL Server Integration Services","parent":"ETL"},{"folder":"true","id":"ORACLE_DATA_INTEGRATOR","icon":"skin/odi.png","name":"Oracle Data Integrator","parent":"ETL"},{"processingType":"TASK","taskType":"ODI_SESSION","id":"ODI_SESSION","icon":"skin/odi.png","name":"ODI Session","parent":"ORACLE_DATA_INTEGRATOR"},{"processingType":"TASK","taskType":"ODI_LOAD_PLAN","id":"ODI_LOAD_PLAN","icon":"skin/odi.png","name":"ODI Load Plan","parent":"ORACLE_DATA_INTEGRATOR"},{"folder":"true","id":"SAS","icon":"skin/sas.png","name":"SAS","parent":"ETL"},{"processingType":"TASK","taskType":"SAS_4GL","id":"SAS_4GL","icon":"skin/sas.png","name":"SAS Dynamic Code","parent":"SAS"},{"processingType":"TASK","taskType":"SAS_DI","id":"SAS_DI","icon":"skin/sas.png","name":"SAS Stored Code","parent":"SAS"},{"processingType":"TASK","taskType":"SAS_JOB","id":"SAS_JOB","icon":"skin/sas.png","name":"SAS Job","parent":"SAS"},{"folder":"true","id":"SAS_VIYA","icon":"skin/sas_viya.png","name":"SAS Viya","parent":"ETL"},{"processingType":"TASK","taskType":"SAS_VIYA_JOB","id":"SAS_VIYA_JOB","icon":"skin/sas_viya.png","name":"SAS Viya Job","parent":"SAS_VIYA"},{"id":"TALEND","parent":"ETL","icon":"skin/talend.png","name":"Talend"},{"processingType":"TASK","taskType":"TALEND_JOB","id":"TALEND_JOB","icon":"skin/talend.png","name":"Talend Job","parent":"TALEND"},{"id":"DBT_GROUP","icon":"skin/dbt.ico","name":"dbt","parent":"ETL"},{"processingType":"TASK","taskType":"DBT_JOB","id":"DBT_JOB","icon":"skin/dbt.ico","name":"dbt Job","parent":"DBT_GROUP"},{"processingType":"TASK","taskType":"DBT_CORE_JOB","id":"DBT_CORE_JOB","icon":"skin/dbt.ico","name":"dbt Core Job","parent":"DBT_GROUP"},{"folder":"true","id":"ERP","icon":"skin/erp.png","name":"ERP","parent":"TASK"},{"folder":"true","id":"SAP_R3","icon":"skin/sap.png","name":"SAP R/3","parent":"ERP"},{"folder":"true","id":"SAP_R3_JOBS","icon":"skin/sap.png","name":"SAP R/3 Job","parent":"SAP_R3"},{"folder":"true","id":"SAP_R3_OTHER","icon":"skin/sap.png","name":"SAP R/3 Other","parent":"SAP_R3"},{"folder":"true","id":"SAP_4H","icon":"skin/sap.png","name":"SAP S/4HANA","parent":"ERP"},{"folder":"true","id":"SAP_4H_JOBS","icon":"skin/sap.png","name":"SAP 4/HANA Job","parent":"SAP_4H"},{"folder":"true","id":"SAP_4H_OTHER","icon":"skin/sap.png","name":"SAP 4/HANA Other","parent":"SAP_4H"},{"folder":"true","id":"SAP_4HC","icon":"skin/sap.png","name":"SAP S/4HANA Cloud","parent":"ERP"},{"processingType":"TASK","taskType":"SAP_R3_JOB","id":"SAP_R3_JOB","icon":"skin/sap.png","name":"SAP R/3 Job","parent":"SAP_R3_JOBS"},{"processingType":"TASK","taskType":"SAP_R3_VARIANT_CREATE","id":"SAP_R3_VARIANT_CREATE","icon":"skin/sap.png","name":"SAP R/3 Create Variant","parent":"SAP_R3_JOBS"},{"processingType":"TASK","taskType":"SAP_R3_VARIANT_COPY","id":"SAP_R3_VARIANT_COPY","icon":"skin/sap.png","name":"SAP R/3 Copy Variant","parent":"SAP_R3_JOBS"},{"processingType":"TASK","taskType":"SAP_R3_VARIANT_UPDATE","id":"SAP_R3_VARIANT_UPDATE","icon":"skin/sap.png","name":"SAP R/3 Update Variant","parent":"SAP_R3_JOBS"},{"processingType":"TASK","taskType":"SAP_R3_VARIANT_DELETE","id":"SAP_R3_VARIANT_DELETE","icon":"skin/sap.png","name":"SAP R/3 Delete Variant","parent":"SAP_R3_JOBS"},{"processingType":"TASK","taskType":"SAP_R3_RAISE_EVENT","id":"SAP_R3_RAISE_EVENT","icon":"skin/sap.png","name":"SAP R/3 Raise Event","parent":"SAP_R3_OTHER"},{"processingType":"SERVICE","serviceType":"SENSOR","sensorType":"SAP_R3_EVENT_SENSOR","id":"SAP_R3_EVENT_SENSOR","icon":"skin/sap.png","name":"SAP R/3 Event Sensor","parent":"SAP_R3_OTHER"},{"processingType":"TASK","taskType":"SAP_R3_COPY_EXISTING_JOB","id":"SAP_R3_COPY_EXISTING_JOB","icon":"skin/sap.png","name":"SAP R/3 Copy Existing Job","parent":"SAP_R3_JOBS"},{"processingType":"TASK","taskType":"SAP_R3_START_SCHEDULED_JOB","id":"SAP_R3_START_SCHEDULED_JOB","icon":"skin/sap.png","name":"SAP R/3 Start Scheduled Job","parent":"SAP_R3_JOBS"},{"processingType":"TASK","taskType":"SAP_R3_JOB_INTERCEPTOR","id":"SAP_R3_JOB_INTERCEPTOR","icon":"skin/sap.png","name":"SAP R/3 Job Interceptor","parent":"SAP_R3_JOBS"},{"processingType":"TASK","id":"SAP_BW_PROCESS_CHAIN","taskType":"SAP_BW_PROCESS_CHAIN","name":"SAP BW Process Chain","icon":"skin/sap.png","parent":"SAP_R3_OTHER"},{"processingType":"TASK","id":"SAP_ARCHIVE","taskType":"SAP_ARCHIVE","name":"SAP Data Archive","icon":"skin/sap.png","parent":"SAP_R3_OTHER"},{"processingType":"TASK","id":"SAP_FUNCTION_MODULE_CALL","taskType":"SAP_FUNCTION_MODULE_CALL","name":"SAP Function Module Call","icon":"skin/sap.png","parent":"SAP_R3_OTHER"},{"processingType":"TASK","id":"SAP_READ_TABLE","taskType":"SAP_READ_TABLE","name":"SAP Read Table","icon":"skin/sap.png","parent":"SAP_R3_OTHER"},{"processingType":"TASK","id":"SAP_CM_PROFILE_ACTIVATE","taskType":"SAP_CM_PROFILE_ACTIVATE","name":"SAP Activate CM Profile","icon":"skin/sap.png","parent":"SAP_R3_OTHER"},{"processingType":"TASK","id":"SAP_CM_PROFILE_DEACTIVATE","taskType":"SAP_CM_PROFILE_DEACTIVATE","name":"SAP Deactivate CM Profile","icon":"skin/sap.png","parent":"SAP_R3_OTHER"},{"processingType":"TASK","id":"SAP_EXPORT_CALENDAR","taskType":"SAP_EXPORT_CALENDAR","name":"SAP Export Calendar","icon":"skin/sap.png","parent":"SAP_R3_OTHER"},{"processingType":"TASK","id":"SAP_EXPORT_JOB","taskType":"SAP_EXPORT_JOB","name":"SAP Export Job","icon":"skin/sap.png","parent":"SAP_R3_OTHER"},{"processingType":"TASK","id":"SAP_MODIFY_INTERCEPTION_CRITERIA","taskType":"SAP_MODIFY_INTERCEPTION_CRITERIA","name":"SAP R/3 Modify Interception Criteria","icon":"skin/sap.png","parent":"SAP_R3_JOBS"},{"processingType":"SERVICE","serviceType":"SENSOR","sensorType":"SAP_R3_INTERCEPTED_JOB_SENSOR","id":"SAP_R3_INTERCEPTED_JOB_SENSOR","icon":"skin/sap.png","name":"SAP R/3 Intercepted Job Sensor","parent":"SAP_R3_JOBS"},{"processingType":"TASK","taskType":"SAP_4H_JOB","id":"SAP_4H_JOB","icon":"skin/sap.png","name":"SAP 4/H Job","parent":"SAP_4H_JOBS"},{"processingType":"TASK","taskType":"SAP_4H_VARIANT_CREATE","id":"SAP_4H_VARIANT_CREATE","icon":"skin/sap.png","name":"SAP 4/H Create Variant","parent":"SAP_4H_JOBS"},{"processingType":"TASK","taskType":"SAP_4H_VARIANT_COPY","id":"SAP_4H_VARIANT_COPY","icon":"skin/sap.png","name":"SAP 4/H Copy Variant","parent":"SAP_4H_JOBS"},{"processingType":"TASK","taskType":"SAP_4H_VARIANT_UPDATE","id":"SAP_4H_VARIANT_UPDATE","icon":"skin/sap.png","name":"SAP 4/H Update Variant","parent":"SAP_4H_JOBS"},{"processingType":"TASK","taskType":"SAP_4H_VARIANT_DELETE","id":"SAP_4H_VARIANT_DELETE","icon":"skin/sap.png","name":"SAP 4/H Delete Variant","parent":"SAP_4H_JOBS"},{"processingType":"TASK","taskType":"SAP_4H_RAISE_EVENT","id":"SAP_4H_RAISE_EVENT","icon":"skin/sap.png","name":"SAP 4/H Raise Event","parent":"SAP_4H_OTHER"},{"processingType":"SERVICE","serviceType":"SENSOR","sensorType":"SAP_4H_EVENT_SENSOR","id":"SAP_4H_EVENT_SENSOR","icon":"skin/sap.png","name":"SAP 4/H Event Sensor","parent":"SAP_4H_OTHER"},{"processingType":"TASK","taskType":"SAP_4H_COPY_EXISTING_JOB","id":"SAP_4H_COPY_EXISTING_JOB","icon":"skin/sap.png","name":"SAP 4/H Copy Existing Job","parent":"SAP_4H_JOBS"},{"processingType":"TASK","taskType":"SAP_4H_START_SCHEDULED_JOB","id":"SAP_4H_START_SCHEDULED_JOB","icon":"skin/sap.png","name":"SAP 4/H Start Scheduled Job","parent":"SAP_4H_JOBS"},{"processingType":"TASK","taskType":"SAP_4H_JOB_INTERCEPTOR","id":"SAP_4H_JOB_INTERCEPTOR","icon":"skin/sap.png","name":"SAP 4/H Job Interceptor","parent":"SAP_4H_JOBS"},{"processingType":"TASK","id":"SAP_4H_BW_PROCESS_CHAIN","taskType":"SAP_4H_BW_PROCESS_CHAIN","name":"SAP 4/H BW Process Chain","icon":"skin/sap.png","parent":"SAP_4H_OTHER"},{"processingType":"TASK","id":"SAP_4H_ARCHIVE","taskType":"SAP_4H_ARCHIVE","name":"SAP 4/H Data Archive","icon":"skin/sap.png","parent":"SAP_4H_OTHER"},{"processingType":"TASK","id":"SAP_4H_FUNCTION_MODULE_CALL","taskType":"SAP_4H_FUNCTION_MODULE_CALL","name":"SAP 4/H Function Module Call","icon":"skin/sap.png","parent":"SAP_4H_OTHER"},{"processingType":"TASK","id":"SAP_4H_READ_TABLE","taskType":"SAP_4H_READ_TABLE","name":"SAP 4/H Read Table","icon":"skin/sap.png","parent":"SAP_4H_OTHER"},{"processingType":"TASK","id":"SAP_4H_CM_PROFILE_ACTIVATE","taskType":"SAP_4H_CM_PROFILE_ACTIVATE","name":"SAP 4/H Activate CM Profile","icon":"skin/sap.png","parent":"SAP_4H_OTHER"},{"processingType":"TASK","id":"SAP_4H_CM_PROFILE_DEACTIVATE","taskType":"SAP_4H_CM_PROFILE_DEACTIVATE","name":"SAP 4/H Deactivate CM Profile","icon":"skin/sap.png","parent":"SAP_4H_OTHER"},{"processingType":"TASK","id":"SAP_4H_EXPORT_CALENDAR","taskType":"SAP_4H_EXPORT_CALENDAR","name":"SAP 4/H Export Calendar","icon":"skin/sap.png","parent":"SAP_4H_OTHER"},{"processingType":"TASK","id":"SAP_4H_EXPORT_JOB","taskType":"SAP_4H_EXPORT_JOB","name":"SAP 4/H Export Job","icon":"skin/sap.png","parent":"SAP_4H_OTHER"},{"processingType":"TASK","id":"SAP_4H_MODIFY_INTERCEPTION_CRITERIA","taskType":"SAP_4H_MODIFY_INTERCEPTION_CRITERIA","name":"SAP 4/H Modify Interception Criteria","icon":"skin/sap.png","parent":"SAP_4H_JOBS"},{"processingType":"SERVICE","serviceType":"SENSOR","sensorType":"SAP_4H_INTERCEPTED_JOB_SENSOR","id":"SAP_4H_INTERCEPTED_JOB_SENSOR","icon":"skin/sap.png","name":"SAP 4/H Intercepted Job Sensor","parent":"SAP_4H_JOBS"},{"processingType":"SERVICE","serviceType":"MONITOR","monitorType":"SAP_4H_JOB_MONITOR","id":"SAP_4H_JOB_MONITOR","icon":"skin/sap.png","name":"SAP 4/H Job Monitor","parent":"SAP_4H_JOBS"},{"processingType":"TASK","id":"SAP_ODATA_API_CALL","taskType":"SAP_ODATA_API_CALL","name":"SAP ODATA API Call","icon":"skin/sap.png","parent":"SAP_4HC"},{"processingType":"TASK","id":"SAP_IBP_JOB","taskType":"SAP_IBP_JOB","name":"SAP IBP Job","icon":"skin/sap.png","parent":"SAP_4HC"},{"processingType":"TASK","id":"SAP_IBP_CREATE_PROCESS","taskType":"SAP_IBP_CREATE_PROCESS","name":"SAP IBP Create Process","icon":"skin/sap.png","parent":"SAP_4HC","inactive":"hideInactiveFeatures"},{"processingType":"TASK","id":"SAP_IBP_DELETE_PROCESS","taskType":"SAP_IBP_DELETE_PROCESS","name":"SAP IBP Delete Process","icon":"skin/sap.png","parent":"SAP_4HC","inactive":"hideInactiveFeatures"},{"processingType":"TASK","id":"SAP_IBP_SET_PROCESS_STEP_STATUS","taskType":"SAP_IBP_SET_PROCESS_STEP_STATUS","name":"SAP IBP Set Process Job Status","icon":"skin/sap.png","parent":"SAP_4HC","inactive":"hideInactiveFeatures"},{"folder":"true","id":"ORACLE_EBS","icon":"skin/oracle.png","name":"Oracle EBS","parent":"ERP"},{"processingType":"TASK","taskType":"ORACLE_EBS_PROGRAM","id":"ORACLE_EBS_PROGRAM","icon":"skin/oracle.png","name":"Oracle EBS Program","parent":"ORACLE_EBS"},{"processingType":"TASK","taskType":"ORACLE_EBS_REQUEST_SET","id":"ORACLE_EBS_REQUEST_SET","icon":"skin/oracle.png","name":"Oracle EBS Request Set","parent":"ORACLE_EBS"},{"processingType":"TASK","taskType":"ORACLE_EBS_EXECUTE_PROGRAM","id":"ORACLE_EBS_EXECUTE_PROGRAM","icon":"skin/oracle.png","name":"Oracle EBS Execute Program","parent":"ORACLE_EBS"},{"processingType":"TASK","taskType":"ORACLE_EBS_EXECUTE_REQUEST_SET","id":"ORACLE_EBS_EXECUTE_REQUEST_SET","icon":"skin/oracle.png","name":"Oracle EBS Execute Request Set","parent":"ORACLE_EBS"},{"id":"ITSM","folder":"true","icon":"skin/compress_repair.png","name":"ITSM","parent":"TASK"},{"id":"JIRA","parent":"ITSM","icon":"skin/jira.png","name":"Jira","folder":"true"},{"processingType":"SERVICE","serviceType":"SENSOR","sensorType":"JIRA_ISSUE_SENSOR","id":"JIRA_ISSUE_SENSOR","icon":"skin/jira.png","name":"Jira Issue Sensor","parent":"JIRA"},{"processingType":"TASK","id":"JIRA_ADD_ISSUE","parent":"JIRA","icon":"skin/jira.png","name":"Jira Add Issue","taskType":"JIRA_ADD_ISSUE"},{"processingType":"TASK","id":"JIRA_CLOSE_ISSUE","parent":"JIRA","icon":"skin/jira.png","name":"Jira Close Issue","taskType":"JIRA_CLOSE_ISSUE"},{"id":"SERVICE_NOW","parent":"ITSM","icon":"skin/servicenow.png","name":"ServiceNow","folder":"true"},{"id":"SERVICE_NOW_CREATE_INCIDENT","parent":"SERVICE_NOW","processingType":"TASK","taskType":"SERVICE_NOW_CREATE_INCIDENT","icon":"skin/servicenow.png","name":"ServiceNow Create Incident"},{"id":"SERVICE_NOW_RESOLVE_INCIDENT","parent":"SERVICE_NOW","processingType":"TASK","taskType":"SERVICE_NOW_RESOLVE_INCIDENT","icon":"skin/servicenow.png","name":"ServiceNow Resolve Incident"},{"id":"SERVICE_NOW_CLOSE_INCIDENT","parent":"SERVICE_NOW","processingType":"TASK","taskType":"SERVICE_NOW_CLOSE_INCIDENT","icon":"skin/servicenow.png","name":"ServiceNow Close Incident"},{"id":"SERVICE_NOW_UPDATE_INCIDENT","parent":"SERVICE_NOW","processingType":"TASK","taskType":"SERVICE_NOW_UPDATE_INCIDENT","icon":"skin/servicenow.png","name":"ServiceNow Update Incident"},{"id":"SERVICE_NOW_ADD_ATTACHMENT","parent":"SERVICE_NOW","processingType":"TASK","taskType":"SERVICE_NOW_ADD_ATTACHMENT","icon":"skin/servicenow.png","name":"ServiceNow Add Attachment"},{"id":"SERVICE_NOW_INCIDENT_STATUS_SENSOR","parent":"SERVICE_NOW","processingType":"SERVICE","serviceType":"SENSOR","sensorType":"SERVICE_NOW_INCIDENT_STATUS_SENSOR","icon":"skin/servicenow.png","name":"ServiceNow Incident Status Sensor"},{"id":"BMC_REMEDY","parent":"ITSM","icon":"skin/bmc.ico","name":"BMC Remedy","folder":"true"},{"id":"BMC_REMEDY_INCIDENT","parent":"BMC_REMEDY","icon":"skin/bmc.ico","processingType":"TASK","name":"BMC Remedy Incident","taskType":"BMC_REMEDY_INCIDENT"},{"id":"PEOPLESOFT","name":"Peoplesoft","icon":"skin/oracle.png","parent":"ERP","folder":"true"},{"id":"PEOPLESOFT_APPLICATION_ENGINE_TASK","taskType":"PEOPLESOFT_APPLICATION_ENGINE_TASK","name":"Peoplesoft Application Engine","icon":"skin/oracle.png","parent":"PEOPLESOFT","processingType":"TASK"},{"id":"PEOPLESOFT_COBOL_SQL_TASK","name":"Peoplesoft COBOL SQL","icon":"skin/oracle.png","parent":"PEOPLESOFT","inactive":true},{"id":"PEOPLESOFT_CRW_ONLINE_TASK","taskType":"PEOPLESOFT_CRW_ONLINE_TASK","name":"Peoplesoft CRW Online","icon":"skin/oracle.png","parent":"PEOPLESOFT","processingType":"TASK"},{"id":"PEOPLESOFT_CRYSTAL_REPORTS_TASK","taskType":"PEOPLESOFT_CRYSTAL_REPORTS_TASK","name":"Peoplesoft Crystal Reports","icon":"skin/oracle.png","parent":"PEOPLESOFT","processingType":"TASK"},{"id":"PEOPLESOFT_CUBE_BUILDER_TASK","taskType":"PEOPLESOFT_CUBE_BUILDER_TASK","name":"Peoplesoft Cube Builder","icon":"skin/oracle.png","parent":"PEOPLESOFT","processingType":"TASK"},{"id":"PEOPLESOFT_NVISION_TASK","taskType":"PEOPLESOFT_NVISION_TASK","name":"Peoplesoft nVision","icon":"skin/oracle.png","parent":"PEOPLESOFT","processingType":"TASK"},{"id":"PEOPLESOFT_SQR_PROCESS_TASK","taskType":"PEOPLESOFT_SQR_PROCESS_TASK","name":"Peoplesoft SQR Process","icon":"skin/oracle.png","parent":"PEOPLESOFT","processingType":"TASK"},{"id":"PEOPLESOFT_SQR_REPORT_TASK","taskType":"PEOPLESOFT_SQR_REPORT_TASK","name":"Peoplesoft SQR Report","icon":"skin/oracle.png","parent":"PEOPLESOFT","processingType":"TASK"},{"id":"PEOPLESOFT_WINWORD_TASK","taskType":"PEOPLESOFT_WINWORD_TASK","name":"Peoplesoft Winword","icon":"skin/oracle.png","parent":"PEOPLESOFT","processingType":"TASK"},{"id":"PEOPLESOFT_JOB_TASK","taskType":"PEOPLESOFT_JOB_TASK","name":"Peoplesoft Job","icon":"skin/oracle.png","parent":"PEOPLESOFT","processingType":"TASK"},{"id":"WLA","folder":"true","icon":"skin/gears.png","name":"Workload Automation","parent":"TASK"},{"id":"AUTOMATE_NOW_TRIGGER_EVENT","parent":"WLA","icon":"skin/favicon.png","name":"ANOW! Trigger Event","processingType":"TASK","taskType":"AUTOMATE_NOW_TRIGGER_EVENT"},{"id":"APACHE_AIRFLOW_RUN_DAG","parent":"WLA","icon":"skin/airflow.png","name":"Run Apache Airflow DAG","processingType":"TASK","taskType":"APACHE_AIRFLOW_RUN_DAG"},{"id":"POWER_AUTOMATE_EXECUTE_FLOW","parent":"WLA","icon":"skin/powerAutomate.png","name":"Power Automate Execute Flow","processingType":"TASK","taskType":"POWER_AUTOMATE_EXECUTE_FLOW"},{"id":"ANSIBLE_PLAYBOOK","parent":"WLA","icon":"skin/ansible.png","name":"Ansible playbook","processingType":"TASK","taskType":"ANSIBLE_PLAYBOOK"},{"id":"ANSIBLE_PLAYBOOK_PATH","parent":"WLA","icon":"skin/ansible.png","name":"Ansible script","processingType":"TASK","taskType":"ANSIBLE_PLAYBOOK_PATH"},{"folder":"true","id":"CTRL_M","icon":"skin/bmc.png","name":"Ctrl-M","parent":"WLA"},{"id":"CTRLM_ADD_CONDITION","parent":"CTRL_M","icon":"skin/bmc.png","name":"Add Condition","processingType":"TASK","taskType":"CTRLM_ADD_CONDITION"},{"id":"CTRLM_DELETE_CONDITION","parent":"CTRL_M","icon":"skin/bmc.png","name":"Delete Condition","processingType":"TASK","taskType":"CTRLM_DELETE_CONDITION"},{"id":"CTRLM_ORDER_JOB","parent":"CTRL_M","icon":"skin/bmc.png","name":"Order Job","processingType":"TASK","taskType":"CTRLM_ORDER_JOB"},{"id":"CTRLM_CREATE_JOB","parent":"CTRL_M","icon":"skin/bmc.png","name":"Create Job","processingType":"TASK","taskType":"CTRLM_CREATE_JOB"},{"folder":"true","id":"CTRL_M_RESOURCE","icon":"skin/bmc.png","name":"Ctrl-M Resource","parent":"CTRL_M"},{"id":"CTRLM_RESOURCE_TABLE_ADD","parent":"CTRL_M_RESOURCE","icon":"skin/bmc.png","name":"Add Resource","processingType":"TASK","taskType":"CTRLM_RESOURCE_TABLE_ADD"},{"id":"CTRLM_RESOURCE_TABLE_UPDATE","parent":"CTRL_M_RESOURCE","icon":"skin/bmc.png","name":"Update Resource","processingType":"TASK","taskType":"CTRLM_RESOURCE_TABLE_UPDATE"},{"id":"CTRLM_RESOURCE_TABLE_DELETE","parent":"CTRL_M_RESOURCE","icon":"skin/bmc.png","name":"Delete Resource","processingType":"TASK","taskType":"CTRLM_RESOURCE_TABLE_DELETE"},{"folder":"true","id":"INTERNAL","icon":"skin/milestone.png","name":"Internal Task"},{"folder":"true","id":"PROCESSING","icon":"skin/gear.png","name":"Processing","parent":"INTERNAL"},{"processingType":"TASK","taskType":"RESTART","id":"RESTART","icon":"skin/restart.png","name":"Restart","parent":"PROCESSING"},{"processingType":"TASK","taskType":"FORCE_COMPLETED","id":"FORCE_COMPLETED","icon":"skin/accept.png","name":"Force Completed","parent":"PROCESSING"},{"processingType":"TASK","taskType":"FORCE_FAILED","id":"FORCE_FAILED","icon":"skin/forceFailed.png","name":"Force Failed","parent":"PROCESSING"},{"processingType":"TASK","taskType":"FORCE_READY","id":"FORCE_READY","icon":"skin/exe.png","name":"Force Launch","parent":"PROCESSING"},{"processingType":"TASK","taskType":"HOLD","id":"HOLD","icon":"skin/hold.png","name":"Hold","parent":"PROCESSING"},{"processingType":"TASK","taskType":"RESUME","id":"RESUME","icon":"skin/resume.png","name":"Resume","parent":"PROCESSING"},{"processingType":"TASK","taskType":"ABORT","id":"ABORT","icon":"skin/kill.png","name":"Abort","parent":"PROCESSING"},{"processingType":"TASK","taskType":"KILL","id":"KILL","icon":"skin/kill.png","name":"Kill","parent":"PROCESSING"},{"processingType":"TASK","taskType":"SKIP_ON","id":"SKIP_ON","icon":"skin/passByOn.png","name":"Skip On","parent":"PROCESSING"},{"processingType":"TASK","taskType":"SKIP_OFF","id":"SKIP_OFF","icon":"skin/passByOff.png","name":"Skip Off","parent":"PROCESSING"},{"processingType":"TASK","taskType":"PROCESSING_ACTION_SKIP_ON","id":"PROCESSING_ACTION_SKIP_ON","icon":"skin/passByOn.png","name":"Skip On Action","parent":"PROCESSING"},{"processingType":"TASK","taskType":"PROCESSING_ACTION_SKIP_OFF","id":"PROCESSING_ACTION_SKIP_OFF","icon":"skin/passByOff.png","name":"Skip Off Action","parent":"PROCESSING"},{"processingType":"TASK","taskType":"ARCHIVE","id":"ARCHIVE","icon":"skin/archive.png","name":"Archive","parent":"PROCESSING"},{"processingType":"TASK","taskType":"SET_PRIORITY","id":"SET_PRIORITY","icon":"skin/numeric_stepper.png","name":"Set Priority","parent":"PROCESSING"},{"processingType":"TASK","taskType":"SET_STATUS_CODE","id":"SET_STATUS_CODE","icon":"skin/sort_number.png","name":"Set Status Code","parent":"PROCESSING"},{"processingType":"TASK","taskType":"SET_CONTEXT_VARIABLE_VALUE","id":"SET_CONTEXT_VARIABLE_VALUE","icon":"skin/pi_math--pencil.png","name":"Set context variable","parent":"PROCESSING"},{"processingType":"TASK","taskType":"SET_CONTEXT_VARIABLE_VALUES","id":"SET_CONTEXT_VARIABLE_VALUES","icon":"skin/pi_math--pencil.png","name":"Set multiple context variables","parent":"PROCESSING"},{"processingType":"TASK","taskType":"PROCESSING_RUN_NOW","id":"PROCESSING_RUN_NOW","icon":"skin/gear.png","name":"Add processing from template","parent":"PROCESSING"},{"processingType":"TASK","taskType":"CHECK_PROCESSING_STATE","id":"CHECK_PROCESSING_STATE","icon":"skin/system-monitor.png","name":"Check processing state","parent":"PROCESSING"},{"processingType":"TASK","taskType":"ADD_TAG","id":"ADD_TAG","icon":"skin/price_tag_plus.png","name":"Add Tag","parent":"PROCESSING"},{"processingType":"TASK","taskType":"REMOVE_TAG","id":"REMOVE_TAG","icon":"skin/price_tag_minus.png","name":"Remove Tag","parent":"PROCESSING"},{"processingType":"TASK","taskType":"SET_FOLDER","id":"SET_FOLDER","icon":"skin/folder.png","name":"Set Folder","parent":"PROCESSING"},{"processingType":"TASK","taskType":"PROCESSING_REGISTER_STATE","id":"PROCESSING_REGISTER_STATE","icon":"skin/system-monitor.png","name":"Register Processing State","parent":"PROCESSING"},{"processingType":"TASK","taskType":"PROCESSING_UNREGISTER_STATE","id":"PROCESSING_UNREGISTER_STATE","icon":"skin/system-monitor.png","name":"Unregister Processing State","parent":"PROCESSING"},{"processingType":"TASK","taskType":"PROCESSING_CLEAR_STATE_REGISTRY","id":"PROCESSING_CLEAR_STATE_REGISTRY","icon":"skin/system-monitor.png","name":"Clear Processing Registry","parent":"PROCESSING"},{"processingType":"TASK","taskType":"PROCESSING_ADD_NOTE","id":"PROCESSING_ADD_NOTE","icon":"skin/note_add.png","name":"Add Note","parent":"PROCESSING"},{"folder":"true","id":"RESOURCE","icon":"skin/traffic-light.png","name":"Resource","parent":"INTERNAL"},{"folder":"true","id":"DATA_SOURCE","icon":"skin/database.png","name":"Data Source","parent":"INTERNAL"},{"processingType":"TASK","id":"DATA_SOURCE_GET","name":"Get Data Source Entry","icon":"skin/database_go.png","parent":"DATA_SOURCE","taskType":"DATA_SOURCE_GET"},{"processingType":"TASK","id":"DATA_SOURCE_SET","name":"Set Data Source Entry","icon":"skin/database_add.png","parent":"DATA_SOURCE","taskType":"DATA_SOURCE_SET"},{"processingType":"TASK","id":"DATA_SOURCE_REMOVE","name":"Remove Data Source Entry","icon":"skin/database_delete.png","parent":"DATA_SOURCE","taskType":"DATA_SOURCE_REMOVE"},{"folder":"true","id":"SET_RESOURCE","icon":"skin/traffic-light--pencil.png","name":"Set Resource","parent":"RESOURCE"},{"processingType":"TASK","id":"SET_SEMAPHORE_STATE","name":"Set semaphore state","icon":"skin/traffic-light--pencil.png","parent":"SET_RESOURCE","taskType":"SET_SEMAPHORE_STATE"},{"processingType":"TASK","id":"SET_TIME_WINDOW_STATE","name":"Set time window state","icon":"skin/clock--pencil.png","parent":"SET_RESOURCE","taskType":"SET_TIME_WINDOW_STATE"},{"processingType":"TASK","id":"SET_STOCK_TOTAL_PERMITS","name":"Set stock total permits","icon":"skin/stock--pencil.png","parent":"SET_RESOURCE","taskType":"SET_STOCK_TOTAL_PERMITS"},{"processingType":"TASK","id":"SET_VARIABLE_VALUE","name":"Set variable","icon":"skin/pi_math--pencil.png","parent":"SET_RESOURCE","taskType":"SET_VARIABLE_VALUE"},{"processingType":"TASK","id":"SET_PHYSICAL_RESOURCE","name":"Set physical resource","icon":"skin/memory.png","parent":"SET_RESOURCE","taskType":"SET_PHYSICAL_RESOURCE"},{"processingType":"TASK","id":"SET_METRIC","name":"Set metric","icon":"skin/gauge.png","parent":"SET_RESOURCE","taskType":"SET_METRIC"},{"processingType":"TASK","id":"TRIGGER_EVENT","name":"Trigger Event","icon":"skin/arrow-out.png","parent":"SET_RESOURCE","taskType":"TRIGGER_EVENT"},{"folder":"true","id":"CHECK_RESOURCE","icon":"skin/traffic-light--check.png","name":"Check Resource","parent":"RESOURCE"},{"processingType":"TASK","id":"CHECK_SEMAPHORE_STATE","name":"Check semaphore state","icon":"skin/traffic-light--check.png","parent":"CHECK_RESOURCE","taskType":"CHECK_SEMAPHORE_STATE"},{"processingType":"TASK","id":"CHECK_TIME_WINDOW_STATE","name":"Check time window state","icon":"skin/clock--check.png","parent":"CHECK_RESOURCE","taskType":"CHECK_TIME_WINDOW_STATE"},{"processingType":"TASK","id":"CHECK_STOCK_AVAILABLE_PERMITS","name":"Check stock available permits","icon":"skin/stock--check.png","parent":"CHECK_RESOURCE","taskType":"CHECK_STOCK_AVAILABLE_PERMITS"},{"processingType":"TASK","id":"CHECK_CALENDAR","name":"Check calendar","icon":"skin/date_control.png","parent":"CHECK_RESOURCE","taskType":"CHECK_CALENDAR"},{"processingType":"TASK","id":"CHECK_STOCK_TOTAL_PERMITS","name":"Check stock total permits","icon":"skin/stock-total--check.png","parent":"CHECK_RESOURCE","taskType":"CHECK_STOCK_TOTAL_PERMITS"},{"processingType":"TASK","id":"CHECK_LOCK_STATE","name":"Check lock state","icon":"skin/lock--check.png","parent":"CHECK_RESOURCE","taskType":"CHECK_LOCK_STATE"},{"processingType":"TASK","id":"CHECK_VARIABLE_VALUE","name":"Check variable value","icon":"skin/pi_math--check.png","parent":"CHECK_RESOURCE","taskType":"CHECK_VARIABLE_VALUE"},{"processingType":"TASK","id":"CHECK_PHYSICAL_RESOURCE","name":"Check physical resource","icon":"skin/memory.png","parent":"CHECK_RESOURCE","taskType":"CHECK_PHYSICAL_RESOURCE"},{"processingType":"TASK","id":"CHECK_METRIC","name":"Check metric","icon":"skin/gauge.png","parent":"CHECK_RESOURCE","taskType":"CHECK_METRIC"},{"processingType":"TASK","taskType":"RESOURCE_ADD_TAG","id":"RESOURCE_ADD_TAG","icon":"skin/price_tag_plus.png","name":"Resource Add Tag","parent":"RESOURCE"},{"processingType":"TASK","taskType":"RESOURCE_REMOVE_TAG","id":"RESOURCE_REMOVE_TAG","icon":"skin/price_tag_minus.png","name":"Resource Remove Tag","parent":"RESOURCE"},{"processingType":"TASK","taskType":"RESOURCE_SET_FOLDER","id":"RESOURCE_SET_FOLDER","icon":"skin/folder.png","name":"Set Resource Folder","parent":"RESOURCE"},{"folder":"true","id":"SERVER_NODE","icon":"skin/servers.png","name":"Server Node","parent":"INTERNAL"},{"processingType":"TASK","taskType":"SERVER_NODE_HOLD","id":"SERVER_NODE_HOLD","icon":"skin/hold.png","name":"Server Node Hold","parent":"SERVER_NODE"},{"processingType":"TASK","taskType":"SERVER_NODE_RESUME","id":"SERVER_NODE_RESUME","icon":"skin/resume.png","name":"Server Node Resume","parent":"SERVER_NODE"},{"processingType":"TASK","taskType":"SERVER_NODE_SKIP_ON","id":"SERVER_NODE_SKIP_ON","icon":"skin/passByOn.png","name":"Server Node Skip On","parent":"SERVER_NODE"},{"processingType":"TASK","taskType":"SERVER_NODE_SKIP_OFF","id":"SERVER_NODE_SKIP_OFF","icon":"skin/passByOff.png","name":"Server Node Skip Off","parent":"SERVER_NODE"},{"processingType":"TASK","taskType":"SERVER_NODE_ABORT_ALL","id":"SERVER_NODE_ABORT_ALL","icon":"skin/kill.png","name":"Server Node Abort All","parent":"SERVER_NODE"},{"processingType":"TASK","taskType":"SERVER_NODE_KILL_ALL","id":"SERVER_NODE_KILL_ALL","icon":"skin/kill.png","name":"Server Node Kill All","parent":"SERVER_NODE"},{"processingType":"TASK","taskType":"SERVER_NODE_STOP","id":"SERVER_NODE_STOP","icon":"skin/stop.png","name":"Server Node Stop","parent":"SERVER_NODE"},{"processingType":"TASK","taskType":"SERVER_NODE_ADD_TAG","id":"SERVER_NODE_ADD_TAG","icon":"skin/price_tag_plus.png","name":"Server Node Add Tag","parent":"SERVER_NODE"},{"processingType":"TASK","taskType":"SERVER_NODE_REMOVE_TAG","id":"SERVER_NODE_REMOVE_TAG","icon":"skin/price_tag_minus.png","name":"Server Node Remove Tag","parent":"SERVER_NODE"},{"processingType":"TASK","taskType":"SERVER_NODE_SET_FOLDER","id":"SERVER_NODE_SET_FOLDER","icon":"skin/folder.png","name":"Server Node Set Folder","parent":"SERVER_NODE"},{"processingType":"TASK","taskType":"SERVER_NODE_SET_TOTAL_WEIGHT_CAPACITY","id":"SERVER_NODE_SET_TOTAL_WEIGHT_CAPACITY","icon":"skin/folder.png","name":"Server Node Set Capacity","parent":"SERVER_NODE"},{"folder":"true","id":"PROCESSING_TEMPLATE","icon":"skin/clock.png","name":"Processing Template","parent":"INTERNAL"},{"processingType":"TASK","taskType":"PROCESSING_TEMPLATE_HOLD","id":"PROCESSING_TEMPLATE_HOLD","icon":"skin/hold.png","name":"Processing Template Hold","parent":"PROCESSING_TEMPLATE"},{"processingType":"TASK","taskType":"PROCESSING_TEMPLATE_RESUME","id":"PROCESSING_TEMPLATE_RESUME","icon":"skin/resume.png","name":"Processing Template Resume","parent":"PROCESSING_TEMPLATE"},{"processingType":"TASK","taskType":"PROCESSING_TEMPLATE_SKIP_ON","id":"PROCESSING_TEMPLATE_SKIP_ON","icon":"skin/passByOn.png","name":"Processing Template Skip On","parent":"PROCESSING_TEMPLATE"},{"processingType":"TASK","taskType":"PROCESSING_TEMPLATE_SKIP_OFF","id":"PROCESSING_TEMPLATE_SKIP_OFF","icon":"skin/passByOff.png","name":"Processing Template Skip Off","parent":"PROCESSING_TEMPLATE"},{"folder":"true","id":"MAINTENANCE","icon":"skin/gear.png","name":"Maintenance","parent":"INTERNAL"},{"processingType":"TASK","taskType":"ARCHIVE_INTERVAL","id":"ARCHIVE_INTERVAL","icon":"skin/archive.png","name":"Archive old processing items","parent":"MAINTENANCE"},{"processingType":"TASK","taskType":"ARCHIVE_CLEANUP","id":"ARCHIVE_CLEANUP","icon":"skin/archive.png","name":"Archive cleanup","parent":"MAINTENANCE"},{"processingType":"TASK","taskType":"RECALCULATE_STATISTICS","id":"RECALCULATE_STATISTICS","icon":"skin/calculator.png","name":"Recalculate Statistic","parent":"MAINTENANCE"},{"processingType":"TASK","taskType":"DESIGN_BACKUP","id":"DESIGN_BACKUP","icon":"skin/drive-download.png","name":"Design Backup","parent":"MAINTENANCE"},{"processingType":"TASK","taskType":"DESIGN_IMPORT","id":"DESIGN_IMPORT","icon":"skin/drive-download.png","name":"Design Import","parent":"MAINTENANCE"},{"folder":"true","id":"OTHER","icon":"skin/alarm.png","name":"Other","parent":"INTERNAL"},{"processingType":"TASK","taskType":"WAIT","id":"WAIT","icon":"skin/alarm.png","name":"Wait","parent":"OTHER"},{"processingType":"TASK","taskType":"CHECK_TIME","id":"CHECK_TIME","icon":"skin/clock.png","name":"Check Time","parent":"OTHER"},{"id":"USER_TASKS","name":"User","icon":"skin/user.png","parent":"INTERNAL","folder":"true"},{"processingType":"TASK","taskType":"USER_CONFIRM","id":"USER_CONFIRM","icon":"skin/thumbUp.png","name":"User confirmation","parent":"USER_TASKS"},{"processingType":"TASK","taskType":"USER_INPUT","id":"USER_INPUT","icon":"skin/pencil.png","name":"User input","parent":"USER_TASKS"},{"processingType":"TASK","taskType":"NOTIFY_GROUP","id":"NOTIFY_GROUP","icon":"skin/users.png","name":"Notify Group","parent":"USER_TASKS"},{"processingType":"TASK","taskType":"NOTIFY_CHANNEL","id":"NOTIFY_CHANNEL","icon":"skin/mail_server_exim.png","name":"Notify Channel","parent":"USER_TASKS"},{"processingType":"TASK","taskType":"NOTIFY_EMAIL","id":"NOTIFY_EMAIL","icon":"skin/mail.png","name":"Notify Email","parent":"USER_TASKS"},{"processingType":"TASK","taskType":"ADHOC_REPORT_SEND","id":"ADHOC_REPORT_SEND","icon":"skin/table.png","name":"Adhoc Report Send","parent":"USER_TASKS"},{"processingType":"TASK","id":"AE","icon":"skin/terminal.gif","name":"AE","parent":"INTERNAL","folder":"true"},{"processingType":"TASK","taskType":"AE_SCRIPT","id":"AE_SCRIPT","icon":"skin/terminal.gif","name":"AE Script","parent":"AE"},{"processingType":"WORKFLOW","id":"WORKFLOW","name":"Workflow","icon":"skin/diagram.png","folder":"true"},{"processingType":"WORKFLOW","workflowType":"STANDARD","id":"STANDARD","icon":"skin/diagram.png","name":"Workflow","parent":"WORKFLOW"},{"processingType":"WORKFLOW","workflowType":"BROADCAST","id":"BROADCAST","icon":"skin/rss.png","name":"Broadcast","parent":"WORKFLOW"},{"processingType":"WORKFLOW","workflowType":"FOR_EACH","id":"FOR_EACH","icon":"skin/ordered_list.png","name":"For Each","parent":"WORKFLOW"},{"processingType":"WORKFLOW","workflowType":"SWITCH","id":"SWITCH","icon":"skin/switch.png","name":"Switch","parent":"WORKFLOW"},{"processingType":"WORKFLOW","workflowType":"CYCLE","id":"CYCLE","icon":"skin/cycle.png","name":"Cycle","parent":"WORKFLOW"},{"processingType":"WORKFLOW","workflowType":"TIME_SERIES","id":"TIME_SERIES","icon":"skin/ui-paginator.png","name":"Time Series","parent":"WORKFLOW"},{"processingType":"SERVICE","serviceType":"SENSOR","sensorType":"FILE_SENSOR","id":"FILE_SENSOR","icon":"skin/fileWatcher.png","name":"File Sensor","parent":"FILE_PROCESSING"},{"id":"RPA","icon":"skin/robot.png","name":"Robotic Process Automation","parent":"TASK","folder":"true"},{"processingType":"TASK","id":"UI_PATH","icon":"skin/uipath.ico","name":"UiPath","parent":"RPA","taskType":"UI_PATH"},{"processingType":"TASK","id":"BLUE_PRISM","icon":"skin/blueprism.ico","name":"Blue Prism","parent":"RPA","taskType":"BLUE_PRISM"},{"processingType":"TASK","id":"ROBOT_FRAMEWORK_START_ROBOT","icon":"skin/robotFramework.png","name":"Robot Framework Start Robot","parent":"RPA","taskType":"ROBOT_FRAMEWORK_START_ROBOT"},{"id":"BI","icon":"skin/table_chart.png","name":"Business Intelligence","parent":"TASK","folder":"true"},{"id":"TABLEAU","icon":"skin/tableau.ico","name":"Tableau","parent":"BI","folder":"true"},{"processingType":"TASK","id":"TABLEAU_REFRESH_EXTRACT","icon":"skin/tableau.ico","name":"Tableau Refresh Extract","parent":"TABLEAU","taskType":"TABLEAU_REFRESH_EXTRACT"},{"id":"MICROSOFT_POWER_BI","icon":"skin/powerBi.ico","name":"Microsoft Power BI","parent":"BI","folder":"true"},{"processingType":"TASK","id":"MICROSOFT_POWER_BI_DATASET_REFRESH","icon":"skin/powerBi.ico","name":"Microsoft Power BI Refresh Data Set","parent":"MICROSOFT_POWER_BI","taskType":"MICROSOFT_POWER_BI_DATASET_REFRESH"},{"processingType":"TASK","id":"MICROSOFT_POWER_BI_DATAFLOW_REFRESH","icon":"skin/powerBi.ico","name":"Microsoft Power BI Refresh Data Flow","parent":"MICROSOFT_POWER_BI","taskType":"MICROSOFT_POWER_BI_DATAFLOW_REFRESH"},{"id":"INSTANT_MESSAGING","name":"Instant Messaging","icon":"skin/comment_edit.png","parent":"TASK","folder":true},{"processingType":"TASK","id":"TELEGRAM_MESSAGE","icon":"skin/telegram.png","name":"Telegram Message","parent":"INSTANT_MESSAGING","taskType":"TELEGRAM_MESSAGE"},{"processingType":"TASK","id":"WHATSAPP_MESSAGE","icon":"skin/whatsapp.png","name":"WhatsApp Message","parent":"INSTANT_MESSAGING","taskType":"WHATSAPP_MESSAGE"},{"processingType":"TASK","id":"TEAMS_CHAT_MESSAGE","icon":"skin/teams.png","name":"Teams Message","parent":"INSTANT_MESSAGING","taskType":"TEAMS_CHAT_MESSAGE"},{"processingType":"SERVICE","serviceType":"SENSOR","sensorType":"SQL_SENSOR","id":"SQL_SENSOR","icon":"skin/database-sql.png","name":"SQL Sensor","parent":"SQL"},{"processingType":"SERVICE","serviceType":"SENSOR","sensorType":"Z_OS_JES_JOB_SENSOR","id":"Z_OS_JES_JOB_SENSOR","icon":"skin/zos.png","name":"z/OS JES Job Sensor","parent":"Z_OS"},{"processingType":"SERVICE","serviceType":"MONITOR","monitorType":"SH_MONITOR","id":"SH_MONITOR","icon":"skin/terminal.gif","name":"Shell Monitor","parent":"CODE"},{"processingType":"SERVICE","serviceType":"MONITOR","monitorType":"PYTHON_MONITOR","id":"PYTHON_MONITOR","icon":"skin/python.png","name":"Python Monitor","parent":"CODE"},{"processingType":"SERVICE","serviceType":"MONITOR","monitorType":"PERL_MONITOR","id":"PERL_MONITOR","icon":"skin/perl.png","name":"Perl Monitor","parent":"CODE"},{"processingType":"SERVICE","serviceType":"MONITOR","monitorType":"RUBY_MONITOR","id":"RUBY_MONITOR","icon":"skin/ruby.png","name":"Ruby Monitor","parent":"CODE"},{"processingType":"SERVICE","serviceType":"MONITOR","monitorType":"GROOVY_MONITOR","id":"GROOVY_MONITOR","icon":"skin/groovy.png","name":"Groovy Monitor","parent":"CODE"},{"processingType":"SERVICE","serviceType":"MONITOR","monitorType":"POWERSHELL_MONITOR","id":"POWERSHELL_MONITOR","icon":"skin/powershell.png","name":"PowerShell Monitor","parent":"CODE"},{"processingType":"SERVICE","serviceType":"MONITOR","monitorType":"HTTP_MONITOR","id":"HTTP_MONITOR","icon":"skin/http.png","name":"HTTP Monitor","parent":"WEB"},{"folder":"true","id":"OPERATING_SYSTEM_MONITOR","icon":"skin/system-monitor.png","name":"OS Monitors","parent":"TASK"},{"processingType":"SERVICE","serviceType":"MONITOR","monitorType":"SYSTEM_MONITOR","id":"SYSTEM_MONITOR","icon":"skin/memory.png","name":"System Monitor","parent":"OPERATING_SYSTEM_MONITOR"},{"processingType":"SERVICE","serviceType":"MONITOR","monitorType":"SYSTEM_PROCESS_MONITOR","id":"SYSTEM_PROCESS_MONITOR","icon":"skin/system-monitor.png","name":"System Process Monitor","parent":"OPERATING_SYSTEM_MONITOR"},{"processingType":"SERVICE","serviceType":"MONITOR","monitorType":"SAP_R3_JOB_MONITOR","id":"SAP_R3_JOB_MONITOR","icon":"skin/sap.png","name":"SAP R/3 Job Monitor","parent":"SAP_R3_JOBS"},{"id":"SLA","title":"Service Manager","name":"Service Manager","icon":"skin/traffic-light.png","folder":"true"},{"id":"SLA_SERVICE_MANAGER","title":"Service Level Agreement","icon":"skin/traffic-light.png","processingType":"SERVICE","serviceType":"SERVICE_MANAGER","serviceManagerType":"SLA_SERVICE_MANAGER","name":"Service Level Agreement","parent":"SLA"},{"processingType":"SERVICE","serviceType":"MONITOR","monitorType":"PROCESSING_BASELINE_DEVIATION_MONITOR","id":"PROCESSING_BASELINE_DEVIATION_MONITOR","icon":"skin/chart_down_color.png","name":"Baseline Deviation Monitor","parent":"PROCESSING"},{"processingType":"SERVICE","serviceType":"MONITOR","monitorType":"PROCESSING_DEADLINE_MONITOR","id":"PROCESSING_DEADLINE_MONITOR","icon":"skin/chart_stock.png","name":"Processing Deadline Monitor","parent":"SLA"},{"processingType":"TRIGGER","id":"TRIGGER","name":"Trigger","icon":"skin/arrow-out.png","folder":"true"},{"processingType":"TRIGGER","triggerType":"SCHEDULE","id":"SCHEDULE","icon":"skin/clock.png","name":"Time Schedule","parent":"TRIGGER"},{"processingType":"TRIGGER","triggerType":"USER","id":"USER","icon":"skin/user.png","name":"User","parent":"TRIGGER"},{"processingType":"TRIGGER","triggerType":"EVENT","id":"EVENT","icon":"skin/arrow-out.png","name":"Event Schedule","parent":"TRIGGER"},{"processingType":"TRIGGER","triggerType":"SELF_SERVICE","id":"SELF_SERVICE","icon":"skin/user.png","name":"Self Service","parent":"TRIGGER"},{"parent":"NONEXISTING_ITEM_TO_HIDE_FROM_VIEW","processingType":"TASK","taskType":"TRIGGER_ITEM","id":"TRIGGER_ITEM","name":"Trigger Item","icon":"skin/exe.png","inactive":true},{"processingType":"TASK","taskType":"PROCESSING_OBSERVER","id":"PROCESSING_OBSERVER","icon":"skin/emotion_eye.png","name":"Processing Observer","parent":"NONEXISTING_ITEM_TO_HIDE_FROM_VIEW","inactive":true}]' | ConvertFrom-Json
+    If ($JustGiveMeTheJSON -eq $true) {
+        Return $TaskTypesJson
+    }
     [array]$TaskTypesArray = $TaskTypesJson | ForEach-Object { [PSCustomObject]@{ Parent = $_.parent; Id = $_.id; Name = $_.name; } }
     Return $TaskTypesArray
 }
 
 #endregion
 
-#Region - TimeTriggers
+#Region - Time Triggers
 
 Function Read-AutomateNOWTimeTrigger {
     <#
@@ -69479,7 +74198,7 @@ Function Remove-AutomateNOWTimeTrigger {
         }
         [string]$ProcessingTimeTrigger_id = $ProcessingTimeTrigger.id
         If ($ProcessingTimeTrigger_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ProcessingTimeTrigger_id)")) -eq $true) {
@@ -70224,7 +74943,7 @@ Function Skip-AutomateNOWTimeTrigger {
 
 #endregion
 
-#Region - TimeWindows (RESOURCE)
+#Region - Time Windows (RESOURCE)
 
 Function Get-AutomateNOWTimeWindow {
     <#
@@ -70897,7 +75616,7 @@ Function New-AutomateNOWTimeWindow {
     If ($Folder.Length -gt 0) {
         $Error.Clear()
         Try {
-            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -71056,7 +75775,7 @@ Function Remove-AutomateNOWTimeWindow {
         }
         [string]$TimeWindow_id = $TimeWindow.id
         If ($TimeWindow_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($TimeWindow_id)")) -eq $true) {
@@ -71282,7 +76001,7 @@ Function Copy-AutomateNOWTimeWindow {
                 $BodyMetaData.'_dataSource' = 'ResourceDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
                 $parameters.Body = $Body
                 $Error.Clear()
                 Try {
@@ -71815,7 +76534,7 @@ Function Import-AutomateNOWLocalTimeZone {
 
 #endregion
 
-#Region - UserReports
+#Region - User Reports
 
 Function Get-AutomateNOWUserReport {
     <#
@@ -71915,7 +76634,7 @@ Function Get-AutomateNOWUserReport {
             If ($Folder.Length -gt 0) {
                 $Error.Clear()
                 Try {
-                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
                 }
                 Catch {
                     [string]$Message = $_.Exception.Message
@@ -72002,7 +76721,7 @@ Function Set-AutomateNOWUserReport {
     The name of the icon library (if you choose to use one). Possible choices are: FAT_COW, FUGUE (note that FONT_AWESOME is not an actual icon library)
 
     .PARAMETER iconCode
-    The name of the icon which matches the chosen library. To see the list of available iconCodes, use Import-AutomateNOWIcon (or Import-AutomateNOWLocalIcon) then try $anow_assets.icon_library."FUGUE"[0..10] to see the names of the first 10 icons from the Fugue library.
+    The name of the icon which matches the chosen library. Must be lower-case. To see the list of available iconCodes, use Import-AutomateNOWIcon (or Import-AutomateNOWLocalIcon) then try $anow_assets.icon_library."FUGUE"[0..10] to see the names of the first 10 icons from the Fugue library.
 
     .PARAMETER Folder
     String that specifies the name of the folder to add the UserReport to.
@@ -72063,6 +76782,7 @@ Function Set-AutomateNOWUserReport {
         [switch]$UnsetDescription,
         [Parameter(Mandatory = $true, ParameterSetName = 'SetIcon')]
         [ANOWIcon_IconsOnly]$iconSet,
+        [ValidateScript({ $_ -match '^[a-z0-9-_]{1,}$' })]
         [Parameter(Mandatory = $true, ParameterSetName = 'SetIcon')]
         [string]$iconCode,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
@@ -72148,7 +76868,7 @@ Function Set-AutomateNOWUserReport {
             If ($Folder.Length -gt 0) {
                 $Error.Clear()
                 Try {
-                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
                 }
                 Catch {
                     [string]$Message = $_.Exception.Message
@@ -72359,7 +77079,7 @@ Function Remove-AutomateNOWUserReport {
         }
         [string]$UserReport_id = $UserReport.id
         If ($UserReport_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($UserReport_id)")) -eq $true) {
@@ -72587,7 +77307,7 @@ Function Copy-AutomateNOWUserReport {
                 $BodyMetaData.'_dataSource' = 'UserReportDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
                 $parameters.Body = $Body
                 $Error.Clear()
                 Try {
@@ -73227,7 +77947,7 @@ Function Set-AutomateNOWVariable {
             Else {
                 $parameters.Body = $Body
             }
-            If ($null -eq $parameters.Command) {
+            If ($null -eq $parameters["Command"]) {
                 $parameters.Add('Command', $command)
             }
             Else {
@@ -73450,7 +78170,7 @@ Function New-AutomateNOWVariable {
     If ($Folder.Length -gt 0) {
         $Error.Clear()
         Try {
-            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -73604,7 +78324,7 @@ Function Remove-AutomateNOWVariable {
         }
         [string]$Variable_id = $Variable.id
         If ($Variable_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Variable_id)")) -eq $true) {
@@ -73830,7 +78550,7 @@ Function Copy-AutomateNOWVariable {
                 $BodyMetaData.'_dataSource' = 'ResourceDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
                 $parameters.Body = $Body
                 $Error.Clear()
                 Try {
@@ -74026,7 +78746,7 @@ Function Rename-AutomateNOWVariable {
 
 #endregion
 
-#Region - VariableTimestamps
+#Region - Variable Timestamps
 
 Function Get-AutomateNOWVariableTimestamp {
     <#
@@ -74501,6 +79221,638 @@ Function Export-AutomateNOWVariableTimestamp {
 
 #endregion
 
+#Region - View Setups
+
+Function Get-AutomateNOWViewSetup {
+    <#
+    .SYNOPSIS
+    Gets the View Setup Objects from an AutomateNOW! instance
+
+    .DESCRIPTION
+    Gets the View Setup Objects from an AutomateNOW! instance
+
+    .PARAMETER Id
+    Optional CASE-SENSITIVE string containing the Id of the View Setup object
+
+    .PARAMETER startRow
+    Integer to indicate the row to start from. This is intended for when you need to paginate the results. Default is 0.
+
+    .PARAMETER endRow
+    Integer to indicate the row to stop on. This is intended for when you need to paginate the results. Default is 100.
+
+    .PARAMETER sortBy
+    Optional string parameter to sort the results by (may not be used with the Id parameter). Valid choices are: id*, name, iconCode, dateCreated, lastUpdated, createdBy, lastUpdatedBy
+
+    .PARAMETER Descending
+    Optional switch parameter to sort in descending order
+
+    .PARAMETER PublicOnly
+    Optional switch parameter to limit the results to Views that are public.
+
+    .PARAMETER PrivateOnly
+    Optional switch parameter to limit the results to Views that are private.
+
+    .INPUTS
+    A single Id or a string of Id's across the pipeline will be accepted.
+
+    .OUTPUTS
+    Either one or more [ANOWViewSetup] objects
+
+    .EXAMPLE
+    Gets the first page of View Setup objects
+
+    Get-AutomateNOWViewSetup
+
+    .EXAMPLE
+    Gets a single View Setup named 'ViewSetup1'
+
+    Get-AutomateNOWViewSetup -Id 'ViewSetup1'
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [OutputType([ANOWViewSetup[]])]
+    [Cmdletbinding(DefaultParameterSetName = 'Default')]
+    Param(
+        [Parameter(Mandatory = $True, ParameterSetName = 'Id', ValueFromPipeline = $true)]
+        [string]$Id,
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Public')]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Private')]
+        [int32]$startRow = 0,
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Public')]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Private')]
+        [int32]$endRow = 100,
+        [ValidateSet('id', 'name', 'iconCode', 'dateCreated', 'lastUpdated', 'createdBy', 'lastUpdatedBy', IgnoreCase = $false)]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Public')]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Private')]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [string]$sortBy = 'id',
+        [Parameter(Mandatory = $False, ParameterSetName = 'Public')]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Private')]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [switch]$Descending,
+        [Parameter(Mandatory = $False, ParameterSetName = 'Public')]
+        [switch]$PublicOnly,
+        [Parameter(Mandatory = $False, ParameterSetName = 'Private')]
+        [switch]$PrivateOnly
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'GET')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+        If ($AllLoadBalancers -eq $true -and $AllChildNodes -eq $true) {
+            Write-Warning -Message "You can't request only load balancer and then only load balancer nodes in the same request. Please choose one or the other."
+            Break
+        }
+    }
+    Process {
+        [System.Collections.Specialized.OrderedDictionary]$Body = [System.Collections.Specialized.OrderedDictionary]@{}
+        If (($_.Length -gt 0 -or $Id.Length -gt 0) ) {
+            If ($_.Length -gt 0) {
+                $Body.'id' = $_
+            }
+            Else {
+                $Body.'id' = $Id
+            }
+            [string]$textMatchStyle = 'exactCase'
+        }
+        ElseIf ($itemId.Length -gt 0) {
+            $Body.'itemId' = $itemId
+            [string]$textMatchStyle = 'exactCase'
+        }
+        Else {
+            $Body.'_constructor' = 'AdvancedCriteria'
+            $Body.'operator' = 'and'
+            If ($PublicOnly -eq $true) {
+                $Body.'criteria1' = '{"fieldName":"publicSetup","operator":"equals","value":"true"}'
+            }
+            ElseIf ($PrivateOnly -eq $true) {
+                $Body.'criteria1' = '{"fieldName":"publicSetup","operator":"equals","value":"false"}'
+            }
+            $Body.'_componentId' = 'ViewSetupList'
+            $Body.'_startRow' = $startRow
+            $Body.'_endRow' = $endRow
+            [string]$textMatchStyle = 'substring'
+            If ($Descending -eq $true) {
+                $Body.'_sortBy' = '-' + $sortBy
+            }
+            Else {
+                $Body.'_sortBy' = $sortBy
+            }
+        }
+        $Body.'_operationId' = 'read'
+        $Body.'_operationType' = 'fetch'
+        $Body.'_textMatchStyle' = $textMatchStyle
+        $Body.'_dataSource' = 'ViewSetupDataSource'
+        $Body.'isc_metaDataPrefix' = '_'
+        $Body.'isc_dataFormat' = 'json'
+        [string]$Body = ConvertTo-QueryString -InputObject $Body
+        [string]$command = ('/viewSetup/read?' + $Body)
+        If ($null -eq $parameters["Command"]) {
+            $parameters.Add('Command', $command)
+        }
+        Else {
+            $parameters.Command = $command
+        }
+        $Error.Clear()
+        Try {
+            [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
+            Break
+        }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 10
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
+        }
+        $Error.Clear()
+        Try {
+            [ANOWViewSetup[]]$ViewSetups = $results.response.data
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Failed to parse the response into a series of [ANOWViewSetup] objects due to [$Message]."
+            Break
+        }
+        If ($ViewSetups.Count -gt 0) {
+            Return $ViewSetups
+        }
+    }
+    End {
+
+    }
+}
+
+Function Export-AutomateNOWViewSetup {
+    <#
+    .SYNOPSIS
+    Exports the View Setup objects from an instance of AutomateNOW!
+
+    .DESCRIPTION
+    Exports the View Setup objects from an instance of AutomateNOW! to a local .csv file
+
+    .PARAMETER ViewSetup
+    Mandatory [ANOWViewSetup] object (Use Get-AutomateNOWViewSetup to retrieve them)
+
+    .INPUTS
+    ONLY [ANOWViewSetup] objects from the pipeline are accepted
+
+    .OUTPUTS
+    The [ANOWViewSetup] objects are exported to the local disk in CSV format
+
+    .EXAMPLE
+    Exports the first page of View Setup objects
+
+    Get-AutomateNOWViewSetup | Export-AutomateNOWViewSetup
+
+    .EXAMPLE
+    Exports a single View Setup object named 'ViewSetup1'
+
+    Get-AutomateNOWViewSetup -Id 'ViewSetup1' | Export-AutomateNOWViewSetup
+
+    .EXAMPLE
+    Exports a series of View Setup objects by Id across the pipeline
+
+    ''ViewSetup1', 'ViewSetup2' | Get-AutomateNOWViewSetup | Export-AutomateNOWViewSetup
+
+    .NOTES
+	You must present [ANOWViewSetup] objects to the pipeline to use this function.
+    #>
+
+    [Cmdletbinding(DefaultParameterSetName = 'Pipeline')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true, ParameterSetName = 'Pipeline')]
+        [ANOWViewSetup]$ViewSetup
+    )
+    Begin {
+        [string]$current_time = Get-Date -Format 'yyyyMMddHHmmssfff'
+        [string]$ExportFileName = 'Export-AutomateNOW-ViewSetups-' + $current_time + '.csv'
+        [string]$ExportFilePath = ((Get-Location | Select-Object -ExpandProperty Path) + '\' + $ExportFileName)
+        [hashtable]$parameters = @{}
+        $parameters.Add('Path', $ExportFilePath)
+        $parameters.Add('Append', $true)
+        If ($PSVersionTable.PSVersion.Major -eq 5) {
+            $parameters.Add('NoTypeInformation', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [ANOWViewSetup]$ViewSetup = $_
+        }
+        $Error.Clear()
+        Try {
+            $ViewSetup | Export-CSV @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Export-CSV failed to export the [ANOWViewSetup] object on the pipeline due to [$Message]"
+            Break
+        }
+    }
+    End {
+        $Error.Clear()
+        If ((Test-Path -Path $ExportFilePath) -eq $true) {
+            [System.IO.FileInfo]$fileinfo = Get-Item -Path "$ExportFilePath"
+            [int32]$filelength = $fileinfo.Length
+            [string]$filelength_display = "{0:N0}" -f $filelength
+            Write-Information -MessageData "Created file $ExportFileName ($filelength_display bytes)"
+        }
+    }
+}
+
+Function Remove-AutomateNOWViewSetup {
+    <#
+    .SYNOPSIS
+    Removes a View Setup from an AutomateNOW! instance
+
+    .DESCRIPTION
+    Removes a View Setup from an AutomateNOW! instance
+
+    .PARAMETER ViewSetup
+    An [ANOWViewSetup] object representing the View Setup to be deleted.
+
+    .PARAMETER Force
+    Force the removal without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    ONLY [ANOWViewSetup] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    None. The status will be written to the console with Write-Verbose.
+
+    .EXAMPLE
+    Remove a single ViewSetup by Id
+
+    Get-AutomateNOWViewSetup -Id '375787b5-37e4-4117-80ef-05967bcc5abb' | Remove-AutomateNOWViewSetup
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $false, ValueFromPipeline = $True)]
+        [ANOWViewSetup]$ViewSetup,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [string]$command = '/viewSetup/delete'
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [ANOWViewSetup]$ViewSetup = $_
+        }
+        [string]$ViewSetup_id = $ViewSetup.id
+        If ($ViewSetup_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
+            Break
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ViewSetup_id)")) -eq $true) {
+            [string]$oldvalues = $ViewSetup.CreateOldValues()
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.'id' = $ViewSetup.id
+            $BodyMetaData.'_textMatchStyle' = 'exact'
+            $BodyMetaData.'_operationType' = 'remove'
+            $BodyMetaData.'_oldValues' = $oldvalues
+            $BodyMetaData.'_componentId' = 'DomainProcessingTypeList'
+            $BodyMetaData.'_dataSource' = 'DomainProcessingTypeDataSource'
+            $BodyMetaData.'isc_metaDataPrefix' = '_'
+            $BodyMetaData.'isc_dataFormat' = 'json'
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            If ($null -eq $parameters["Body"]) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$ViewSetup_id] due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 10
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
+            }
+            Write-Verbose -Message "View Setup [$ViewSetup_id] successfully removed"
+        }
+    }
+    End {
+
+    }
+}
+
+Function Copy-AutomateNOWViewSetup {
+    <#
+    .SYNOPSIS
+    Copies a View Setup object from an AutomateNOW! instance
+
+    .DESCRIPTION
+    Copies a View Setup object from an AutomateNOW! instance.
+
+    .PARAMETER ViewSetup
+    Mandatory [ANOWViewSetup] object to be copied.
+
+    .PARAMETER NewId
+    The name (Id) of the new View Setup object. The new Id must be unique (per domain). It may consist only of letters, numbers, underscore, dot or hypen.
+
+    .PARAMETER Force
+    Force the copy without confirmation. This is equivalent to -Confirm:$false
+
+    .PARAMETER Quiet
+    Optional switch to suppress the return of the newly created object.
+
+    .INPUTS
+    ONLY [ANOWViewSetup] object is accepted. Pipeline support is intentionally unavailable.
+
+    .OUTPUTS
+    The newly created [ANOWViewSetup] object will be emitted. Use the -Quiet parameter to suppress this.
+
+    .EXAMPLE
+    Creates a copy of a ViewSetup named 'ViewSetup1' to 'ViewSetup2'
+    $ViewSetup1 = Get-AutomateNOWViewSetup -Id 'ViewSetup1'
+    Copy-AutomateNOWViewSetup -ViewSetup $ViewSetup1 -NewId 'ViewSetup2'
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global ViewSetup.
+
+    AutomateNOW object id's can never change, but we can copy the object to a new id and it will (typically) include all of the items therein.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [ANOWViewSetup]$ViewSetup,
+        [Parameter(Mandatory = $true)]
+        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [string]$NewId,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        ## Begin warning ##
+        ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
+        $Error.Clear()
+        Try {
+            [boolean]$ViewSetup_exists = ($null -ne (Get-AutomateNOWViewSetup -Id $NewId))
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWViewSetup failed to check if the ViewSetup [$NewId] already existed due to [$Message]."
+            Break
+        }
+        If ($ViewSetup_exists -eq $true) {
+            [string]$current_domain = $anow_session.header.domain
+            Write-Warning -Message "There is already a ViewSetup named [$NewId] in [$current_domain]. You may not proceed."
+            [boolean]$PermissionToProceed = $false
+        }
+        ## End warning ##
+        [string]$command = '/viewSetup/copy'
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($PermissionToProceed -ne $false) {
+            [string]$ViewSetup_oldId = $ViewSetup.id
+            [string]$ViewSetup_simpleId = $ViewSetup.simpleId
+            If ($ViewSetup_oldId -eq $NewId) {
+                Write-Warning -Message "The new id cannot be the same as the old id."
+                Break
+            }
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Copy the ViewSetup $($ViewSetup_simpleId) to $($NewId)?")) -eq $true) {
+                [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+                $BodyMetaData.'oldId' = $ViewSetup_oldId
+                $BodyMetaData.'domain' = $ViewSetup.domain
+                $BodyMetaData.'id' = $NewId
+                $BodyMetaData.'_operationType' = 'add'
+                $BodyMetaData.'_operationId' = 'copy'
+                $BodyMetaData.'_textMatchStyle' = 'exact'
+                $BodyMetaData.'_dataSource' = 'ViewSetupDataSource'
+                $BodyMetaData.'isc_metaDataPrefix' = '_'
+                $BodyMetaData.'isc_dataFormat' = 'json'
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+                $parameters.Body = $Body
+                $Error.Clear()
+                Try {
+                    [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$ViewSetup_oldId] due to [$Message]."
+                    Break
+                }
+                [int32]$response_code = $results.response.status
+                If ($response_code -ne 0) {
+                    [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 10
+                    Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                    Break
+                }
+                $Error.Clear()
+                Try {
+                    [ANOWViewSetup]$NewViewSetup = $results.response.data[0]
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Failed to create copied [ANOWViewSetup] object [$NewId] due to [$Message]."
+                    Break
+                }
+                If ($NewViewSetup.id.Length -eq 0) {
+                    Write-Warning -Message "Somehow the newly created (copied) [ANOWViewSetup] object [$NewId] is empty!"
+                    Break
+                }
+                If ($Quiet -ne $true) {
+                    Return $NewViewSetup
+                }
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+Function Rename-AutomateNOWViewSetup {
+    <#
+    .SYNOPSIS
+    Renames a View Setup object on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Performs a psuedo-rename operations of a View Setup object from an AutomateNOW! instance by copying it first and then deleting the source. This function merely combines Copy-AutomateNOWViewSetup and Remove-AutomateNOWViewSetup therefore it is to be considered destructive.
+
+    .PARAMETER ViewSetup
+    An [ANOWViewSetup] object representing the View Setup object to be renamed.
+
+    .PARAMETER NewId
+    Mandatory string indicating the new id or name of the View Setup object. The Id is the same as a primary key, it must be unique. The console will provide the old Id + '_COPY' in the UI when making a copy. The Id is limited to 1024 characters.
+
+    .PARAMETER Force
+    Force the renaming without confirmation. This is equivalent to -Confirm:$false
+
+    .PARAMETER Quiet
+    Optional switch to suppress the return of the newly renamed object.
+
+    .INPUTS
+    ONLY [ANOWViewSetup] objects are accepted. There is intentionally no support for the pipeline.
+
+    .OUTPUTS
+    The newly renamed [ANOWViewSetup] object will be returned.
+
+    .EXAMPLE
+    Renames a View Setup object from 'ViewSetup1' to 'ViewSetup2' in a multi-line format
+
+    $ViewSetup = Get-AutomateNOWViewSetup -Id 'ViewSetup1'
+    Rename-AutomateNOWViewSetup -ViewSetup $ViewSetup -NewId 'ViewSetup2'
+
+    .EXAMPLE
+    Renames a View Setup object from 'ViewSetup1' to 'ViewSetup2' in a single-line format
+
+    Rename-AutomateNOWViewSetup -ViewSetup (Get-AutomateNOWViewSetup -Id 'ViewSetup1') -NewId 'ViewSetup2'
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global ViewSetup.
+
+    When renaming, you may only specify a different Id (name).
+    #>
+    [OutputType([ANOWViewSetup])]
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [ANOWViewSetup]$ViewSetup,
+        [Parameter(Mandatory = $true)]
+        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [string]$NewId,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        ## Begin standard warning ##
+        ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
+        $Error.Clear()
+        Try {
+            [boolean]$new_ViewSetup_exists = ($null -ne (Get-AutomateNOWViewSetup -Id $NewId))
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWViewSetup failed to check if the ViewSetup [$NewId] already existed due to [$Message]."
+            Break
+        }
+        If ($new_ViewSetup_exists -eq $true) {
+            [string]$current_domain = $anow_session.header.domain
+            Write-Warning -Message "There is already a ViewSetup named [$NewId] in [$current_domain]. You may not proceed."
+            [boolean]$PermissionToProceed = $false
+        }
+        #[string]$ViewSetup_id = $ViewSetup.id
+        [string]$ViewSetup_id = $ViewSetup.simpleId
+        $Error.Clear()
+        Try {
+            [boolean]$old_ViewSetup_exists = ($null -ne (Get-AutomateNOWViewSetup -Id $ViewSetup_id))
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Get-AutomateNOWViewSetup failed to check if the ViewSetup [$ViewSetup_id] already existed due to [$Message]."
+            Break
+        }
+        If ($old_ViewSetup_exists -eq $false) {
+            [string]$current_domain = $anow_session.header.domain
+            Write-Warning -Message "There is not a ViewSetup named [$ViewSetup_id] in [$current_domain]. You may not proceed."
+            [boolean]$PermissionToProceed = $false
+        }
+        ## End standard warning ##
+    }
+    Process {
+        If ($PermissionToProceed -ne $false) {
+            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ViewSetup_id)")) -eq $true) {
+                $Error.Clear()
+                Try {
+                    [ANOWViewSetup]$new_ViewSetup = Copy-AutomateNOWViewSetup -ViewSetup $ViewSetup -NewId $NewId -Force
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Copy-AutomateNOWViewSetup failed to create a new View Setup object [$NewId] as Part 1 of the renaming process due to [$Message]."
+                    Break
+                }
+                If ($new_ViewSetup.simpleId -eq $NewId) {
+                    Write-Verbose -Message "Part 1: View Setup object [$ViewSetup_id] successfully copied to [$NewId]"
+                }
+                Else {
+                    Write-Warning -Message "Somehow the first phase (Copy-AutomateNOWViewSetup) failed. Please look into this."
+                    Break
+                }
+                $Error.Clear()
+                Try {
+                    Remove-AutomateNOWViewSetup -ViewSetup $ViewSetup -Force
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Remove-AutomateNOWViewSetup failed to remove [$ViewSetup_id] as Part 2 of the renaming process due to [$Message]."
+                    Break
+                }
+                Write-Verbose -Message "Part 2: View Setup object [$ViewSetup_id] removed"
+                Write-Verbose -Message "Task [$ViewSetup_id] successfully renamed to [$NewId]"
+                If ($Quiet -ne $true) {
+                    Return $ViewSetup
+                }
+            }
+        }
+        Else {
+            Write-Warning -Message "No action was taken because either the source object didn't exist or the new object already existed"
+        }
+    }
+    End {
+    }
+}
+
+#endregion
+
 #Region - Workflows (PROCESSING)
 
 Function Get-AutomateNOWWorkflow {
@@ -74678,11 +80030,25 @@ Function Get-AutomateNOWWorkflow {
             }
             ElseIf ($WorkflowTemplate.Id.Length -gt 0) {
                 $BodyMetaData.'criteria2' = ('{"fieldName":"template","operator":"equals","value":"' + $WorkflowTemplate.Id + '"}')
+                [string]$Type = $WorkflowTemplate.workflowType
+                $BodyMetaData.'criteria3' = '{"fieldName":"itemType","operator":"equals","value":"' + $Type + '"}'
             }
             ElseIf ($launchedById -gt 0) {
                 $BodyMetaData.'criteria2' = '{"fieldName":"parent","value":null,"operator":"equals"}'
                 $BodyMetaData.'criteria3' = ('{"fieldName":"launchedById","operator":"equals","value":"' + $launchedById + '"}')
                 $BodyMetaData.'criteria4' = '{"fieldName":"isRoot","operator":"equals","value":true}'
+            }
+            Else {
+                $Error.Clear()
+                Try {
+                    [string]$all_workflow_types = ([ANOWProcessing_workflowType].GetEnumNames() | ForEach-Object { '"' + $_ + '"' }) -join ','
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Get-AutomateNOWWorkflow was unable to enumerate the object class [ANOWProcessing_workflowType] due to [$Message]."
+                    Break
+                }
+                $BodyMetaData.'criteria2' = '{"fieldName":"itemType","operator":"inSet","value":[' + $all_workflow_types + ']}'
             }
             If ($Folder.Length -gt 0) {
                 $BodyMetaData.'criteria5' = ('{"fieldName":"folder","operator":"equals","value":"' + $Folder + '"}')
@@ -74704,24 +80070,12 @@ Function Get-AutomateNOWWorkflow {
                 }
                 $BodyMetaData.'criteria6' = ('{"fieldName":"tags","operator":"containsAny","value":' + $TagString + '}')
             }
-            Else {
-                $Error.Clear()
-                Try {
-                    [string]$all_workflow_types = ([ANOWProcessing_workflowType].GetEnumNames() | ForEach-Object { '"' + $_ + '"' }) -join ','
-                }
-                Catch {
-                    [string]$Message = $_.Exception.Message
-                    Write-Warning -Message "Get-AutomateNOWWorkflow was unable to enumerate the object class [ANOWProcessing_workflowType] due to [$Message]."
-                    Break
-                }
-                $BodyMetaData.'criteria2' = '{"fieldName":"itemType","operator":"inSet","value":[' + $all_workflow_types + ']}'
-            }
             If ($ProcessingStatus.Length -gt 0) {
                 [string]$ProcessingStatus = $ProcessingStatus.ToString()
-                $BodyMetaData.'criteria3' = ('{"fieldName":"processingStatus","operator":"inSet","value":["' + $ProcessingStatus + '"]}')
+                $BodyMetaData.'criteria7' = ('{"fieldName":"processingStatus","operator":"inSet","value":["' + $ProcessingStatus + '"]}')
             }
             If ($ItemsOnly -ne $true) {
-                $BodyMetaData.'criteria5' = '{"fieldName":"isProcessing","operator":"equals","value":true}'
+                $BodyMetaData.'criteria8' = '{"fieldName":"isProcessing","operator":"equals","value":true}'
             }
             Else {
                 [string]$componentId = 'ProcessingItemList'
@@ -74981,7 +80335,7 @@ Function Remove-AutomateNOWWorkflow {
         }
         [int64]$Workflow_id = $Workflow.id
         If ($Workflow_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess($Workflow_id, 'Archive')) -eq $true) {
@@ -75674,841 +81028,9 @@ Function Skip-AutomateNOWWorkflow {
     }
 }
 
-Function Wait-AutomateNOWWorkFlow {
-    <#
-    .SYNOPSIS
-    Waits for a Workflow to complete executing on an AutomateNOW! instance
-
-    .DESCRIPTION
-    Waits for a Workflow to complete executing on an AutomateNOW! instance
-
-    .PARAMETER Workflow
-    An [ANOWWorkflow] object representing the Workflow to wait for
-
-    .PARAMETER WaitForExecutionInterval
-    Optional int32 number of times (intervals) to wait for executing. The default value is 60.
-
-    .PARAMETER WaitForExecutionDuration
-    Optional int32 number of seconds to wait for executing between each interval. The default value is 10.
-
-    .PARAMETER Quiet
-    Switch parameter to silence the Write-Progress progress meter that appears by default
-
-    .INPUTS
-    ONLY [ANOWWorkflow] objects are accepted (including from the pipeline)
-
-    .OUTPUTS
-    The [ANOWWorkflow] will be returned once it is no longer in the EXECUTING state or when the intervals deplete
-
-    .EXAMPLE
-    Waits for a Workflow with the defalut settings
-
-    Get-AutomateNOWWorkflow -Id 12345678 | Wait-AutomateNOWWorkflow
-
-    .EXAMPLE
-    Starts a Workflow with the default settings and waits for it
-
-    Get-AutomateNOWWorkflow -Id 12345678 | Start-AutomateNOWWorkflow | Wait-AutomateNOWWorkflow
-
-    .EXAMPLE
-    Quietly waits for a Workflow with custom interval and delay time and waits for it
-
-    12345678 | Get-AutomateNOWWorkflow | Wait-AutomateNOWWorkflow -WaitForExecutionInterval 23 -WaitForExecutionInterval 5 -Quiet
-
-    .NOTES
-    You must use Connect-AutomateNOW to establish the token by way of global variable.
-
-    #>
-    [CmdletBinding()]
-    Param(
-        [ValidateScript({ $_.processingStatus -eq 'EXECUTING' -or $_.processingStatus -eq 'WAITING' })]
-        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
-        #[ANOWWorkflow]$Workflow,
-        [ANOWProcessing]$Workflow,
-        [Parameter(Mandatory = $false)]
-        [int32]$WaitForExecutionInterval = 60,
-        [Parameter(Mandatory = $false)]
-        [int32]$WaitForExecutionDuration = 10,
-        [Parameter(Mandatory = $false)]
-        [switch]$Quiet
-    )
-    Begin {
-        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
-            Write-Warning -Message "Somehow there is not a valid token confirmed."
-            Break
-        }
-    }
-    Process {
-        If ($_.Id.Length -gt 0) {
-            [ANOWProcessing]$Workflow = $_
-        }
-        [int64]$Workflow_Id = $Workflow.Id
-        $Error.Clear()
-        Try {
-            [ANOWProcessing]$Workflow = Get-AutomateNOWWorkflow -Id $Workflow_Id
-        }
-        Catch {
-            [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Get-AutomateNOWWorkflow failed to retrieve [$Workflow_id] (under Wait-AutomateNOWWorkflow) due to [$Message]."
-            Break
-        }
-        If ($Workflow.processingStatus -eq 'EXECUTING' -or $Workflow.processingStatus -eq 'WAITING') {
-            [string]$Workflow_Name = $Workflow.Name
-            [int32]$loop = 1
-            While ( ($Workflow.processingStatus -eq 'EXECUTING' -or $Workflow.processingStatus -eq 'WAITING') -and ($loop -lt $WaitForExecutionInterval)) {
-                If ($Quiet -ne $true) {
-                    Write-Progress -Activity "Waiting [$WaitForExecutionDuration] seconds for RunId [$Workflow_Id] to complete executing" -Status "Loop $loop of $WaitForExecutionInterval" -CurrentOperation "$Workflow_Name" -PercentComplete ($loop / $WaitForExecutionInterval * 100)
-                }
-                Start-Sleep -Seconds $WaitForExecutionDuration
-                $Error.Clear()
-                Try {
-                    [ANOWProcessing]$Workflow = Get-AutomateNOWWorkflow -Id $Workflow_Id
-                }
-                Catch {
-                    [string]$Message = $_.Exception.Message
-                    Write-Warning -Message "Get-AutomateNOWWorkflow failed to retrieve [$Workflow_id] (under Wait-AutomateNOWWorkflow) due to [$Message]."
-                    Break
-                }
-                $loop++
-            }
-            If ($Quiet -ne $true) {
-                Write-Progress -Activity "Waiting has completed for RunId [$Workflow_Id]" -Status "$WaitForExecutionInterval loops were completed" -Completed
-            }
-            [ANOWProcessing_processingStatus]$Workflow_processingStatus = $Workflow.processingStatus
-            If ($loop -ge $WaitForExecutionInterval -and ($Workflow.processingStatus -eq 'EXECUTING' -or $Workflow.processingStatus -eq 'WAITING')) {
-                Write-Warning -Message "After $WaitForExecutionInterval attempts of $WaitForExecutionDuration seconds each, $Workflow_Id is still in EXECUTING status"
-            }
-            Write-Verbose -Message "Returning $Workflow_Id which is in the [$Workflow_processingStatus] status"
-        }
-        Return $Workflow
-    }
-    End {
-
-    }
-}
-
-Function Trace-AutomateNOWProcessing {
-    <#
-    .SYNOPSIS
-    Traces a Workflow based on its parentage on an AutomateNOW! instance
-
-    .DESCRIPTION
-    Traces a Workflow based on its parentage on an AutomateNOW! instance. This function is intended only for Workflows.
-
-    .PARAMETER Id
-    Mandatory option of the int64 Run Id of the Workflow that you wish to trace.
-
-    .PARAMETER Workflow
-    Mandatory option to supply the [ANOWProcessing] object that you wish to trace. Do not send WorkflowTemplates here!
-
-    .PARAMETER WaitForExecution
-    Optional switch parameter to enable 'Waiting for execution...' loops. Use with caution. Default is 60 intervals at 10 seconds each.
-
-    .PARAMETER WorkflowSortBy
-    Optional string to supply the property to sort by. Valid values are: dateCreated*, sortOrder, endTime, firstStartTime, startTime, duration
-
-    .PARAMETER DoNotIncludeTriggers
-    Optional switch parameter to exclude the trigger items from the final result.
-
-    .PARAMETER PerformDeepSearch
-    Optional switch parameter to include searching for Workflows that were launched by one of the Workflows in the trace. Note, this may add a considerable number of items to the output.
-
-    .PARAMETER ReturnContextVariables
-    Optional switch parameter to replace the workflows in the output with the context variables instead.
-
-    .PARAMETER DefaultPause
-    Optional number of milliseconds to pause between each Workflow lookup. The default is 100. If you want to simulate the behavior of the console exactly then set this to 0 for no delays between Workflow lookups.
-
-    .PARAMETER NoStats
-    Optional switch to suppress the showing of stats (time elapsed) for the trace. This parameter is ignored if -Quiet is specified.
-
-    .PARAMETER WaitForExecutionDuration
-    Optional int32 number of seconds to wait for executing between each interval. The default value is 10.
-
-    .PARAMETER WaitForExecutionInterval
-    Optional int32 number of times (intervals) to wait for executing. The default value is 60.
-
-    .PARAMETER IncludeArchived
-    Optional switch parameter removes the filter for archived items thus both archived and non-archived items will be returned.
-
-    .PARAMETER OnlyArchived
-    Optional switch parameter filters out non-archived items thus only archived items will be returned.
-
-    .PARAMETER pendingCharacter
-    Optional 1-character string to change how the "waiting" status appears. The default character is an asterisk *.
-
-    .PARAMETER Quiet
-    .Optional switch that will suppress the Write-Information outputs during the course of the trace.
-
-    .INPUTS
-    Accepts either a numeric RunId in the -Id parameter or an [ANOWProcessing] object. Either can be presented via the pipeline.
-
-    .OUTPUTS
-    The output will be either an array of whole [ANOWProcessing] objects (formatted or unformatted) or the output will be an array of just the RunId's of the Workflows.
-
-    .EXAMPLE
-    Traces a workflow (by Id) with the RunId of 1234567 and a sort order of endTime
-
-    Trace-AutomateNOWProcessing -Id 1234567 -WorkflowSortBy endTime
-
-    .EXAMPLE
-    Traces a workflow (by Id) with the RunId of 1234567 and using the pipeline with the default sort order (dateCreated)
-
-    1234567 | Trace-AutomateNOWProcessing
-
-    .EXAMPLE
-    Traces a workflow (by object) with the RunId of 1234567 while excluding the trigger items from the output and sorting in the same order that the console uses (sortOrder).
-
-    Get-AutomateNOWWorkflow -Id 1234567 | Trace-AutomateNOWProcessing -DoNotIncludeTriggers -WorkflowSortBy sortOrder
-
-    .EXAMPLE
-    Traces (and waits for) a workflow (by object) with the RunId of 1234567 using the pipeline and returns the Context Variables instead of the Workflows
-
-    1234567 | Get-AutomateNOWWorkflow | Trace-AutomateNOWProcessing -ReturnContextVariables -WaitForExecution
-
-    .EXAMPLE
-    Quietly starts a Workflow and deep traces it while waiting for execution and ignoring trigger items.
-
-    Get-AutomateNOWWorkflowTemplate -Id 'Worflow1' | Start-AutomateNOWWorkflowTemplate | Trace-AutomateNOWProcessing -WaitForExecution -PerformDeepSearch -DoNotIncludeTriggers -ReturnContextVariables -Quiet
-
-    .EXAMPLE
-    Starts a Task Template ('TaskTemplate1') with parameters, waits for execution to complete and returns the context variables (one-liner format)
-
-    Get-AutomateNOWTaskTemplate -Id 'TaskTemplate1' | Start-AutomateNOWTaskTemplate -TaskParameters @{parameter1 = "value1"; parameter2 = "value2";} | Trace-AutomateNOWTask -WaitForExecution -ReturnContextVariables
-
-    .NOTES
-    You must use Connect-AutomateNOW to establish the token by way of global variable.
-
-    This function uses an inner function to ensure that the output does not contain any duplicates. Help to re-write this to be more efficient would be welcomed!
-
-    All sorting has a secondary sort by id. This is most applicable when sorting by sortOrder property while including triggers.The default sort order of the console is sortOrder but the default sort order for this function is dateCreated.
-
-    #>
-    [CmdletBinding()]
-    [Alias('Trace-AutomateNOWSchedule', 'Trace-AutomateNOWServiceManager', 'Trace-AutomateNOWTask', 'Trace-AutomateNOWWorkflow')]
-    Param(
-        [Parameter(Mandatory = $True, ParameterSetName = 'Id', ValueFromPipeline = $true)]
-        [int64]$Id,
-        [Parameter(Mandatory = $True, ParameterSetName = 'Workflow', ValueFromPipeline = $true)]
-        [ANOWProcessing]$Workflow,
-        [Parameter(Mandatory = $False)]
-        [switch]$WaitForExecution,
-        [Parameter(Mandatory = $False)]
-        [int32]$WaitForExecutionDuration = 10,
-        [Parameter(Mandatory = $False)]
-        [int32]$WaitForExecutionInterval = 60,
-        [ValidateSet('dateCreated', 'sortOrder', 'id', 'endTime', 'firstStartTime', 'startTime', 'duration', IgnoreCase = $false)]
-        [Parameter(Mandatory = $False)]
-        [string]$WorkflowSortBy = 'dateCreated',
-        [Parameter(Mandatory = $False)]
-        [switch]$DoNotIncludeTriggers,
-        [Parameter(Mandatory = $False)]
-        [switch]$PerformDeepSearch,
-        [Parameter(Mandatory = $False)]
-        [switch]$ReturnContextVariables,
-        [Parameter(Mandatory = $False)]
-        [switch]$ReturnRunIds,
-        [Parameter(Mandatory = $False)]
-        [switch]$NoStats,
-        [Parameter(Mandatory = $False)]
-        [int32]$DefaultPause = 100,
-        [Parameter(Mandatory = $False)]
-        [switch]$IncludeArchived,
-        [Parameter(Mandatory = $False)]
-        [switch]$OnlyArchived,
-        [ValidateScript({ $_.length -eq 1 })]
-        [Parameter(Mandatory = $False)]
-        [string]$pendingCharacter = '*',
-        [Parameter(Mandatory = $False)]
-        [switch]$Quiet
-    )
-    Function Search-AutomateNOWProcessing {
-        [Cmdletbinding()]
-        Param(
-            [Parameter(Mandatory = $True, ParameterSetName = 'Id', ValueFromPipeline = $true)]
-            [int64]$Id,
-            [Parameter(Mandatory = $True, ParameterSetName = 'Workflow', ValueFromPipeline = $true)]
-            [ANOWProcessing]$Workflow,
-            [Parameter(Mandatory = $False)]
-            [array]$items,
-            [Parameter(Mandatory = $False)]
-            [int32]$DefaultPause = 100,
-            [Parameter(Mandatory = $False)]
-            [switch]$PerformDeepSearch,
-            [Parameter(Mandatory = $False)]
-            [switch]$IncludeArchived,
-            [Parameter(Mandatory = $False)]
-            [switch]$OnlyArchived,
-            [ValidateScript({ $_.length -eq 1 })]
-            [Parameter(Mandatory = $False)]
-            [string]$pendingCharacter = '*'
-        )
-        Begin {
-            If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
-                Write-Warning -Message "Somehow there is not a valid token confirmed."
-                Break
-            }
-            [hashtable]$parameters = @{}
-            $parameters.Add('Method', 'POST')
-            $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
-            If ($anow_session.NotSecure -eq $true) {
-                $parameters.Add('NotSecure', $true)
-            }
-            If ($ReturnContextVariables -eq $true -and $ReturnRunIds -eq $true) {
-                Write-Warning -Message "You cannot use -ReturnContextVariables with -ReturnRunIds. Please choose one or the other."
-                Break
-            }
-        }
-        Process {
-            [int32]$items_count = $global:items.count
-            Write-Verbose -Message "Current items count: $items_count"
-            Write-Debug -Message "Current items count: $items_count"
-            If ((($_ -is [int64]) -or ($Id -gt 0)) -and ($Id -notin $global:items.id)) {
-                If ($Id -gt 0) {
-                    [int64]$current_id = $Id
-                }
-                Else {
-                    [int64]$current_id = $_
-                }
-                If ($global:items.Id -notcontains $current_id) {
-                    [hashtable]$parameters = @{}
-                    $parameters.Add('Id', $current_id)
-                    If ($IncludeArchived -eq $true) {
-                        $parameters.Add('IncludeArchived', $true)
-                    }
-                    If ($OnlyArchived -eq $true) {
-                        $parameters.Add('OnlyArchived', $true)
-                    }
-                    [string]$processingType = $Workflow.processingType
-                    If ($processingType -eq 'WORKFLOW' -or $processingType.Length -eq 0) {
-                        $Error.Clear()
-                        Try {
-                            [ANOWProcessing]$Workflow = Get-AutomateNOWTask @parameters
-                        }
-                        Catch {
-                            [string]$Message = $_.Exception.Message
-                            Write-Warning -Message "Get-AutomateNOWTask failed (under Search-AutomateNOWProcessing) due to [$Message]."
-                            Break
-                        }
-                    }
-                    ElseIf ($processingType -eq 'TASK' ) {
-                        $Error.Clear()
-                        Try {
-                            [ANOWProcessing]$Workflow = Get-AutomateNOWWorkflow @parameters
-                        }
-                        Catch {
-                            [string]$Message = $_.Exception.Message
-                            Write-Warning -Message "Get-AutomateNOWWorkflow failed (under Search-AutomateNOWProcessing) due to [$Message]."
-                            Break
-                        }
-                    }
-                    ElseIf ($processingType -eq 'TRIGGER' ) {
-                        $Error.Clear()
-                        Try {
-                            [ANOWProcessing]$Workflow = Get-AutomateNOWSchedule @parameters
-                        }
-                        Catch {
-                            [string]$Message = $_.Exception.Message
-                            Write-Warning -Message "Get-AutomateNOWSchedule failed (under Search-AutomateNOWProcessing) due to [$Message]."
-                            Break
-                        }
-                    }
-                    ElseIf ($processingType -eq 'SERVICE' ) {
-                        $Error.Clear()
-                        Try {
-                            [ANOWProcessing]$Workflow = Get-AutomateNOWServiceManager @parameters
-                        }
-                        Catch {
-                            [string]$Message = $_.Exception.Message
-                            Write-Warning -Message "Get-AutomateNOWServiceManager failed (under Search-AutomateNOWProcessing) due to [$Message]."
-                            Break
-                        }
-                    }
-                    Else {
-                        Write-Warning -Message "Couldn't identify the type of Processing Template that was $current_id"
-                        Break
-                    }
-                    If ($Workflow.Id.Length -gt 0 -and $global:items.Id -notcontains $Workflow.Id) {
-                        [string]$item_id = $Workflow.Id
-                        [int32]$items_count = $global:items.Count
-                        If ($items_count -gt 0) {
-                            [array]$global:items = @($global:items) + @($Workflow)
-                        }
-                        Else {
-                            [array]$global:items = @($Workflow)
-                        }
-                        [int32]$items_count = $global:items.Count
-                        Write-Verbose -Message "Adding $item_id ($items_count items accumulated) to the collection (1)"
-                        Write-Debug -Message "Adding $item_id ($items_count items accumulated) to the collection (1)"
-                    }
-                }
-            }
-            ElseIf ($_ -is [ANOWProcessing]) {
-                [ANOWProcessing]$Workflow = $_
-            }
-            ElseIf ($Workflow.Id.Length -gt 0) {
-                #this space intentionally left blank
-            }
-            ElseIf ($Id -in $global:items.id) {
-                $Error.Clear()
-                Try {
-                    [ANOWProcessing]$Workflow = ($global:items | Where-Object { $_.Id -eq $Id })
-                }
-                Catch {
-                    [string]$Message = $_.Exception.Message
-                    Write-Warning -Message "Failed to create a single [ANOWProcessing] object from the traced items due to [$Message]. Note, that this function is in experimental status. Please report steps to reproduce to the author."
-                    Break
-                }
-            }
-            Else {
-                Write-Warning -Message "Somehow was unable to determine the object type that was passed to the pipeline of Search-AutomateNOWProcessing"
-                Break
-            }
-            [int32]$items_count = $global:items.Count
-            If ($items_count -eq 0 -and $null -eq $Workflow -and $Id -gt 0) {
-                Write-Warning -Message "Apparently the RunId you provided [$Id] does not exist on this instance. Are you sure you are in the correct ANOW domain?"
-                Break
-            }
-            If ($Workflow.Id -gt 0 -and $global:items.Id -notcontains $Workflow.Id) {
-                [int64]$item_id = $Workflow.Id
-                [array]$global:items = @($global:items) + @($Workflow)
-                [int32]$items_count = $global:items.Count
-                Write-Verbose -Message "Adding $item_id ($items_count items accumulated) to the collection (2)"
-                Write-Debug -Message "Adding $item_id ($items_count items accumulated) to the collection (2)"
-            }
-            [int64]$RunId = $Workflow.Id
-            If ($null -ne $Workflow.processingStatus) {
-                [ANOWProcessing_processingStatus]$workflow_processingStatus = $Workflow.processingStatus
-            }
-            Else {
-                [ANOWProcessing_processingStatus]$workflow_processingStatus = 'WAITING'
-            }
-            If (($workflow_processingStatus -eq 'EXECUTING' -or $workflow_processingStatus -eq 'WAITING' -or $null -eq $workflow_processingStatus) -and $WaitForExecution -eq $true) {
-                [hashtable]$parameters = @{}
-                $parameters.Add('Workflow', $Workflow)
-                $parameters.Add('WaitForExecutionInterval', $WaitForExecutionInterval)
-                $parameters.Add('WaitForExecutionDuration', $WaitForExecutionDuration)
-                If ($Quiet -eq $true) {
-                    $parameters.Add('Quiet', $true)
-                }
-                Write-Verbose -Message "Initating wait for $RunId"
-                Write-Debug -Message "Initating wait for $RunId"
-                $Error.Clear()
-                Try {
-                    [ANOWProcessing]$Workflow = Wait-AutomateNOWWorkFlow @parameters
-                }
-                Catch {
-                    [string]$Message = $_.Exception.Message
-                    Write-Warning -Message "Wait-AutomateNOWWorkFlow failed to wait for RunId $RunId due to [$Message]."
-                    Break
-                }
-                [ANOWProcessing_processingStatus]$workflow_processingStatus = $Workflow.processingStatus
-                If ($workflow_processingStatus -eq 'EXECUTING' -or $workflow_processingStatus -eq 'WAITING') {
-                    Write-Warning -Message "$RunId was still executing (or waiting) after pause intervals were exhausted!"
-                }
-            }
-            ElseIf (($workflow_processingStatus -eq 'EXECUTING' -or $workflow_processingStatus -eq 'WAITING') -and $WaitForExecution -ne $true -and $ReturnContextVariables -eq $true) {
-                If ($Quiet -ne $true) {
-                    Write-Warning -Message "Warning: $RunId is still executing (or waiting) but you requested Context Variables. As a result, you may not receive all of the Context Variables that you were expecting. Use -WaitForExecution or -Quiet to suppress this warning."
-                }
-            }
-            [hashtable]$parameters = @{}
-            $Error.Clear()
-            Try {
-                [ANOWProcessing_processingType]$processingType = $Workflow.processingType
-                If ($null -ne $Workflow.taskType) {
-                    [ANOWProcessing_taskType]$taskType = $Workflow.taskType
-                }
-                Else {
-                    [string]$taskType = 'n/a'
-                }
-            }
-            Catch {
-                [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Somehow failed to extract the processingType from a Processing object due to [$Message]."
-                Break
-            }
-            If ($Quiet -ne $true) {
-                Write-Host $pendingCharacter -NoNewLine
-            }
-            [int32]$items_count = $global:items.count
-            Write-Verbose -Message "Tracing $RunId ($items_count items accumulated) ($processingType of type $taskType)"
-            Write-Debug -Message "Tracing $RunId ($items_count items accumulated) ($processingType of type $taskType)"
-            If ($processingType -eq 'TRIGGER' -and ($taskType -eq 'PROCESSING_OBSERVER' -or $taskType -eq 'n/a')) {
-                Write-Verbose -Message "$RunId is the Processing Observer (Trigger)"
-                Write-Debug -Message "$RunId is the Processing Observer (Trigger)"
-                [string]$nextProperty = 'Id'
-                $parameters.Add('Id', $RunId)
-                $parameters.Add('ItemsOnly', $true)
-            }
-            ElseIf ($processingType -eq 'TASK' -and $taskType -eq 'TRIGGER_ITEM') {
-                Write-Verbose -Message "$RunId is the Trigger Item (Task)"
-                Write-Debug -Message "$RunId is the Trigger Item (Task)"
-                [boolean]$isProcessing = $Workflow.isProcessing
-                [int64]$exitCode = $Workflow.exitCode
-                [ANOWProcessing_processingStatus]$processingStatus = $Workflow.processingStatus
-                If ($isProcessing -eq $false -and $exitCode -eq 0) {
-                    If ($processingStatus -in @('WAITING', 'READY')) {
-                        Write-Verbose -Message "Skipping $RunId because it is in a state of $processingStatus"
-                        Write-Debug -Message "Skipping $RunId because it is in a state of $processingStatus"
-                        [string]$nextProperty = 'Id'
-                        $parameters.Add('Id', $RunId)
-                        $parameters.Add('ItemsOnly', $true)
-                    }
-                    Else {
-                        Write-Warning -Message "How can $RunId (a TRIGGER_ITEM) be in a state of isProcessing = false and processingStatus is $processingStatus instead of (WAITING or READY)?"
-                        Break
-                    }
-                }
-                Else {
-                    [string]$nextProperty = 'exitCode'
-                    If ($exitCode -eq 0) {
-                        Write-Warning -Message "Somehow $RunId (a TRIGGER_ITEM) didn't have an exit code. (processingStatus = $processingStatus) Please look into this..."
-                        Break
-                    }
-                    $parameters.Add('Id', $exitCode)
-                }
-            }
-            Else {
-                [string]$nextProperty = 'Id'
-                $parameters.Add('Id', $RunId)
-                $parameters.Add('ItemsOnly', $true)
-            }
-            If ($IncludeArchived -eq $true) {
-                $parameters.Add('IncludeArchived', $true)
-            }
-            If ($OnlyArchived -eq $true) {
-                $parameters.Add('OnlyArchived', $true)
-            }
-            [string]$parameters_display = $parameters | ConvertTo-Json -compress
-            Write-Verbose -Message "Sending the following parameters to Get-AutomateNOWWorkflow: $parameters_display"
-            Write-Verbose -Message "Pausing for [$DefaultPause] milliseconds before proceeding to trace $RunId..."
-            Start-Sleep -Milliseconds $DefaultPause
-            $Error.Clear()
-            Try {
-                [ANOWProcessing[]]$new_items = Get-AutomateNOWWorkflow @parameters
-            }
-            Catch {
-                [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Get-AutomateNOWWorkflow failed to retrieve $RunId (under Search-AutomateNOWProcessing) due to [$Message]."
-                Break
-            }
-            [array]$new_items = $new_items | Where-Object { $_.Id -notin $global:items.Id }
-            [int32]$new_items_count = $new_items.count
-            If ($new_items_count -eq 1 -and (($new_items.processingType -eq 'TRIGGER' -and ($new_items.taskType -eq 'PROCESSING_OBSERVER' -or $new_items.taskType -eq 'n/a' )) -or ($new_items.processingType -eq 'TASK' -and $new_items.taskType -eq 'TRIGGER_ITEM' ))) {
-                [int64]$current_id = $new_items.Id
-                [int64]$NextId = $new_items."$nextProperty"
-                If ($NextId -eq 0) {
-                    Write-Warning -Message "Somehow a trigger_item/processing_observer ($current_id) has no child exit code!"
-                    Break
-                }
-                ElseIf ($NextId -in $global:items.Id) {
-                    Write-Verbose -Message "Skipping $NextId because it is already in the collection..." # Note: This check may not be needed
-                    Write-Debug -Message "Skipping $NextId because it is already in the collection..." # Note: This check may not be needed
-                }
-                Else {
-                    [int32]$items_count = $global:items.count
-                    Write-Verbose -Message "Adding $NextId ($items_count items accumulated) to the next trace"
-                    Write-Debug -Message "Adding $NextId ($items_count items accumulated) to the next trace"
-                    [hashtable]$parameters = @{}
-                    $parameters.Add('Id', $NextId)
-                    $parameters.Add('Items', $global:items)
-                    If ($PerformDeepSearch -eq $true) {
-                        $parameters.Add('PerformDeepSearch', $true)
-                    }
-                    If ($IncludeArchived -eq $true) {
-                        $parameters.Add('IncludeArchived', $true)
-                    }
-                    If ($OnlyArchived -eq $true) {
-                        $parameters.Add('OnlyArchived', $true)
-                    }
-                    $Error.Clear()
-                    Try {
-                        Search-AutomateNOWProcessing @parameters
-                    }
-                    Catch {
-                        [string]$Message = $_.Exception.Message
-                        [string]$parameters_display = $parameters | ConvertTo-Json -Compress
-                        Write-Warning -Message "Search-AutomateNOWProcessing failed (#1) regarding `$NextId $NextId due to [$Message]. Full parameters were: $parameters_display"
-                        Break
-                    }
-                }
-            }
-            ElseIf ($new_items_count -gt 0 -or $PerformDeepSearch -eq $true) {
-                If ($PerformDeepSearch -eq $true) {
-                    Write-Verbose -Message "Pausing for [$DefaultPause] milliseconds before proceeding to deep search $RunId"
-                    Write-Debug -Message "Pausing for [$DefaultPause] milliseconds before proceeding to deep search $RunId"
-                    Start-Sleep -Milliseconds $DefaultPause
-                    [hashtable]$parameters = @{}
-                    $parameters.Add('LaunchedById', $RunId)
-                    If ($IncludeArchived -eq $true) {
-                        $parameters.Add('IncludeArchived', $true)
-                    }
-                    If ($OnlyArchived -eq $true) {
-                        $parameters.Add('OnlyArchived', $true)
-                    }
-                    $Error.Clear()
-                    Try {
-                        [array]$new_launched_by_items = Get-AutomateNOWWorkflow @parameters
-                    }
-                    Catch {
-                        [string]$Message = $_.Exception.Message
-                        Write-Warning -Message "Get-AutomateNOWWorkflow failed (during deep search for $RunId) due to [$Message]."
-                        Break
-                    }
-                    [array]$new_launched_by_items = $new_launched_by_items | Where-Object { $_.Id -notin $global:items.Id }
-                    [int32]$new_launched_by_items_count = $new_launched_by_items.Count
-                    If ($new_launched_by_items_count -gt 0) {
-                        Write-Verbose -Message "Found $new_launched_by_items_count new Processing items that will be added to the trace"
-                        Write-Debug -Message "Found $new_launched_by_items_count new Processing items that will be added to the trace"
-                        ForEach ($new_launched_by_item in $new_launched_by_items) {
-                            [int64]$new_launchedby_id = $new_launched_by_item.Id
-                            If ($global:items.Id -notcontains $new_launchedby_id) {
-                                [int32]$items_count = $global:items.count
-                                Write-Verbose -Message "Adding $new_launchedby_id ($items_count items accumulated) to the trace list (launchedById)"
-                                Write-Debug -Message "Adding $new_launchedby_id ($items_count items accumulated) to the trace list (launchedById)"
-                                [array]$global:items = @($global:items) + @($new_launched_by_item)
-                                [hashtable]$parameters = @{}
-                                $parameters.Add('Id', $new_launchedby_id)
-                                $parameters.Add('Items', $global:items)
-                                If ($PerformDeepSearch -eq $true) {
-                                    $parameters.Add('PerformDeepSearch', $true)
-                                }
-                                If ($IncludeArchived -eq $true) {
-                                    $parameters.Add('IncludeArchived', $true)
-                                }
-                                If ($OnlyArchived -eq $true) {
-                                    $parameters.Add('OnlyArchived', $true)
-                                }
-                                $Error.Clear()
-                                Try {
-                                    Search-AutomateNOWProcessing @parameters
-                                }
-                                Catch {
-                                    [string]$Message = $_.Exception.Message
-                                    Write-Warning -Message "Search-AutomateNOWProcessing failed (#2) due to [$Message]."
-                                    Break
-                                }
-                            }
-                        }
-                    }
-                }
-                [array]$new_items = $new_items | Where-Object { $_.Id -notin $global:items.Id }
-                ForEach ($new_item in $new_items) {
-                    [int64]$new_item_id = $new_item.id
-                    [int32]$items_count = $global:items.count
-                    If ($Quiet -ne $true) {
-                        Write-Host $pendingCharacter -NoNewLine
-                    }
-                    Write-Verbose -Message "Adding $new_item_id ($items_count items accumulated) to the trace list (new items)"
-                    Write-Debug -Message "Adding $new_item_id ($items_count items accumulated) to the trace list (new items)"
-                    [array]$global:items = @($global:items) + @($new_item)
-                    [hashtable]$parameters = @{}
-                    $parameters.Add('Id', $new_item_id)
-                    $parameters.Add('Items', $global:items)
-                    If ($PerformDeepSearch -eq $true) {
-                        $parameters.Add('PerformDeepSearch', $true)
-                    }
-                    If ($IncludeArchived -eq $true) {
-                        $parameters.Add('IncludeArchived', $true)
-                    }
-                    If ($OnlyArchived -eq $true) {
-                        $parameters.Add('OnlyArchived', $true)
-                    }
-                    $Error.Clear()
-                    Try {
-                        Search-AutomateNOWProcessing @parameters
-                    }
-                    Catch {
-                        [string]$Message = $_.Exception.Message
-                        Write-Warning -Message "Search-AutomateNOWProcessing failed (#3) due to [$Message]."
-                        Break
-                    }
-                }
-            }
-            Else {
-                [int32]$items_count = $global:items.Count
-                If ($items_count -gt 0) {
-                    Write-Verbose -Message "$items_count items are in the queue"
-                    Write-Debug -Message "$items_count items are in the queue"
-                    [int64[]]$unique_item_ids = $global:items.id | Sort-Object -Unique
-                    [ANOWProcessing[]]$unique_items = ForEach ($unique_item_id in $unique_item_ids) {
-                        $global:items | Where-Object { $_.Id -eq $unique_item_id | Select-Object -First 1 }
-                    }
-                    [int32]$unique_items_count = $unique_items.Count
-                    If ($unique_items_count -lt $items_count) {
-                        Write-Verbose -Message "The items account was reduced from $items_count to $unique_items_count"
-                        Write-Debug -Message "The items account was reduced from $items_count to $unique_items_count"
-                    }
-                    Return $unique_items
-                }
-            }
-        }
-        End {
-            [int32]$items_count = $global:items.count
-            Write-Verbose -Message "End running with $items_count items accrued"
-            Write-Debug -Message "End running with $items_count items accrued"
-            [int64[]]$unique_item_ids = $global:items.id | Sort-Object -Unique
-            [ANOWProcessing[]]$unique_items = ForEach ($unique_item_id in $unique_item_ids) {
-                $global:items | Where-Object { $_.Id -eq $unique_item_id | Select-Object -First 1 }
-            }
-            [int32]$unique_items_count = $unique_items.Count
-            If ($unique_items_count -lt $items_count) {
-                Write-Verbose -Message "Reduced items accrued from $items_count to $unique_items_count"
-                Write-Debug -Message "Reduced items accrued from $items_count to $unique_items_count"
-            }
-            Return $unique_items
-        }
-    }
-    $global:items = @()
-    [hashtable]$parameters = @{}
-    If ($Id -gt 0) {
-        [int64]$original_id = $Id
-        $parameters.Add('Id', $Id)
-    }
-    ElseIf ($Workflow.Id -gt 0) {
-        [int64]$original_id = $Workflow.Id
-        $parameters.Add('Workflow', $Workflow)
-    }
-    Else {
-        Write-Warning -Message "Somehow was unable to determine the starting Id to start this trace from. How can that happen? Are you debugging?"
-        Break
-    }
-    If ($Quiet -ne $true) {
-        Write-Host "Tracing $original_id $pendingCharacter" -NoNewLine
-    }
-    Write-Verbose -Message "Tracing $original_id (1 item accumulated) (first)"
-    Write-Debug -Message "Tracing $original_id (1 item accumulated) (first)"
-    $parameters.Add('DefaultPause', $DefaultPause)
-    If ($PerformDeepSearch -eq $true) {
-        $parameters.Add('PerformDeepSearch', $true)
-    }
-    If ($IncludeArchived -eq $true) {
-        $parameters.Add('IncludeArchived', $true)
-    }
-    If ($OnlyArchived -eq $true) {
-        $parameters.Add('OnlyArchived', $true)
-    }
-    [System.Diagnostics.Stopwatch]$stopwatch = [System.Diagnostics.Stopwatch]::new()
-    $stopwatch.Start()
-    [array]$returned_items = Search-AutomateNOWProcessing @parameters
-    [int32]$returned_items_count = $returned_items.Count
-    If ($returned_items_count -gt 0) {
-        [int64[]]$unique_ids = @($returned_items.Id | Sort-Object -Unique)
-        [array]$formatted_items = ForEach ($Id in $unique_ids) {
-            $returned_items | Where-Object { $_.Id -eq $Id } | Select-Object -First 1
-        }
-        [int32]$formatted_items_count = $formatted_items.count
-        [string]$object_label = 'Processing object'
-        If ($formatted_items_count -eq 0) {
-            Write-Warning -Message "Somehow the returned items were lost after formatting! Please look into this or contact the author with steps to reproduce if you were not debugging."
-            Break
-        }
-        Else {
-            If ($DoNotIncludeTriggers -eq $true) {
-                [array]$formatted_items = ($formatted_items | Where-Object { $_.Id -notin ($formatted_items | Where-Object { (($_.processingType -eq 'TRIGGER') -and ($_.taskType -eq 'PROCESSING_OBSERVER' -or $null -eq $_.taskType)) -or (($_.processingType -eq 'TASK') -and ($_.taskType -eq 'TRIGGER_ITEM')) } | Select-Object -ExpandProperty Id) }) #this line of code really needs to be optimized :-)
-            }
-            [array]$formatted_items = $formatted_items | Sort-Object -Property $WorkflowSortBy, 'id'
-            [int32]$formatted_items_count = $formatted_items.count
-            If ($formatted_items_count -gt 0) {
-                If ($ReturnContextVariables -ne $true) {
-                    If ($ReturnRunIds -eq $true) {
-                        [array]$formatted_items = @($formatted_items.Id)
-                        [string]$object_label = 'RunId'
-                    }
-                    Write-Verbose -Message "Returning [$formatted_items_count] [$object_label]'s sorted by [$WorkflowSortBy] (traced from $original_id)"
-                    Write-Debug -Message "Returning [$formatted_items_count] [$object_label]'s sorted by [$WorkflowSortBy] (traced from $original_id)"
-                }
-                Else {
-                    [int64[]]$IdArray = @($formatted_items.Id)
-                    [string]$IdArray_display = $IdArray | ConvertTo-JSON -Compress
-                    Write-Verbose -Message "Fetching $formatted_items_count Context Variables (from RunId's: $IdArray_display)"
-                    Write-Debug -Message "Fetching $formatted_items_count Context Variables (from RunId's: $IdArray_display)"
-                    $Error.Clear()
-                    Try {
-                        [ANOWProcessingContextVariable[]]$context_variables = Get-AutomateNOWContextVariable -RunId $IdArray
-                    }
-                    Catch {
-                        [string]$Message = $_.Exception.Message
-                        Write-Warning -Message "Get-AutomateNOWContextVariable failed (under Trace-AutomateNOWProcessing) due to [$Message]."
-                        Break
-                    }
-                    [int64[]]$root_ids = $formatted_items | Where-Object { $_.ancestorpath.count -eq 0 } | Where-Object { $_.Id -gt 0 } | Select-Object -ExpandProperty Id
-                    [int32]$context_variables_count = $context_variables.count
-                    Write-Verbose -Message "Fetched $context_variables_count Context Variables"
-                    Write-Debug -Message "Fetched $context_variables_count Context Variables"
-                    If ($context_variables_count -gt 0) {
-                        [array]$formatted_variables = ForEach ($variable in $context_variables) {
-                            [int64]$current_variable_processingId = $variable.processing
-                            [ANOWProcessing]$current_workflow = $formatted_items | Where-Object { $_.Id -eq $current_variable_processingId } | Select-Object -First 1
-                            [int64]$rootProcessingId = $current_workflow.rootProcessingId
-                            [int64]$parent = $current_workflow.parent
-                            [string]$ancestorPath = $current_workflow.ancestorPath
-                            [boolean]$isRoot = $current_workflow.isRoot
-                            [int32]$ancestorCount = $(If ($ancestorPath.Length -gt 0) { ($ancestorPath -split ',') | Measure-Object | Select-Object -ExpandProperty Count -EA 0 })
-                            If ($current_variable_processingId -in $root_ids) {
-                                [string]$scope = 'Root'
-                            }
-                            ElseIf ($rootProcessingId -eq $parent) {
-                                [string]$scope = 'Parent'
-                            }
-                            Else {
-                                [string]$scope = 'Self'
-                            }
-                            [PSCustomObject]@{ scope = $scope; name = $variable.name; value = $variable.valuePreview; processing = $variable.processing; id = $variable.id; rootProcessingId = $rootProcessingId; parent = $parent; ancestorPath = $ancestorPath; ancestorCount = $ancestorCount; isRoot = $isRoot; }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    Else {
-        Write-Verbose -Message "There were no returned items when tracing from [$original_id]"
-        Write-Debug -Message "There were no returned items when tracing from [$original_id]"
-    }
-    $stopwatch.Stop()
-    [decimal]$elapsed_seconds = [math]::Round($stopwatch.elapsed.TotalSeconds, 2)
-    If ($Quiet -ne $true) {
-        Write-Host ""
-        If ($NoStats -ne $true) {
-            [decimal]$average_time_per_item = [math]::Round(($elapsed_seconds / $formatted_items_count), 2)
-            If ($null -eq $context_variables_count) {
-                [int32]$context_variables_count = 0
-            }
-            If ($elapsed_seconds -lt 60) {
-                If ($Quiet -ne $true) {
-                    Write-Information -MessageData "Trace $original_id completed: $formatted_items_count processing items in $elapsed_seconds sec. ($average_time_per_item sec. each). $context_variables_count context variables were returned."
-                }
-                ElseIf ($elapsed_seconds -lt 3600) {
-                    [decimal]$elapsed_minutes = [math]::Round(($elapsed_seconds / 60), 2)
-                    [int32]$elapsed_seconds = ($elapsed_seconds - ($elapsed_minutes * 60))
-                    If ($elapsed_minutes -gt 0) {
-                        Write-Information -MessageData "Trace $original_id completed: $formatted_items_count processing items in 1 minute and $elapsed_seconds sec. ($average_time_per_item sec. each). $context_variables_count context variables were returned."
-                    }
-                    Else {
-                        Write-Information -MessageData "Trace $original_id completed: $formatted_items_count processing items in $elapsed_minutes min. ($average_time_per_item sec. each). $context_variables_count context variables were returned."
-                    }
-                }
-                Else {
-                    [decimal]$elapsed_hours = [math]::Round(($elapsed_seconds / 3600), 2)
-                    If ($elapsed_hours -gt 0) {
-                        Write-Information -MessageData "Trace $original_id completed: $formatted_items_count workflows in $elapsed_elapsed hour(s) ($average_time_per_item sec. each). $context_variables_count context variables were returned. This trace took entirely too much time. Please look into this."
-                    }
-                }
-            }
-        }
-    }
-    If ($formatted_items_count -gt 0 -and $ReturnContextVariables -ne $true) {
-        Return $formatted_items
-    }
-    If ($context_variables_count -gt 0 -and $ReturnContextVariables -eq $true) {
-        Return $formatted_variables
-    }
-}
-
 #endregion
 
-#Region - WorkflowTemplates (PROCESSING_TEMPLATE)
+#Region - Workflow Templates (PROCESSING_TEMPLATE)
 
 Function Get-AutomateNOWWorkflowTemplate {
     <#
@@ -76673,7 +81195,7 @@ Function Get-AutomateNOWWorkflowTemplate {
                 }
             }
             If ($Folder.Length -gt 0) {
-                If ($null -eq (Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000)) {
+                If ($null -eq (Get-AutomateNOWFolder -Id $Folder)) {
                     Write-Warning -Message "The folder [$Folder] does not appear to exist. Please only use existing Folders when filtering."
                     Break
                 }
@@ -76763,6 +81285,12 @@ Function Set-AutomateNOWWorkflowTemplate {
 
     .PARAMETER UnsetTags
     A switch parameter that will remove the Tags from the Workflow Template
+
+    .PARAMETER CodeRepository
+    Optional [ANOWCodeRepository] object to place the Workflow Template into.
+
+    .PARAMETER UnsetCodeRepository
+    A switch parameter that will remove the Workflow Template from its current code repository.
 
     .PARAMETER Title
     A string representing the "alias" of the Workflow Template (this property needs a better explanation)
@@ -76892,6 +81420,10 @@ Function Set-AutomateNOWWorkflowTemplate {
         [string[]]$Tags,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [switch]$UnsetTags,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
+        [ANOWCodeRepository]$CodeRepository,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
+        [switch]$UnsetCodeRepository,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [string]$Title,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
@@ -77045,7 +81577,7 @@ Function Set-AutomateNOWWorkflowTemplate {
             If ($Folder.Length -gt 0) {
                 $Error.Clear()
                 Try {
-                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+                    [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
                 }
                 Catch {
                     [string]$Message = $_.Exception.Message
@@ -77102,6 +81634,13 @@ Function Set-AutomateNOWWorkflowTemplate {
                 Write-Verbose -Message "Removing tags [$tags_display] from [$WorkflowTemplate_id]"
                 $BodyMetaData.'tags' = $null
                 $include_properties += 'tags'
+            }
+            If ($CodeRepository.Id.Length -gt 0) {
+                [string]$CodeRepository_Id = $CodeRepository.Id
+                $BodyMetaData.'codeRepository' = $CodeRepository_Id
+            }
+            ElseIf ($UnsetCodeRepository -eq $true) {
+                $BodyMetaData.'codeRepository' = $null
             }
             If ($Title.Length -gt 0) {
                 $BodyMetaData.'title' = $Title
@@ -77549,7 +82088,7 @@ Function New-AutomateNOWWorkflowTemplate {
     If ($Folder.Length -gt 0) {
         $Error.Clear()
         Try {
-            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -77734,7 +82273,7 @@ Function Remove-AutomateNOWWorkflowTemplate {
         }
         [string]$WorkflowTemplate_id = $WorkflowTemplate.id
         If ($WorkflowTemplate_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($WorkflowTemplate_id)")) -eq $true) {
@@ -77956,7 +82495,7 @@ Function Copy-AutomateNOWWorkflowTemplate {
                 $BodyMetaData.'_dataSource' = 'ProcessingTemplateDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData #-IncludeProperties oldId, domain, NewId, description, folder
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData #-IncludeProperties oldId, domain, NewId, description, folder
                 $Body = $Body -replace '&tags[0-9]{1,}', '&tags'
                 $parameters.Body = $Body
                 $Error.Clear()
@@ -78345,7 +82884,7 @@ Function Start-AutomateNOWWorkflowTemplate {
         If ($folder.Length -gt 0) {
             $Error.Clear()
             Try {
-                [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+                [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
             }
             Catch {
                 [string]$Message = $_.Exception.Message
@@ -78941,6 +83480,9 @@ Function Read-AutomateNOWWorkflowTemplateItem {
     .PARAMETER Id
     A string containing the 36-character guid Id of the Workflow Item to fetch.
 
+    .PARAMETER Name
+    Optional "name" of the Workflow Item. Be careful with this parameter as the "name" of the Workflow Item is not required to be unique outside of the Processing Template that it is a part of.
+
     .PARAMETER startRow
     Optional integer to indicate the row to start from. This is intended for when you need to paginate the results. Default is 0.
 
@@ -78960,9 +83502,14 @@ Function Read-AutomateNOWWorkflowTemplateItem {
     $workflow_template_items = $workflow_template | Read-AutomateNOWWorkflowTemplateItem
 
     .EXAMPLE
-    Gets a specific item in a Workflow by its 36-character GUID id
+    Gets a specific item in a Workflow Template by its 36-character GUID id
 
     Read-AutomateNOWWorkflowTemplateItem -Id '12342fde-7e1e-4a69-ae7c-bc15e19a0fe1'
+
+    .EXAMPLE
+    Gets a specific item in a Workflow Template named 'TaskTemplate1' from within a Workflow Template named 'WorkflowTemplate1'
+
+    Get-AutomateNOWWorkflowTemplate -Id 'WorkflowTemplate1' | Read-AutomateNOWWorkflowTemplateItem -Name 'TaskTemplate1'
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
@@ -78978,6 +83525,8 @@ Function Read-AutomateNOWWorkflowTemplateItem {
         [ValidateScript({ $_ -match '^[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}$' })]
         [Parameter(Mandatory = $true, ParameterSetName = 'Id', ValueFromPipeline = $true)]
         [string]$Id,
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [string]$Name,
         [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
         [int32]$startRow = 0,
         [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
@@ -79010,12 +83559,21 @@ Function Read-AutomateNOWWorkflowTemplateItem {
         ElseIf ($WorkflowTemplate.Id.Length -gt 0) {
             [string]$WorkflowTemplate_id = $WorkflowTemplate.Id
             $BodyMetaData.Add('workflow', $WorkflowTemplate_id )
-            $BodyMetaData.Add('_operationId', 'readWorkflow')
-            $BodyMetaData.Add('_startRow', $startRow)
-            $BodyMetaData.Add('_endRow', $endRow)
-            $BodyMetaData.Add('_sortBy1', '-isMasterRecord')
-            $BodyMetaData.Add('_sortBy2', 'sortOrder')
-            $BodyMetaData.Add('_sortBy3', 'title')
+            If ($Name.Length -gt 0) {
+                <# This code does not work :(
+                $BodyMetaData.Add('_constructor', 'AdvancedCriteria')
+                $BodyMetaData.Add('operator', 'and')
+                $BodyMetaData.Add('criteria1', '{"fieldName":"name","operator":"equals","value":"' + $Name + '"}')
+                #>
+            }
+            Else {
+                $BodyMetaData.Add('_operationId', 'readWorkflow')
+                $BodyMetaData.Add('_startRow', $startRow)
+                $BodyMetaData.Add('_endRow', $endRow)
+                $BodyMetaData.Add('_sortBy1', '-isMasterRecord')
+                $BodyMetaData.Add('_sortBy2', 'sortOrder')
+                $BodyMetaData.Add('_sortBy3', 'title')
+            }
         }
         Else {
             Write-Warning -Message "Could not determine the arrangement under Read-AutomateNOWWorkflowTemplateItem"
@@ -79028,8 +83586,8 @@ Function Read-AutomateNOWWorkflowTemplateItem {
         $BodyMetaData.Add('isc_metaDataPrefix', '_')
         $BodyMetaData.Add('isc_dataFormat', 'json')
         [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
-        [string]$command = ('/processingTemplateItem/read' + '?' + $Body)
-        If ($null -eq $parameters.'Command') {
+        [string]$command = ('/processingTemplateItem/readWorkflow' + '?' + $Body)
+        If ($null -eq $parameters["Command"]) {
             $parameters.Add('Command', $command)
         }
         Else {
@@ -79053,7 +83611,21 @@ Function Read-AutomateNOWWorkflowTemplateItem {
         If ($results.response.data.count -gt 0) {
             $Error.Clear()
             Try {
-                [array]$ProcessingTemplateItems = $results.response.data | Where-Object { $_.sortOrder -ge 0 } | ForEach-Object {
+                If ($null -eq $WorkflowTemplate) {
+                    If ($results.response.data.count -ne 1) {
+                        Write-Warning -Message "The expected number of Workflow Template Items in this scenario was 1. Please look into this."
+                        Break
+                    }
+                    [string]$WorkflowTemplateItem_Id = $results.response.data.id
+                    If ($results.response.data.workflow.Length -eq 0) {
+                        Write-Warning -Message "The workflow property within Workflow Template Item $WorkflowTemplateItem_Id was empty. Please look into this."
+                        Break
+                    }
+                    [string]$WorkflowTemplate_simpleId = $results.response.data.workflow -split ']' | Select-Object -Last 1
+                    [ANOWWorkflowTemplate]$WorkflowTemplate = Get-AutomateNOWWorkflowTemplate -Id $WorkflowTemplate_simpleId
+                }
+                [ANOWProcessingTemplateItem[]]$ProcessingTemplateItems = $results.response.data | Where-Object { $_.sortOrder -ge 0 } | ForEach-Object {
+                    $_.workflow = $WorkflowTemplate
                     If ($_.processingType -eq 'TRIGGER' -or $_.parentProcessingType -eq 'TRIGGER') {
                         [ANOWScheduleTemplateItem]$_
                     }
@@ -79077,9 +83649,10 @@ Function Read-AutomateNOWWorkflowTemplateItem {
                 Break
             }
             Write-Verbose -Message "Workflow Template Items successfully read from $WorkflowTemplate_id"
-            If ($Quiet -ne $true) {
-                Return $ProcessingTemplateItems
+            If ($Name.Length -gt 0) {
+                [ANOWProcessingTemplateItem[]]$ProcessingTemplateItems = $ProcessingTemplateItems | Where-Object { $_.name -eq $Name } | Select-Object -First 1
             }
+            Return $ProcessingTemplateItems
         }
         Else {
             Write-Verbose -Message "There were no Workflow Template Items within $WorkflowTemplate_id"
@@ -79099,10 +83672,10 @@ Function Add-AutomateNOWWorkflowTemplateItem {
     Adds a Processing Template (i.e. Task, Workflow, Service Manager or Integration) to a Workflow Template
 
     .PARAMETER WorkflowTemplate
-    Mandatory [ANOWWorkflowTemplate] object representing the Workflow Template that will receive the new Processing Template.
+    Mandatory [ANOWWorkflowTemplate] object representing the Workflow Template that is receiving a new item.
 
     .Parameter ProcessingTemplate
-    Mandatory [PSObject] (either Task Template or Workflow Template) object representing the Processing Template that is being added to the Workflow Template.
+    Mandatory [ANOWProcessingTemplate] (only Task Template, Workflow Template or Service Manager Template) object representing the Processing Template that is being added to the Workflow Template as a new item.
 
     .PARAMETER sortOrder
     Optional int32 specifying the sort order. When not specified, the sort order will be LAST. If needed, use Read-AutomateNOWWorkflow to obtain the current sort order of the items in the Workflow.
@@ -79114,24 +83687,27 @@ Function Add-AutomateNOWWorkflowTemplateItem {
     Force the addition of the object without confirmation. This is equivalent to -Confirm:$false
 
     .INPUTS
-    Either [ANOWTaskTemplate] or [ANOWWorkflowTemplate] objects are accepted (including from the pipeline)
+    Any of [ANOWTaskTemplate], [ANOWWorkflowTemplate] or [ANOWServiceManagerTemplate] objects are accepted (including from the pipeline). You can also use Get-AutomateNOWProcessingTemplate. Do not send Schedule Templates to Workflow Templates.
 
     .OUTPUTS
     None. The status will be written to the console with Write-Verbose.
 
     .EXAMPLE
-    Forcibly adds a Task Template ($task_template1) and a Workflow Template ($workflow_template1) to a Workflow Template ($workflow_template2)
+    Forcibly and quietly adds 2 Task Templates to a Workflow Template named 'WorkflowTemplate1' (multi-line format)
 
-    $task_template1 = Get-AutomateNOWTaskTemplate -Id 'TaskTemplate01'
-    $workflow_template1 = Get-AutomateNOWTaskTemplate -Id 'WorkflowTemplate01'
-    $workflow_template2 = Get-AutomateNOWTaskTemplate -Id 'WorkflowTemplate02'
+    $task_template1 = Get-AutomateNOWTaskTemplate -Id 'TaskTemplate1'
+    $task_template2 = Get-AutomateNOWTaskTemplate -Id 'TaskTemplate2'
+    $workflow_template1 = Get-AutomateNOWWorkflowTemplate -Id 'WorkflowTemplate1'
 
-    @($task_template1, $workflow_template1) | Add-AutomateNOWWorkflowTemplateItem -WorkflowTemplate $workflow_template2 -Force
+    $task_template1, $task_template2 | Add-AutomateNOWWorkflowTemplateItem -WorkflowTemplate $workflow_template1 -Quiet -Force
+
+    .EXAMPLE
+    Uses the pipeline to add a Service Manager Template named 'ServiceManagerTemplate1' to a Workflow Template named 'WorkflowTemplate1' (one-liner format)
+
+    Get-AutomateNOWServiceManagerTemplate -Id 'ServiceManagerTemplate1' | Add-AutomateNOWWorkflowTemplateItem -WorkflowTemplate (Get-AutomateNOWWorkflowTemplate -Id 'WorkflowTemplate1')
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
-
-    Only Task Templates and Workflow Templates are supported. Service Managers and Integrations are not supported yet.
 
     The sort order cannot be changed yet through this module. All items are added as the last item.
 
@@ -79170,7 +83746,7 @@ Function Add-AutomateNOWWorkflowTemplateItem {
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Add $($ProcessingTemplate_id) to $($WorkflowTemplate_id)")) -eq $true) {
             $Error.Clear()
             Try {
-                [ANOWProcessingTemplateItem[]]$WorkflowTemplateItems = Read-AutomateNOWWorkflowTemplateItem -WorkflowTemplate $WorkflowTemplate
+                [ANOWProcessingTemplateItem[]]$WorkflowTemplateItems = Read-AutomateNOWWorkflowTemplateItem -WorkflowTemplate $WorkflowTemplate -startRow 0 -endRow 10000
             }
             Catch {
                 [string]$Message = $_.Exception.Message
@@ -79231,14 +83807,15 @@ Function Add-AutomateNOWWorkflowTemplateItem {
                 $Error.Clear()
                 Try {
                     [array]$ProcessingTemplateItem = $results.response.data | Where-Object { $_.sortOrder -ge 0 } | ForEach-Object {
-                        If ($_.processingType -eq 'TRIGGER' -or $_.parentProcessingType -eq 'TRIGGER') {
-                            [ANOWScheduleTemplateItem]$_
+                        $_.workflow = $WorkflowTemplate
+                        If ($_.processingType -eq 'TASK' -or $_.parentProcessingType -eq 'TASK') {
+                            [ANOWTaskTemplateItem]$_
                         }
                         ElseIf ($_.processingType -eq 'WORKFLOW' -or $_.parentProcessingType -eq 'WORKFLOW') {
                             [ANOWWorkflowTemplateItem]$_
                         }
-                        ElseIf ($_.processingType -eq 'TASK' -or $_.parentProcessingType -eq 'TASK') {
-                            [ANOWTaskTemplateItem]$_
+                        ElseIf ($_.processingType -eq 'SERVICE' -or $_.parentProcessingType -eq 'SERVICE') {
+                            [ANOWServiceManagerTemplateItem]$_
                         }
                         Else {
                             [string]$processingType = $_.processingType
@@ -79348,7 +83925,7 @@ Function Remove-AutomateNOWWorkflowTemplateItem {
         }
         [string]$ProcessingTemplateItem_id = $ProcessingTemplateItem.id
         If ($ProcessingTemplateItem_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If ($ProcessingTemplateItem_id -notmatch '^[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}$') {
@@ -79361,7 +83938,7 @@ Function Remove-AutomateNOWWorkflowTemplateItem {
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($ProcessingTemplateItem_id)")) -eq $true) {
             $Error.Clear()
             Try {
-                [PSCustomObject]$WorkflowTemplateItems = Read-AutomateNOWWorkflowTemplateItem -WorkflowTemplate $WorkflowTemplate
+                [PSCustomObject]$WorkflowTemplateItems = Read-AutomateNOWWorkflowTemplateItem -WorkflowTemplate $WorkflowTemplate -startRow 0 -endRow 10000
             }
             Catch {
                 [string]$Message = $_.Exception.Message
@@ -79409,6 +83986,582 @@ Function Remove-AutomateNOWWorkflowTemplateItem {
                 Break
             }
             Write-Verbose -Message "Processing Template $ProcessingTemplateItem_id ($processingType) was removed from $WorkflowTemplate_id"
+        }
+    }
+    End {
+
+    }
+}
+
+#endregion
+
+#Region - Workflow Template Dependencies
+
+Function Read-AutomateNOWWorkflowTemplateDependency {
+    <#
+    .SYNOPSIS
+    Reads the Processing Template Dependency objects that are associated with a Workflow Template on an AutomateNOW! instance
+
+    .DESCRIPTION
+    Reads the Processing Template Dependency objects that are associated with a Workflow Template on an AutomateNOW! instance
+
+    .PARAMETER WorkflowTemplate
+    An [ANOWWorkflowTemplate] object representing the Workflow Template to read the dependencies from.
+
+    .PARAMETER Successors
+    Switch parameter that forces only predecessor Processing Template Item dependencies of the Workflow Template to be returned. If you do not provide this switch then the results may include other depency types (e.g. resources).
+
+    .PARAMETER Id
+    A string containing the 36-character guid Id of the Workflow Template Dependency object to fetch.
+
+    .PARAMETER dependencyType
+    An optional string that will filter the results based on the type of dependency. Valid choices are: PREDECESSOR; PROCESSING_TEMPLATE; WORKFLOW_ITEM; RESOURCE; EVENT; CHRONOLOGY; AND; OR; XOR; NAND; NOR; XNOR;
+
+    .PARAMETER startRow
+    Optional integer to indicate the row to start from. This is intended for when you need to paginate the results. Default is 0.
+
+    .PARAMETER endRow
+    Optional integer to indicate the row to stop on. This is intended for when you need to paginate the results. Default is 100.
+
+    .INPUTS
+    Either a [ANOWProcessingTemplateItem] object or its id are required
+
+    .OUTPUTS
+    [ANOWProcessingTemplateDependency] objects will be returned
+
+    .EXAMPLE
+    Imagine a WorkflowTemplate named 'WorkflowTemplate1' that contains two Task Templates named 'TaskTemplate1' and 'TaskTemplate2' where 'TaskTemplate2' has been configured as a successor of 'TaskTemplate1'.
+
+    Gets the -name- of the successor Workflow Template Item for a Task named 'TaskTemplate1' within a Workflow Template named 'WorkflowTemplate1'. Note the use of the -Successors switch parameter (one-liner format)
+
+    Get-AutomateNOWWorkflowTemplate -Id 'WorkflowTemplate1' | Read-AutomateNOWWorkflowTemplateItem -Name 'TaskTemplate1' | Read-AutomateNOWWorkflowTemplateDependency -Successors | Select-Object -ExpandProperty sourceTitle
+
+    .EXAMPLE
+    Imagine a WorkflowTemplate named 'WorkflowTemplate1' that contains two Task Templates named 'TaskTemplate1' and 'TaskTemplate2' where 'TaskTemplate2' has been configured as a successor of 'TaskTemplate1'.
+
+    Gets the -name- of the predecessor Workflow Template Item for a Task named 'TaskTemplate2' within a Workflow Template named 'WorkflowTemplate1'. Note the lack of -Successors switch parameter (one-liner format).
+
+    Get-AutomateNOWWorkflowTemplate -Id 'WorkflowTemplate1' | Read-AutomateNOWWorkflowTemplateItem -Name 'TaskTemplate2' | Read-AutomateNOWWorkflowTemplateDependency | Select-Object -ExpandProperty predecessor
+
+    .EXAMPLE
+    Gets the first page of successor Workflow Template Dependency objects from a Workflow Template Item with an id of 'a7c1290d-89f4-4d37-9bfb-7ffaf9ce6c89' (one-liner format)
+
+    Read-AutomateNOWWorkflowTemplateItem -Id 'a7c1290d-89f4-4d37-9bfb-7ffaf9ce6c89' | Read-AutomateNOWWorkflowTemplateDependency -Successors
+
+    .EXAMPLE
+    Gets a specific Workflow Template Dependency object with an id of 'c680bdfc-ba66-4645-971d-1c3ada3d545b'
+
+    Read-AutomateNOWWorkflowTemplateDependency -Id 'c680bdfc-ba66-4645-971d-1c3ada3d545b'
+
+    .EXAMPLE
+    Gets the first page of RESOURCE related dependencies from a Task Template named 'TaskTemplate1' that is part of a Workflow Template named 'WorkflowTemplate1'.
+
+    Get-AutomateNOWWorkflowTemplate -Id 'WorkflowTemplate1' | Read-AutomateNOWWorkflowTemplateItem -Name 'TaskTemplate1' | Read-AutomateNOWWorkflowTemplateDependency -dependencyType RESOURCE
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    Do not overlook the -Successors switch parameter.
+
+    #>
+    [OutputType([ANOWProcessingTemplateItem[]])]
+    [Cmdletbinding(DefaultParameterSetName = 'Default')]
+    Param(
+        [Parameter(Mandatory = $true, ParameterSetName = 'Default', ValueFromPipeline = $true)]
+        [ANOWProcessingTemplateItem]$ProcessingTemplateItem,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
+        [switch]$Successors,
+        [ValidateScript({ $_ -match '^[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}$' })]
+        [Parameter(Mandatory = $true, ParameterSetName = 'Id', ValueFromPipeline = $true)]
+        [string]$Id,
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [string]$Name,
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [ANOWProcessingTemplateDependency_dependencyType]$dependencyType,
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [int32]$startRow = 0,
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
+        [int32]$endRow = 100
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        If ($endRow -le $startRow) {
+            Write-Warning -Message "The endRow must be greater than the startRow. Please try again."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'GET')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [ANOWProcessingTemplateItem]$ProcessingTemplateItem = $_
+            [string]$ProcessingTemplateItem_Name = $ProcessingTemplateItem.name
+        }
+        ElseIf ($_.length -eq 36) {
+            [string]$Id = $_
+        }
+        [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+        If ($Id.Length -eq 36) {
+            $BodyMetaData.Add('id', $Id )
+        }
+        Else {
+            If ($ProcessingTemplateItem.id.Length -eq 0) {
+                Write-Warning -Message "Somehow the Processing Template Item that was supplied has an empty id. Please look into this."
+                Break
+            }
+            [string]$WorkflowTemplate_id = $ProcessingTemplateItem.workflow.id
+            [string]$WorkflowTemplate_simpleId = $ProcessingTemplateItem.workflow.simpleId
+            $BodyMetaData.Add('_constructor', 'AdvancedCriteria')
+            $BodyMetaData.Add('_startRow', $startRow)
+            $BodyMetaData.Add('_endRow', $endRow)
+        }
+        If ($Successors -eq $true) {
+            $BodyMetaData.Add('operator', 'or')
+            $BodyMetaData.Add('criteria1', '{"_constructor":"AdvancedCriteria","operator":"and","criteria":[{"fieldName":"dependencyType","operator":"equals","value":"PREDECESSOR"},{"fieldName":"workflow","operator":"equals","value":"' + $WorkflowTemplate_id + '"},{"fieldName":"predecessor","operator":"equals","value":"' + $ProcessingTemplateItem_Name + '"}]}')
+            $BodyMetaData.Add('criteria2', '{"_constructor":"AdvancedCriteria","operator":"and","criteria":[{"fieldName":"dependencyType","operator":"equals","value":"PROCESSING_TEMPLATE"},{"fieldName":"processingTemplate","operator":"equals","value":"' + $ProcessingTemplateItem_Name + '"}]}')
+            $BodyMetaData.Add('criteria3', '{"_constructor":"AdvancedCriteria","operator":"and","criteria":[{"fieldName":"dependencyType","operator":"equals","value":"WORKFLOW_ITEM"},{"fieldName":"workflowTemplateItem","operator":"equals","value":"Download-Report.ZendeskCaseBackup.ps1"},{"fieldName":"workflowTemplate","operator":"equals","value":"' + $WorkflowTemplate_simpleId + '"}]}')
+            [string]$componentId = 'ProcessingTemplateSuccessorList'
+        }
+        Else {
+            $BodyMetaData.Add('operator', 'and')
+            $BodyMetaData.Add('criteria1', ('{"fieldName":"workflow","operator":"equals","value":"' + $WorkflowTemplate_id + '"}'))
+            $BodyMetaData.Add('criteria2', ('{"fieldName":"workflowItem","operator":"equals","value":"' + $ProcessingTemplateItem_Name + '"}'))
+            $BodyMetaData.Add('criteria3', ('{"operator":"or","criteria":[{"fieldName":"resourceType","operator":"isNull"},{"fieldName":"resourceType","operator":"notInSet","value":["STOCK","LOCK"]}]}'))
+            If ($dependencyType.Length -gt 0) {
+                $BodyMetaData.Add('criteria4', ('{"fieldName":"dependencyType","operator":"equals","value":"' + $dependencyType + '"}'))
+            }
+            [string]$componentId = 'ProcessingTemplateDependencyList'
+            [string]$operationId = 'ProcessingTemplateDependencyDataSource_fetch'
+            $BodyMetaData.Add('_operationId', $operationId)
+        }
+        $BodyMetaData.Add('_componentId', $componentId)
+        $BodyMetaData.Add('_textMatchStyle', 'exact')
+        $BodyMetaData.Add('_operationType', 'fetch')
+        $BodyMetaData.Add('_dataSource', 'ProcessingTemplateDependencyDataSource')
+        $BodyMetaData.Add('isc_metaDataPrefix', '_')
+        $BodyMetaData.Add('isc_dataFormat', 'json')
+        [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+        [string]$command = ('/processingTemplateDependency/read' + '?' + $Body)
+        If ($null -eq $parameters["Command"]) {
+            $parameters.Add('Command', $command)
+        }
+        Else {
+            $parameters.'Command' = $command
+        }
+        $Error.Clear()
+        Try {
+            [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$WorkflowTemplate_id] due to [$Message]."
+            Break
+        }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 10
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
+        }
+        If ($results.response.data.count -gt 0) {
+            If ($Id.Length -eq 36) {
+                If ($results.response.data.workflow.length -eq 0) {
+                    Write-Warning -Message "Somehow the workflow property of the retrieved Workflow Template Dependency object was empty. Please look into this."
+                    Break
+                }
+                [string]$WorkflowTemplate_id = $results.response.data | Select-Object -First 1 -ExpandProperty workflow
+                [string]$WorkflowTemplate_simpleId = $WorkflowTemplate_id -split ']' | Select-Object -Last 1
+                $Error.Clear()
+                Try {
+                    [ANOWWorkflowTemplate]$WorkflowTemplate = Get-AutomateNOWWorkflowTemplate -Id $WorkflowTemplate_simpleId
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Failed to extract the Workflow Template object from Workflow Template Item on [$ProcessingTemplateItem_Name] due to [$Message]."
+                    Break
+                }
+            }
+            [ANOWProcessingTemplateDependency[]]$ProcessingTemplateDependencies = ForEach ($result in $results.response.data) {
+                $Error.Clear()
+                Try {
+                    $result.workflow = $WorkflowTemplate
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Failed to parse the Workflow Template Items from $WorkflowTemplate_id due to [$Message]"
+                    Break
+                }
+                $result
+            }
+            Write-Verbose -Message "Workflow Template Items successfully read from $WorkflowTemplate_id"
+            Return $ProcessingTemplateDependencies
+        }
+        Else {
+            Write-Verbose -Message "There were no Workflow Template Items within $WorkflowTemplate_id"
+        }
+    }
+    End {
+
+    }
+}
+
+Function Add-AutomateNOWWorkflowTemplateDependency {
+    <#
+    .SYNOPSIS
+    Adds a dependency between two Processing Template Items within a Workflow Template
+
+    .DESCRIPTION
+    Adds a dependency between two Processing Template Items within a Workflow Template
+
+    .PARAMETER WorkflowTemplate
+    Mandatory [ANOWWorkflowTemplate] object that the dependency will be configured for.
+
+    .Parameter WorkflowTemplateItem
+    Mandatory [ANOWWorkflowTemplateItem] object representing the Processing Template Item that is receiving the dependency to another Processing Template Item within the same Workflow Template.
+
+    .PARAMETER DependencyType
+    Mandatory type of dependency that will exist between the two Processing Template Items. Valid choices are: PREDECESSOR; PROCESSING_TEMPLATE; WORKFLOW_ITEM; RESOURCE; EVENT; CHRONOLOGY; AND; OR; XOR; NAND; NOR; XNOR;
+
+    .PARAMETER Predecessor
+    Mandatory (when -DependencyType is PREDECESSOR) [ANOWWorkflowTemplateItem] object representing the Processing Template Item that is being set as the predessor to the Processing Template Item that was specified with the -WorkflowTemplateItem parameter.
+
+    .PARAMETER Quiet
+    Switch parameter to silence the emitted [ANOWWorkflowTemplateItem] object
+
+    .PARAMETER Force
+    Force the addition of the object without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    An [ANOWWorkflowTemplate] object must be presented along with at least one [ANOWWorkflowTemplateItem] object from within that Workflow Template. Pipeline support is intentionally not included.
+
+    .OUTPUTS
+    None. The status will be written to the console with Write-Verbose.
+
+    .EXAMPLE
+    Forcefully adds a Workflow Template Item named 'TaskTemplate1' as a predecessor to a Workflow Template Item named 'TaskTemplate2' within a Workflow Template named 'WorkflowTemplate1'
+
+    $workflow_template = Get-AutomateNOWWorkflowTemplate -Id 'WorkflowTemplate1'
+    $predecessor_item = $workflow_template | Read-AutomateNOWWorkflowTemplateItem -Name 'TaskTemplate1'
+    $successor_item = $workflow_template | Read-AutomateNOWWorkflowTemplateItem -Name 'TaskTemplate2'
+    Add-AutomateNOWWorkflowTemplateDependency -WorkflowTemplate $workflow_template -WorkflowTemplateItem $successor_item -Predecessor $predecessor_item -DependencyType PREDECESSOR -Force
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    ONLY adding Workflow Template Items as predecessor to other WorkflowTemplate Items is supported. All other options such as adding a Semaphore (etc) are not added yet.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [ANOWWorkflowTemplate]$WorkflowTemplate,
+        [Parameter(Mandatory = $true)]
+        [ANOWWorkflowTemplateItem]$WorkflowTemplateItem,
+        [Parameter(Mandatory = $true)]
+        [ANOWProcessingTemplateDependency_dependencyType]$DependencyType,
+
+        [Parameter(Mandatory = $true, ParameterSetName = 'WorkflowTemplateItem')]
+        [ANOWWorkflowTemplateItem]$Predecessor,
+        [switch]$Quiet,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force
+    )
+    If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+        Write-Warning -Message "Somehow there is not a valid token confirmed."
+        Break
+    }
+    If ($DependencyType -eq 'PREDECESSOR' -and $Predecessor.Id.Length -eq 0) {
+        Write-Warning -Message "You must include a Workflow Template Item with the -Predecessor parameter when the -DepencyType is PREDECESSOR"
+        Break
+    }
+    [string]$WorkflowTemplate_id = $WorkflowTemplate.id
+    [string]$WorkflowTemplate_simpleId = $WorkflowTemplate.simpleId
+    [string]$command = '/processingTemplateDependency/create'
+    [hashtable]$parameters = @{}
+    $parameters.Add('Command', $command)
+    $parameters.Add('Method', 'POST')
+    $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+    If ($anow_session.NotSecure -eq $true) {
+        $parameters.Add('NotSecure', $true)
+    }
+    [string]$WorkflowTemplateItem_processingTemplate = $WorkflowTemplateItem.processingTemplate
+    If ($WorkflowTemplateItem_processingTemplate.Length -eq 0) {
+        Write-Warning -Message "Somehow the name (processingTemplate) property of the supplied (via the -WorkflowTemplateItem parameter) Workflow Template Item was empty. Please look into this."
+        Break
+    }
+    If ($Predecessor.id.Length -gt 0) {
+        [string]$Predecessor_processingTemplate = $Predecessor.processingTemplate
+        [string]$target = "Workflow Template Item $Predecessor_processingTemplate will be added as a predecessor of $WorkflowTemplateItem_processingTemplate"
+    }
+    Else {
+        Write-Warning -Message "Dependency type $DependencyType is not supported yet"
+        Break
+    }
+    If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($target) within $($WorkflowTemplate_simpleId)")) -eq $true) {
+        $Error.Clear()
+        Try {
+            [ANOWProcessingTemplateItem[]]$WorkflowTemplateItems = Read-AutomateNOWWorkflowTemplateItem -WorkflowTemplate $WorkflowTemplate -startRow 0 -endRow 10000
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Read-AutomateNOWWorkflowTemplateItem failed to Read $WorkflowTemplate_id under Add-AutomateNOWWorkflowTemplateItem due to [$Message]."
+            Break
+        }
+        [int32]$WorkflowTemplateItems_Count = $WorkflowTemplateItems.Count
+        If ($WorkflowTemplateItems_Count -eq 0) {
+            Write-Verbose -Message "$WorkflowTemplate_id has zero items within"
+            Break
+        }
+        [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+        $BodyMetaData.Add('workflow', $WorkflowTemplate_id )
+        $BodyMetaData.Add('workflowItem', $WorkflowTemplateItem_processingTemplate)
+        $BodyMetaData.Add('dependencyType', $DependencyType)
+        If ($Predecessor.id.Length -gt 0) {
+            [string]$componentId = 'ProcessingTemplateDependencyList'
+            $BodyMetaData.Add('predecessor', $Predecessor_processingTemplate)
+        }
+        ElseIf ($Semaphore.id.Length -gt 0) {
+            [string]$componentId = 'ProcessingTemplateDependencyEditForm'
+            [string]$Semaphore_Id = $Semaphore.id
+            $BodyMetaData.Add('resource', $Semaphore_Id)
+            $BodyMetaData.Add('resourceType', 'BINARY_SEMAPHORE')
+            $BodyMetaData.Add('semaphoreState', $semaphoreState)
+            If ($timestampRelation.Length -gt 0) {
+                $BodyMetaData.Add('timestampRelation', $timestampRelation)
+            }
+            If ($timestampSelection.Length -gt 0) {
+                $BodyMetaData.Add('timestampSelector', $timestampSelection)
+            }
+            If ($Calendar.Id.Length -gt 0) {
+                [string]$Calendar_Id = $Calendar.Id
+                $BodyMetaData.Add('timestampCalendar', $Calendar_Id)
+            }
+            If ($timestampOffset.Length -gt 0) {
+                $BodyMetaData.Add('timestampOffset', $timestampOffset)
+            }
+            If ($specificTimestamp.Length -gt 0) {
+                $BodyMetaData.Add('specificTimestamp', $specificTimestamp)
+            }
+            If ($selectedDates.Count -gt 0) {
+                [string]$selectedDates_string = $selectedDates -join ','
+                $BodyMetaData.Add('selectedDates', $selectedDates_string)
+            }
+        }
+        ElseIf ($TimeWindow.Id.Length -gt 0) {
+            [string]$componentId = 'ProcessingTemplateDependencyEditForm'
+            [string]$TimeWindow_Id = $TimeWindow.id
+            $BodyMetaData.Add('resource', $TimeWindow_Id)
+            $BodyMetaData.Add('resourceType', 'TIME_SEMAPHORE')
+            $BodyMetaData.Add('semaphoreState', $TimeWindowState)
+        }
+        ElseIf ($Variable.Id.Length -gt 0) {
+            [string]$componentId = 'ProcessingTemplateDependencyEditForm'
+            [string]$Variable_Id = $Variable.id
+            $BodyMetaData.Add('resource', $Variable_Id)
+            $BodyMetaData.Add('resourceType', 'VARIABLE')
+            $BodyMetaData.Add('valueOperator', $valueOperator)
+            If ($Value.Length -gt 0) {
+                $BodyMetaData.Add('value', $value)
+            }
+        }
+        Else {
+            Write-Warning -Message "Dependency type $DependencyType is not supported yet"
+            Break
+        }
+        $BodyMetaData.Add('_oldValues', '{}' )
+        $BodyMetaData.Add('_operationType', 'add')
+        $BodyMetaData.Add('_textMatchStyle', 'exact')
+        $BodyMetaData.Add('_componentId', $componentId)
+        $BodyMetaData.Add('_dataSource', 'ProcessingTemplateDependencyDataSource')
+        $BodyMetaData.Add('isc_metaDataPrefix', '_')
+        $BodyMetaData.Add('isc_dataFormat', 'json')
+        [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+        If ($null -eq $parameters.Body) {
+            $parameters.Add('Body', $Body)
+        }
+        Else {
+            $parameters.Body = $Body
+        }
+        $Error.Clear()
+        Try {
+            [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$WorkflowTemplate_id] due to [$Message]."
+            Break
+        }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 10
+            Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+            Break
+        }
+        If ($results.response.data.count -eq 1) {
+            [PSCustomObject]$ProcessingTemplateDependency = $results.response.data | Select-Object -ExcludeProperty workflow
+            $ProcessingTemplateDependency | Add-Member -MemberType NoteProperty -Name workflow -Value $WorkflowTemplate
+            If ($ProcessingTemplateDependency.workspace.length -gt 0) {
+                [string]$Workspace_id = $ProcessingTemplateDependency.workspace
+                $Error.Clear()
+                Try {
+                    [ANOWWorkspace]$Workspace = Get-AutomateNOWWorkspace -Id $Workspace_id
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Get-AutomateNOWWorkspace failed to retrieve $Workspace_id (under Add-AutomateNOWWorkflowTemplateDependency) due to [$Message]"
+                    Break
+                }
+                [PSCustomObject]$ProcessingTemplateDependency = $ProcessingTemplateDependency | Select-Object -ExcludeProperty workspace
+                $ProcessingTemplateDependency | Add-Member -MemberType NoteProperty -Name workspace -Value $Workspace
+            }
+            $Error.Clear()
+            Try {
+                [ANOWProcessingTemplateDependency]$ProcessingTemplateDependency = $ProcessingTemplateDependency
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Failed to parse the result of adding the dependency within $WorkflowTemplate_id between $WorkflowTemplateItem_processingTemplate and its target due to [$Message]"
+                Break
+            }
+            Write-Verbose -Message "A Processing Template Dependency was successfully added to $WorkflowTemplate_id between $WorkflowTemplateItem_processingTemplate and its target"
+            If ($Quiet -ne $true) {
+                Return $ProcessingTemplateDependency
+            }
+        }
+        Else {
+            Write-Verbose -Message "There were no Processing Template Dependencies within $WorkflowTemplate_id"
+        }
+    }
+}
+
+Function Remove-AutomateNOWWorkflowTemplateDependency {
+    <#
+    .SYNOPSIS
+    Removes a Processing Template Dependency from a Workflow Template Item within a Workflow Template
+
+    .DESCRIPTION
+    Removes a Processing Template Dependency from a Workflow Template Item within a Workflow Template
+
+    .PARAMETER WorkflowTemplateDependency
+    Mandatory [ANOWWorkflowTemplateDependency] object representing the Workflow Template Dependency that will be removed
+
+    .PARAMETER Force
+    Force the removal without confirmation. This is equivalent to -Confirm:$false
+
+    .INPUTS
+    You must present one or more [ANOWWorkflowTemplateDependency] object to the WorkflowTemplateDependency parameter or the pipeline
+
+    .OUTPUTS
+    None. The status will be written to the console with Write-Verbose.
+
+    .EXAMPLE
+    Imagine a Workflow Template named 'WorkflowTemplate1' that contains two Task Templates named 'TaskTemplate1' and 'TaskTemplate2' where 'TaskTemplate2' has been configured as a successor of 'TaskTemplate1'.
+
+    Removes a successor Workflow Template Dependency object between 'TaskTemplate1' and 'TaskTemplate2' within a Workflow Template named 'WorkflowTemplate1'
+
+    Get-AutomateNOWWorkflowTemplate -Id 'WorkflowTemplate1' | Read-AutomateNOWWorkflowTemplateItem -Name 'TaskTemplate1' | Read-AutomateNOWWorkflowTemplateDependency -Successors | Remove-AutomateNOWWorkflowTemplateDependency
+
+    .EXAMPLE
+    Removes a specific Workflow Template Dependency object by its id (one-liner)
+
+    Read-AutomateNOWWorkflowTemplateDependency -Id '1e6da255-b2d5-458f-aff6-711b06c14921' | Remove-AutomateNOWWorkflowTemplateDependency
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    #>
+    [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
+        [ANOWProcessingTemplateDependency]$WorkflowTemplateDependency,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "Somehow there is not a valid token confirmed."
+            Break
+        }
+        [string]$command = '/processingTemplateDependency/delete'
+        [hashtable]$parameters = @{}
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [ANOWProcessingTemplateDependency]$WorkflowTemplateDependency = $_
+        }
+        [string]$WorkflowTemplateDependency_id = $WorkflowTemplateDependency.id
+        If ($WorkflowTemplateDependency_id.Length -eq 0) {
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
+            Break
+        }
+        If ($WorkflowTemplateDependency_id -notmatch '^[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}$') {
+            Write-Warning -Message "Was expecting the Id of the Workflow Template Dependency object to match a 36-character GUID, instead received [$WorkflowTemplateDependency_id]. Please check into this."
+            Break
+        }
+        Else {
+            Write-Verbose -Message "Received [$WorkflowTemplateDependency_id] for the Id of the Workflow Template Dependency to be removed"
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($WorkflowTemplateDependency_id)")) -eq $true) {
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$WorkflowTemplateDependency_Check = Read-AutomateNOWWorkflowTemplateDependency -Id $WorkflowTemplateDependency_id
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Read-AutomateNOWWorkflowTemplateDependency failed to Read [$WorkflowTemplateDependency_id] under Remove-AutomateNOWWorkflowTemplateDependency due to [$Message]."
+                Break
+            }
+            If ($WorkflowTemplateDependency_id -ne $WorkflowTemplateDependency_Check.id ) {
+                [string]$unexpected_id = $WorkflowTemplateDependency_Check.id
+                Write-Warning -Message "Somehow the Workflow Template Dependency with id $WorkflowTemplateDependency_id was not the same as the checked object $unexpected_id. Please check this."
+                Break
+            }
+            [string]$old_values = $WorkflowTemplateDependency.CreateOldValues()
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.Add('id', $WorkflowTemplateDependency_id )
+            $BodyMetaData.Add('_oldValues', $old_values )
+            $BodyMetaData.Add('_operationType', 'remove')
+            $BodyMetaData.Add('_textMatchStyle', 'exact')
+            $BodyMetaData.Add('_dataSource', 'ProcessingTemplateDependencyDataSource')
+            $BodyMetaData.Add('isc_metaDataPrefix', '_')
+            $BodyMetaData.Add('isc_dataFormat', 'json')
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            If ($null -eq $parameters.Body) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters.Body = $Body
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$WorkflowTemplate_id] due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 10
+                Write-Warning -Message "Somehow the response code was not 0 but was [$response_code]. Please look into this. Body: $full_response_display"
+                Break
+            }
+            [string]$WorkflowTemplate_id = $WorkflowTemplateDependency.workflow.id
+            Write-Verbose -Message "Workflow Template Dependency $WorkflowTemplateDependency_id has been removed from $WorkflowTemplate_id"
         }
     }
     End {
@@ -79559,7 +84712,12 @@ Function Get-AutomateNOWWorkspace {
         $Body.'isc_dataFormat' = 'json'
         [string]$Body = ConvertTo-QueryString -InputObject $Body
         [string]$command = ('/workspace/read?' + $Body)
-        $parameters.Add('command', $command)
+        If ($null -ne $parameters['command']) {
+            $parameters.command = $command
+        }
+        Else {
+            $parameters.Add('command', $command)
+        }
         $Error.Clear()
         Try {
             [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
@@ -79614,7 +84772,7 @@ Function Set-AutomateNOWWorkspace {
     The name of the icon library (if you choose to use one). Possible choices are: FAT_COW, FUGUE (note that FONT_AWESOME is not an actual icon library)
 
     .PARAMETER iconCode
-    The name of the icon which matches the chosen library. To see the list of available iconCodes, use Import-AutomateNOWIcon (or Import-AutomateNOWLocalIcon) then try $anow_assets.icon_library."FUGUE"[0..10] to see the names of the first 10 icons from the Fugue library.
+    The name of the icon which matches the chosen library. Must be lower-case. To see the list of available iconCodes, use Import-AutomateNOWIcon (or Import-AutomateNOWLocalIcon) then try $anow_assets.icon_library."FUGUE"[0..10] to see the names of the first 10 icons from the Fugue library.
 
     .PARAMETER UnsetFolder
     Switch parameter that will unset the folder configuration. This is equivalent to unticking the box for 'Automatically set folder to workspace template'
@@ -79732,6 +84890,7 @@ Function Set-AutomateNOWWorkspace {
         [switch]$UnsetDescription,
         [Parameter(Mandatory = $true, ParameterSetName = 'SetIcon')]
         [ANOWIcon_IconsOnly]$iconSet,
+        [ValidateScript({ $_ -match '^[a-z0-9-_]{1,}$' })]
         [Parameter(Mandatory = $true, ParameterSetName = 'SetIcon')]
         [string]$iconCode,
         [Parameter(Mandatory = $true, ParameterSetName = 'RemoveIcon')]
@@ -79874,7 +85033,7 @@ Function Set-AutomateNOWWorkspace {
                 If ($Folder.Length -gt 0) {
                     $Error.Clear()
                     Try {
-                        [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+                        [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
                     }
                     Catch {
                         [string]$Message = $_.Exception.Message
@@ -80129,7 +85288,7 @@ Function New-AutomateNOWWorkspace {
     Mandatory string representing a choice between three icon sets. Valid choices are: FAT_COW, FUGUE, FONT_AWESOME
 
     .PARAMETER iconCode
-    The name of the icon which matches the chosen library.
+    The name of the icon which matches the chosen library. Must be lower-case.
 
     .PARAMETER CodeRepository
     Optional name of the code repository to place the Workspace into.
@@ -80173,6 +85332,7 @@ Function New-AutomateNOWWorkspace {
         [string]$Folder,
         [Parameter(Mandatory = $true, ParameterSetName = 'iconSet')]
         [ANOWIcon_IconsOnly]$iconSet,
+        [ValidateScript({ $_ -match '^[a-z0-9-_]{1,}$' })]
         [Parameter(Mandatory = $true, ParameterSetName = 'iconSet')]
         [string]$iconCode,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
@@ -80241,7 +85401,7 @@ Function New-AutomateNOWWorkspace {
     If ($Folder.Length -gt 0) {
         $Error.Clear()
         Try {
-            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder -startRow 0 -endRow 10000
+            [ANOWFolder]$folder_object = Get-AutomateNOWFolder -Id $Folder
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -80395,7 +85555,7 @@ Function Remove-AutomateNOWWorkspace {
         }
         [string]$Workspace_id = $Workspace.id
         If ($Workspace_id.Length -eq 0) {
-            Write-Warning -Message "Somehow an empty Id was passed to this function. Please look into this."
+            Write-Warning -Message "Somehow an object with an empty Id was passed to this function. Please look into this."
             Break
         }
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($Workspace_id)")) -eq $true) {
@@ -80621,7 +85781,7 @@ Function Copy-AutomateNOWWorkspace {
                 $BodyMetaData.'_dataSource' = 'WorkspaceDataSource'
                 $BodyMetaData.'isc_metaDataPrefix' = '_'
                 $BodyMetaData.'isc_dataFormat' = 'json'
-                $Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
+                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData -IncludeProperties oldId, domain, NewId, description, folder, tags
                 $parameters.Body = $Body
                 $Error.Clear()
                 Try {
@@ -80859,6 +86019,12 @@ Function Invoke-AutomateNOWAPI {
     .PARAMETER NotAPICommand
     Rarely used switch parameter that removes the '/api' portion of the API URL. Note: This parameter is slated for removal
 
+    .PARAMETER NoHeaders
+    Rarely used switch parameter that prevents the standard authorization bearer header from being included. This is normally used when requesting to download a file from the API.
+
+    .PARAMETER IncludeAttachmentFilename
+    Rarely used switch parameter that will include a 2nd object (string) with the usual response object. This is normally used when requesting to download a file from the API.
+
     .INPUTS
     None. You cannot pipe objects to Invoke-AutomateNOWAPI (yet).
 
@@ -80894,7 +86060,11 @@ Function Invoke-AutomateNOWAPI {
         [Parameter(Mandatory = $false)]
         [switch]$JustGiveMeJSON,
         [Parameter(Mandatory = $false)]
-        [switch]$NotAPICommand = $false
+        [switch]$NotAPICommand = $false,
+        [Parameter(Mandatory = $false)]
+        [switch]$NoHeaders = $false,
+        [Parameter(Mandatory = $false)]
+        [switch]$IncludeAttachmentFilename = $false
     )
     If ($anow_session.header.values.count -eq 0 -or $anow_session.Instance.Length -eq 0) {
         Write-Warning -Message "Please use Connect-AutomateNOW to establish your access token."
@@ -80914,6 +86084,10 @@ Function Invoke-AutomateNOWAPI {
     }
     If ($Body.Length -gt 0 -and $BinaryBody.Count -gt 0) {
         Write-Warning -Message "You cannot specify a binary body and a text body. Please choose one or the other."
+        Break
+    }
+    If ($Headers.keys.count -gt 0 -and $NoHeaders -eq $true) {
+        Write-Warning -Message "You cannot specify -Headers and -NoHeaders. Please choose one or the other."
         Break
     }
     [hashtable]$parameters = @{}
@@ -80943,13 +86117,15 @@ Function Invoke-AutomateNOWAPI {
         [string]$api_url = ($protocol + '://' + $instance + '/automatenow' + $command)
     }
     $parameters.Add('Uri', $api_url)
-    If ($Headers -is [hashtable]) {
+    If ($Headers.Keys.count -gt 0) {
         $Headers.Add('domain', $anow_session.header.domain)
         $Headers.Add('Authorization', $anow_session.header.Authorization)
         $parameters.Add('Headers', $Headers)
     }
     Else {
-        $parameters.Add('Headers', $anow_session.header)
+        If ($NoHeaders -ne $true) {
+            $parameters.Add('Headers', $anow_session.header)
+        }
     }
     $parameters.Add('Method', $Method)
     $parameters.Add('ContentType', $ContentType)
@@ -80965,8 +86141,8 @@ Function Invoke-AutomateNOWAPI {
     ElseIf ($BinaryBody.Count -gt 0) {
         $parameters.Add('Body', $BinaryBody)
     }
-    #[string]$parameters_debug_display = $parameters | ConvertTo-Json
-    #Write-Debug -Message "Sending the following parameters to $api_url -> $parameters_debug_display."
+    [string]$parameters_debug_display = $parameters | ConvertTo-Json
+    Write-Debug -Message "Sending the following parameters to $api_url -> $parameters_debug_display."
     [string]$parameters_verbose_display = $parameters | Select-Object -ExcludeProperty $Headers | ConvertTo-Json
     Write-Verbose -Message "Sending the following parameters to $api_url -> $parameters_verbose_display."
     $ProgressPreference = 'SilentlyContinue'
@@ -81016,8 +86192,16 @@ Function Invoke-AutomateNOWAPI {
     }
     $ProgressPreference = 'Continue'
     [string]$content = $Results.Content
+    If ($IncludeAttachmentFilename -eq $true) {
+        [string]$outgoing_filename = $Results.headers.'Content-Disposition' -replace 'attachment; filename=' -replace '"'
+    }
     If ($JustGiveMeJSON -eq $true) {
-        Return $content
+        If ($IncludeAttachmentFilename -ne $true) {
+            Return $content
+        }
+        Else {
+            Return $content, $outgoing_filename
+        }
     }
     $Error.Clear()
     If ($BinaryBody.Count -eq 0) {
@@ -81095,7 +86279,12 @@ Function Invoke-AutomateNOWAPI {
         Write-Verbose -Message "The ANOW API acknowledged receipt of the binary payload with a response code of 0 and a message of [$MessageType]"
         Return 0
     }
-    Return $content_object
+    If ($IncludeAttachmentFilename -ne $true) {
+        Return $content_object
+    }
+    Else {
+        Return $content_object, $outgoing_filename
+    }
 }
 
 #EndRegion

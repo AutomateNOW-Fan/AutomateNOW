@@ -128,6 +128,14 @@ Enum ANOWDataSource_dataSourceType {
 
 #endregion
 
+#Region - Enum [DesignTemplate] * Custom Class
+
+Enum ANOWDesignTemplate_designTemplateType {
+    PROCESSING_TEMPLATE; SERVER_NODE_TEMPLATE; ENDPOINT_TEMPLATE; RESOURCE_TEMPLATE;
+}
+
+#endregion
+
 #Region - Enum [Domain]
 
 Enum ANOWDomain_secretVaultType {
@@ -250,6 +258,7 @@ Enum ANOWProcessing_processingStatus {
 Enum ANOWProcessing_killMode {
     SOFT; HARD;
 }
+
 Enum ANOWProcessing_agentOperatingSystemType {
     UNIX; LINUX; WINDOWS; SOLARIS; HPUX; AIX; OPENVMS; MACOS; AS400; Z_OS;
 }
@@ -1190,6 +1199,31 @@ Class ANOWAgent : ANOW {
 
 #endregion
 
+#region Class - [ANOWAgentServerNode] * Custom Class
+
+Class ANOWAgentServerNode : Base {
+    [string]$id
+    [string]$lastUpdatedBy
+    [datetime]$dateCreated
+    [datetime]$lastUpdated
+    [string]$agent
+    [ANOWServerNode_serverNodeType]$serverNodeType # this enumerator is from a different class
+    [string]$userIp
+    [string]$createdBy
+    [string]$domain
+    [string]$serverNode
+    ANOWAgentServerNode() {
+        $this.Init(@{})
+    }
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+}
+
+#endregion
+
 #region Class - [ANOWAgentDefinition]
 
 Class ANOWAgentDefinition : ANOW {
@@ -1404,6 +1438,9 @@ Class ANOWApplicationConfiguration : Base {
     [string]$openTelemetryAnowLogCollectorEndpoint
     [string]$openTelemetryAnowMetricCollectorEndpoint
     [string]$openTelemetryAnowTraceCollectorEndpoint
+    [int32]$maxProcessingRegistryThreads
+    [string]$openTelemetryAgentExporterType
+    [string]$openTelemetryAnowExporterType
 
     ANOWApplicationConfiguration() {
         $this.Init(@{})
@@ -1456,6 +1493,7 @@ Class ANOWApprovalRule : Base {
 #endregion
 
 #region Class - [ANOWAuditLog]
+
 Class ANOWAuditLog : Base {
     [string]$actionTimestamp
     [ValidateSet('UPDATE', 'INSERT', 'DELETE')]
@@ -1483,6 +1521,7 @@ Class ANOWBusinessView : ANOW {
     [string]$iconCode
     [ANOWIcon_IconsOnly]$iconSet
     [string]$tags
+    [PSCustomObject]$state
 
     ANOWBusinessView() {
         $this.Init(@{})
@@ -1933,6 +1972,91 @@ Class ANOWLocalTextFileStoreRecord : ANOWDataSourceItem {
 
 #endregion
 
+#region Class - [ANOWDeletedDomain] * Custom Class
+
+Class ANOWDeletedDomain : Base {
+    [string]$id
+    [int64]$dataSize
+    [string]$lastUpdatedBy
+    [datetime]$dateCreated
+    [datetime]$lastUpdated
+    [string]$deletedBy
+    [datetime]$deletedDate
+    [string]$userIp
+    [string]$createdBy
+    [string]$description
+
+    ANOWDeletedDomain() {
+        $this.Init(@{})
+    }
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+}
+
+#endregion
+
+#region Class - [ANOWDeletedObject] * Custom Class
+
+Class ANOWDeletedObject : Base {
+    [string]$id
+    [string]$itemId
+    [string]$userIp
+    [ANOWCodeRepositoryObjectSourceCode_domainClassName]$domainClass
+    [string]$deletedBy
+    [PSCustomObject]$definition
+    [string]$domain
+    [string]$codeRepository
+    [datetime]$deletedDate
+    ANOWDeletedObject() {
+        $this.Init(@{})
+    }
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+}
+
+#endregion
+
+#region Class - [ANOWDesignTemplate] * Custom Class
+
+Class ANOWDesignTemplate : Base {
+    [string]$id
+    [string]$simpleId
+    [string]$lastUpdatedBy
+    [string]$description
+    [datetime]$dateCreated
+    [datetime]$lastUpdated
+    [string]$userIp
+    [string]$createdBy
+    [Nullable[ANOWProcessingTemplate_processingType]]$processingType
+    [Nullable[ANOWProcessingTemplate_serverNodeType]]$serverNodeType
+    [Nullable[ANOWProcessingTemplate_taskType]]$taskType
+    [Nullable[ANOWProcessingTemplate_triggerType]]$triggerType
+    [Nullable[ANOWDesignTemplate_designTemplateType]]$designTemplateType
+    [Nullable[ANOWProcessingTemplate_serviceType]]$serviceType
+    [Nullable[ANOWProcessingTemplate_serviceManagerType]]$serviceManagerType
+    [Nullable[ANOWProcessingTemplate_workflowType]]$workflowType
+    [PSCustomObject]$templateDefinition
+    [string]$domain
+    [boolean]$defaultTemplate
+
+    ANOWDesignTemplate() {
+        $this.Init(@{})
+    }
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+}
+
+#endregion
+
 #region Class - [ANOWDocumentationItem]
 
 Class ANOWDocumentationItem : Base {
@@ -2113,6 +2237,32 @@ Class ANOWIntegration : ANOW {
     [string]$comment
 
     ANOWIntegration() {
+        $this.Init(@{})
+    }
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+}
+
+#endregion
+
+#region Class - [ANOWMenuCustomization]
+
+Class ANOWMenuCustomization : ANOW {
+    [string]$iconCode
+    [string]$name
+    [ANOWIcon_IconsOnly]$iconSet
+    [boolean]$folder
+    [Nullable[ANOWProcessingTemplate_processingType]]$processingType
+    [Nullable[ANOWProcessingTemplate_taskType]]$taskType
+    [Nullable[ANOWProcessingTemplate_workflowType]]$workflowType
+    [Nullable[ANOWProcessingTemplate_monitorType]]$monitorType
+    [Nullable[ANOWProcessingTemplate_serviceType]]$serviceType
+    [ANOWIntegration]$integration
+
+    ANOWMenuCustomization() {
         $this.Init(@{})
     }
     [void] Init([hashtable]$Properties) {
@@ -2720,30 +2870,30 @@ Class ANOWProcessingAction : Base {
 
 Class ANOWProcessingDependency : Base {
 
-    [ANOWProcessingDependency_serviceType]$serviceType
+    [Nullable[ANOWProcessingDependency_serviceType]]$serviceType
     [int64]$parent
-    [ANOWProcessingDependency_statusCodeOperator]$statusCodeOperator
+    [Nullable[ANOWProcessingDependency_statusCodeOperator]]$statusCodeOperator
     [string]$triggerName
-    [ANOWProcessingDependency_serviceManagerType]$serviceManagerType
+    [Nullable[ANOWProcessingDependency_serviceManagerType]]$serviceManagerType
     [datetime]$lastUpdated
-    [ANOWProcessingDependency_monitorType]$monitorType
+    [Nullable[ANOWProcessingDependency_monitorType]]$monitorType
     [boolean]$eventTriggered
     [string]$processingName
-    [ANOWProcessingDependency_sensorType]$sensorType
+    [Nullable[ANOWProcessingDependency_sensorType]]$sensorType
     [string]$processingTemplate
     [string]$eventName
-    [string]$canDrag	
-    [ANOWProcessingDependency_workflowType]$workflowType
+    [boolean]$canDrag	
+    [Nullable[ANOWProcessingDependency_workflowType]]$workflowType
     [int64]$id
     [boolean]$acquired
     [string]$workflowTemplate
     [string]$lastUpdatedBy
     [string]$timestampOffset
     [string]$resource
-    [ANOWProcessingDependency_serverNodeType]$serverNodeType
+    [Nullable[ANOWProcessingDependency_serverNodeType]]$serverNodeType
     [datetime]$eventTriggeredDate
     [int64]$resourcePermits
-    [ANOWProcessingDependency_processingStatus]$processingStatus
+    [Nullable[ANOWProcessingDependency_processingStatus]]$processingStatus
     [boolean]$isFolder
     [string]$sortKey
     [ANOWProcessingDependency_dependencyType]$dependencyType
@@ -2752,29 +2902,30 @@ Class ANOWProcessingDependency : Base {
     [int64]$processing
     [string]$statusCode
     [string]$template
-    [ANOWProcessingDependency_processingType]$processingType
-    [ANOWProcessingDependency_timestampSelector]$timestampSelector
+    [Nullable[ANOWProcessingDependency_processingType]]$processingType
+    [Nullable[ANOWProcessingDependency_timestampSelector]]$timestampSelector
     [int64]$predecessor
     [string]$title
-    [ANOWProcessingDependency_lockState]$lockState
+    [Nullable[ANOWProcessingDependency_lockState]]$lockState
     [boolean]$archived
-    [ANOWProcessingDependency_taskType]$taskType
+    [Nullable[ANOWProcessingDependency_taskType]]$taskType
     [datetime]$dateCreated
     [string]$predecessorName
     [string]$value
     [string]$timestampCalendar
     [datetime]$timestamp
     [string]$workflowTemplateItem
-    [ANOWProcessingDependency_ownerProcessingType]$ownerProcessingType
+    [Nullable[ANOWProcessingDependency_ownerProcessingType]]$ownerProcessingType
     [string]$selectedDates
     [string]$specificTimestamp
-    [ANOWProcessingDependency_valueOperator]$valueOperator
-    [ANOWProcessingDependency_timestampRelation]$timestampRelation
+    [Nullable[ANOWProcessingDependency_valueOperator]]$valueOperator
+    [Nullable[ANOWProcessingDependency_timestampRelation]]$timestampRelation
     [string]$createdBy
     [string]$userIp
-    [ANOWProcessingDependency_semaphoreState]$semaphoreState
-    [ANOWProcessingDependency_triggerType]$triggerType
-    [ANOWProcessingDependency_resourceType]$resourceType
+    [Nullable[ANOWProcessingDependency_semaphoreState]]$semaphoreState
+    [Nullable[ANOWProcessingDependency_triggerType]]$triggerType
+    [Nullable[ANOWProcessingDependency_resourceType]]$resourceType
+    [boolean]$optional
 
     ANOWProcessingDependency() {
         $this.Init(@{})
@@ -2875,7 +3026,7 @@ Class ANOWProcessingExecutionStatistic : Base {
     [string]$id
     [ANOWProcessingExecutionStatistic_statisticPeriod]$statisticPeriod
     [int64]$durationMin
-    [PSCustomObject]$statisticPeriodId
+    #[PSCustomObject]$statisticPeriodId # this property appears and re-appears
 
     ANOWProcessingExecutionStatistic() {
         $this.Init(@{})
@@ -3121,9 +3272,9 @@ Class ANOWProcessingTemplateScenario : Base {
     [string]$exitCodes
     [string]$userIp
     [string]$id
-    [PSCustomObject]$processingStatusId
-    [PSCustomObject]$processingTemplateId
-    [PSCustomObject]$scenarioTypeId
+    #[PSCustomObject]$processingStatusId # this property appears and re-appears
+    #[PSCustomObject]$processingTemplateId # this property appears and re-appears
+    #[PSCustomObject]$scenarioTypeId # this property appears and re-appears
 
     ANOWProcessingTemplateScenario() {
         $this.Init(@{})
@@ -3182,54 +3333,55 @@ Class ANOWProcessingTemplateAction : Base {
 #region Class - [ANOWProcessingTemplateDependency]
 
 Class ANOWProcessingTemplateDependency : Base {
-    [string]$serviceType
+    [Nullable[ANOWProcessingTemplateDependency_serviceType]]$serviceType
     [string]$parent
     [ANOWWorkspace]$workspace
-    [string]$statusCodeOperator
+    [Nullable[ANOWProcessingTemplateDependency_statusCodeOperator]]$statusCodeOperator
     [string]$groupId
     [string]$workflowItem
-    [string]$serviceManagerType
+    [Nullable[ANOWProcessingTemplateDependency_serviceManagerType]]$serviceManagerType
     [datetime]$lastUpdated
-    [string]$monitorType
-    [string]$sensorType
+    [Nullable[ANOWProcessingTemplateDependency_monitorType]]$monitorType
+    [Nullable[ANOWProcessingTemplateDependency_sensorType]]$sensorType
     [string]$processingTemplate
     [boolean]$canDrag
-    [string]$workflowType
+    [Nullable[ANOWProcessingTemplateDependency_workflowType]]$workflowType
     [string]$id
     [string]$workflowTemplate
     [string]$lastUpdatedBy
     [string]$timestampOffset
     [ANOWProcessingTemplate]$workflow
     [string]$resource
-    [string]$serverNodeType
+    [Nullable[ANOWProcessingTemplateDependency_serverNodeType]]$serverNodeType
     [string]$sourceTitle
     [string]$resourcePermits	
-    [string]$processingStatus
+    [Nullable[ANOWProcessingTemplateDependency_processingStatus]]$processingStatus
     [string]$isFolder	
     [string]$sortKey
-    [string]$dependencyType
+    [ANOWProcessingTemplateDependency_dependencyType]$dependencyType
     [string]$domain
     [string]$name
     [string]$statusCode
-    [string]$processingType
-    [string]$timestampSelector
+    [Nullable[ANOWProcessingTemplateDependency_processingType]]$processingType
+    [Nullable[ANOWProcessingTemplateDependency_timestampSelector]]$timestampSelector
     [string]$predecessor
     [string]$title
-    [string]$lockState
-    [string]$taskType
+    [Nullable[ANOWProcessingTemplateDependency_lockState]]$lockState
+    [Nullable[ANOWProcessingTemplateDependency_taskType]]$taskType
     [datetime]$dateCreated
     [string]$value
     [string]$timestampCalendar
     [string]$workflowTemplateItem
     [string]$selectedDates
     [string]$specificTimestamp
-    [string]$valueOperator	
-    [string]$timestampRelation
+    [Nullable[ANOWProcessingTemplateDependency_valueOperator]]$valueOperator	
+    [Nullable[ANOWProcessingTemplateDependency_timestampRelation]]$timestampRelation
     [string]$createdBy
     [string]$userIp
-    [string]$semaphoreState
-    [string]$triggerType
-    [string]$resourceType
+    [Nullable[ANOWProcessingTemplateDependency_semaphoreState]]$semaphoreState
+    [Nullable[ANOWProcessingTemplateDependency_triggerType]]$triggerType
+    [Nullable[ANOWProcessingTemplateDependency_resourceType]]$resourceType
+    [boolean]$optional
 
     ANOWProcessingTemplateDependency() {
         $this.Init(@{})
@@ -3252,7 +3404,7 @@ Class ANOWProcessingTemplateItem : Base {
     [string]$createdBy
     [datetime]$dateCreated
     [string]$description
-    [boolean]$disallowConcurrentExecution
+    [Nullable[boolean]]$disallowConcurrentExecution
     [string]$domain
     [string]$endpoint
     [Nullable[ANOWProcessingTemplateItem_endpointType]]$endpointType
@@ -3310,9 +3462,50 @@ Class ANOWProcessingTemplateItem : Base {
     [string]$valueDataPath
     [boolean]$verboseMode
     [string]$weight
-    [string]$workflow
+    [ANOWProcessingTemplate]$workflow
     [Nullable[ANOWProcessingTemplateItem_workflowType]]$workflowType
     [string]$delayedStartTime
+
+    ### new properties? Where did these come from and why are they needed now? is this output from a LIST of Workflow Template Items?
+    [int64]$actions
+    [int64]$barriers
+    [int64]$calendars
+    [int64]$crossDependencies
+    [string]$endpointTypeId
+    [int64]$events
+    [string]$highRiskStatisticMethodId
+    [string]$highRiskStatisticPeriodId
+    [int64]$locks
+    [int64]$metrics
+    [string]$monitorTypeId
+    [int64]$notifications
+    [string]$parentMonitorTypeId
+    [string]$parentProcessingTypeId
+    [string]$parentSensorTypeId
+    [string]$parentServiceManagerTypeId
+    [string]$parentServiceTypeId
+    [string]$parentTaskTypeId
+    [string]$parentTriggerTypeId
+    [string]$parentWorkflowTypeId
+    [int64]$physicalResources
+    [int64]$predecessors
+    [string]$processingTypeId
+    [int64]$queues
+    [int64]$semaphores
+    [string]$sensorTypeId
+    [string]$serverNodeTypeId
+    [string]$serviceManagerTypeId
+    [string]$serviceTypeId
+    [string]$statisticMethodId
+    [string]$statisticPeriodId
+    [int64]$stocks
+    [int64]$successors
+    [string]$taskTypeId
+    [int64]$timeWindows
+    [string]$triggerTypeId
+    [int64]$variables
+    [string]$workflowId
+    [string]$workflowTypeId
 
     ANOWProcessingTemplateItem() {
         $this.Init(@{})
@@ -3400,6 +3593,30 @@ Class ANOWProcessingTimeTrigger : Base {
     [int64]$endTime
 
     ANOWTimeTrigger() {
+        $this.Init(@{})
+    }
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+}
+
+#endregion
+
+#region Class - [ANOWProcessingTimeTriggerLog]
+
+Class ANOWProcessingTriggerLog : Base {
+    [string]$id
+    [datetime]$scheduledFireTime
+    [string]$schedulerInstanceId
+    [datetime]$dateCreated
+    [ANOWProcessing_processingLaunchType]$launchType
+    [string]$triggerId
+    [string]$fireInstanceId
+    [string]$domain
+
+    ANOWProcessingTriggerLog() {
         $this.Init(@{})
     }
     [void] Init([hashtable]$Properties) {
@@ -3649,10 +3866,10 @@ Class ANOWResourceComponent : Base {
     [ANOWResourceComponent_resourceType]$resourceType
     [string]$statisticPeriod
     [double]$statisticValue
-    [PSCustomObject]$resourceId
-    [PSCustomObject]$resourceService
-    [PSCustomObject]$resourceTypeId
-    [PSCustomObject]$statisticFunctionId
+    #[PSCustomObject]$resourceId # this property appears and re-appears
+    #[PSCustomObject]$resourceService # this property appears and re-appears
+    #[PSCustomObject]$resourceTypeId # this property appears and re-appears
+    #[PSCustomObject]$statisticFunctionId # this property appears and re-appears
 
     ANOWResourceComponent() {
         $this.Init(@{})
