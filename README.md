@@ -68,7 +68,7 @@ Use `Connect-AutomateNOW` to establish your session
 - Fixed an issue with `Read-AutomateNOWServerNodeGroupItem` that prevented it from working under Windows PowerShell
 - Fixed an issue with `New-AutomateNOWTaskTemplate` that prevented some types of Tasks from being created
 - Fixed an issue with `Get-AutomateNOWorkflow` where the -WorkflowTemplate parameter was ignored
-- Fixed an issue with (quite a few) of the Get-* functions where receiving Id's across the pipeline didn't. All Get functions may receive Id's across the pipeline now.
+- Fixed an issue with (quite a few) of the Get-* functions where receiving Id's across the pipeline didn't work. All Get functions may receive Id's across the pipeline now.
 - Fixed an issue with `New-AutomateNOWCodeRepository` that prevented creation of SSH-based repositories
 - Fixed an issue with `Set-AutomateNOWWorkspace` that prevented the changing of the tags
 - Fixed an issue with the validating regex used in the `-iconCode` parameter on all of the functions that use that parameter
