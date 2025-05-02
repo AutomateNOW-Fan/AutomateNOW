@@ -12,7 +12,7 @@ Created by AutomateNOW-Fan
 ```
 ## Efficacy 🧪
 
-Compatible with AutomateNOW! version _3.3.1.89_
+Compatible with AutomateNOW! version _3.3.1.89 HF1_
 <br/><br/>
 ## Installation 🏗
 
@@ -25,7 +25,7 @@ Use `Connect-AutomateNOW` to establish your session
 
 - Completely browserless operation
 - Both http & https protocols supported
-- PowerShell Core & Windows PowerShell compatible
+- PowerShell Core (incl. Linux 🐧) & Windows PowerShell compatible
 - Classes and enums are defined (see Classes.psm1)
 - Pipeline capability to streamline your workloads
 - Session tokens will be automatically refreshed during usage
@@ -36,6 +36,42 @@ Use `Connect-AutomateNOW` to establish your session
 - Edit source code objects with NotePad (Windows only for now)
 <br/><br/>
 ## Change Log 📝
+
+## 1.0.36
+### Major updates
++ You can now reconstitute 🍊 previous versions of an object from the Audit Log (see `Restore-AutomateNOWObjectVersion`)
++ You can now search the Audit Log by specific object id or table name
++ You can now fetch a specific item from a Data Source by its key or filename
++ Migration Imports are added and fully supported ✅
++ Support for HTTP proxies
++ Bump compatibility to ANOW version _3.3.1.89 HF1_ *
+
+### Minor updates
+- All Applicable Set-* functions will now output their object type by default (use -Quiet to suppress this)
+- All applicable Set-* functions now support adding/removing to Code Repositories
+- Modifying Server Nodes is _partially_ supported 🔰
+
+### Detailed Change Log
+- Added new functions: `Confirm-AutomateNOWMigrationImport`, `Export-AutomateNOWMigrationImport`, `Get-AutomateNOWMigrationImport`, `New-AutomateNOWMigrationImport`, `Restore-AutomateNOWObjectVersion`, `Save-AutomateNOWMigrationImport`, `Set-AutomateNOWServerNode`
+- Fixed an issue with `New-AutomateNOWFolder` being unable to create the Folder
+- Fixed an issue with `Add-AutomateNOWScheduleTemplateItem` and not being able to return back the updated Schedule Template Item
+- Fixed an issue with `Remove-AutomateNOWScheduleTemplateItem` that prevented the removal from happening
+- Fixed an issue with `Disconnect-AutomateNOW` the prevented it from disconnecting from insecure instances
+- Fixed an issue where `Trace-AutomateNOWProcessing` would still return back the 128-character "preview value" of Context Variables
+- Fixed an issue where `Get-AutomateNOWSecUser` would fail if a user with a clientId was encountered
+- Fixed an issue with `Read-AutomateNOWServiceManagerTemplateItem` and reading Service Manager Template Items
+- Fixed another issue with `Get-AutomateNOWSecUser` encountering non-Gregorian date values in a user's passwordValidUntil property
+- Added some missing parameters to `Set-AutomateNOWWorkspace` and re-organized the parameter sets
+- Added the `-Proxy` parameter to `Connect-AutomateNOW`
+- Added the `-Quiet` parameter to most Set-* functions and set the OutputType of the function
+- Added the `-Key`, `-Value` and `-Filename` parameters to `Read-AutomateNOWDataSourceItem`
+- Added the `-TableName` and `-ObjectId` parameters to `Get-AutomateNOWAuditLog`
+- Added the `-Length` parameter to `New-WebkitBoundaryString`
+- Removed the `-All` parameter from `Read-AutomateNOWDataSourceItem`
+- Renamed the parameter `-Count` to `-Sum` for `Find-AutomateNOWObjectReferral`
+- Added a workaround for when the API sends byte streams when it is not expected (a scenario that occurs when downloading some types of Migration Import files)
+- Repaired the in-line help for `Write-AutomateNOWIconData`
+- Added tiny fixes and aligned `Set-AutomateNOWTag`, `Set-AutomateNOWBusinessView`, `Set-AutomateNOWFolder`
 
 ## 1.0.35
 
@@ -52,9 +88,7 @@ Use `Connect-AutomateNOW` to establish your session
 + Menu Customizations are added and _partially_ supported 🔰
 + Views (a.k.a. View Setups) are added and _partially_ supported 🔰
 + The menu functionality 👉 **Processing Templates** is now available with `Get-AutomateNOWProcessingTemplate`
-+ Bump compatibility to ANOW version _3.3.1.89_ *
-
-<sup>* tested against Patch 89 Swagger (otherwise consider this Patch 88 compatible)</sup>
++ Bump compatibility to ANOW version _3.3.1.89_
 
 ### Minor updates
 - Internal Security Roles are now accessible
@@ -662,7 +696,7 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 > An [ANOWResource] is a base class that is the foundation for the 9 Resource objects (e.g. Locks, Stocks, Metrics).
 > An [ANOWAnomaly] is a class representing the ANOW Anomaly object. These are intended for interpreting Metrics.
 > An [ANOWResourceAnomaly] is a class representing what you get when you add an Anomaly to a Metric.
-> Think of [ANOWResourceAnomaly] as synonymous with adding a Task Template to a Workflow Template or a Business View Item to a Business View.
+> Think of [ANOWResourceAnomaly] as synonymous with adding a Task Template to a Workflow Template (which creates a Workflow Template Item) or a Dashboard to a Business View (which creates a Business View Item)
 
 ### Why doesn't `Read-AutomateNOWSecurityAccessToken` include the actual security token?
 > `Read-AutomateNOWSecurityAccessToken` will tell you everything else about the security token objects except the actual token. This is by design. You only get to see the token once when it was created with `Add-AutomateNOWSecurityAccessToken`.
@@ -720,6 +754,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Compare-AutomateNOWCodeRepositoryConflictItem`
 
 `Confirm-AutomateNOWCodeRepository`
+
+`Confirm-AutomateNOWMigrationImport`
 
 `Confirm-AutomateNOWScheduleTemplate`
 
@@ -871,6 +907,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Export-AutomateNOWMigration`
 
+`Export-AutomateNOWMigrationImport`
+
 `Export-AutomateNOWNotification`
 
 `Export-AutomateNOWNotificationChannel`
@@ -1011,6 +1049,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Get-AutomateNOWMetric`
 
+`Get-AutomateNOWMigrationImport`
+
 `Get-AutomateNOWNotification`
 
 `Get-AutomateNOWNotificationChannel`
@@ -1144,6 +1184,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `New-AutomateNOWLock`
 
 `New-AutomateNOWMetric`
+
+`New-AutomateNOWMigrationImport`
 
 `New-AutomateNOWNotificationChannel`
 
@@ -1491,6 +1533,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Restore-AutomateNOWDeletedObject`
 
+`Restore-AutomateNOWObjectVersion`
+
 `Resume-AutomateNOWDomain`
 
 `Resume-AutomateNOWSchedule`
@@ -1514,6 +1558,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Resume-AutomateNOWWorkflowTemplate`
 
 `Save-AutomateNOWDeletedDomain`
+
+`Save-AutomateNOWMigrationImport`
 
 `Select-AutomateNOWCodeRepositoryBranch`
 
@@ -1578,6 +1624,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Set-AutomateNOWSemaphore`
 
 `Set-AutomateNOWSemaphoreTimestamp`
+
+`Set-AutomateNOWServerNode`
 
 `Set-AutomateNOWServerNodeEndpoint`
 
@@ -1700,11 +1748,5 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Update-AutomateNOWToken`
 
 `Wait-AutomateNOWProcessing`
-
-`Wait-AutomateNOWSchedule`
-
-`Wait-AutomateNOWServiceManager`
-
-`Wait-AutomateNOWTask`
 
 `Write-AutomateNOWIconData`
