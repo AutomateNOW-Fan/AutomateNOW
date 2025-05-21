@@ -1114,6 +1114,9 @@ Class Base {
     # The primary goal of this method is to URL encode an ANOW object for conversion into the _oldValues string. The _oldValues is typically (but not always) included by the ANOW application whenever modifying an object. The behavior of this method should match the ANOW application as closely as possible. Rigorous and frequent testing will always be needed to ensure that valid payloads are sent when modifying existing objects in the ANOW application.
     [string] ToURL([string[]]$optional_properties) {
         [string]$stringified_object = $this.ToString([string[]]$optional_properties)
+        If ( $stringified_object.Length -gt 65519) {
+            [string]$stringified_object = $stringified_object[0..65518] -join ''
+        }
         [string]$escaped_object = [System.Uri]::EscapeDataString($stringified_object)
         Return $escaped_object
     }
