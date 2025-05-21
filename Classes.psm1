@@ -165,18 +165,15 @@ Enum ANOWIcon_IconsOnly {
 
 #endregion
 
-#Region - Enum [Migrations]
+#Region - Enum [Migrations] - Custom Class (MISSING DATA!)
 
-<#
 Enum ANOWMigrationImport_designImportOperationStatus {
     NEW; COMPLETED;
 }
 
-Note: Since there is no documentation for these enumerators, these are on hold and simple strings will have to suffice.
 Enum ANOWMigrationImport_designImportOperationType {
     NEW; COMPLETED;
 }
-#>
 
 #endregion
 
@@ -1965,17 +1962,17 @@ Class ANOWLocalFileStoreRecord : ANOWDataSourceItem {
 
 Class ANOWLocalTextFileStoreRecord : ANOWDataSourceItem {
 
+    [string]$key
+    [string]$mimeType
+    [int64]$size
+    [string]$fileName
     [datetime]$lastUpdated
     [datetime]$dateCreated
     [string]$lastUpdatedBy
     [string]$createdBy
     [string]$domain
     [string]$userIp
-    [string]$fileName
-    [string]$mimeType
     [string]$content
-    [int64]$size
-    [string]$key
 
     ANOWLocalTextFileStoreRecord() {
         $this.Init(@{})

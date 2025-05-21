@@ -37,6 +37,26 @@ Use `Connect-AutomateNOW` to establish your session
 <br/><br/>
 ## Change Log 📝
 
+## 1.0.37
+### Major updates
+- The new endpoint _/executeProcessingSync_ is supported by way of the `-Synchronous` parameter. This means users with limited privileges can now start a task/workflow/schedule and receive back the RunId of the task/workflow/schedule uninhibited.
+- Data Source Items binary & text files can now easily be saved (downloaded) to disk
+
+### Minor updates
+- The filename for the .json files created by `Export-AutomateNOWMigration` nows include the object id making the output much easier to use.
+- You can now opt for individual .json files to be created when batch sending objects for export to `Export-AutomateNOWMigration` (the default behavior is to create a single merged .json file)
+- A warning instead an error will now be thrown when duplicate keys are detected (within the .json file payload) by `New-AutomateNOWMigrationImport`
+- ConvertTo-Json will always convert at a depth of 100. This mainly fixes a potential issue with the Start-* functions accept a parameter hashtable.
+
+### Detailed Change Log
+- Added new functions: `Remove-AutomateNOWMigrationImport`, `Save-AutomateNOWDataSourceItem`
+- Added the parameter `-Synchronous` to `Start-AutomateNOWWorkflowTemplate`, `Start-AutomateNOWTaskTemplate`, `Start-AutomateNOWScheduleTemplate`, `Start-AutomateNOWServiceManagerTemplate`
+- Added the parameters `-IndividualExportFile` and `DoNotIncludeObjectIdInFileName` to `Export-AutomateNOWMigration`
+- Added the parameter `-IgnoreProcessingRegistry` to `Set-AutomateNOWTaskTemplate`
+- Added pipeline input for sending .json files to `New-AutomateNOWMigrationImport`
+- Fixed an issue with `Start-AutomateNOWEvent` that prevented it from returning the result
+- Fixed an issue with `Trace-AutomateNOWProcessing` not being able to perform deep searches
+
 ## 1.0.36
 ### Major updates
 + You can now reconstitute 🍊 previous versions of an object from the Audit Log (see `Restore-AutomateNOWObjectVersion`)
@@ -547,6 +567,7 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 - Modify the source code of certain objects that the UI does not offer (e.g. Stocks)
 - Use temporal duration timestamps (See `Add-AutomateNOWWorkflowTemplateDependency`) without restriction
 - Modify the template definition within a Design Template object
+- Access and restore deleted objects without restriction
 
 <sub>* things the console does not allow</sub>
 
@@ -706,6 +727,9 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 ### Wait! There is `Read-AutomateNOWAgentServerNode` function but also a `Read-AutomateNOWServerNodeAgent`. Is this a mistake?
 > No, but this does get a little confusing at first glance. `Read-AutomateNOWAgentServerNode` fetches the [ANOWAgentServerNode] objects that have been attached to an Agent (see classes.psm1 for more details on this class). Whereas `Read-AutomateNOWServerNodeAgent` exists to take advantage of a similarly named ANOW endpoint that will fetch the Agents ([ANOWAgent] class object) to which the provided Server Node is attached to (mounted on). The former is a function that retrieves full-fledged class objects whereas the latter is more of a shortcut to lookup Agents associated with a particular Server Node.
+
+### How can I see a list of all verbs that are represented in this module?
+> ((Get-Command -Module AutomateNOW | Select-Object -ExpandProperty Name) -split '-[a-z0-9]{1,}' -match '[a-z]{1,}' | Sort-Object -Unique ) -join ', '
 
 ## Functions 🛠
 
@@ -1361,6 +1385,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Remove-AutomateNOWMetric`
 
+`Remove-AutomateNOWMigrationImport`
+
 `Remove-AutomateNOWNotification`
 
 `Remove-AutomateNOWNotificationChannel`
@@ -1556,6 +1582,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Resume-AutomateNOWWorkflow`
 
 `Resume-AutomateNOWWorkflowTemplate`
+
+`Save-AutomateNOWDataSourceItem`
 
 `Save-AutomateNOWDeletedDomain`
 
