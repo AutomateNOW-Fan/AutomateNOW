@@ -44,14 +44,14 @@ Use `Connect-AutomateNOW` to establish your session
 
 ### Minor updates
 - The filename created by `Export-AutomateNOWMigration` for the output .json file now includes the object id
-- You now have the option to export multiple objects with individual .json files in addition to the default behavior of merging them into a single .json file
-- A warning (instead of an error) will now be thrown when duplicate keys are detected (within the .json file payload) by `New-AutomateNOWMigrationImport`
+- You now have the option to export multiple objects to individual .json files (in addition to the default behavior of merging them into a single .json file)
+- A warning (instead of an error) will now be thrown whenever duplicate keys are detected (within the .json file payload) by `New-AutomateNOWMigrationImport`
 - ConvertTo-Json will always convert at a depth of 100 (this fixes an issue with the Start-* functions and accepting a parameter hashtable of high depth)
 
 ### Detailed Change Log
 - Added new functions: `Remove-AutomateNOWMigrationImport`, `Save-AutomateNOWDataSourceItem`
-- Added the parameter `-Synchronous` to `Start-AutomateNOWWorkflowTemplate`, `Start-AutomateNOWTaskTemplate`, `Start-AutomateNOWScheduleTemplate`, `Start-AutomateNOWServiceManagerTemplate`
-- Added the parameters `-IndividualExportFile` and `DoNotIncludeObjectIdInFileName` to `Export-AutomateNOWMigration`
+- Added the parameter `-Synchronous` to `Start-AutomateNOWWorkflowTemplate`, `Start-AutomateNOWTaskTemplate`, `Start-AutomateNOWScheduleTemplate` and `Start-AutomateNOWServiceManagerTemplate`
+- Added the parameters `-IndividualExportFile` and `-DoNotIncludeObjectIdInFileName` to `Export-AutomateNOWMigration`
 - Added the parameter `-IgnoreProcessingRegistry` to `Set-AutomateNOWTaskTemplate`
 - Added pipeline input for sending .json files to `New-AutomateNOWMigrationImport`
 - Fixed an issue with `Start-AutomateNOWEvent` that prevented it from returning the result
