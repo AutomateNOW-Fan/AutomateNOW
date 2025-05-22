@@ -39,14 +39,14 @@ Use `Connect-AutomateNOW` to establish your session
 
 ## 1.0.37
 ### Major updates
-- The new endpoint _/executeProcessingSync_ is supported by way of the `-Synchronous` parameter. This means we get back the Id of the Processing Template that we started instead of the trigger. This is particularly helpful for users with limited privileges.
-- Data Source Items (binary & text files) can now be easily saved (downloaded) to disk 💾
+- The new endpoint _/executeProcessingSync_ is supported by way of the `-Synchronous` parameter. This means we get back the Id of the Processing Template that we want instead of the trigger id. This is particularly helpful for users with limited privileges.
+- Data Source Items (binary & text files) can now easily be saved (downloaded) to disk 💾
 
 ### Minor updates
-- The filename created by `Export-AutomateNOWMigration` for the output .json file now includes the object id
+- The object id is now included in the filename for the output .json file created by `Export-AutomateNOWMigration`
 - You now have the option to export multiple objects to individual .json files (in addition to the default behavior of merging them into a single .json file)
 - A warning (instead of an error) will now be thrown whenever duplicate keys are detected (within the .json file payload) by `New-AutomateNOWMigrationImport`
-- ConvertTo-Json will always convert at a depth of 100 (this fixes an issue with the Start-* functions and accepting a parameter hashtable of high depth)
+- ConvertTo-Json will now always convert at a depth of 100 (this fixes an issue with the Start-* functions and accepting a parameter hashtable of high depth)
 
 ### Detailed Change Log
 - Added new functions: `Remove-AutomateNOWMigrationImport`, `Save-AutomateNOWDataSourceItem`
