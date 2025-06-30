@@ -12,7 +12,7 @@ Created by AutomateNOW-Fan
 ```
 ## Efficacy 🧪
 
-Compatible with AutomateNOW! version _3.3.1.89 HF1_
+Compatible with AutomateNOW! version _3.3.1.90 HF2_
 <br/><br/>
 ## Installation 🏗
 
@@ -36,6 +36,42 @@ Use `Connect-AutomateNOW` to establish your session
 - Edit source code objects with NotePad (Windows only for now)
 <br/><br/>
 ## Change Log 📝
+
+## 1.0.38
+### Major updates
+- Exporting/Saving 💾 of Data Source Items is much improved
+- You can now modify the attributes of Items within Workflow Templates (and Service Manager Templates)
+- Server Nodes can now be added/removed from Load Balancer Server Nodes
+- Configuring Agent telemetry settings & pushing the configuration to the Agent are now supported
+- `Get-AutomateNOWAuditLog` no longer requires domain admin rights
+- Bump compatibility to ANOW version _3.3.1.90 HF2_ *
+
+### Minor updates
+- Central Management can now be enabled/disabled on Agents (disabling is experimental 🧪)
+- You can now modify the `Run Mode` of Service Manager Templates
+- You can now fetch a Workflow Template Item by id, name or title (same for Service Manager Template Items)
+- You can now fetch a Context Variable by name
+- You can now reload (update) Tasks, Workflows, Service Managers and Schedules
+- Managing Service Manager Templates is now on par with Workflow Templates (e.g. modifying items, dependencies)
+- `Export-AutomateNOWMigration` now outputs a [System.IO.FileInfo] object
+- `Restore-AutomateNOWObjectVersion` no longer requires a .json file
+- `Get-AutomateNOWContextVariable` now accepts Processing objects as input (i.e. Task, Workflow, Schedule or Service Manager)
+
+### Detailed Change Log
+- Added new functions: `Add-AutomateNOWLoadBalancerNode`, `Add-AutomateNOWServiceManagerTemplateDependency`, `Disable-AutomateNOWAgentCentralManagement`, `Enable-AutomateNOWAgentCentralManagement`, `Get-AutomateNOWCodeRepositoryOutOfSyncItem`, `Read-AutomateNOWServiceManagerTemplateDependency`, `Remove-AutomateNOWLoadBalancerNode`, `Remove-AutomateNOWServiceManagerTemplateDependency`, `Resolve-AutomateNOWObject2TableName`, `Send-AutomateNOWAgentConfiguration`, `Set-AutomateNOWContextVariable`, `Set-AutomateNOWServiceManagerTemplateItem`, `Set-AutomateNOWWorkflowTemplateItem`, `Update-AutomateNOWSchedule`, `Update-AutomateNOWServiceManager`, `Update-AutomateNOWTask`, `Update-AutomateNOWWorkflow`
+- Added the parameter `-IgnoreProcessingRegistry` to `Set-AutomateNOWWorkflowTemplate` and `Set-AutomateNOServiceManagerTemplate`
+- Added the parameter `-DisableManualExecution` to `Set-AutomateNOWScheduleTemplate`
+- Added the parameters `-Name` and `-Processing` to `Get-AutomateNOWContextVariable`
+- Added the parameters `-Status`, `-CentralManagement` and `-IPAddress` to `Get-AutomateNOWAgent`
+- Fixed an issue with `Set-AutomateNOWWorkflowTemplate` and setting the Folder
+- Fixed an issue with `Add-AutomateNOWServiceManagerTemplateItem` and adding Items
+- Fixed an issue with `Save-AutomateNOWDataSourceItem` and saving Local File Text Store objects to disk
+- Fixed an issue with `Show-AutomateNOWTaskTemplateType`
+- Fixed an issue with `Get-AutomateNOWProcessingList` where the `-launchedById` parameter was mandatory
+- Fixed a few issues with `Get-AutomateNOWContextVariable` where empty results could be included or from using the -Id parameter
+- Fixed an issue with `Remove-AutomateNOWWorkflowTemplateItem`
+- Removed the informational message about token expiration when a token expiration date was never provided (typically API users)
+- Tiny fixes, improvements and alignments for `Set-AutomateNOWWorkflowTemplate`, `Set-AutomateNOWTaskTemplate`, `Set-AutomateNOWServiceManagerTemplate`
 
 ## 1.0.37
 ### Major updates
@@ -560,7 +596,7 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 ## Cheats* 🎰
 
 - Execute Adhoc Reports where you may not have permission to in the UI
-- List & apply tags, folders etc. on an instance that you may not have permission to in the UI
+- List & apply tags, folders etc. on an instance that you may not have permission to in the UI *sometimes*
 - (Psuedo) Rename many object types including Workflow Templates and Task Templates
 - Automatic text file MIME type detection for `Add-AutomateNOWDataSourceItem`
 - Specify the theme and ui density at the time of user creation
@@ -594,31 +630,31 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 >Yes, except where it doesn't make sense. Otherwise, this module is designed to take advantage of the pipeline.
 
 ### I imported the AutomateNOW module into my PowerShell session. What's next?
->Try `Connect-AutomateNOW -?`. Also try `Get-Command -Module AutomateNOW`.
+>Try `Connect-AutomateNOW -?`. Also try `Get-Command -Module AutomateNOW` to see the full list of commands.
 
-### How can I specify the domain with `Connect-AutomateNOW` if I don't know what the available domains are?
->Use `Connect-AutomateNOW` without the `-Domain` parameter to discover available domains to your account. Then run it again with the -Domain parameter.
+### How can I specify the domain with the `-Domain` parameter of `Connect-AutomateNOW` if I don't know what domains are available to my account?
+>Use `Connect-AutomateNOW` without the `-Domain` parameter to discover available domains to your account.
 
 ### How do I use a particular command? Where's the help?
->Type the name of the command followed by -?.
+>Type the name of the command followed by -? for quick syntax. For the full help with examples, try `Get-Help NameOfCommand -Full`.
 
 ### Help! I keep receiving the error message "Parameter set cannot be resolved using the specified named parameters."
->Again, type the name of the command followed by -?. You need to review the "parameter sets". Not all parameters can be mixed with others. Please consult the built-in help.
+>Type the name of the command followed by -?. You need to review the "parameter sets". Not all parameters can be mixed with others. Please consult the built-in help for that individual function.
 
-### How do I see the actual payloads, headers, parameters that are sent to ANOW? In other words, how can I see what's happening "under the hood" while the function is running?
+### How do I see 👀 the actual payloads, headers, parameters that are sent to ANOW?
 >Include the `-Verbose` parameter (use with caution)
 
 ### Why don't these functions share the identical verbs as the ANOW UI? (e.g. "Suspend" instead of "Hold")
->As a best practice this module uses only approved verbs that means sometimes the verbs won't match. See https://learn.microsoft.com/en-us/powershell/scripting/developer/cmdlet/approved-verbs-for-windows-powershell-commands for more information.
+>This module uses only approved verbs. See https://learn.microsoft.com/en-us/powershell/scripting/developer/cmdlet/approved-verbs-for-windows-powershell-commands for more.
 
 ### Why do I only receive 100 results when using the Get commands? I should be getting more results...
 >The default values of `-startRow` and `-endRow` are 0 and 100 respectively. You can use those parameters to paginate the results.
 
 ### How do I paginate the results?
->You will have to develop your own routine for cycling through pages. Pay careful attention to the property by which you are sorting! (I'm looking at you `Design Audit Log`)
+>You will have to develop your own routine for interating through the pages. Pay careful attention to which property you are sorting by! (I'm looking at you `Design Audit Log`)
 
 ### Why doesn't this module work correctly with my older version of AutomateNOW?
->This module uses classes and enums to manage the schema. Beta Systems (formerly InfiniteDATA) makes frequent updates to this schema (with most new non-hotfix patch updates). Thus, the incompatilities cannot be helped. You would need to downgrade to an older version of the module.
+>This module uses classes and enums to manage the schema. Beta Systems (formerly InfiniteDATA) makes frequent updates to this schema (with most new non-hotfix patch updates). Thus, the incompatilities cannot be helped. You will need to downgrade to a previous version of this module that matches your ANOW version.
 
 ### How does the password encryption in this module work?
 >It's the same as the console. See the `Protect-AutomateNOWEncryptedString` and `Unprotect-AutomateNOWEncryptedString` functions for technical details.
@@ -630,10 +666,10 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 >Use `Add-AutomateNOWWorkflowTemplateItem`
 
 ### How do I change my domain?
->Use `Switch-AutomateNOWDomain`
+>Use `Switch-AutomateNOWDomain -Domain 'MyDomain'`
 
-### How to retrieve Tasks and Workflows by their RunId?
->Use `Get-AutomateNOWTask` or `Get-AutomateNOWWorkflow` and refer to the Id's that are returned
+### How to retrieve a Task or Workflow (a.k.a. a "job") by its RunId?
+>Use `Get-AutomateNOWTask -Id 12345` for Tasks or `Get-AutomateNOWWorkflow -Id 12345` for Workflows. There is also `Get-AutomateNOWProcessingList -Id 12345` which can provide both Task and Workflow outputs.
 
 ### How to push my changes to my properly configured code repository that my admin provided?
 > Step 1 - Select the branch of the repository
@@ -689,7 +725,7 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 ### Why is there no Copy and Rename functions for Time Triggers?
 > The ANOW application does not actually offer this functionality. You must 'add' a Time Trigger to a Schedule Template.
 
-### How can I use `Edit-AutomateNOWDataSourceItem` if I don't already know the 32 character guid Id of the item?
+### How can I use `Edit-AutomateNOWDataSourceItem` if I don't already know the Id (36 character GUID) of the item?
 > Use the built-in help `Get-Help Edit-AutomateNOWDataSourceItem -Examples` to see examples
 
 ### Why doesn't `Get-AutomateNOWContextVariable` include the level of the variable (i.e. Self, Parent or Root)?
@@ -731,6 +767,24 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 ### How can I see a list of all verbs that are represented in this module?
 > ((Get-Command -Module AutomateNOW | Select-Object -ExpandProperty Name) -split '-[a-z0-9]{1,}' -match '[a-z]{1,}' | Sort-Object -Unique ) -join ', '
 
+### Why do I not receive the expected results when using the `-Title` parameter with `Read-AutomateNOWWorkflowTemplateItem` or `Read-AutomateNOWServiceManagerTemplateItem`?
+> The "title" and "name" property of Processing Template Items can be misleading. Upon creation (i.e. adding) the item, the "name" property of the Item is automatically created and will be immutable (typically with a ".1" suffix). The ANOW UI will then use this "name" as the "title" as well since the "title" is NULL by default. To populate the "title" property for each Item you would need to specifically set the "title".
+
+### How can I resolve (merge) Out Of Sync conflicts in my git repository?
+> The first below code will show the left/right comparison (yours/theirs) using your installed git executable. This will help you to decide whether to "Accept Yours" or "Accept Theirs".
+> `$repository = Get-AutomateNOWCodeRepository -Id 'MyRepository'`
+> `$conflict_item = $repository | Get-AutomateNOWCodeRepositoryOutOfSyncItem | Select-Object -First 1`
+> `$comparison = $conflict_item | Compare-AutomateNOWCodeRepositoryConflictItem -CodeRepository $repository`
+> `$comparison | Show-AutomateNOWCodeRepositoryConflictItemComparison`
+>
+> The second below code will apply the "Accept Yours" decision (i.e. "Accept Left")
+> $repository = Get-AutomateNOWCodeRepository -Id 'MyRepository'
+> $out_of_sync_items = $repository | Get-AutomateNOWCodeRepositoryOutOfSyncItem -startRow 0 -endRow 10000
+> $out_of_sync_items | Merge-AutomateNOWCodeRepositoryConflictItem -CodeRepository $repo -AcceptYours
+
+### How can I fetch Load Balancer nodes?
+> Use the `Get-AutomateNOWServerNode` as Load Balancers are also Server Nodes.
+
 ## Functions 🛠
 
 `Add-AutomateNOWApprovalRule`
@@ -742,6 +796,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Add-AutomateNOWDashboardPortlet`
 
 `Add-AutomateNOWDataSourceItem`
+
+`Add-AutomateNOWLoadBalancerNode`
 
 `Add-AutomateNOWNotificationGroupMember`
 
@@ -760,6 +816,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Add-AutomateNOWServerNodeEndpoint`
 
 `Add-AutomateNOWServerNodeGroupItem`
+
+`Add-AutomateNOWServiceManagerTemplateDependency`
 
 `Add-AutomateNOWServiceManagerTemplateItem`
 
@@ -871,6 +929,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Deny-AutomateNOWCodeRepositoryMergeRequest`
 
+`Disable-AutomateNOWAgentCentralManagement`
+
 `Disconnect-AutomateNOW`
 
 `Dismount-AutomateNOWAgentServerNode`
@@ -878,6 +938,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Edit-AutomateNOWCodeRepositoryObjectSource`
 
 `Edit-AutomateNOWDataSourceItem`
+
+`Enable-AutomateNOWAgentCentralManagement`
 
 `Export-AutomateNOWAdhocReport`
 
@@ -1042,6 +1104,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Get-AutomateNOWCodeRepositoryMergeRequest`
 
 `Get-AutomateNOWCodeRepositoryObjectSource`
+
+`Get-AutomateNOWCodeRepositoryOutOfSyncItem`
 
 `Get-AutomateNOWCodeRepositoryTag`
 
@@ -1323,6 +1387,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Read-AutomateNOWServerNodeGroupItem`
 
+`Read-AutomateNOWServiceManagerTemplateDependency`
+
 `Read-AutomateNOWServiceManagerTemplateItem`
 
 `Read-AutomateNOWTimeTrigger`
@@ -1378,6 +1444,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Remove-AutomateNOWEvent`
 
 `Remove-AutomateNOWFolder`
+
+`Remove-AutomateNOWLoadBalancerNode`
 
 `Remove-AutomateNOWLock`
 
@@ -1440,6 +1508,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Remove-AutomateNOWServiceManager`
 
 `Remove-AutomateNOWServiceManagerTemplate`
+
+`Remove-AutomateNOWServiceManagerTemplateDependency`
 
 `Remove-AutomateNOWServiceManagerTemplateItem`
 
@@ -1545,6 +1615,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Resolve-AutomateNOWMonitorType2ServerNodeType`
 
+`Resolve-AutomateNOWObject2TableName`
+
 `Resolve-AutomateNOWSensorType2ServerNodeType`
 
 `Resolve-AutomateNOWTaskType2ServerNodeType`
@@ -1593,6 +1665,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Select-AutomateNOWCodeRepositoryTag`
 
+`Send-AutomateNOWAgentConfiguration`
+
 `Send-AutomateNOWCodeRepository`
 
 `Set-AutomateNOWAdhocReport`
@@ -1606,6 +1680,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Set-AutomateNOWBusinessView`
 
 `Set-AutomateNOWCodeRepository`
+
+`Set-AutomateNOWContextVariable`
 
 `Set-AutomateNOWDashboard`
 
@@ -1661,6 +1737,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Set-AutomateNOWServiceManagerTemplate`
 
+`Set-AutomateNOWServiceManagerTemplateItem`
+
 `Set-AutomateNOWStock`
 
 `Set-AutomateNOWTag`
@@ -1678,6 +1756,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Set-AutomateNOWVariableTimestamp`
 
 `Set-AutomateNOWWorkflowTemplate`
+
+`Set-AutomateNOWWorkflowTemplateItem`
 
 `Set-AutomateNOWWorkspace`
 
@@ -1767,13 +1847,21 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Unprotect-AutomateNOWEncryptedString`
 
-`UnPublish-AutomateNOWCodeRepository`
+`Unpublish-AutomateNOWCodeRepository`
 
 `Unregister-AutomateNOWProcessingState`
 
 `Update-AutomateNOWCodeRepositoryObjectSource`
 
+`Update-AutomateNOWSchedule`
+
+`Update-AutomateNOWServiceManager`
+
+`Update-AutomateNOWTask`
+
 `Update-AutomateNOWToken`
+
+`Update-AutomateNOWWorkflow`
 
 `Wait-AutomateNOWProcessing`
 
