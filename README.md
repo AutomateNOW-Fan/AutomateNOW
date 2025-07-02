@@ -39,23 +39,25 @@ Use `Connect-AutomateNOW` to establish your session
 
 ## 1.0.38
 ### Major updates
-- Exporting/Saving 💾 of Data Source Items is much improved
-- You can now modify the attributes of Items within Workflow Templates (and Service Manager Templates)
-- Server Nodes can now be added/removed from Load Balancer Server Nodes
-- Configuring Agent telemetry settings & pushing the configuration to the Agent are now supported
-- `Get-AutomateNOWAuditLog` no longer requires domain admin rights
+- The Exporting and Saving 💾 of Data Source Items is much improved
+- You can now modify the attributes of Items within Workflow Templates & Service Manager Templates
+- Server Nodes can now be removed or added from Load Balancer Server Nodes
+- Configuring Agent telemetry settings is now supported
+- Pushing (Sending) Agent settings is now supported
+- `Get-AutomateNOWAuditLog` no longer always requires domain admin rights
 - Bump compatibility to ANOW version _3.3.1.90 HF2_ *
 
 ### Minor updates
 - Central Management can now be enabled/disabled on Agents (disabling is experimental 🧪)
 - You can now modify the `Run Mode` of Service Manager Templates
-- You can now fetch a Workflow Template Item by id, name or title (same for Service Manager Template Items)
-- You can now fetch a Context Variable by name
+- You can now fetch Workflow Template Items by id, name or title (same for Service Manager Template Items)
+- You can now fetch Context Variables by their name
 - You can now reload (update) Tasks, Workflows, Service Managers and Schedules
-- Managing Service Manager Templates is now on par with Workflow Templates (e.g. modifying items, dependencies)
-- `Export-AutomateNOWMigration` now outputs a [System.IO.FileInfo] object
+- Capabilities to manage Service Manager Template Items are now on par with managing Workflow Template Items
+- `Export-AutomateNOWMigration` now includes a [System.IO.FileInfo] object in the output
 - `Restore-AutomateNOWObjectVersion` no longer requires a .json file
-- `Get-AutomateNOWContextVariable` now accepts Processing objects as input (i.e. Task, Workflow, Schedule or Service Manager)
+- `Get-AutomateNOWContextVariable` now accepts Processing objects as input
+- Slight change to dealing with Out Of Sync (Conflict) repository items (see FAQ for more)
 
 ### Detailed Change Log
 - Added new functions: `Add-AutomateNOWLoadBalancerNode`, `Add-AutomateNOWServiceManagerTemplateDependency`, `Disable-AutomateNOWAgentCentralManagement`, `Enable-AutomateNOWAgentCentralManagement`, `Get-AutomateNOWCodeRepositoryOutOfSyncItem`, `Read-AutomateNOWServiceManagerTemplateDependency`, `Remove-AutomateNOWLoadBalancerNode`, `Remove-AutomateNOWServiceManagerTemplateDependency`, `Resolve-AutomateNOWObject2TableName`, `Send-AutomateNOWAgentConfiguration`, `Set-AutomateNOWContextVariable`, `Set-AutomateNOWServiceManagerTemplateItem`, `Set-AutomateNOWWorkflowTemplateItem`, `Update-AutomateNOWSchedule`, `Update-AutomateNOWServiceManager`, `Update-AutomateNOWTask`, `Update-AutomateNOWWorkflow`
@@ -66,11 +68,12 @@ Use `Connect-AutomateNOW` to establish your session
 - Fixed an issue with `Set-AutomateNOWWorkflowTemplate` and setting the Folder
 - Fixed an issue with `Add-AutomateNOWServiceManagerTemplateItem` and adding Items
 - Fixed an issue with `Save-AutomateNOWDataSourceItem` and saving Local File Text Store objects to disk
-- Fixed an issue with `Show-AutomateNOWTaskTemplateType`
 - Fixed an issue with `Get-AutomateNOWProcessingList` where the `-launchedById` parameter was mandatory
-- Fixed a few issues with `Get-AutomateNOWContextVariable` where empty results could be included or from using the -Id parameter
+- Fixed an issue with `Get-AutomateNOWContextVariable` where empty results could be included
+- Fixed an issue with `Get-AutomateNOWContextVariable` when using the -Id parameter
 - Fixed an issue with `Remove-AutomateNOWWorkflowTemplateItem`
-- Removed the informational message about token expiration when a token expiration date was never provided (typically API users)
+- Fixed an issue with `Show-AutomateNOWTaskTemplateType`
+- Removed the informational message about token expiration for users without an expiration (typically API users)
 - Tiny fixes, improvements and alignments for `Set-AutomateNOWWorkflowTemplate`, `Set-AutomateNOWTaskTemplate`, `Set-AutomateNOWServiceManagerTemplate`
 
 ## 1.0.37
