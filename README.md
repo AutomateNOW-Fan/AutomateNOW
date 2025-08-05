@@ -42,37 +42,37 @@ Use `Connect-AutomateNOW` to establish your session
 - Communication Notes 📝 are added and fully supported
 - Creating API users 🤖 is added and fully supported
 - Reading the Agent Log (not sysout) is added and fully supported
-- Bump compatibility to ANOW version _3.3.1.92_ *
+- Bump compatibility to ANOW version _3.3.1.92_
 
 ### Minor updates
 - You can now create and delete Context Variables
-- You can now reload workflows/tasks that are on hold
+- You can now reload Workflows/Tasks that are on hold ⏸️
+- You can now 'load items' on lazy mode workflows that are on hold ⏸️
 - You can now 'restate' workflows that were Force Completed or Force Failed
-- You can now 'load items' on lazy mode workflows that are on hold
 - You can now Activate (enable) and Deactive (disable) user accounts
-- You can now set and unset the processing template within processing deadline monitors
+- You can now set and unset the Processing Template within Processing Deadline Monitors
 - Launching Processing Templates with multiple tags 🏷️ assigned works correctly now
 - When creating a new user, you can now copy roles from another user
 - The `-Name` parameter of `Get-AutomateNOWContextVariable` now accepts a string array
 - `ConvertFrom-AutomateNOWContextVariable` now defaults to JSON output
 - `Trace-AutomateNOWProcessing` (and its aliases) now returns [ANOWProcessingContextVariable] class objects instead of generic [PSCustomObject] objects when using the `-ReturnContextVariables` parameter
-- The `-DesignTemplate` parameter when creating new Processing Templates now requires an [ANOWDesignTemplate] object instead of a string Id
+- The `-DesignTemplate` parameter in the New Processing Template functions now requires an actual [ANOWDesignTemplate] object
 
 ### Detailed Change Log
 - Added new functions: `Disable-AutomateNOWSecUser`, `Enable-AutomateNOWSecUser`, `Export-AutomateNOWBusinessViewItem`, `Export-AutomateNOWCommunicationNote`, `Export-AutomateNOWScheduleTemplateItem`, `Export-AutomateNOWServiceManagerTemplateDependency`, `Export-AutomateNOWWorkflowTemplateDependency`, `Export-AutomateNOWWorkflowTemplateItem`, `Get-AutomateNOWAgentLog`, `Get-AutomateNOWCommunicationNote`, `New-AutomateNOWCommunicationNote`, `New-AutomateNOWContextVariable`, `Remove-AutomateNOWCommunicationNote`, `Remove-AutomateNOWContextVariable`, `Reset-AutomateNOWWorkflow`, `Show-AutomateNOWCollaborationWall`, `Update-AutomateNOWCommunicationNote`, `Update-AutomateNOWWorkflowLazyItem`
-- Fixed a handful of classes that had a typo in the Create() method
+- Fixed a handful of classes that had a typo in their Create() method
 - Fixed a number of issues with `New-AutomateNOWServiceManagerTemplate`
-- Fixed an issue with the `Start-AutomateNOW` functions (for processing templates) when assigning multiple tags
-- Fixed an issue with `Save-AutomateNOWDataSourceItem` and saving text files
-- Fixed an issue when specifying a Phone Number for `New-AutomateNOWSecUser`
-- Fixed an issue (PowerShell Core only) when specifying a password for `New-AutomateNOWSecUser`
-- Fixed pipeline support for all of the Skip, Suspend, Resume & Confirm functions
+- Fixed an issue with the `Start-AutomateNOW*` functions (for processing templates) when assigning multiple tags
+- Fixed an issue with `Save-AutomateNOWDataSourceItem` when saving text files
+- Fixed an issue when specifying a Phone Number 📞 in `New-AutomateNOWSecUser`
+- Fixed an issue (PowerShell Core only) when specifying a password in `New-AutomateNOWSecUser`
 - Added the parameters `-APIUser` & `-Description` to `New-AutomateNOWSecUser`
+- Fixed pipeline support for all of the Skip, Suspend, Resume & Confirm functions
 - Added the parameter `-ProcessingTemplate` to `Set-AutomateNOWServiceManagerTemplate`
 - Added a warning to `Connect-AutomateNOW` if the licence status is less than 30 days (suppress with -Quiet)
 - Fixed a few functions that were missing an example within the in-line help
-- Older Change Log entries have been moved to README-OLD.md
-- Many tiny clean-ups & optimizations
+- Moved older Change Log entries to [README-OLD.md](README-OLD.md)
+- Many tiny clean-ups & optimizations 🧹
 
 ## 1.0.38
 ### Major updates
@@ -82,7 +82,7 @@ Use `Connect-AutomateNOW` to establish your session
 - Configuring Agent telemetry settings is now supported
 - Pushing (Sending) Agent settings is now supported
 - `Get-AutomateNOWAuditLog` no longer always requires domain admin rights
-- Bump compatibility to ANOW version _3.3.1.90 HF2_ *
+- Bump compatibility to ANOW version _3.3.1.90 HF2_
 
 ### Minor updates
 - Central Management can now be enabled/disabled on Agents (disabling is experimental 🧪)
@@ -140,7 +140,7 @@ Use `Connect-AutomateNOW` to establish your session
 + You can now fetch a specific item from a Data Source by its key or filename
 + Migration Imports are added and fully supported ✅
 + Support for HTTP proxies
-+ Bump compatibility to ANOW version _3.3.1.89 HF1_ *
++ Bump compatibility to ANOW version _3.3.1.89 HF1_
 
 ### Minor updates
 - All Applicable Set-* functions will now output their object type by default (use -Quiet to suppress this)
