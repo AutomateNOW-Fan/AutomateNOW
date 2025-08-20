@@ -42,7 +42,7 @@ Use `Connect-AutomateNOW` to establish your session
 - Fixed an issue with `Set-AutomateNOWAgent` when changing the configuration of an Agent that could result in a corrupted Agent definition
 
 ### Detailed Change Log
-- The default sort order for `Get-AutomateNOWWorkflow`, `Get-AutomateNOWTask, `Get-AutomateNOWSchedule` and `Get-AutomateNOWServiceManager` is now descending.
+- The default sort order for `Get-AutomateNOWWorkflow`, `Get-AutomateNOWTask`, `Get-AutomateNOWSchedule` and `Get-AutomateNOWServiceManager` is now descending.
 - Fixed an issue when trying to use the `-Name` parameter of `Get-AutomateNOWContextVariable`
 
 ## 1.0.39
