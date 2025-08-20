@@ -37,6 +37,14 @@ Use `Connect-AutomateNOW` to establish your session
 <br/><br/>
 ## Change Log 📝
 
+## 1.0.40
+### Major updates
+- Fixed an issue with `Set-AutomateNOWAgent` when changing the configuration of an Agent that could result in a corrupted Agent definition
+
+### Detailed Change Log
+- The default sort order for `Get-AutomateNOWWorkflow`, `Get-AutomateNOWTask, `Get-AutomateNOWSchedule` and `Get-AutomateNOWServiceManager` is now descending.
+- Fixed an issue when trying to use the `-Name` parameter of `Get-AutomateNOWContextVariable`
+
 ## 1.0.39
 ### Major updates
 - Communication Notes 📝 are added and fully supported
@@ -498,7 +506,7 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 > Use the built-in help `Get-Help Edit-AutomateNOWDataSourceItem -Examples` to see examples
 
 ### Why doesn't `Get-AutomateNOWContextVariable` include the level of the variable (i.e. Self, Parent or Root)?
-> Use `Trace-AutomateNOWProcessing` with the `-ReturnContextVariables` parameter to have the level of the variables. It is not possible to determine the level of the variable without also knowing the RunId of the Workflows involved.
+> The scope of the variable is not actually included within the [ANOWProcessingContextVariable] object (refer to the ANOW schema and/or Classes.psm1). Scope is a -derived- property which is calculated by comparing the ProcessingId of the variable with the one specific task/workflow Id that you are comparing with. In other words, you will have to calculate this yourself. However, the functionality to include a scope with a context variable may be added as an enhancement in the future (e.g. `Show-AutomateNOWContextVariable`).
 
 ### I'm tired of seeing the Trigger Items in the results of `Trace-AutomateNOWProcessing`
 > Use the `-DoNotIncludeTriggers` parameter with `Trace-AutomateNOWProcessing`. Even better, you can also use the `-Synchronous` parameter when starting the Task/Workflow Template.
