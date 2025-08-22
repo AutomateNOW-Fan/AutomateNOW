@@ -2,7 +2,8 @@
 
 > Requires an account on an AutomateNOW! instance
 
-![image](usage-example.png)
+<img width="1115" height="366" alt="usage-example" src="https://github.com/user-attachments/assets/db440886-2b8d-4166-9b16-6ad0388536a1" />
+<br/><br/>
 
 ```
 Created by AutomateNOW-Fan
@@ -389,7 +390,7 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 ### What exactly can I do with this module? How complete is this?
 >See the feature chart below
 
-![image](feature-chart.png)
+<img width="1338" height="1401" alt="feature-chart" src="https://github.com/user-attachments/assets/055d93a3-8817-4253-8cd7-098333bc83e7" />
 
 ### Where are the connection details stored in my PowerShell session after successfully authenticating?
 >Check the global variable `$anow_session`
