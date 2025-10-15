@@ -2,8 +2,7 @@
 
 > Requires an account on an AutomateNOW! instance
 
-<img width="1115" height="366" alt="usage-example" src="https://github.com/user-attachments/assets/db440886-2b8d-4166-9b16-6ad0388536a1" />
-<br/><br/>
+![image](usage-example.png)
 
 ```
 Created by AutomateNOW-Fan
@@ -13,7 +12,7 @@ Created by AutomateNOW-Fan
 ```
 ## Efficacy 🧪
 
-Compatible with AutomateNOW! version _3.3.1.92_
+Compatible with AutomateNOW! version _3.3.1.93<sup>[1]</sup>_
 <br/><br/>
 ## Installation 🏗
 
@@ -37,6 +36,53 @@ Use `Connect-AutomateNOW` to establish your session
 - Edit source code objects with NotePad (Windows only for now)
 <br/><br/>
 ## Change Log 📝
+
+## 1.0.41
+### Major updates
+- Retrieving sysout logs is now possible 🥳
+- Non-admin users can now audit their own security permissions (domain role privileges) 📜
+- Admins can now compare the security permissions (domain role privileges) between 2 users 🔎
+- The content (items) within Code Repositories can now be transformed for batch export (see FAQ)
+- _Force Complete_ and _Force Fail_ are now added and fully supported
+- Searching all domain roles for instances of a Tag 🏷️ is now possible
+- Bump compatibility to ANOW version _3.3.1.93<sup>[1]</sup>_
+
+<sup>[1] Should work with _3.3.1.94_ but not tested yet</sup>
+
+### Minor updates
+- The individual settings of items with Schedule Templates can now be configured
+- Tracing Tasks, Workflows & Service Managers will now always return the specific class object instead of the generic [ANOWProcessing] base class
+- Restarting Workflows, Tasks, Schedules & Service Managers now returns back the restarted [ANOWProcessing] object along with other small improvements
+- Security Role objects will now always have the associated Domain Role objects (if any) embedded within
+- User objects will now always have their associated Security Role objects (if any) embedded within
+- The pipeline can now be used to add items to a Data Source
+- Cleaned up a couple of minor discrepancies within the Classes.psm1 🧹
+- Tags within domain role permissions are now always properly forgotten (cleared) whenever the permission is set to false
+- `Read-AutomateNOWSecurityRoleDomain` now always requires an [ANOWSecRole] object
+
+### Detailed Change Log
+- Added new functions: `Compare-AutomateNOWSecUserPermission`, `Complete-AutomateNOWSchedule`, `Complete-AutomateNOWServiceManager`, `Complete-AutomateNOWTask`, `Complete-AutomateNOWWorkflow`, `ConvertFrom-AutomateNOWCodeRepositoryItem`, `Export-AutomateNOWSecUserPermission`, `Export-AutomateNOWServiceManagerTemplateItem`, `Get-AutomateNOWAgentSysOutLog`, `Measure-AutomateNOWSecUserPermission`, `New-AutomateNOWSecUserPrivilegeList`, `New-AutomateNOWSecUserPrivilegeLookupTable`, `New-AutomateNOWSecUserPrivilegeReport`, `Resolve-AutomateNOWSecUserPermission`, `Save-AutomateNOWAgentSysOutLog`, `Search-AutomateNOWSecurityRole`, `Set-AutomateNOWScheduleTemplateItem`
+- Added a new constructor to the 4 sub-classes of [ANOWProcessing] that allows the conversion of [ANOWProcessing] objects to their sub class<sup>[2]</sup>
+- Added a new constructor to the 4 sub-classes of [ANOWProcessingTemplate] that allows the conversion of [ANOWProcessingTemplate] objects to their sub class<sup>[3]</sup>
+- Added the `-restartType` parameter to `Restart-AutomateNOWWorkflow` and `Restart-AutomateNOWServiceManager`
+- Added new parameters `-AdminsOnly`, `-NonAdminsOnly` and `-NoWarning` to `Get-AutomateNOWSecUser`
+- Added the `-AllowTimeout` parameter to `Connect-AutomateNOW` (this is intended to accomodate for certain edge case git scenarios)
+- Removed the `-SecurityRole` parameter from `Set-AutomateNOWSecurityRoleDomain` (improves pipeline support)
+- Removed the `-OverrideProcessingType` parameter from `Get-AutomateNOWWorkflowTemplate`. Use `Get-AutomateNOWProcessingTemplate` instead.
+- Downgraded the 'SecRole' property inside of the [ANOWDomainRole] class from an [ANOWSecRole] object to a string
+- Upgraded the 'resource' property inside of the [ANOWResourceTimestampState] class from a string to an [ANOWSemaphore] object
+- Upgraded the 'actionTimestamp' property inside of the [ANOWAuditLog] class from a string to an [ANOWSemaphore] object
+- Replaced all instances of the `-Type` parameter with something more specific (e.g. `-DataSourceType` instead of `-Type`)
+- Fixed an issue where `Get-AutomateNOWSecurityRole` failed to accept certain types of internal security roles when using the `-Id` parameter
+- Fixed an issue with `Get-AutomateNOWSecUser` where the secRoles property was not populated
+- Fixed an issue with `Merge-AutomateNOWCodeRepositoryConflictItem` during post-processing of the result
+- Fixed an issue with `Get-AutomateNOWProcessingState` that occurred when the associated processing template no longer exists
+- Fixed an issue with the [ANOWProcessing] class where the 'internalProcessingStatus' property was defined as an enum instead of a string
+- Fixed an issue with the [ANOWSecRoleDomain] class where the members related to Tags 🏷️ were joined into a single string instead of a string array
+
+<sup>[2] This was required for accurate tracing with `Trace-AutomateNOWProcess` because PowerShell class inheritance is one-directional</sup>
+
+<sup>[3] This was required for exporting the JSON content of all possible items within a Code Repository (see FAQ)</sup>
 
 ## 1.0.40
 ### Major updates
@@ -364,23 +410,24 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 ## Wish List 🌠
 
-- Enrich the sorting options for all Get functions
+- Expand and enrish the sorting options for all Get functions
 - Export diagrams to PNG
 - Automatic binary file MIME type detection for `Add-AutomateNOWDataSourceItem`
-- Refactor the redundant code
-- Export functions should convert objects containing an object type to JSON strings
+- Refactor any redundant code
+- The individual Export functions need to be enhanced (Use `Export-AutomateNOWMigration` for now)
 - Ability to action individual items in a code repository instead of applying the action to all items
-- Support for multiple simultaneous sessions to different domains or ANOW servers
+- Support for establishing multiple concurrent sessions to different ANOW instances or domains
 
-## Cheats* 🎰
+## Bonuses* 🎰
 
 - List & apply tags, folders etc. on an instance that you may not have permission to in the UI *sometimes*
+- Deep search for root Workflows that were spawned by other Tasks/Workflows
 - Modify the source code of certain objects (e.g. Stocks)
 - Modify the template definition within a Design Template object
 - Detect MIME type automatically when uploading text files to text file stores
 - Utilize temporal duration timestamps unrestricted within Processing Dependencies (See `Add-AutomateNOWWorkflowTemplateDependency`)
 
-<sub>* things the console does not allow</sub>
+<sub>* things the console does not allow or provide for</sub>
 
 ## Questions ❓
 
@@ -390,7 +437,7 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 ### What exactly can I do with this module? How complete is this?
 >See the feature chart below
 
-<img width="1338" height="1401" alt="feature-chart" src="https://github.com/user-attachments/assets/055d93a3-8817-4253-8cd7-098333bc83e7" />
+![image](feature-chart.png)
 
 ### Where are the connection details stored in my PowerShell session after successfully authenticating?
 >Check the global variable `$anow_session`
@@ -435,7 +482,7 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 >It's the same as the console. See the `Protect-AutomateNOWEncryptedString` and `Unprotect-AutomateNOWEncryptedString` functions for technical details.
 
 ### Why are some of the columns in the export .csv containing `[System.Object]`?
->All of the Export functions are preliminary. Each export function in this module needs to be fine-tuned to ensure each column is property exported. This is on the wish list.
+>All of the individual Export functions should be considered work-in-progress. For now, use the `Export-AutomateNOWMigration` function to create proper json exports.
 
 ### How do I add a Task Template to a Workflow Template?
 >Use `Add-AutomateNOWWorkflowTemplateItem`
@@ -498,7 +545,7 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 > `New` is for when we are creating something new from scratch. `Add` is for when we are adding an existing object to another existing object.
 
 ### I'm confused about why some functions are prefixed with Get- and others with Read-?
-> `Get` is for when we are fetching something that can be created with a `New` command. `Read` is for when we are fetching something that can be created with a `Add` command.
+> `Get` is for when we are fetching something that can be created with a `New` command. `Read` is for when we are fetching something that can be created with an `Add` command.
 
 ### Why is there no Copy and Rename functions for Time Triggers?
 > The ANOW application does not actually offer this functionality. You must 'add' a Time Trigger to a Schedule Template.
@@ -513,7 +560,7 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 > Use the `-DoNotIncludeTriggers` parameter with `Trace-AutomateNOWProcessing`. Even better, you can also use the `-Synchronous` parameter when starting the Task/Workflow Template.
 
 ### I need more from `Trace-AutomateNOWProcessing`. It only returns Workflows which were parented by my Workflow. I need to see *everything* which could have been launched by my Workflow.
-> Use the `-PerformDeepSearch` parameter
+> Use the `-PerformDeepSearch` parameter. Note that this parameter will significantly increase the time required. Also, the UI does not offer this functionality.
 
 ### How do I start a Workflow, wait for it to finish executing and then return all of the related Context Variables in a single command?
 > `Get-AutomateNOWWorkflowTemplate -Id 'WorkflowTemplate1' | Start-AutomateNOWWorkflowTemplate | Trace-AutomateNOWProcessing -WaitForExecution -ReturnContextVariables`
@@ -523,9 +570,6 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 ### How can I see the items that exist in the UI under the Monitoring -> Trigger tab?
 > Use `Get-AutomateNOWSchedule` to retrieve these
-
-### I just want to remove the tags from 1 privilege in a Domain Security Role. How do I do that?
-> To clear the tags from an individual privilege in a Domain Security Role without disabling it you have to use the `Set-AutomateNOWSecurityRoleDomain` function twice. First, set the privilege to $false then back to $true.
 
 ### What is the difference between an [ANOWResource] object, an [ANOWAnomaly] object and the [ANOWResourceAnomaly] object? This is confusing
 > An [ANOWResource] is a base class that is the foundation for the 9 Resource objects (e.g. Locks, Stocks, Metrics).
@@ -570,13 +614,37 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 > Use the -Close switch parameter with `Update-AutomateNOWCommunicationNote`
 
 ### How do I create a copy of a user? I was expecting `Copy-AutomateNOWSecUser` to exist.
-> Use `New-AutomateNOWSecUser` with the `-CopyRolesFromUser` parameter.
+> ANOW does not offer a copy function for users but you can copy the roles from another user by using `-CopyRolesFromUser` with `New-AutomateNOWSecUser`
 
 ### Why isn't there a `Lock-AutomateNOWSecUser` to accompany `Unlock-AutomateNOWSecUser`?
 > An account can only be locked through too many failed password attempts. To enable/disable an account you can use `Enable-AutomateNOWSecUser` & `Disable-AutomateNOWSecUser`
 
 ### Where is the function for exporting items from within a Code Repository?
 > Use `Export-AutomateNOWCodeRepositoryObjectSource`
+
+### Why can't I combine the `-Id` parameter with the `-IncludeArchived` parameter when using the `Get-AutomateNOWTask` (et al) functions?
+> The processing archive is already included when using the `-Id` parameter
+
+### Why is the 'secRole' property sometimes empty on users?
+> Not all users have 'internal' security roles. The 'secRole' property is a string representing the Id of the internal security role for that user
+
+### How is it possible to send all objects within a Code Repository to the Migration Export functionality?
+> `Get-AutomateNOWCodeRepository -Id 'CodeRepository1' | Read-AutomateNOWCodeRepositoryItem -startRow 0 -endRow 10000 | ConvertFrom-AutomateNOWCodeRepositoryItem | Export-AutomateNOWMigration -IndividualExportFile`
+
+> See the full in-line help for both `Read-AutomateNOWCodeRepositoryItem` and `ConvertFrom-AutomateNOWCodeRepositoryItem`
+
+> Note: It is not recommended to send multiple repositories across the pipeline. As a best practice, keep this process limited to one repository at a time.
+
+### As a non-admin on the instance, how can I generate a full report of all of my permissions (granted or not) (including undocumented) for all domains?
+> `Measure-AutomateNOWSecUserPermission -Me -IncludeUndocumented -FullReport | Resolve-AutomateNOWSecUserPermission`
+
+> Note that the `-FullReport` parameter will include all privileges whether granted or not
+
+### How can I export the permission report from the previous question to a .csv?
+> `Measure-AutomateNOWSecUserPermission -Me | Export-AutomateNOWSecUserPermission`
+
+### What if I am an admin and I wish to do the same for a different non-admin user?
+> `Get-AutomateNOWSecUser -Id 'User1' | Measure-AutomateNOWSecUserPermission | Export-AutomateNOWSecUserPermission`
 
 ### 
 
@@ -630,6 +698,16 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Compare-AutomateNOWCodeRepositoryConflictItem`
 
+`Compare-AutomateNOWSecUserPermission`
+
+`Complete-AutomateNOWSchedule`
+
+`Complete-AutomateNOWServiceManager`
+
+`Complete-AutomateNOWTask`
+
+`Complete-AutomateNOWWorkflow`
+
 `Confirm-AutomateNOWCodeRepository`
 
 `Confirm-AutomateNOWMigrationImport`
@@ -645,6 +723,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Confirm-AutomateNOWWorkflowTemplate`
 
 `Connect-AutomateNOW`
+
+`ConvertFrom-AutomateNOWCodeRepositoryItem`
 
 `ConvertFrom-AutomateNOWContextVariable`
 
@@ -842,6 +922,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Export-AutomateNOWSecUser`
 
+`Export-AutomateNOWSecUserPermission`
+
 `Export-AutomateNOWSemaphore`
 
 `Export-AutomateNOWSemaphoreTimestamp`
@@ -857,6 +939,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Export-AutomateNOWServiceManagerTemplate`
 
 `Export-AutomateNOWServiceManagerTemplateDependency`
+
+`Export-AutomateNOWServiceManagerTemplateItem`
 
 `Export-AutomateNOWStock`
 
@@ -897,6 +981,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Get-AutomateNOWAgent`
 
 `Get-AutomateNOWAgentLog`
+
+`Get-AutomateNOWAgentSysOutLog`
 
 `Get-AutomateNOWAnomaly`
 
@@ -1042,6 +1128,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Invoke-AutomateNOWAPI`
 
+`Measure-AutomateNOWSecUserPermission`
+
 `Merge-AutomateNOWCodeRepositoryBranch`
 
 `Merge-AutomateNOWCodeRepositoryConflictItem`
@@ -1121,6 +1209,12 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `New-AutomateNOWSecurityRole`
 
 `New-AutomateNOWSecUser`
+
+`New-AutomateNOWSecUserPrivilegeList`
+
+`New-AutomateNOWSecUserPrivilegeLookupTable`
+
+`New-AutomateNOWSecUserPrivilegeReport`
 
 `New-AutomateNOWSemaphore`
 
@@ -1442,6 +1536,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Resolve-AutomateNOWObject2TableName`
 
+`Resolve-AutomateNOWSecUserPermission`
+
 `Resolve-AutomateNOWSensorType2ServerNodeType`
 
 `Resolve-AutomateNOWTaskType2ServerNodeType`
@@ -1480,11 +1576,15 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Resume-AutomateNOWWorkflowTemplate`
 
+`Save-AutomateNOWAgentSysOutLog`
+
 `Save-AutomateNOWDataSourceItem`
 
 `Save-AutomateNOWDeletedDomain`
 
 `Save-AutomateNOWMigrationImport`
+
+`Search-AutomateNOWSecurityRole`
 
 `Select-AutomateNOWCodeRepositoryBranch`
 
@@ -1541,6 +1641,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Set-AutomateNOWRuntimeAction`
 
 `Set-AutomateNOWScheduleTemplate`
+
+`Set-AutomateNOWScheduleTemplateItem`
 
 `Set-AutomateNOWSecurityRole`
 
