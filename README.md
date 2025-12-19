@@ -43,7 +43,7 @@ Use `Connect-AutomateNOW` to establish your session
 - A `copilot-instructions.md` file is now included with this project (defensive documentation 🛡️)
 - Importing and Exporting Domain JSON is added and fully supported
 - All 5 types of Secret Vaults 🔒 are added and partially supported
-- You can now easily write to disk 💾 each of the sysout logs from restarted Tasks (including from round-robin load balancer)
+- You can now easily write to disk 💾 each of the sysout logs from restarted Tasks (including round-robin)
 - Bump compatibility to ANOW version _3.3.1.95 HF2_
 
 ### Minor updates
