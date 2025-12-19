@@ -12,7 +12,7 @@ Created by AutomateNOW-Fan
 ```
 ## Efficacy 🧪
 
-Compatible with AutomateNOW! version _3.3.1.93<sup>[1]</sup>_
+Compatible with AutomateNOW! version _3.3.1.95 HF2<sup>[1]</sup>_
 <br/><br/>
 ## Installation 🏗
 
@@ -36,6 +36,43 @@ Use `Connect-AutomateNOW` to establish your session
 - Edit source code objects with NotePad (Windows only for now)
 <br/><br/>
 ## Change Log 📝
+
+## 1.0.42
+### Major updates
+- Rated A+ for code quality by Copilot 🤖 (requires `copilot-instructions.md`)
+- A `copilot-instructions.md` file is now included with this project (defensive documentation 🛡️)
+- Importing and Exporting Domain JSON is added and fully supported
+- All 5 types of Secret Vaults 🔒 are added and partially supported
+- You can now easily write to disk 💾 each of the sysout logs from restarted Tasks (including from round-robin load balancer)
+- Bump compatibility to ANOW version _3.3.1.95 HF2_
+
+### Minor updates
+- A code repository object is no longer required for `Compare-AutomateNOWCodeRepositoryConflictItem` (improves pipeline capability)
+- When auditing a users security roles, you can now specify a limited array of permissions to check
+- Added filtering options to `Show-AutomateNOWTaskTemplateType`
+- `Read-AutomateNOWWorkflowTemplateItem` no longer returns an empty object when the Workflow Template is empty
+- Strengthened the filtering within `Get-AutomateNOWTask` & `Get-AutomateNOWServiceManager` to ensure correct results
+- Non-domain-admins can now change the properties of an existing View
+
+### Detailed Change Log
+- Added new functions: 'Add-AutomateNOWSecretVaultSecret', 'Clear-AutomateNOWSecretVaultCache', 'Copy-AutomateNOWSecretVault', 'Export-AutomateNOWDomainJSON', 'Export-AutomateNOWSecretVault', 'Get-AutomateNOWSecretVault', 'Import-AutomateNOWDomainJSON', 'New-AutomateNOWSecretVault', 'New-AutomateNOWViewSetup', 'Read-AutomateNOWIconSet', 'Read-AutomateNOWNotificationGroupMember', 'Remove-AutomateNOWSecretVault', 'Rename-AutomateNOWSecretVault', 'Set-AutomateNOWSecretVault', 'Set-AutomateNOWSecretVaultDefault', 'Set-AutomateNOWViewSetup', 'Test-AutomateNOWSecretVault', 'Write-AutomateNOWObjectVersion'
+- Added the `-PermissionList` parameter to `Measure-AutomateNOWSecUserPermission`
+- Added the `-NoDomain` parameter to `Invoke-AutomateNOWAPI`
+- Added a token expiration check to `Invoke-AutomateNOWAPI`
+- Renamed `Restore-AutomateNOWObjectVersion` to `Write-AutomateNOWObjectVersion`
+- Renamed `Get-AutomateNOWNotificationGroupMember` to `Read-AutomateNOWNotificationGroupMember`
+- Renamed `Read-AutomateNOWIcon` to `Read-AutomateNOWIconSet`
+- Removed the `-Synchronous` parameter from `Start-AutomatenowScheduleTemplate`
+- Removed the `-CodeRepository` parameter from `Compare-AutomateNOWCodeRepositoryConflictItem`
+- `Get-AutomateNOWSchedule` now only accepts id's from and will only return Schedule (Trigger) objects
+- `Get-AutomateNOWServiceManager` now only accepts id's from and will only return Service Manager objects
+- `Get-AutomateNOWTask` now only accepts id's from and will only return Task objects
+- `Get-AutomateNOWWorkflow` now only accepts id's from and will only return Workflow objects
+- Cleaned up and aligned all parameters within the in-line help (including the parameter ordering)
+- Fixed pipeline issues with `Confirm-AutomateNOWCodeRepository` and `Confirm-AutomateNOWScheduleTemplate`
+- Fixed an issue with `Get-AutomateNOWDeletedObject` and Self-Service Templates
+- Fixed the KByte/sec display in `Write-AutomateNOWIconData`
+
 
 ## 1.0.41
 ### Major updates
@@ -71,8 +108,8 @@ Use `Connect-AutomateNOW` to establish your session
 - Removed the `-OverrideProcessingType` parameter from `Get-AutomateNOWWorkflowTemplate`. Use `Get-AutomateNOWProcessingTemplate` instead.
 - Downgraded the 'SecRole' property inside of the [ANOWDomainRole] class from an [ANOWSecRole] object to a string
 - Upgraded the 'resource' property inside of the [ANOWResourceTimestampState] class from a string to an [ANOWSemaphore] object
-- Upgraded the 'actionTimestamp' property inside of the [ANOWAuditLog] class from a string to an [ANOWSemaphore] object
-- Replaced all instances of the `-Type` parameter with something more specific (e.g. `-DataSourceType` instead of `-Type`)
+- Upgraded the 'actionTimestamp' property inside of the [ANOWAuditLog] class from a string to a [datetime] object
+- Replaced all instances of the `-Type` parameter with something more specific (e.g. `-DataSourceType`)
 - Fixed an issue where `Get-AutomateNOWSecurityRole` failed to accept certain types of internal security roles when using the `-Id` parameter
 - Fixed an issue with `Get-AutomateNOWSecUser` where the secRoles property was not populated
 - Fixed an issue with `Merge-AutomateNOWCodeRepositoryConflictItem` during post-processing of the result
@@ -129,280 +166,6 @@ Use `Connect-AutomateNOW` to establish your session
 - Moved older Change Log entries to [README-OLD.md](README-OLD.md)
 - Many tiny clean-ups & optimizations 🧹
 
-## 1.0.38
-### Major updates
-- The Exporting and Saving 💾 of Data Source Items is much improved
-- You can now modify the attributes of Items within Workflow Templates & Service Manager Templates
-- Server Nodes can now be removed or added from Load Balancer Server Nodes
-- Configuring Agent telemetry settings is now supported
-- Pushing (Sending) Agent settings is now supported
-- `Get-AutomateNOWAuditLog` no longer always requires domain admin rights
-- Bump compatibility to ANOW version _3.3.1.90 HF2_
-
-### Minor updates
-- Central Management can now be enabled/disabled on Agents (disabling is experimental 🧪)
-- You can now modify the `Run Mode` of Service Manager Templates
-- You can now fetch Workflow Template Items by id, name or title (same for Service Manager Template Items)
-- You can now fetch Context Variables by their name
-- You can now reload (update) Tasks, Workflows, Service Managers and Schedules
-- Capabilities to manage Service Manager Template Items are now on par with managing Workflow Template Items
-- `Export-AutomateNOWMigration` now includes a [System.IO.FileInfo] object in the output
-- `Restore-AutomateNOWObjectVersion` no longer requires a .json file
-- `Get-AutomateNOWContextVariable` now accepts Processing objects as input
-- Slight change to dealing with Out Of Sync (Conflict) repository items (see FAQ for more)
-
-### Detailed Change Log
-- Added new functions: `Add-AutomateNOWLoadBalancerNode`, `Add-AutomateNOWServiceManagerTemplateDependency`, `Disable-AutomateNOWAgentCentralManagement`, `Enable-AutomateNOWAgentCentralManagement`, `Get-AutomateNOWCodeRepositoryOutOfSyncItem`, `Read-AutomateNOWServiceManagerTemplateDependency`, `Remove-AutomateNOWLoadBalancerNode`, `Remove-AutomateNOWServiceManagerTemplateDependency`, `Resolve-AutomateNOWObject2TableName`, `Send-AutomateNOWAgentConfiguration`, `Set-AutomateNOWContextVariable`, `Set-AutomateNOWServiceManagerTemplateItem`, `Set-AutomateNOWWorkflowTemplateItem`, `Update-AutomateNOWSchedule`, `Update-AutomateNOWServiceManager`, `Update-AutomateNOWTask`, `Update-AutomateNOWWorkflow`
-- Added the parameter `-IgnoreProcessingRegistry` to `Set-AutomateNOWWorkflowTemplate` and `Set-AutomateNOServiceManagerTemplate`
-- Added the parameter `-DisableManualExecution` to `Set-AutomateNOWScheduleTemplate`
-- Added the parameters `-Name` and `-Processing` to `Get-AutomateNOWContextVariable`
-- Added the parameters `-Status`, `-CentralManagement` and `-IPAddress` to `Get-AutomateNOWAgent`
-- Fixed an issue with `Set-AutomateNOWWorkflowTemplate` and setting the Folder
-- Fixed an issue with `Add-AutomateNOWServiceManagerTemplateItem` and adding Items
-- Fixed an issue with `Save-AutomateNOWDataSourceItem` and saving Local File Text Store objects to disk
-- Fixed an issue with `Get-AutomateNOWProcessingList` where the `-launchedById` parameter was mandatory
-- Fixed an issue with `Get-AutomateNOWContextVariable` where empty results could be included
-- Fixed an issue with `Get-AutomateNOWContextVariable` when using the -Id parameter
-- Fixed an issue with `Remove-AutomateNOWWorkflowTemplateItem`
-- Fixed an issue with `Show-AutomateNOWTaskTemplateType`
-- Removed the informational message about token expiration for users without an expiration (typically API users)
-- Tiny fixes, improvements and alignments for `Set-AutomateNOWWorkflowTemplate`, `Set-AutomateNOWTaskTemplate`, `Set-AutomateNOWServiceManagerTemplate`
-
-## 1.0.37
-### Major updates
-- The new endpoint _/executeProcessingSync_ is supported by way of the `-Synchronous` parameter. This means we get back the Id of the Processing Template that we want instead of the trigger id. This is particularly helpful for users with limited privileges.
-- Data Source Items (binary & text files) can now easily be saved (downloaded) to disk 💾
-
-### Minor updates
-- The object id is now included in the filename for the output .json file created by `Export-AutomateNOWMigration`
-- You now have the option to export multiple objects to individual .json files (in addition to the default behavior of merging them into a single .json file)
-- A warning (instead of an error) will now be thrown whenever duplicate keys are detected (within the .json file payload) by `New-AutomateNOWMigrationImport`
-- ConvertTo-Json will now always convert at a depth of 100 (this fixes an issue with the Start-* functions and accepting a parameter hashtable of high depth)
-
-### Detailed Change Log
-- Added new functions: `Remove-AutomateNOWMigrationImport`, `Save-AutomateNOWDataSourceItem`
-- Added the parameter `-Synchronous` to `Start-AutomateNOWWorkflowTemplate`, `Start-AutomateNOWTaskTemplate`, `Start-AutomateNOWScheduleTemplate` and `Start-AutomateNOWServiceManagerTemplate`
-- Added the parameters `-IndividualExportFile` and `-DoNotIncludeObjectIdInFileName` to `Export-AutomateNOWMigration`
-- Added the parameter `-IgnoreProcessingRegistry` to `Set-AutomateNOWTaskTemplate`
-- Added pipeline input for sending .json files to `New-AutomateNOWMigrationImport`
-- Fixed an issue with `Start-AutomateNOWEvent` that prevented it from returning the result
-- Fixed an issue with `Trace-AutomateNOWProcessing` not being able to perform deep searches
-
-## 1.0.36
-### Major updates
-+ You can now reconstitute 🍊 previous versions of an object from the Audit Log (see `Restore-AutomateNOWObjectVersion`)
-+ You can now search the Audit Log by specific object id or table name
-+ You can now fetch a specific item from a Data Source by its key or filename
-+ Migration Imports are added and fully supported ✅
-+ Support for HTTP proxies
-+ Bump compatibility to ANOW version _3.3.1.89 HF1_
-
-### Minor updates
-- All Applicable Set-* functions will now output their object type by default (use -Quiet to suppress this)
-- All applicable Set-* functions now support adding/removing to Code Repositories
-- Modifying Server Nodes is _partially_ supported 🔰
-
-### Detailed Change Log
-- Added new functions: `Confirm-AutomateNOWMigrationImport`, `Export-AutomateNOWMigrationImport`, `Get-AutomateNOWMigrationImport`, `New-AutomateNOWMigrationImport`, `Restore-AutomateNOWObjectVersion`, `Save-AutomateNOWMigrationImport`, `Set-AutomateNOWServerNode`
-- Fixed an issue with `New-AutomateNOWFolder` being unable to create the Folder
-- Fixed an issue with `Add-AutomateNOWScheduleTemplateItem` and not being able to return back the updated Schedule Template Item
-- Fixed an issue with `Remove-AutomateNOWScheduleTemplateItem` that prevented the removal from happening
-- Fixed an issue with `Disconnect-AutomateNOW` the prevented it from disconnecting from insecure instances
-- Fixed an issue where `Trace-AutomateNOWProcessing` would still return back the 128-character "preview value" of Context Variables
-- Fixed an issue where `Get-AutomateNOWSecUser` would fail if a user with a clientId was encountered
-- Fixed an issue with `Read-AutomateNOWServiceManagerTemplateItem` and reading Service Manager Template Items
-- Fixed another issue with `Get-AutomateNOWSecUser` encountering non-Gregorian date values in a user's passwordValidUntil property
-- Added some missing parameters to `Set-AutomateNOWWorkspace` and re-organized the parameter sets
-- Added the `-Proxy` parameter to `Connect-AutomateNOW`
-- Added the `-Quiet` parameter to most Set-* functions and set the OutputType of the function
-- Added the `-Key`, `-Value` and `-Filename` parameters to `Read-AutomateNOWDataSourceItem`
-- Added the `-TableName` and `-ObjectId` parameters to `Get-AutomateNOWAuditLog`
-- Added the `-Length` parameter to `New-WebkitBoundaryString`
-- Removed the `-All` parameter from `Read-AutomateNOWDataSourceItem`
-- Renamed the parameter `-Count` to `-Sum` for `Find-AutomateNOWObjectReferral`
-- Added a workaround for when the API sends byte streams when it is not expected (a scenario that occurs when downloading some types of Migration Import files)
-- Repaired the in-line help for `Write-AutomateNOWIconData`
-- Added tiny fixes and aligned `Set-AutomateNOWTag`, `Set-AutomateNOWBusinessView`, `Set-AutomateNOWFolder`
-
-## 1.0.35
-
-### Major updates
-+ Big improvements with `Trace-AutomateNOWProcessing`
-+ The Wait-* functions were consolidated to a single function
-+ Migrations (exports only) are added and fully supported ✅
-+ Trigger Logs are added and fully supported ✅
-+ The ANOW Recycle Bin 🗑️ (i.e. deleted objects) is added and fully supported ✅
-+ Agent Server Node objects are added and fully supported ✅
-+ Deleted Domains are added and fully supported ✅
-+ Design Templates are added and fully supported ✅
-+ Processing Template Dependencies are added and _partially_ supported (experimental 🧪)
-+ Menu Customizations are added and _partially_ supported 🔰
-+ Views (a.k.a. View Setups) are added and _partially_ supported 🔰
-+ The menu functionality 👉 **Processing Templates** is now available with `Get-AutomateNOWProcessingTemplate`
-+ Bump compatibility to ANOW version _3.3.1.89_
-
-### Minor updates
-- Internal Security Roles are now accessible
-- Workflow Template Items can now be fetched directly by name
-- Processing Templates can now be fetched by the name of its Workspace
-- Code Repositories can now be added/removed from Task Templates, Workflow Templates, Data Sources and Tags
-
-### Detailed Change Log
-- Added new functions: `Add-AutomateNOWWorkflowTemplateDependency`,  `Copy-AutomateNOWDesignTemplate`,  `Copy-AutomateNOWViewSetup`,  `Export-AutomateNOWAgentServerNode`,  `Export-AutomateNOWDeletedDomain`,  `Export-AutomateNOWDeletedObject`,  `Export-AutomateNOWDesignTemplate`,  `Export-AutomateNOWMenuCustomization`,  `Export-AutomateNOWMigration`,  `Export-AutomateNOWProcessingTriggerLog`,  `Export-AutomateNOWViewSetup`,  `Get-AutomateNOWDeletedDomain`,  `Get-AutomateNOWDeletedObject`,  `Get-AutomateNOWDesignTemplate`,  `Get-AutomateNOWMenuCustomization`,  `Get-AutomateNOWProcessingTemplate`,  `Get-AutomateNOWProcessingTriggerLog`,  `Get-AutomateNOWViewSetup`,  `Mount-AutomateNOWAgentServerNode`,  `New-AutomateNOWDesignTemplate`,  `Read-AutomateNOWAgentServerNode`,  `Read-AutomateNOWServerNodeAgent`,  `Read-AutomateNOWWorkflowTemplateDependency`,  `Remove-AutomateNOWDeletedObject`,  `Remove-AutomateNOWDesignTemplate`,  `Remove-AutomateNOWMenuCustomization`,  `Remove-AutomateNOWViewSetup`,  `Remove-AutomateNOWWorkflowTemplateDependency`,  `Rename-AutomateNOWDesignTemplate`,  `Rename-AutomateNOWViewSetup`,  `Restore-AutomateNOWDeletedObject`,  `Save-AutomateNOWDeletedDomain`,  `Set-AutomateNOWDesignTemplate`
-- Consolidated all of the Wait-* functions into a single Wait-AutomateNOWProcessing. Aliases for the previous functions still exist.
-- Fixed an issue with `Read-AutomateNOWServerNodeGroupItem` that prevented it from working under Windows PowerShell
-- Fixed an issue with `New-AutomateNOWTaskTemplate` that prevented some types of Tasks from being created
-- Fixed an issue with `Get-AutomateNOWorkflow` where the -WorkflowTemplate parameter was ignored
-- Fixed an issue with (quite a few) of the Get-* functions where receiving Id's across the pipeline didn't work. All Get functions may receive Id's across the pipeline now.
-- Fixed an issue with `New-AutomateNOWCodeRepository` that prevented creation of SSH-based repositories
-- Fixed an issue with `Set-AutomateNOWWorkspace` that prevented the changing of the tags
-- Fixed an issue with the validating regex used in the `-iconCode` parameter on all of the functions that use that parameter
-- Fixed an issue with the -Folder parameter causing an error in some of the New-* functions
-- Fixed an issue with `Read-AutomateNOWDashboardPortlet` where it would unintentionally halt if the Dashboard had no portlets
-- Improved the functionality of `Add-AutomateNOWWorkflowTemplateItem`
-- Improved the functionality of `Trace-AutomateNOWProcessing`
-- Renamed `Dismount-AutomateNOWServerNode` to `Dismount-AutomateNOWAgentServerNode`
-- Added parameters `-NoHeaders` and `-IncludeAttachmentFilename` to `Invoke-AutomateNOWAPI` (to assist downloading JSON downloads)
-- Added parameter `-JustGiveMeTheJSON` to `Show-AutomateNOWTaskTemplateType`
-- Added parameter `-isProcessing` to `Get-AutomateNOWProcessingList` (see the in-line help)
-- Added parameters `-IncludeInternalRoles` and `-OnlyInternalRoles` to `Get-AutomateNOWSecurityRole`
-- Added parameter `-Workspace` to `Get-AutomateNOWProcessingTemplate`
-- Added case-sensitive enforcement to the -iconCode parameter to all applicable functions
-- Added pipeline capabilty to `Get-AutomateNOWProcessingList`
-- Added pipeline capabilty to `Get-AutomateNOWResourceList`
-
-## 1.0.34
-### Major updates
-+ All Get functions support filtering by Tags & Folder 🥳
-+ The menu functionality 👉 **Processing List** is now available with `Get-AutomateNOWProcessingList`
-+ The menu functionality 👉 **Resource List** is now available with `Get-AutomateNOWResourceList`
-+ Processing States are added and fully supported
-+ Processing Functions are added and fully supported
-+ Bump compatibility to _ANOW version 3.3.1.88 HF1_
-
-### Minor updates
-+ The new Code Repository domainClass `ItemList` from Patch 87 is recognized by `Read-AutomateNOWCodeRepositoryItem`
-+ Rules within an Approval can now be individually removed
-+ Rules within a Result Mapping can now be removed
-+ Rules within Approvals can now be re-ordered
-+ Rules within Result Mappings can now be re-ordered
-+ Processing States now include the parent processing template object
-+ Tags can now be copied
-
-### Detailed Change Log
-- Added new functions: `Clear-AutomateNOWProcessingStateRegistry`, `Copy-AutomateNOWProcessingFunction`, `Copy-AutomateNOWTag`, `Export-AutomateNOWProcessingFunction`, `Export-AutomateNOWProcessingState`, `Get-AutomateNOWProcessingFunction`, `Get-AutomateNOWProcessingList`, `Get-AutomateNOWProcessingState`, `Get-AutomateNOWResourceList`, `New-AutomateNOWProcessingFunction`, `New-AutomateNOWProcessingState`, `Pop-AutomateNOWApprovalRule`, `Pop-AutomateNOWResultMappingRule`, `Push-AutomateNOWApprovalRule`, `Push-AutomateNOWResultMappingRule`, `Read-AutomateNOWProcessingStateItem`, `Register-AutomateNOWProcessingState`, `Remove-AutomateNOWApprovalRule`, `Remove-AutomateNOWProcessingFunction`, `Remove-AutomateNOWProcessingState`, `Remove-AutomateNOWResultMappingRule`, `Rename-AutomateNOWProcessingFunction`, `Reset-AutomateNOWJWTIssuerToken`, `Set-AutomateNOWProcessingFunction`, `Unregister-AutomateNOWProcessingState`
-- Fixed an issue with `Read-AutomateNOWCodeRepositoryItem` where Server Node Group items were not recognized
-- Fixed an issue with `Set-AutomateNOWRuntimeAction` where Runtime Actions without a rule definition could not be modified
-- Fixed an issue with `Get-AutomateNOWResultMapping` where the definition in the returned results could be empty
-- Fixed an issue with `Get-AutomateNOWResourceList` where the results would not be returned
-- Fixed an ambiguous error message that could occur under `Connect-AutomateNOW` when a non-existent domain was specified
-- Added the parameter `-Id` to `Read-AutomateNOWWorkflowTemplateItem`
-- Added the parameter `-KeepSessionVariable` to `Disconnect-AutomateNOW`
-- Removed the parameter `-All` from `Read-AutomateNOWCodeRepositoryItem` as it is now redundant with Patch 87
-- Removed the parameter `-unsetRules` from `Set-AutomateNOWApproval`
-- Optimized the parameter sets within `Get-AutomateNOWRuntimeAction`
-- Optimized the parameter sets within `Get-AutomateNOWTask`
-- Added more information to the "instance_info" object within the ANOW session variable (e.g. _apiReadDefaultMaxDataPageSize_)
-- Added a custom class [ANOWReferrer] which formalizes the output of `Find-AutomateNOWObjectReferrer`
-
-## 1.0.33
-### Major updates
-+ Dashboards are added and fully supported
-+ Server Node Groups are added and fully supported
-+ Runtime Actions are added and mostly supported (the 'Do Action' tab is missing)
-
-### Minor updates
-+ Anomalies can now be added to a Metric (i.e. to create a Resource Anomaly object)
-+ All 5 types of Event Logs are fully supported (Agent, Domain, Node, Processing & Resource)
-+ You can now pass any type of [ANOWProcessTemplate] object to the pipeline of its respective Get function
-+ The last remaining object types (domain classes) have been added to Add/Remove Code Repository Item
-+ The last remaining object types (domain classes) have been added to Edit Object Source Code
-+ Unlocking user accounts is now supported
-+ Bump compatibility to _ANOW version 3.3.1.86 HF3_
-
-### Detailed Change Log
-- Added new functions: `Add-AutomateNOWDashboardPortlet`, `Add-AutomateNOWResourceAnomaly`, `Add-AutomateNOWServerNodeGroupItem`, `Copy-AutomateNOWDashboard`, `Copy-AutomateNOWRuntimeAction`, `Copy-AutomateNOWServerNodeGroup`, `Export-AutomateNOWDashboard`, `Export-AutomateNOWRuntimeAction`, `Export-AutomateNOWServerNodeGroup`, `Get-AutomateNOWDashboard`, `Get-AutomateNOWInterface`, `Get-AutomateNOWRuntimeAction`, `Get-AutomateNOWServerNodeGroup`, `New-AutomateNOWDashboard`, `New-AutomateNOWRuntimeAction`, `New-AutomateNOWServerNodeGroup`, `Pop-AutomateNOWDashboard`, `Pop-AutomateNOWServerNodeGroupItem`, `Push-AutomateNOWDashboard`, `Push-AutomateNOWServerNodeGroupItem`, `Read-AutomateNOWDashboardPortlet`, `Read-AutomateNOWServerNodeGroupItem`, `Remove-AutomateNOWDashboard`, `Remove-AutomateNOWDashboardPortlet`, `Remove-AutomateNOWRuntimeAction`, `Remove-AutomateNOWServerNodeGroup`, `Remove-AutomateNOWServerNodeGroupItem`, `Rename-AutomateNOWDashboard`, `Rename-AutomateNOWServerNodeGroup`, `Set-AutomateNOWDashboard`, `Set-AutomateNOWRuntimeAction`, `Set-AutomateNOWServerNodeGroup`, `Unlock-AutomateNOWSecUser`
-- Fixed an issue with `Get-AutomateNOWSchedule` by aligning the nullable properties within the [ANOWProcessing] class
-- Fixed an issue with the GetCurrentTime() method in the [ANOWTimeZone] class. All calculations have been tested
-- Fixed an issue with `Trace-AutomateNOWProcessing` that occurred if the Design Template's taskType was null
-- Fixed an issue with `Get-AutomateNOWSecUser` that occurred if the accountValidUntil was null
-- Fixed an issue with `Get-AutomateNOWWorkflow` where the -ProcessingStatus parameter could sometimes be ignored
-- Added the parameter `-OverrideConnectionRequirement` to `Import-AutomateNOWLocalTimeZone`
-- Renamed `Get-AutomateNOWProcessingEventLog` to `Read-AutomateNOWProcessingEventLog` and fixed some minor issues
-- Renamed `Get-AutomateNOWTimeTrigger` to `Read-AutomateNOWTimeTrigger`
-- Added the remaining object types to `Add-AutomateNOWCodeRepositoryItem`, `Get-AutomateNOWCodeRepositoryObjectSource` and `Remove-AutomateNOWCodeRepositoryItem`
-- Added pipeline capability to `Protect-AutomateNOWEncryptedString` (unsecure strings only) and `Unprotect-AutomateNOWEncryptedString`
-- Updated the Trace function for patch 86 where TRIGGER tasks no longer have a Task Type defined
-- Optimized the Wait functions
-
-## 1.0.32
-### Major updates
-+ A single command `Trace-AutomateNOWProcessing` will trace any Task, Workflow, Service Manager or Schedule (and optionally return back its Context Variables)
-+ Security Roles, User Roles & Domain Roles are added and fully supported.
-+ Security Access Tokens for API users are fully supported
-
-### Minor updates
-+ You can now easily convert returned context variables into a hash table (or json string) via `ConvertFrom-AutomateNOWContextVariable`
-+ Tracing with the `-WaitForExecution` parameter now includes the 'WAITING' status along with 'EXECUTING'
-+ You can now change the order of ServerNode Endpoint objects within a Node object
-+ Bump compatibility to _ANOW version 3.3.1.85 HF1_
-
-### Detailed Change Log
-- Added new functions: `Add-AutomateNOWSecurityAccessToken`, `Add-AutomateNOWSecurityRoleDomain`, `Add-AutomateNOWSecurityRoleUser`, `ConvertFrom-AutomateNOWContextVariable`, `Copy-AutomateNOWAnomaly`, `Copy-AutomateNOWSecurityRole`, `Copy-AutomateNOWSecurityRoleDomain`, `Export-AutomateNOWAnomaly`, `Export-AutomateNOWResourceAnomaly`, `Export-AutomateNOWSecurityAccessToken`, `Export-AutomateNOWSecurityRole`, `Export-AutomateNOWSecurityRoleDomain`, `Export-AutomateNOWSecurityRoleUser`, `Export-AutomateNOWServerNodeEndpoint`, `Get-AutomateNOWAnomaly`, `Get-AutomateNOWSecurityRole`, `New-AutomateNOWAnomaly`, `New-AutomateNOWSecurityRole`, `Pop-AutomateNOWServerNodeEndpoint`, `Push-AutomateNOWServerNodeEndpoint`, `Read-AutomateNOWResourceAnomaly`, `Read-AutomateNOWSecurityAccessToken`, `Read-AutomateNOWSecurityRoleDomain`, `Read-AutomateNOWSecurityRoleUser`, `Remove-AutomateNOWAnomaly`, `Remove-AutomateNOWResourceAnomaly`, `Remove-AutomateNOWSecurityAccessToken`, `Remove-AutomateNOWSecurityRole`, `Remove-AutomateNOWSecurityRoleDomain`, `Remove-AutomateNOWSecurityRoleUser`, `Rename-AutomateNOWAnomaly`, `Rename-AutomateNOWSecurityRole`, `Set-AutomateNOWAnomaly`, `Set-AutomateNOWSecurityRole`, `Set-AutomateNOWSecurityRoleDomain`, `Set-AutomateNOWServerNodeEndpoint`, `Trace-AutomateNOWProcessing`, `Wait-AutomateNOWSchedule`
-- Fixed another issue with `Get-AutomateNOWVariable` only returning preview values
-- Fixed an issue with the parameter sets for `Set-AutomateNOWBusinessView`
-- Corrected the usage of the `iconSet` enum in a number of places (some objects only accept two types of icons instead of three)
-- Repaired some issues with `Read-AutomateNOWServiceManagerTemplateItem`
-- Renamed all "User" functions to "SecUser" (e.g. `Export-AutomateNOWUser` is now `Export-AutomateNOWSecUser`)
-- Renamed `Get-AutomateNOWCodeRepositoryItem` to `Read-AutomateNOWCodeRepositoryItem`
-- Renamed the parameter `-InactiveUsers` to `-ActiveUsersOnly` for `Get-AutomateNOWSecUser`
-- Renamed `Trace-AutomateNOWWorkflow` to `Trace-AutomateNOWProcessing` (aliases cover Schedules, Service Managers, Tasks & Workflows)
-- Changed the default value of `-sortBy` from `id` to `dateCreated` within `Get-AutomateNOWSchedule`, `Get-AutomateNOWServiceManager`, `Get-AutomateNOWTask` & `Get-AutomateNOWWorkflow`
-- Added the parameters `-IncludeAPIUsers` and `-APIUsersOnly` to `Get-AutomateNOWSecUser`
-- Added the parameters `-startRow` and `-endRow` to `Get-AutomateNOWDomain`
-- Added the parameters `-startRow` and `-endRow` to `Get-AutomateNOWFolder`
-- Added the parameters `-startRow`, `-endRow` and `-AllDomains` to `Get-AutomateNOWTag`
-- Added the parameter `-PreviewOnly` to `Get-AutomateNOWContextVariable`
-- Added the parameter `-EventParameters` to `Start-AutomateNOWEvent`
-- Added the parameter `-Folder` to `Get-AutomateNOWScheduleTemplate`, `Get-AutomateNOWServiceManagerTemplate` and `Get-AutomateWorkflowScheduleTemplate`
-- Added new method `GetCurrentTime()` to [ANOWTimeZone]
-- Optimzed and re-organized the **Classes.psm1** file significantly. All custom classes are clearly identified.
-- Many tiny fixes and improvements to the in-line help
-
-## 1.0.31
-### Major update
-+ You can now trace 🕵️‍♂️ Tasks, Workflows and ServiceManagers with `Trace-AutomateNOWWorkflow`
-+ You can now include archived items 📦 with the Tasks, Workflows and Service Managers by including `-IncludeArchivedItems`
-+ You can now wait ⌚ for a Task, Workflow or Service Manager by way of `Wait-AutomateNOWWorkflow`
-+ You can chain together `Start-AutomateNOWWorkflow` with `Trace-AutomateNOWWorkflow` to wait for the context variables 🤯
-
-### Minor updates
-+ The CodeRepositoryOutOfSync functions have been renamed to CodeRepositoryConflict
-+ Context Variables will now return the **full** value instead of the truncated "preview value"
-+ Statistical duration ⌛ can now be configured (by milliseconds) for Task Templates, Schedule Templates, Service Manager Templates and Workflow Templates 🥳
-+ Compatibility remains at _ANOW version 3.3.1.84_
-
-### Detailed Change Log
-- Added new functions: `Add-AutomateNOWServerNodeEndpoint`, `Add-AutomateNOWServiceManagerTemplateItem`, `Confirm-AutomateNOWServiceManagerTemplate`, `Copy-AutomateNOWServiceManagerTemplate`, `Copy-AutomateNOWUserReport`, `Edit-AutomateNOWDataSourceItem`, `Export-AutomateNOWServiceManager`, `Export-AutomateNOWServiceManagerTemplate`, `Export-AutomateNOWUserReport`, `Get-AutomateNOWServiceManager`, `Get-AutomateNOWServiceManagerTemplate`, `Get-AutomateNOWUserReport`, `New-AutomateNOWServiceManagerTemplate`, `Read-AutomateNOWServerNodeEndpoint`, `Read-AutomateNOWServiceManagerTemplateItem`, `Remove-AutomateNOWServerNodeEndpoint`, `Remove-AutomateNOWServiceManager`, `Remove-AutomateNOWServiceManagerTemplate`, `Remove-AutomateNOWServiceManagerTemplateItem`, `Remove-AutomateNOWUserReport`, `Rename-AutomateNOWServiceManagerTemplate`, `Rename-AutomateNOWUserReport`, `Resolve-AutomateNOWCodeRepository`, `Restart-AutomateNOWServiceManager`, `Resume-AutomateNOWServiceManager`, `Resume-AutomateNOWServiceManagerTemplate`, `Set-AutomateNOWServiceManagerTemplate`, `Set-AutomateNOWUserReport`, `Skip-AutomateNOWServiceManager`, `Skip-AutomateNOWServiceManagerTemplate`, `Start-AutomateNOWServiceManagerTemplate`, `Stop-AutomateNOWServiceManager`, `Suspend-AutomateNOWServiceManager`, `Suspend-AutomateNOWServiceManagerTemplate`, `Trace-AutomateNOWWorkFlow`, `Wait-AutomateNOWServiceManager`, `Wait-AutomateNOWTask`, `Wait-AutomateNOWWorkFlow`
-- Renamed `Compare-AutomateNOWCodeRepositoryOutOfSyncItem` to `Compare-AutomateNOWCodeRepositoryConflictItem`
-- Renamed `Get-AutomateNOWCodeRepositoryOutOfSyncItem` to `Get-AutomateNOWCodeRepositoryConflictItem`
-- Renamed `Get-AutomateNOWDataSourceItem` to `Read-AutomateNOWDataSourceItem`
-- Renamed `Merge-AutomateNOWCodeRepositoryOutOfSyncItem` to `Merge-AutomateNOWCodeRepositoryConflictItem`
-- Renamed `Show-AutomateNOWCodeRepositoryOutOfSyncItemComparison` to `Show-AutomateNOWCodeRepositoryConflictItemComparison`
-- Removed the `-Quiet` parameter from `Stop-AutomateNOWSchedule`, `Stop-AutomateNOWTask`, and `Stop-AutomateNOWWorkflow`
-- Moved the 3 helper functions `Compare-ObjectProperty`, `ConvertTo-QueryString` and `New-WebkitBoundaryString` from public to private
-- Added the parameters `-DelayedStartTime`, `-TimeZone` and `-VerboseMode` to `Start-AutomateNOWScheduleTemplate`, `Start-AutomateNOWServiceManagerTemplate`, `Start-AutomateNOWTaskTemplate`, `Start-AutomateNOWWorkflowTemplate`, `Set-AutomateNOWServiceManagerTemplate`, `Set-AutomateNOWTaskTemplate` and `Set-AutomateNOWWorkflowTemplate`
-- Added the parameters `-DataType`, `-IsArray`, `-ErrorHandling` and `-Validity` to `Set-AutomateNOWDataSource`
-- Added the parameter `-launchedById` to `Get-AutomateNOWWorkflow`
-- Added the parameters `-IncludeArchived` and `-OnlyArchived` to `Get-AutomateNOWSchedule`, `Get-AutomateNOWTask` and `Get-AutomateNOWWorkflow`
-- Added the parameter `-Id` to `Get-AutomateNOWContextVariable`
-- Enforced case-sensitivity to all parameters that validate a set (mostly applies to `-sortBy`)
-- Fixed an issue with `Connect-AutomateNOW` when using the `-SkipPreviousSessionCheck` parameter
-- Fixed an issue with `Disconnect-AutomateNOW` (This function finally behaves the way it was intended to)
-- Fixed an issue with the `-UseAutomaticName` parameter on `Start-AutomateNOWWorkflowTemplate`
-- Cleaned up and updated the parameters for `New-AutomateNOWTaskTemplate`
-- Clarified the error message that `Invoke-AutomateNOWAPI` will display when the ANOW API returns error for unexpected reason (e.g. unstable ANOW instance)
-
 <br/><br/>
 ## Caution 🚸
 
@@ -426,6 +189,7 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 - Modify the template definition within a Design Template object
 - Detect MIME type automatically when uploading text files to text file stores
 - Utilize temporal duration timestamps unrestricted within Processing Dependencies (See `Add-AutomateNOWWorkflowTemplateDependency`)
+- Non-admins can modify the settings of their Views
 
 <sub>* things the console does not allow or provide for</sub>
 
@@ -670,6 +434,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Add-AutomateNOWScheduleTemplateItem`
 
+`Add-AutomateNOWSecretVaultSecret`
+
 `Add-AutomateNOWSecurityAccessToken`
 
 `Add-AutomateNOWSecurityRoleDomain`
@@ -695,6 +461,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Clear-AutomateNOWDomain`
 
 `Clear-AutomateNOWProcessingStateRegistry`
+
+`Clear-AutomateNOWSecretVaultCache`
 
 `Compare-AutomateNOWCodeRepositoryConflictItem`
 
@@ -771,6 +539,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Copy-AutomateNOWRuntimeAction`
 
 `Copy-AutomateNOWScheduleTemplate`
+
+`Copy-AutomateNOWSecretVault`
 
 `Copy-AutomateNOWSecurityRole`
 
@@ -860,6 +630,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Export-AutomateNOWDomain`
 
+`Export-AutomateNOWDomainJSON`
+
 `Export-AutomateNOWEndpoint`
 
 `Export-AutomateNOWEvent`
@@ -909,6 +681,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Export-AutomateNOWScheduleTemplate`
 
 `Export-AutomateNOWScheduleTemplateItem`
+
+`Export-AutomateNOWSecretVault`
 
 `Export-AutomateNOWSecurityAccessToken`
 
@@ -1046,8 +820,6 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Get-AutomateNOWNotificationGroup`
 
-`Get-AutomateNOWNotificationGroupMember`
-
 `Get-AutomateNOWNotificationMessageTemplate`
 
 `Get-AutomateNOWPhysicalResource`
@@ -1071,6 +843,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Get-AutomateNOWSchedule`
 
 `Get-AutomateNOWScheduleTemplate`
+
+`Get-AutomateNOWSecretVault`
 
 `Get-AutomateNOWSecurityEventLog`
 
@@ -1115,6 +889,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Get-AutomateNOWWorkflowTemplate`
 
 `Get-AutomateNOWWorkspace`
+
+`Import-AutomateNOWDomainJSON`
 
 `Import-AutomateNOWIcon`
 
@@ -1206,6 +982,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `New-AutomateNOWScheduleTemplate`
 
+`New-AutomateNOWSecretVault`
+
 `New-AutomateNOWSecurityRole`
 
 `New-AutomateNOWSecUser`
@@ -1235,6 +1013,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `New-AutomateNOWTimeWindow`
 
 `New-AutomateNOWVariable`
+
+`New-AutomateNOWViewSetup`
 
 `New-AutomateNOWWorkflowTemplate`
 
@@ -1278,7 +1058,9 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Read-AutomateNOWDataSourceItem`
 
-`Read-AutomateNOWIcon`
+`Read-AutomateNOWIconSet`
+
+`Read-AutomateNOWNotificationGroupMember`
 
 `Read-AutomateNOWProcessingEventLog`
 
@@ -1402,6 +1184,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Remove-AutomateNOWScheduleTemplateItem`
 
+`Remove-AutomateNOWSecretVault`
+
 `Remove-AutomateNOWSecurityAccessToken`
 
 `Remove-AutomateNOWSecurityRole`
@@ -1500,6 +1284,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Rename-AutomateNOWScheduleTemplate`
 
+`Rename-AutomateNOWSecretVault`
+
 `Rename-AutomateNOWSecurityRole`
 
 `Rename-AutomateNOWSemaphore`
@@ -1551,8 +1337,6 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Restart-AutomateNOWWorkflow`
 
 `Restore-AutomateNOWDeletedObject`
-
-`Restore-AutomateNOWObjectVersion`
 
 `Resume-AutomateNOWDomain`
 
@@ -1644,6 +1428,10 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Set-AutomateNOWScheduleTemplateItem`
 
+`Set-AutomateNOWSecretVault`
+
+`Set-AutomateNOWSecretVaultDefault`
+
 `Set-AutomateNOWSecurityRole`
 
 `Set-AutomateNOWSecurityRoleDomain`
@@ -1681,6 +1469,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Set-AutomateNOWVariable`
 
 `Set-AutomateNOWVariableTimestamp`
+
+`Set-AutomateNOWViewSetup`
 
 `Set-AutomateNOWWorkflowTemplate`
 
@@ -1768,6 +1558,8 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 
 `Sync-AutomateNOWDomainServerNode`
 
+`Test-AutomateNOWSecretVault`
+
 `Test-AutomateNOWSecUserPassword`
 
 `Trace-AutomateNOWProcessing`
@@ -1799,3 +1591,5 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 `Wait-AutomateNOWProcessing`
 
 `Write-AutomateNOWIconData`
+
+`Write-AutomateNOWObjectVersion`
