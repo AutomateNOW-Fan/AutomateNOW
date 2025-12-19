@@ -55,7 +55,7 @@ Use `Connect-AutomateNOW` to establish your session
 - Non-domain-admins can now change the properties of an existing View
 
 ### Detailed Change Log
-- Added new functions: 'Add-AutomateNOWSecretVaultSecret', 'Clear-AutomateNOWSecretVaultCache', 'Copy-AutomateNOWSecretVault', 'Export-AutomateNOWDomainJSON', 'Export-AutomateNOWSecretVault', 'Get-AutomateNOWSecretVault', 'Import-AutomateNOWDomainJSON', 'New-AutomateNOWSecretVault', 'New-AutomateNOWViewSetup', 'Read-AutomateNOWIconSet', 'Read-AutomateNOWNotificationGroupMember', 'Remove-AutomateNOWSecretVault', 'Rename-AutomateNOWSecretVault', 'Set-AutomateNOWSecretVault', 'Set-AutomateNOWSecretVaultDefault', 'Set-AutomateNOWViewSetup', 'Test-AutomateNOWSecretVault', 'Write-AutomateNOWObjectVersion'
+- Added new functions: `Add-AutomateNOWSecretVaultSecret`, `Clear-AutomateNOWSecretVaultCache`, `Copy-AutomateNOWSecretVault`, `Export-AutomateNOWDomainJSON`, `Export-AutomateNOWSecretVault`, `Get-AutomateNOWSecretVault`, `Import-AutomateNOWDomainJSON`, `New-AutomateNOWSecretVault`, `New-AutomateNOWViewSetup`, `Read-AutomateNOWIconSet`, `Read-AutomateNOWNotificationGroupMember`, `Remove-AutomateNOWSecretVault`, `Rename-AutomateNOWSecretVault`, `Set-AutomateNOWSecretVault`, `Set-AutomateNOWSecretVaultDefault`, `Set-AutomateNOWViewSetup`, `Test-AutomateNOWSecretVault`, `Write-AutomateNOWObjectVersion`
 - Added the `-PermissionList` parameter to `Measure-AutomateNOWSecUserPermission`
 - Added the `-NoDomain` parameter to `Invoke-AutomateNOWAPI`
 - Added a token expiration check to `Invoke-AutomateNOWAPI`
