@@ -2,7 +2,7 @@
 
 > Requires an account on an AutomateNOW! instance
 
-<img width="1115" height="366" alt="usage-example" src="https://github.com/user-attachments/assets/630a270d-2db3-467f-a061-c6da6b19cae4" />
+![image](usage-example.png)
 
 ```
 Created by AutomateNOW-Fan
@@ -12,7 +12,7 @@ Created by AutomateNOW-Fan
 ```
 ## Efficacy 🧪
 
-Compatible with AutomateNOW! version _3.3.1.95 HF2<sup>[1]</sup>_
+Compatible with AutomateNOW! version _3.3.1.97 HF2_
 <br/><br/>
 ## Installation 🏗
 
@@ -31,15 +31,56 @@ Use `Connect-AutomateNOW` to establish your session
 - Session tokens will be automatically refreshed during usage
 - All functions can return help with Get-Help or the -? parameter
 - PSScriptAnalyzer compliant / Approved verbs only
+- Rated A+ for code quality by Copilot 🤖 (requires `copilot-instructions.md`)
 - Alternate encryption key bytes can be supplied (let's hope it is never needed 🤞)
 - Integration with the git app for showing out of sync item that require manual merging
 - Edit source code objects with NotePad (Windows only for now)
 <br/><br/>
 ## Change Log 📝
 
+## 1.0.43 (Major bug-fix version)
+### Major updates
+- Bump compatibility to ANOW version _3.3.1.97 HF2_
+- Fixed the debilitating issue "The script failed due to call depth overflow." that was introduced in 1.0.42
+- `Trace-AutomateNOWProcessing` is working correctly again
+- Fetching Processing Logs (e.g. AE Script Execution) is added and fully supported!
+- Processing Template Resource Dependencies (i.e. the Resources tab) are added and partially supported
+- Processing Template Actions (i.e. the Actions tab) are added and partially supported
+- Processing Template Design Parameters (i.e. Inputs and Outputs tab) are added and partially supported
+
+### Minor updates
+- You can now "Preload" (Import) Schedule Templates
+- The functions for Workflow/Service Manager Template Items have been consolidated to `*-AutomateNOWProcessingTemplateItem` (with aliases for backwards compatibility)
+- The Monitor -> Overview menu selection is now supported via the -Overview parameter in `Get-AutomateNOWProcessingList`
+- Tag validation now occurs for all functions (previously the coverage was about 50%)
+- Fixed an issue in 1.0.42 with `Get-AutomateNOWWorkflow` where it only ever will return the first result (row)
+- `Get-AutomateNOWAgentSysOutLog` will now provide advice when you pass a TRIGGER object to it by accident
+- `New-AutomateNOWMigrationImport` will now inform you if you the import operation does not complete successfully
+
+### Detailed Change Log
+- Added new functions: `Add-AutomateNOWProcessingTemplateDependency`, `Add-AutomateNOWProcessingTemplateItem`, `Add-AutomateNOWProcessingTemplateResourceDependency`, `Export-AutomateNOWProcessingLog`, `Export-AutomateNOWProcessingTemplateAction`, `Export-AutomateNOWProcessingTemplateDependency`, `Export-AutomateNOWProcessingTemplateDesignParameter`, `Export-AutomateNOWProcessingTemplateItem`, `Export-AutomateNOWProcessingTemplateResourceDependency`, `Import-AutomateNOWScheduleTemplate`, `Pop-AutomateNOWProcessingTemplateAction`, `Push-AutomateNOWProcessingTemplateAction`, `Read-AutomateNOWProcessingLog`, `Read-AutomateNOWProcessingTemplateAction`, `Read-AutomateNOWProcessingTemplateDependency`, `Read-AutomateNOWProcessingTemplateDesignParameter`, `Read-AutomateNOWProcessingTemplateItem`, `Read-AutomateNOWProcessingTemplateResourceDependency`, `Remove-AutomateNOWProcessingTemplateAction`, `Remove-AutomateNOWProcessingTemplateDependency`, `Remove-AutomateNOWProcessingTemplateDesignParameter`, `Remove-AutomateNOWProcessingTemplateItem`, `Remove-AutomateNOWProcessingTemplateResourceDependency`, `Save-AutomateNOWProcessingLog`, `Set-AutomateNOWProcessingTemplateItem`, `Set-AutomateNOWProcessingTemplateResourceDependency`
+- Converted functions to alias: `Add-AutomateNOWScheduleTemplateItem`, `Add-AutomateNOWServiceManagerTemplateDependency`, `Add-AutomateNOWServiceManagerTemplateItem`, `Add-AutomateNOWWorkflowTemplateDependency`, `Add-AutomateNOWWorkflowTemplateItem`, `Export-AutomateNOWScheduleTemplateItem`, `Export-AutomateNOWServiceManagerTemplateDependency`, `Export-AutomateNOWServiceManagerTemplateItem`, `Export-AutomateNOWWorkflowTemplateDependency`, `Export-AutomateNOWWorkflowTemplateItem`, `Read-AutomateNOWScheduleTemplateItem`, `Read-AutomateNOWServiceManagerTemplateDependency`, `Read-AutomateNOWServiceManagerTemplateItem`, `Read-AutomateNOWWorkflowTemplateDependency`, `Read-AutomateNOWWorkflowTemplateItem`, `Remove-AutomateNOWScheduleTemplateItem`, `Remove-AutomateNOWServiceManagerTemplateDependency`, `Remove-AutomateNOWServiceManagerTemplateItem`, `Remove-AutomateNOWWorkflowTemplateDependency`, `Remove-AutomateNOWWorkflowTemplateItem`, `Set-AutomateNOWScheduleTemplateItem`, `Set-AutomateNOWServiceManagerTemplateItem`, `Set-AutomateNOWWorkflowTemplateItem`
+- Removed the token expiration check that was added to `Invoke-AutomateNOWAPI` in the previous version
+- Improved pipeline support for `Select-AutomateNOWCodeRepositoryBranch` & `Remove-AutomateNOWCodeRepositoryBranch`
+- Fixed an issue with `Save-AutomateNOWAgentSysOutLog` that only occurred when sending more than 1 Task across the pipeline
+- Fixed an issue with `Get-AutomateNOWProcessingList` and filtering by Tags
+- Fixed an issue with `Set-AutomateNOWWorkspace` and setting the Workspace Tags
+- Fixed an issue with `Set-AutomateNOWViewSetup` and setting the View Setup to non-public
+- Fixed an issue with a few of the `Set-*` functions and setting the Description
+- Fixed an issue with `Export-AutomateNOWMigration` and the exporting of Business Views & Server Node Groups
+- Fixed an issue with `Read-AutomateNOWProcessingEventLog` that prevented it from working as expected
+- Fixed an issue with `Read-AutomateNOWAgentServerNode` that prevented it from working as expected
+- Fixed a minor issue with some of the `Rename-*` functions where old object was returned instead of the newly renamed object
+- Fixed a minor issue with many of the `Add-*` functions where no obect was returned after a successful add operation
+- Fixed a minor issue with some of the `New-*` functions where the `-Quiet` parameter was ignored
+- Added parameters `-ProcessingStatus`, `-ProcessingType` and `-Overview` to `Get-AutomateNOWProcessingList`
+- Added parameter `-AsJson` to `Show-AutomateNOWEndpointType`
+- Added parameter `-All` to `Export-AutomateNOWTimeZone`
+- Removed parameter `-timeTriggerType` from `Set-AutomateNOWTimeTrigger` as it was superfluous
+- Fixed many small inconsequential cosmetic errors within the module error messages
+
 ## 1.0.42
 ### Major updates
-- Rated A+ for code quality by Copilot 🤖 (requires `copilot-instructions.md`)
 - A `copilot-instructions.md` file is now included with this project (defensive documentation 🛡️)
 - Importing and Exporting Domain JSON is added and fully supported
 - All 5 types of Secret Vaults 🔒 are added and partially supported
@@ -201,7 +242,7 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 ### What exactly can I do with this module? How complete is this?
 >See the feature chart below
 
-<img width="1338" height="1421" alt="feature-chart" src="https://github.com/user-attachments/assets/826ffdea-bdb7-4322-a849-4b3db7efd819" />
+![image](feature-chart.png)
 
 ### Where are the connection details stored in my PowerShell session after successfully authenticating?
 >Check the global variable `$anow_session`
