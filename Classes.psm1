@@ -1989,6 +1989,7 @@ Class ANOWCommunicationNote : Base {
     [string]$noteSubjectCategory
     [string]$content
     [string]$noteSourceType
+    [string]$noteSourceCategory
     [boolean]$archived
     [boolean]$isReply
     [string]$noteSourceName
