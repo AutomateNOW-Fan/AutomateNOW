@@ -1,6 +1,6 @@
 # AutomateNOW PowerShell Module - Code Review Guidelines
-**Last Updated:** December 7, 2025  
-**Module Version:** 1.0.42
+**Last Updated:** May 25, 2026  
+**Module Version:** 1.0.44
 
 ## Overview
 This PowerShell module aims to provide a comprehensive command-line interface for the AutomateNOW! automation platform. It contains 583+ functions across 104,000+ lines of code, enabling automation scripting, pipeline integration, and programmatic control of most platform resources.
@@ -71,7 +71,7 @@ This PowerShell module aims to provide a comprehensive command-line interface fo
     - `GOOGLE_COULD_STORAGE_BUCKET` (should be `GOOGLE_CLOUD_STORAGE_BUCKET`) in `ANOWEndpoint_endpointType`
   - **Property/parameter names:**
     - `tenatId` (should be `tenantId`) - misspelling of "tenant" appears throughout API responses and must be used exactly as provided
-  - These typos exist in the vendor's API and cannot be corrected in the module without breaking API compatibility
+  - These typos exist in the vendor's API and must be preserved in `Classes.psm1` until the vendor fixes them in their Swagger definition. Where appropriate, we add internal "custom" enums and classes to accommodate tooling or UI needs; these are noted inline in `Classes.psm1`.
 - ✅ **Write-Host for Visual-Only Output:** `Write-Host` is acceptable when:
   - The function's primary purpose is visual display for human consumption (not data processing)
   - Multi-color formatting on a single line requires `-NoNewline` parameter (unavailable in other cmdlets)
@@ -107,6 +107,16 @@ When reviewing or modifying this module:
 1. ✅ Test error handling paths (network failures, authentication errors, API errors)
 2. ✅ Confirm comment-based help is accurate and complete
 3. ✅ Validate parameter sets work correctly and prevent invalid combinations
+
+---
+
+## Workflow Skills
+
+These repo skills are the durable entry points for repeat work. Use the skill that matches the problem instead of hand-trawling the module:
+
+- [automatenow-js-mapping-sync](../.github/skills/automatenow-js-mapping-sync/SKILL.md) for the task, monitor, and sensor lookup-table sync workflow. Use `copilot_extras/analysis/Update-AutomateNOWMappingsFromJs.ps1 -All` when you want all three reports in one pass.
+- [automatenow-swagger-class-sync](../.github/skills/automatenow-swagger-class-sync/SKILL.md) for class property drift in `Classes.psm1`.
+- [automatenow-swagger-enum-sync](../.github/skills/automatenow-swagger-enum-sync/SKILL.md) for enum drift in `Classes.psm1`.
 
 ---
 

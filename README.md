@@ -12,7 +12,7 @@ Created by AutomateNOW-Fan
 ```
 ## Efficacy 🧪
 
-Compatible with AutomateNOW! version _3.3.1.97 HF2_
+Compatible with AutomateNOW! version _3.3.1.99 HF3_
 <br/><br/>
 ## Installation 🏗
 
@@ -37,6 +37,27 @@ Use `Connect-AutomateNOW` to establish your session
 - Edit source code objects with NotePad (Windows only for now)
 <br/><br/>
 ## Change Log 📝
+
+## 1.0.44
+### Major updates
+- Bump compatibility to ANOW version _3.3.1.99 HF3_
+- Documention Items are added and fully supported 📚
+- `Trace-AutomateNOWProcessing` is working correctly again (again!)
+
+### Minor updates
+- Added new functions: `Add-AutomateNOWDocumentation`, `Export-AutomateNOWDocumentation`, `Read-AutomateNOWDocumentation`, `Remove-AutomateNOWDocumentation`, `Set-AutomateNOWDocumentation`
+- Added new parameters `-processingStatus` and `-LogLocationType` to `Read-AutomateNOWProcessingLog`
+- Added new parameters `-AsJson` to `Show-AutomateNOWEndpointType`
+- Fixed an issue with `Get-AutomateNOWProcessingList` which in turn fixed an issue in `Trace-AutomateNOWProcessing`
+- Fixed an issue with `Get-AutomateNOWContextVariable` that prevented it from working with some context variables
+- Fixed an issue with `Save-AutomateNOWDataSourceItem` where it didn't exit cleanly when receiving a data source item of an unsupported data source type
+- Fixed an issue with `Export-AutomateNOWMigration` exporting multiple objects to a single .json (`-IndividualExportFile` still worked)
+- Optimized the warning that `Save-AutomateNOWAgentSysOutLog` emits when the log is not available from the Agent
+- Added a guard to `Save-AutomateNOWAgentSysOutLog` for when the log file doesn't exist on the Agent
+- Renamed `Get-AutomateNOWAuditLog` to `Read-AutomateNOWAuditLog`
+- Removed the `-IncludeArchived` and `-OnlyArchived` parameters from `Trace-AutomateNOWProcessing` as the archive searching is implied
+- Changed `Get-AutomateNOWAgentSysOutLog` to throw a warning instead of breaking when the task has an empty log filename
+- Processing Template Change Requests are scheduled to be added in the next version
 
 ## 1.0.43 (Major bug-fix version)
 ### Major updates
