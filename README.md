@@ -2,7 +2,7 @@
 
 > Requires an account on an AutomateNOW! instance
 
-<img width="1115" height="366" alt="usage-example" src="https://github.com/user-attachments/assets/ed169593-c70c-4f17-8390-10207fbd7e11" />
+![image](usage-example.png)
 
 ```
 Created by AutomateNOW-Fan
@@ -12,7 +12,7 @@ Created by AutomateNOW-Fan
 ```
 ## Efficacy 🧪
 
-Compatible with AutomateNOW! version _3.3.1.99 HF3_
+Compatible with AutomateNOW! version _3.3.1.100_
 <br/><br/>
 ## Installation 🏗
 
@@ -37,6 +37,13 @@ Use `Connect-AutomateNOW` to establish your session
 - Edit source code objects with NotePad (Windows only for now)
 <br/><br/>
 ## Change Log 📝
+
+## 1.0.45
+### Major updates
+- Bump compatibility to ANOW version _3.3.1.100_
+
+### Minor updates
+Clarified the warning emitted by Get-AutomateNOWAgentSysOutLog when a task has an empty logFileName
 
 ## 1.0.44
 ### Major updates
@@ -263,7 +270,7 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 ### What exactly can I do with this module? How complete is this?
 >See the feature chart below
 
-<img width="1338" height="1481" alt="feature-chart" src="https://github.com/user-attachments/assets/45cea061-5e18-4c96-8ba4-98b8df68de94" />
+![image](feature-chart.png)
 
 ### Where are the connection details stored in my PowerShell session after successfully authenticating?
 >Check the global variable `$anow_session`

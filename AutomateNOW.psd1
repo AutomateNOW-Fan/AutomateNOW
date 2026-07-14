@@ -1,6 +1,6 @@
 ﻿<#	
 
-Developed and tested against AutomateNOW! version 3.3.1.99 HF3
+Developed and tested against AutomateNOW! version 3.3.1.100
 
 #>
 @{	
@@ -11,10 +11,10 @@ Developed and tested against AutomateNOW! version 3.3.1.99 HF3
 	RootModule             = 'AutomateNOW.psm1'
 	
 	# Version number of this module.
-	ModuleVersion          = '1.0.44'
+	ModuleVersion          = '1.0.45'
 	
 	# ID used to uniquely identify this module
-	GUID                   = '43ccfe47-6bbf-4c87-b7f2-637ca8f05cfc'
+	GUID                   = 'f27c7f93-1024-4a28-ab4d-4f551a37e69a'
 	
 	# Copyright statement for this module
 	Copyright              = 'not affiliated with Beta Systems'
