@@ -43,7 +43,7 @@ Use `Connect-AutomateNOW` to establish your session
 - Bump compatibility to ANOW version _3.3.1.100_
 
 ### Minor updates
-Clarified the warning emitted by Get-AutomateNOWAgentSysOutLog when a task has an empty logFileName
+- Clarified the warning emitted by `Get-AutomateNOWAgentSysOutLog` when the task has an empty `logFileName`
 
 ## 1.0.44
 ### Major updates
