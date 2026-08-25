@@ -38,6 +38,268 @@ Use `Connect-AutomateNOW` to establish your session
 <br/><br/>
 ## Change Log 📝
 
+## 1.0.46
+
+### Major updates
+
+- New Functions: `Invoke-AutomateNOWCodeRepositoryItemCommit`, `Invoke-AutomateNOWCodeRepositoryItemRollback`
+
+- Fixed the Code Repository Git merge-conflict workflow. File-based conflicts
+  are now listed, compared, and resolved through the correct
+  `codeRepositoryConflict` API contract.
+- `Get-AutomateNOWCodeRepositoryConflictItem` now returns the correct typed
+  conflict records for Git files. The conflict model now retains the file,
+  file path, simple ID, and domain class information needed by follow-on
+  commands.
+- `Compare-AutomateNOWCodeRepositoryConflictItem` and
+  `Merge-AutomateNOWCodeRepositoryConflictItem` now distinguish ANOW-local
+  content (`yours`) from remote Git branch content (`theirs`) correctly.
+
+### Minor updates
+
+- Removed credential-bearing and token-bearing values from authentication and
+  request diagnostics. Passwords, access and refresh tokens, Authorization
+  header values, clipboard authentication JSON, request bodies, and raw
+  authentication responses are no longer written to verbose, debug, warning,
+  or error output. Request diagnostics now contain safe metadata such as the
+  method, URI, content type, header names, body presence/length, and whether a
+  proxy was used.
+- Added shared opaque-token validation for connection, confirmation, refresh
+  prerequisites, and the API wrapper. Empty, whitespace-containing, malformed,
+  or inconsistent token/header state is rejected without echoing the rejected
+  value.
+- Direct-credential authentication now constrains `-Key` to exactly 16 bytes
+  and passes the selected key consistently through password protection and the
+  authentication request helper.
+- Secure-string conversion now uses a BSTR in both Windows PowerShell and
+  PowerShell 7. BSTR allocation, conversion, and cleanup pass through small
+  private boundaries, and `ZeroFreeBSTR` runs from `finally` after both success
+  and failure so unmanaged plaintext is not left allocated.
+- Authentication responses are parsed as JSON rather than matched as strings.
+  Token type, lifetime, expiration, access token, and refresh token fields are
+  validated independently, and malformed or partial responses fail with
+  sanitized messages.
+- `Connect-AutomateNOW -ReadJSONFromClipboard` now requires a usable access
+  token and safely validates numeric fields with `Int64.TryParse` on both
+  supported PowerShell editions. Invalid clipboard input returns without
+  falling through to an interactive username/password prompt.
+
+- Connection setup now builds a local candidate session and publishes
+  `$global:anow_session` only after authentication, instance discovery, domain
+  selection, timezone resolution, and user hydration all succeed. A failed
+  replacement leaves the existing global session object untouched.
+- Authentication and discovery locals—including user id, default domain,
+  server timezone, and token-response state—are initialized explicitly and no
+  longer inherit stale values from the caller or an earlier attempt.
+- Instance metadata is extracted from the AutomateNOW home page with a
+  quote-aware, balanced-object parser. The parser tolerates property-order,
+  indentation, line-ending, nested-object, and braces-inside-string differences
+  instead of depending on one exact JavaScript line format.
+- Required instance discovery remains mandatory. `-SkipMOTD` suppresses only
+  the welcome message and is no longer suggested as a remedy for home-page or
+  instance-metadata failures.
+- Non-quiet connection success returns an unformatted, safe `PSCustomObject`
+  containing connection facts rather than token fragments or formatting
+  objects. `-Quiet -SkipMOTD` produces no connection success object.
+- License-status warnings now include the entire documented zero-through-30-day
+  range, including zero days. Negative values retain the prior sentinel policy
+  until the vendor contract distinguishes perpetual and expired negative
+  values.
+- Proxy validation now requires a clean absolute HTTP or HTTPS URI with a host
+  and an explicit port from 1 through 65535. Credentials, outer whitespace,
+  paths, queries, and fragments are rejected; valid IPv4 and bracketed IPv6
+  proxy forms are passed to the request layer without changing certificate
+  policy.
+
+- PowerShell 7 now retains normal HTTPS certificate validation unless
+  `-SkipCertificateCheck` is explicitly supplied. Proxy use no longer implies a
+  certificate bypass.
+- In Windows PowerShell 5.1, the temporary certificate callback is installed
+  only for an explicit bypass and is always restored in `finally`, including
+  when the web request throws. A request cannot leave the process-wide callback
+  altered after it completes.
+- The chosen certificate policy is retained in the completed session so
+  authentication, instance discovery, token refresh, and later API calls use
+  one consistent transport policy.
+
+- `-Domain` remains optional during Connect bootstrap so the logged-on user's
+  available and default domains can be discovered. After selection, however,
+  the session is not considered domain-ready until both canonical domain fields
+  contain the same exact-case value.
+- Domain names are treated as case-sensitive throughout connection and domain
+  switching. Available-domain membership and default-domain selection use exact
+  case rather than PowerShell's default case-insensitive collection operators.
+- An explicitly requested domain is now checked against the logged-on user's
+  exact-case domain membership before it is placed in `header.domain` or used
+  for server timezone discovery. Wrong-case and unavailable domains therefore
+  fail transactionally with useful domain guidance instead of first failing a
+  request under a provisional header.
+- Once a domain is selected, `current_domain` and `header.domain` are updated
+  together and must remain exactly equal. The incorrect legacy header key used
+  by earlier switching logic is no longer written.
+- Connection bootstrap first uses the local timezone catalogue while domain
+  membership is unknown, then replaces it with the authoritative server
+  catalogue after domain validation. Server and user timezones are resolved
+  from the selected catalogue on every connection path rather than being
+  inherited from ambient state.
+- `Switch-AutomateNOWDomain` now requires a non-empty `-Domain` during parameter
+  binding, performs only local exact-case validation, and cannot refresh a token
+  or contact the server as a side effect. Successful switching updates both
+  canonical domain fields atomically.
+
+- Unix expiration conversion now uses `DateTimeOffset`. Connection timestamps
+  use the documented millisecond form, while refresh compatibility accepts the
+  vendor's observed seconds-or-milliseconds values.
+- Tokens with one through 60 seconds remaining are treated as still valid.
+  Failed connection replacement or refresh no longer destroys an existing
+  session merely because it is near expiration.
+- Refresh responses are fully staged and validated before any session field is
+  committed. Null, malformed, partial, non-advancing, unexpected-token-type, or
+  failed refresh responses preserve the prior access token, refresh token,
+  Authorization header, and expiration.
+- Refresh request fields are encoded through `ConvertTo-QueryString`, so
+  reserved characters in a refresh token are preserved correctly in the form
+  body.
+- `Confirm-AutomateNOWSession` catches refresh failures and returns `True` only
+  after the session is structurally valid and, when refresh was required, the
+  new expiration is future-dated and strictly later than the previous value. A
+  successful confirmation emits exactly one Boolean.
+- Shared session validation now checks the instance, access-token and
+  Authorization-header identity, refresh-token state, expiration shape and
+  policy, and canonical domain consistency appropriate to each operation.
+- `MaximumTokenRefreshAge` is documented and implemented as a remaining token
+  lifetime threshold, defaults to 3300 seconds, and rejects negative values.
+- `Update-AutomateNOWToken` retains its historical no-success-output contract,
+  supports `WhatIf`, and uses sanitized terminating errors for refresh failure.
+- `-Quiet` suppresses successful refresh information and verbose confirmation
+  while preserving warnings for an invalid session. Help now describes this
+  behavior accurately.
+- Future sessions created with `-DoNotRefresh` remain valid for bounded work;
+  expired or malformed expirations fail. The Unix epoch remains the explicit
+  unknown-expiration sentinel for compatibility and produces a warning rather
+  than being silently treated as a normal future token.
+
+- Ordinary failure exits in Connect, Disconnect, Update, Confirm, Switch, and
+  JWT issuer reset now return to the caller or raise a deliberate sanitized
+  terminating error instead of using `Break` to terminate caller-owned scripts,
+  loops, or switch statements.
+- `Disconnect-AutomateNOW` attempts the server logout notification whenever the
+  session contains the minimum request fields, even when expiration is unknown,
+  and then completes the requested local session disposition.
+- `-KeepSessionVariable` is honored consistently on valid, invalid, expired,
+  partial, and server-notification-failure paths. Status information accurately
+  reports whether the global session was retained or removed.
+
+- `Reset-AutomateNOWJWTIssuerToken` now always routes the destructive operation
+  through `ShouldProcess`. `-Force` suppresses the confirmation prompt but never
+  bypasses `-WhatIf`; `-Force -WhatIf` sends no API request.
+- Invalid-session, request-failure, missing-response, malformed-status, and
+  nonzero-response paths return normally with sanitized diagnostics. Caller
+  control flow is no longer terminated by `Break`, and response data is not
+  embedded in warning or error messages.
+- The command no longer converts or returns the complete application
+  configuration, which can contain OAuth secrets, certificate passwords,
+  messaging credentials, passphrases, and license data. Normal success returns
+  only a minimal acknowledgement containing the instance, reset status, and the
+  fact that API-user tokens were revoked; `-Quiet` suppresses that object.
+- Help now clarifies the blast radius: resetting the JWT issuer invalidates API
+  user tokens, not ordinary logged-in user sessions. No live reset is required
+  to validate the command's PowerShell safety contract.
+
+- `New-AutomateNOWCodeRepository` now returns the newly created typed
+  `[ANOWCodeRepository]` object after successful creation.
+
+- Improved Security Role safety and reliability:
+  - `New-AutomateNOWSecurityRole` now supports `-WhatIf` and `-Confirm`.
+  - `Set-AutomateNOWSecurityRoleDomain` now requires explicit
+    `-AllowAdminDowngrade` acknowledgement before a granular update can remove
+    Domain Admin access. `-Force` does not bypass this safeguard.
+  - `Copy-AutomateNOWSecurityRoleDomain` now preserves Boolean permissions and
+    tag-scoped permissions while omitting server-managed metadata.
+  - `Add-AutomateNOWSecurityRoleUser` and
+    `Remove-AutomateNOWSecurityRoleUser` now page through role assignments in
+    10,000-record batches before making membership decisions.
+  - `Set-AutomateNOWSecurityRole` now rejects contradictory `-LDAPMapping` and
+    `-UnsetLDAPMapping` input.
+  - `Set-AutomateNOWSecurityRoleDomain -AllowDesignCoreModificationTags` now
+    writes the supported `designModifyTags` permission field rather than the
+    non-persisting legacy field used by earlier module versions.
+  - `Set-AutomateNOWSecurityRoleDomain -AllowDesignCoreModifyTags` blocks
+    every explicitly bound value, including empty and null input, for the
+    unsupported legacy field before an API request.
+  - `designVerification` is now included in the normal Security User
+    permission catalogue and effective-permission reports. `designCoreModify`
+    and `taskLog` remain available only as hidden compatibility properties
+    when `-IncludeUndocumented` is explicitly requested.
+  - The module does not expose browser-only Design Action, Workflow Items,
+    Notification, or Design Resource companion fields as public permissions.
+    The Design Action and Workflow Items tag candidates did not persist on
+    exact read-back; the remaining browser-only candidates are unsupported by
+    product policy.
+  - Domain-role reads and mutations when `-Quiet` is not used now return a safe
+    typed result when ANOW supplies nested role data, a null creation date, or
+    unsupported raw response fields.
+  - `Read-AutomateNOWSecurityRoleDomain -Id` now has a direct-id parameter
+    set that does not require a parent Security Role.
+  - `Read-AutomateNOWSecurityRoleUser` removed obsolete `-ItemId` and
+    now hydrates an exact assignment's role from the returned role id.
+  - `New-AutomateNOWSecurityRole` treats an absent exact-id preflight as a
+    normal create condition even when warning preference is `Stop`.
+  - Corrected public simple-ID validation to use `A-Z` rather than the
+    unintended `A-z` ASCII range. IDs containing punctuation that previously
+    fell between uppercase and lowercase letters are now rejected.
+- Repaired Security User permission reporting:
+  `Measure-AutomateNOWSecUserPermission` now calculates per-domain effective
+  access (`Denied`, `Unrestricted`, or `TagRestricted`) across Security Role
+  Domain grants; supported `*Tags` selections are provenance rather than
+  standalone grants. `Compare-AutomateNOWSecUserPermission` retains Boolean
+  `-Basic` and adds tag-aware `-EffectiveScope`; its equality filters include
+  permissions denied to both users. `Resolve-AutomateNOWSecUserPermission`
+  accepts direct and pipeline input without cross-domain tag inference, and
+  `Export-AutomateNOWSecUserPermission` preserves effective-scope and
+  role-provenance columns. Measure and Compare explicitly reject
+  instance-admin accounts because instance-wide access is not modeled.
+  A selected `-PermissionList` with no effective grant now emits an empty
+  success stream rather than a null record, avoiding downstream pipeline
+  binding failures present in earlier module versions.
+- Added optional, case-sensitive `-ConflictResolutionType 'yours'|'theirs'`
+  parameters to `Receive-AutomateNOWCodeRepository` and
+  `Sync-AutomateNOWCodeRepository`. The choice applies only when the initial
+  Pull or Synchronize operation encounters a merge conflict; it does not
+  resolve a conflict already persisted by an earlier operation.
+- Corrected the `ANOWCodeRepositoryOutOfSyncItem` response model so
+  `Get-AutomateNOWCodeRepositoryOutOfSyncItem` can parse the object-oriented
+  identity, provenance, timestamp, and conflict metadata returned by the
+  `/outOfSyncObject/read` endpoint.
+- `Resolve-AutomateNOWCodeRepository` now sends the repository simple ID to
+  the vendor resolve-conflicts operation and correctly processes each
+  repository in a multi-item pipeline.
+- Added `Connect-AutomateNOW -DoNotRefresh` for bounded work with a verified,
+  non-expired token when automatic refresh is unavailable. Automatic refresh
+  remains the default and is recommended for normal or long-running work.
+- Repaired `Sync-AutomateNOWCodeRepository` for direct `-CodeRepository`
+  invocation and multi-repository pipeline input; successful `-Quiet` calls
+  remain silent apart from verbose confirmation.
+- Corrected `Set-AutomateNOWVariable -Value` to include the target variable's
+  required domain in the value-update request.
+- `Get-AutomateNOWTimeZone -Id` now accepts time-zone identifiers containing
+  underscores.
+- Clarified `Publish-AutomateNOWCodeRepository`: default Publish commits
+  changed items, `-ForceCommit` commits all items, and `-Force` only bypasses
+  the PowerShell confirmation prompt.
+- Tightened Code Repository command contracts: `Confirm-AutomateNOWCodeRepository`
+  now requires a repository object; `Approve-AutomateNOWCodeRepositoryMergeRequest`
+  and `Deny-AutomateNOWCodeRepositoryMergeRequest` now require an explicit
+  merge-request object; named branch and merge-request lookups can select a
+  requested page; and `Get-AutomateNOWCodeRepository -Id` cannot be combined
+  with list filters that the endpoint would ignore.
+- `Export-AutomateNOWCodeRepositoryObjectSource` now writes a tab-delimited
+  `.tsv` file and preserves the supplied source object while escaping control
+  characters in exported content.
+- `Get-AutomateNOWCodeRepositoryObjectSource -RuntimeAction` now sends the
+  Runtime Action simple ID required by the vendor source endpoint, restoring
+  typed source retrieval for Runtime Actions.
+
 ## 1.0.45
 ### Major updates
 - Bump compatibility to ANOW version _3.3.1.100_
@@ -326,31 +588,93 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 ### How to retrieve a Task or Workflow (a.k.a. a "job") by its RunId?
 >Use `Get-AutomateNOWTask -Id 12345` for Tasks or `Get-AutomateNOWWorkflow -Id 12345` for Workflows. There is also `Get-AutomateNOWProcessingList -Id 12345` which can provide both Task and Workflow outputs.
 
-### How to push my changes to my properly configured code repository that my admin provided?
-> Step 1 - Select the branch of the repository
-> `Select-AutomateNOWCodeRepositoryBranch` -CodeRepository $repository -Branch 'development' -Force
+### What are the three states involved in a Code Repository transfer?
+> A configured Code Repository has three distinct states:
+>
+> 1. The live objects in ANOW.
+> 2. ANOW's managed server-side Git checkout (called the local repository by
+>    the API and UI).
+> 3. The external remote Git repository.
+>
+> `Publish-AutomateNOWCodeRepository` commits eligible live-object changes to
+> the managed checkout. `Send-AutomateNOWCodeRepository` pushes commits from
+> that checkout to the external remote. In the other direction,
+> `Receive-AutomateNOWCodeRepository` pulls remote commits into the managed
+> checkout, and `Sync-AutomateNOWCodeRepository` reconciles the checkout with
+> the live ANOW objects.
+>
+> `Sync-AutomateNOWCodeRepository` does not perform the remote Git Pull, and
+> `Receive-AutomateNOWCodeRepository` does not by itself apply pulled metadata
+> to the live objects. The ANOW UI's Pull action can make this distinction easy
+> to miss because its browser callback automatically invokes Synchronize after
+> a successful Pull. The PowerShell module exposes the two operations
+> separately, so an incoming end-to-end workflow requires Receive followed by
+> Sync.
 
-> Step 2 - Make a change to one of the items in the repository
-> `Set-AutomateNOWTaskTemplate` -TaskTemplate $task_template -processingCommand $script -Force
+### How do I push my changes to my properly configured Code Repository?
+> Step 1 - Retrieve the repository and select a typed branch object.
+>
+> ```powershell
+> $repository = Get-AutomateNOWCodeRepository -Id 'MyRepository'
+> $branch = Get-AutomateNOWCodeRepositoryBranch -CodeRepository $repository -Name 'development'
+> $branch | Select-AutomateNOWCodeRepositoryBranch -Force
+> ```
+>
+> Step 2 - Make the intended change to an item already associated with the
+> repository.
+>
+> ```powershell
+> Set-AutomateNOWTaskTemplate -TaskTemplate $taskTemplate -ProcessingCommand $script -Force
+> ```
+>
+> Step 3 - Commit eligible changed items from ANOW to the managed checkout.
+> Default Publish commits changed items; `-ForceCommit` commits all items.
+>
+> ```powershell
+> Publish-AutomateNOWCodeRepository -CodeRepository $repository -Force
+> ```
+>
+> Step 4 - Push the managed-checkout commit to the external remote repository.
+>
+> ```powershell
+> Send-AutomateNOWCodeRepository -CodeRepository $repository -Force
+> ```
+>
+> Step 5 - Reconcile the managed checkout and live ANOW objects.
+>
+> ```powershell
+> Sync-AutomateNOWCodeRepository -CodeRepository $repository -Force
+> ```
 
-> Step 3 - Commit all of the changes in the repository
-> `Publish-AutomateNOWCodeRepository` -CodeRepository $repository -Force
-
-> Step 4 - Push all of the commited changes in the local repository to the remote repository
-> `Send-AutomateNOWCodeRepository` -CodeRepository $repository -Force
-
-> Step 5 - Synchronize the local and remote repositories - Do not forget this step! 😅
-> `Sync-AutomateNOWCodeRepository` -CodeRepository $repository -Force
-
-### I made a change to the code on my properly configured remote repository. How do I pull it down to the local repository?
-> Step 1 - Select the branch of the repository
-> `Select-AutomateNOWCodeRepositoryBranch` -CodeRepository $repository -branch 'development' -Force -Quiet
-
-> Step 2 - Pull all of the commited changes in the remote repository to the local repository
-> `Receive-AutomateNOWCodeRepository` -CodeRepository $repository -Force
-
-> Step 3 - Synchronize the local and remote repositories - Do not forget this step! 😅
-> `Sync-AutomateNOWCodeRepository` -CodeRepository $repository -Force
+### I changed a file in the external remote repository. How do I apply it to the live ANOW object?
+> Step 1 - Retrieve the repository and select the intended typed branch object.
+>
+> ```powershell
+> $repository = Get-AutomateNOWCodeRepository -Id 'MyRepository'
+> $branch = Get-AutomateNOWCodeRepositoryBranch -CodeRepository $repository -Name 'development'
+> $branch | Select-AutomateNOWCodeRepositoryBranch -Force -Quiet
+> ```
+>
+> Step 2 - Pull the committed remote change into ANOW's managed checkout.
+>
+> ```powershell
+> Receive-AutomateNOWCodeRepository -CodeRepository $repository -Force
+> ```
+>
+> Receive is the remote-to-checkout step. Verify the managed checkout's branch
+> and commit status where available; do not expect a typed ANOW object read to
+> change yet.
+>
+> Step 3 - Apply/reconcile the managed-checkout state with the live ANOW
+> objects.
+>
+> ```powershell
+> Sync-AutomateNOWCodeRepository -CodeRepository $repository -Force
+> ```
+>
+> Verify the repository status after Receive and verify the intended typed
+> object metadata after Sync. Treat `-WhatIf` as PowerShell request suppression,
+> not as a server-side conflict or transfer preflight.
 
 ### Where are the 5 types of Processing Event Logs in the ANOW UI?
 >Use `Get-Help Read-AutomateNOWProcessingEventLog -Full` for some hints on where they all are.
@@ -425,17 +749,40 @@ Use the _-NotSecure_ parameter when connecting to an instance that doesn't use h
 ### Why do I not receive the expected results when using the `-Title` parameter with `Read-AutomateNOWWorkflowTemplateItem` or `Read-AutomateNOWServiceManagerTemplateItem`?
 > The "title" and "name" property of Processing Template Items can be misleading. Upon creation (i.e. adding) the item, the "name" property of the Item is automatically created and will be immutable (typically with a ".1" suffix). The ANOW UI will then use this "name" as the "title" as well since the "title" is NULL by default. To populate the "title" property for each Item you would need to specifically set the "title".
 
-### How can I resolve (merge) Out Of Sync conflicts in my git repository?
-> The first below code will show the left/right comparison (yours/theirs) using your installed git executable. This will help you to decide whether to "Accept Yours" or "Accept Theirs".
-> `$repository = Get-AutomateNOWCodeRepository -Id 'MyRepository'`
-> `$conflict_item = $repository | Get-AutomateNOWCodeRepositoryOutOfSyncItem | Select-Object -First 1`
-> `$comparison = $conflict_item | Compare-AutomateNOWCodeRepositoryConflictItem -CodeRepository $repository`
-> `$comparison | Show-AutomateNOWCodeRepositoryConflictItemComparison`
+### How do I inspect Out Of Sync items and resolve file-based Git merge conflicts?
+> These are two different record types and must not be piped into each other's
+> commands. `Get-AutomateNOWCodeRepositoryOutOfSyncItem` returns
+> `[ANOWCodeRepositoryOutOfSyncItem]` records describing object/repository
+> divergence. `Get-AutomateNOWCodeRepositoryConflictItem` returns
+> `[ANOWCodeRepositoryConflictItem]` records for file-based Git merge
+> conflicts.
 >
-> The second below code will apply the "Accept Yours" decision (i.e. "Accept Left")
+> Read each list independently:
+>
+> ```powershell
 > $repository = Get-AutomateNOWCodeRepository -Id 'MyRepository'
-> $out_of_sync_items = $repository | Get-AutomateNOWCodeRepositoryOutOfSyncItem -startRow 0 -endRow 10000
-> $out_of_sync_items | Merge-AutomateNOWCodeRepositoryConflictItem -CodeRepository $repo -AcceptYours
+> $outOfSyncItems = $repository | Get-AutomateNOWCodeRepositoryOutOfSyncItem -startRow 0 -endRow 100
+> $conflictItems = $repository | Get-AutomateNOWCodeRepositoryConflictItem -startRow 0 -endRow 100
+> ```
+>
+> Only a file-conflict record can be compared or merged. Comparing retrieves
+> both versions; showing the comparison writes temporary files and invokes the
+> installed `git diff`, so use those commands only when that source access and
+> local Git operation are appropriate.
+>
+> ```powershell
+> $conflictItem = $conflictItems | Select-Object -First 1
+> $comparison = $conflictItem | Compare-AutomateNOWCodeRepositoryConflictItem
+> $comparison | Show-AutomateNOWCodeRepositoryConflictItemComparison
+> ```
+>
+> After deciding which version is correct, resolve only that same typed
+> conflict record. `-AcceptYours` means the ANOW-local repository version;
+> `-AcceptTheirs` means the external remote Git branch version.
+>
+> ```powershell
+> $conflictItem | Merge-AutomateNOWCodeRepositoryConflictItem -CodeRepository $repository -AcceptYours
+> ```
 
 ### How can I fetch only the Server Nodes that are also Load Balancers?
 > Use the `Get-AutomateNOWServerNode` with the `-AllLoadBalancers` switch parameter (depending on your scenario).

@@ -4,186 +4,513 @@ $ErrorActionPreference = 'Stop'
 
 #region - Authentication
 
+Function Test-ANOWTokenValue {
+    [OutputType([boolean])]
+    [CmdletBinding()]
+    Param(
+        [Parameter(Mandatory = $false)]
+        [AllowNull()]
+        [object]$Token
+    )
+    If ($null -eq $Token) {
+        Return $false
+    }
+    If ($Token -isnot [string]) {
+        Return $false
+    }
+    [string]$token_value = [string]$Token
+    If ([string]::IsNullOrWhiteSpace($token_value)) {
+        Return $false
+    }
+    If ($token_value -ceq 'Not set') {
+        Return $false
+    }
+    If ($token_value -cne $token_value.Trim()) {
+        Return $false
+    }
+    ForEach ($token_character in $token_value.ToCharArray()) {
+        If ([char]::IsWhiteSpace($token_character) -or [char]::IsControl($token_character)) {
+            Return $false
+        }
+    }
+    Return $true
+}
+
+Function Write-ANOWInformation {
+    [OutputType([void])]
+    [CmdletBinding()]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [string]$MessageData
+    )
+    Try {
+        Write-Information -MessageData $MessageData
+    }
+    Catch {
+        # Information-stream preferences must not reclassify a completed state
+        # mutation as an authentication failure.
+        $null = $_
+    }
+}
+
+Function Get-ANOWSessionValidation {
+    [OutputType([PSCustomObject])]
+    [CmdletBinding()]
+    Param(
+        [Parameter(Mandatory = $false)]
+        [AllowNull()]
+        [object]$Session,
+        [Parameter(Mandatory = $false)]
+        [switch]$AllowExpired,
+        [Parameter(Mandatory = $false)]
+        [switch]$AllowUnknownExpiration,
+        [Parameter(Mandatory = $false)]
+        [switch]$SkipDomainValidation
+    )
+    [hashtable]$validation = @{
+        Valid = $false
+        Reason = 'missing-session'
+        ExpirationState = 'Invalid'
+        ExpirationDate = $null
+        RefreshAvailable = $false
+    }
+    If ($null -eq $Session -or $Session -isnot [System.Collections.IDictionary]) {
+        Return [PSCustomObject]$validation
+    }
+    If ([string]::IsNullOrWhiteSpace([string]$Session.Instance)) {
+        $validation.Reason = 'missing-instance'
+        Return [PSCustomObject]$validation
+    }
+    If ($null -eq $Session.header -or $Session.header -isnot [System.Collections.IDictionary]) {
+        $validation.Reason = 'missing-header'
+        Return [PSCustomObject]$validation
+    }
+    If (-not (Test-ANOWTokenValue -Token $Session.AccessToken)) {
+        $validation.Reason = 'invalid-access-token'
+        Return [PSCustomObject]$validation
+    }
+    [string]$authorization = [string]$Session.header.Authorization
+    If ($authorization -notmatch '^(?i:Bearer) (?<token>.+)$' -or -not (Test-ANOWTokenValue -Token $Matches['token'])) {
+        $validation.Reason = 'invalid-authorization-header'
+        Return [PSCustomObject]$validation
+    }
+    If ([string]$Matches['token'] -cne [string]$Session.AccessToken) {
+        $validation.Reason = 'access-token-mismatch'
+        Return [PSCustomObject]$validation
+    }
+    If ($Session.Keys -notcontains 'RefreshToken') {
+        $validation.Reason = 'missing-refresh-token-state'
+        Return [PSCustomObject]$validation
+    }
+    $raw_refresh_token = $Session.RefreshToken
+    If ($raw_refresh_token -is [string] -and [string]$raw_refresh_token -ceq 'Not set') {
+        $validation.RefreshAvailable = $false
+    }
+    ElseIf (Test-ANOWTokenValue -Token $raw_refresh_token) {
+        $validation.RefreshAvailable = $true
+    }
+    Else {
+        $validation.Reason = 'invalid-refresh-token'
+        Return [PSCustomObject]$validation
+    }
+    [string]$header_domain = [string]$Session.header.domain
+    [string]$current_domain = [string]$Session.current_domain
+    If ($SkipDomainValidation -ne $true -and
+        (-not [string]::IsNullOrWhiteSpace($header_domain) -or -not [string]::IsNullOrWhiteSpace($current_domain))) {
+        If ([string]::IsNullOrWhiteSpace($header_domain) -or [string]::IsNullOrWhiteSpace($current_domain) -or $header_domain -cne $current_domain) {
+            $validation.Reason = 'domain-mismatch'
+            Return [PSCustomObject]$validation
+        }
+    }
+    If ($Session.ExpirationDate -isnot [datetime]) {
+        $validation.Reason = 'invalid-expiration'
+        Return [PSCustomObject]$validation
+    }
+    [datetime]$expiration_date = $Session.ExpirationDate
+    $validation.ExpirationDate = $expiration_date
+    [datetime]$unix_epoch = [System.DateTimeOffset]::FromUnixTimeMilliseconds(0).LocalDateTime
+    If ($expiration_date -le $unix_epoch.AddSeconds(1)) {
+        $validation.ExpirationState = 'Unknown'
+        If ($AllowUnknownExpiration -ne $true) {
+            $validation.Reason = 'unknown-expiration'
+            Return [PSCustomObject]$validation
+        }
+    }
+    ElseIf ($expiration_date -le (Get-Date)) {
+        $validation.ExpirationState = 'Expired'
+        If ($AllowExpired -ne $true) {
+            $validation.Reason = 'expired'
+            Return [PSCustomObject]$validation
+        }
+    }
+    Else {
+        $validation.ExpirationState = 'Future'
+    }
+    $validation.Valid = $true
+    $validation.Reason = 'valid'
+    Return [PSCustomObject]$validation
+}
+
+Function ConvertFrom-ANOWUnixExpiration {
+    [OutputType([datetime])]
+    [CmdletBinding()]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [object]$Value,
+        [Parameter(Mandatory = $false)]
+        [switch]$SecondsOrMilliseconds
+    )
+    [int64]$numeric_value = 0
+    If (-not [int64]::TryParse([string]$Value, [ref]$numeric_value) -or $numeric_value -le 0) {
+        Throw 'The token expiration value must be a positive integer.'
+    }
+    Try {
+        If ($SecondsOrMilliseconds -eq $true -and $numeric_value -lt 10000000000) {
+            Return [System.DateTimeOffset]::FromUnixTimeSeconds($numeric_value).LocalDateTime
+        }
+        Return [System.DateTimeOffset]::FromUnixTimeMilliseconds($numeric_value).LocalDateTime
+    }
+    Catch {
+        Throw 'The token expiration value is outside the supported Unix timestamp range.'
+    }
+}
+
+Function ConvertTo-ANOWSecureStringBSTR {
+    [OutputType([IntPtr])]
+    [CmdletBinding()]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [SecureString]$SecureString
+    )
+    Return [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($SecureString)
+}
+
+Function ConvertFrom-ANOWSecureStringBSTR {
+    [OutputType([string])]
+    [CmdletBinding()]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [IntPtr]$Pointer
+    )
+    Return [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($Pointer)
+}
+
+Function Clear-ANOWSecureStringBSTR {
+    [OutputType([void])]
+    [CmdletBinding()]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [IntPtr]$Pointer
+    )
+    [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($Pointer)
+}
+
+Function Invoke-ANOWWebRequest {
+    [CmdletBinding()]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [hashtable]$Parameters,
+        [Parameter(Mandatory = $false)]
+        [switch]$SkipCertificateCheck
+    )
+    [hashtable]$request_parameters = @{}
+    ForEach ($parameter_name in $Parameters.Keys) {
+        $request_parameters[$parameter_name] = $Parameters[$parameter_name]
+    }
+    [int32]$ps_version_major = $PSVersionTable.PSVersion.Major
+    If ($ps_version_major -lt 5) {
+        Throw 'AutomateNOW requires Windows PowerShell 5.1 or PowerShell 7.'
+    }
+    If ($ps_version_major -gt 5) {
+        If ($SkipCertificateCheck -eq $true) {
+            $request_parameters['SkipCertificateCheck'] = $true
+        }
+        Return Invoke-WebRequest @request_parameters
+    }
+
+    [System.Net.Security.RemoteCertificateValidationCallback]$previous_callback = [System.Net.ServicePointManager]::ServerCertificateValidationCallback
+    Try {
+        If ($SkipCertificateCheck -eq $true) {
+            [System.Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }
+        }
+        Return Invoke-WebRequest @request_parameters
+    }
+    Finally {
+        If ($SkipCertificateCheck -eq $true) {
+            [System.Net.ServicePointManager]::ServerCertificateValidationCallback = $previous_callback
+        }
+    }
+}
+
+Function ConvertFrom-ANOWInstancePage {
+    [OutputType([PSCustomObject])]
+    [CmdletBinding()]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [string]$Content
+    )
+    [System.Text.RegularExpressions.MatchCollection]$license_markers = [regex]::Matches($Content, '"licenseInfo"\s*:')
+    ForEach ($license_marker in $license_markers) {
+        For ([int32]$start_index = $license_marker.Index; $start_index -ge 0; $start_index--) {
+            If ($Content[$start_index] -cne '{') {
+                Continue
+            }
+            [int32]$depth = 0
+            [boolean]$inside_string = $false
+            [boolean]$escaped = $false
+            For ([int32]$end_index = $start_index; $end_index -lt $Content.Length; $end_index++) {
+                [char]$character = $Content[$end_index]
+                If ($inside_string -eq $true) {
+                    If ($escaped -eq $true) {
+                        $escaped = $false
+                    }
+                    ElseIf ($character -ceq '\') {
+                        $escaped = $true
+                    }
+                    ElseIf ($character -ceq '"') {
+                        $inside_string = $false
+                    }
+                    Continue
+                }
+                If ($character -ceq '"') {
+                    $inside_string = $true
+                    Continue
+                }
+                If ($character -ceq '{') {
+                    $depth++
+                    Continue
+                }
+                If ($character -cne '}') {
+                    Continue
+                }
+                $depth--
+                If ($depth -ne 0) {
+                    Continue
+                }
+                [string]$json_candidate = $Content.Substring($start_index, ($end_index - $start_index + 1))
+                Try {
+                    [PSCustomObject]$instance_information = $json_candidate | ConvertFrom-Json -ErrorAction Stop
+                }
+                Catch {
+                    Break
+                }
+                If ($null -ne $instance_information.licenseInfo) {
+                    Return $instance_information
+                }
+                Break
+            }
+        }
+    }
+    Throw 'The AutomateNOW home page did not contain a recognizable instance-information object.'
+}
+
 Function Connect-AutomateNOW {
     <#
     .SYNOPSIS
-    Connects to the API of an AutomateNOW! instance
+    Connects to the API of an AutomateNOW! instance.
 
     .DESCRIPTION
-    Connects to the API of an AutomateNOW! instance. The session details are then set to global variable $anow_session.
+    Authenticates to an AutomateNOW! instance, validates the selected domain and
+    required session metadata, and publishes the completed session as the global
+    variable $anow_session. Connection setup is transactional: a failed attempt
+    does not replace an existing global session or publish a partial new session.
 
     .PARAMETER Instance
-    Specifies the name of the AutomateNOW! instance. For example: s2.infinitedata.com (do not include any forward/backward slashes)
+    The AutomateNOW! host name, without a protocol or path.
 
     .PARAMETER Domain
-    Optional string to set the AutomateNOW domain. Omit this parameter if you do not know what the available domains are and they will be shown to you. You can then run this function again with the -Domain parameter. This function does support recognition of users with a default domain.
+    Optional exact, case-sensitive domain name. When omitted, the only available
+    domain or the user's configured default is selected. If neither is available,
+    the valid choices are reported and no session is published.
 
     .PARAMETER Proxy
-    Optional string to set a proxy. The format should be: 'http://x.x.x.x:8888' where x.x.x.x is the ip or hostname of the proxy server. Proxy credentials are not supported yet. Caution: Using this setting will force all certificate checks to be disabled. It is equivalent to the -NotSecure function.
+    Optional HTTP or HTTPS proxy URI with an explicit port. Proxy use does not
+    disable certificate validation.
 
     .PARAMETER AccessToken
-    Optionally specify the access token manually for API users or manual testing. This parameter is required for API users.
+    Optional bearer access token for API users, reusable authentication bundles,
+    or manual testing.
 
     .PARAMETER RefreshToken
-    Optionally specify the refresh token manually for API users or manual testing. This parameter is never required but this module will complain about it for non-API users since the token can't be refreshed.
+    Optional refresh token. Without one, automatic refresh is unavailable.
 
     .PARAMETER ExpirationDate
-    Int64 representing the current date in UNIX time milliseconds. You don't need to include this if you use -AccessToken but it's nice to have. This module will complain about it for non-API users since the expiration of the current session token is unknown.
+    Optional positive Unix timestamp in milliseconds for the access-token
+    expiration. Zero means that expiration is unknown.
 
     .PARAMETER ReadJSONFromClipboard
-    Switch parameter that will enable reading the JSON payload from the clipboard. You must have a valid authentication JSON payload in your clipboard for this to work (hint: You can copy it from your web browser after you've logged in). This parameter is useful for one-off scenarios where typing a password into the PowerShell prompt is undesirable.
+    Reads a browser /authenticate JSON payload from the local clipboard.
 
     .PARAMETER User
-    Specifies the user connecting to the API only if you want to enter it on the command line manually. If you do not specify this, you will be prompted for it.
+    User name for the direct-credential parameter set.
 
     .PARAMETER SecurePass
-    Specifies the Secure Password for connecting to the API only if you want to enter it on the command line manually. If you do not specify this, you will be prompted for it. Use ConvertTo-SecureString to create the needed object for this parameter.
+    Secure password for the direct-credential parameter set.
 
     .PARAMETER NotSecure
-    Switch parameter to accommodate instances that use the http protocol (typically on port 8080)
+    Uses HTTP instead of HTTPS. This switch does not bypass certificate
+    validation for HTTPS.
+
+    .PARAMETER SkipCertificateCheck
+    Explicitly bypasses HTTPS certificate validation. Use only for a trusted
+    endpoint whose certificate cannot be validated. On Windows PowerShell 5.1,
+    the process-wide callback is restored immediately after each request.
 
     .PARAMETER Quiet
-    Switch parameter to silence the output of the session details upon login. This will also suppress the license warning (if applicable).
+    Suppresses the session-summary object and license warning.
 
     .PARAMETER SkipMOTD
-    Switch parameter to suppress the "message of the day" upon login.
+    Suppresses the welcome information message. Instance discovery still runs.
 
     .PARAMETER SkipPreviousSessionCheck
-    Switch parameter to override the requirement to disconnect from a previous session before starting a new session on a different instance.
+    Allows a new connection attempt while another session exists. The previous
+    global session remains untouched unless the new connection fully succeeds.
+
+    .PARAMETER DoNotRefresh
+    Disables automatic token refresh for the resulting session.
 
     .PARAMETER AllowTimeout
-    Optional switch parameter that is not recommended for general use. This switch is intended for when your AutomateNOW instance is too slow and timing out before the operation is completed. This switch will ignore the timeout error and continue on.
+    Retains the module's legacy timeout-tolerance behavior for API requests.
 
     .PARAMETER Key
-    Optional 16-byte array for when InfiniteDATA has changed their encryption key. Let's hope we don't need to use this :-)
-
-    .INPUTS
-    None. You cannot pipe objects to Connect-AutomateNOW (yet).
+    Optional 16-byte vendor password-protection key.
 
     .OUTPUTS
-    An informational 'MOTD' will be displayed by default with basic information about the logged in users session. The global variable $anow_session will be populated with many details about the current session with the ANOW console.
+    PSCustomObject. Unless Quiet is used, returns a safe session summary without
+    credential or token material.
 
     .EXAMPLE
-    Basic logon without the domain specified. The use case is when you do not know what the available domains are yet. After authenticating, you will see the domains that are available to you.
-    Connect-AutomateNOW -Instance 's2.infinitedata.com'
-
-    .EXAMPLE
-    Basic login WITH the domain specified. --> This is the recommended standard approach to use when you know the domain that you will want to login to.
-
     Connect-AutomateNOW -Instance 's2.infinitedata.com' -Domain 'Test'
 
     .EXAMPLE
-    Login by providing the Access Token, Refresh Token and Expiration Date. This is the recommended approach when developing this module. It's better to include the refresh/expiration to prevent warnings.
-
-    Connect-AutomateNOW -Instance 's2.infinitedata.com' -AccessToken 'ey...' -RefreshToken 'ey...' -ExpirationDate 1900000000000
+    Connect-AutomateNOW -Instance 's2.infinitedata.com' -AccessToken $accessToken -RefreshToken $refreshToken -ExpirationDate $expirationDate -Domain 'Test' -Quiet -SkipMOTD
 
     .EXAMPLE
-    Login using the JSON payload from your clipboard. This is the payload from the /authenticate endpoint which can be copied from your browser with Dev Tools. The use case for this approach is one-off connections in front of an audience.
-
-    Connect-AutomateNOW -Instance 's2.infinitedata.com' -ReadJSONFromClipboard
-
-    .EXAMPLE
-    Login by providing only the Access Token. This will throw warnings if a non-API user logs in this way --> Not recommended
-
-    Connect-AutomateNOW -Instance 's2.infinitedata.com' -AccessToken 'ey...'
-
-    .EXAMPLE
-    Basic login to an ANOW instance running on http without a certificate or on https with a self-signed/expired certificate. Beta Systems training instances tend to require this parameter.
-
-    Connect-AutomateNOW -Instance 's2.infinitedata.com' -NotSecure -Domain 'Test'
-
-    .EXAMPLE
-    Quietly logs in to an ANOW instance while supplying the username and password on the command line (one-liner)
-
-    Connect-AutomateNOW -Instance 's2.infinitedata.com' -User 'user.10' -SecurePass (Get-Clipboard | ConvertTo-SecureString -AsPlainText -Force) -Domain 'Test' -Quiet -NotSecure
-
-    .EXAMPLE
-    Quietly logs in to an ANOW instance while retrieving the username and password on the command line (multi-format)
-
-    $secure_pass = Read-Host -AsSecureString
-    Connect-AutomateNOW -Instance 's2.infinitedata.com' -User 'user.10' -SecurePass $secure_pass -Domain 'Test' -Quiet -NotSecure
-
-    .EXAMPLE
-    Basic logon to an ANOW instance which has a different encryption key. Note that this parameter is theoretical as it has not been needed yet.
-
-    Connect-AutomateNOW -Instance 's2.infinitedata.com' -Key [byte[]]@(7, 22, 15, 11, 1, 24, 8, 13, 16, 10, 5, 17, 12, 19, 27, 9)
+    Connect-AutomateNOW -Instance 's2.infinitedata.com' -ReadJSONFromClipboard -Domain 'Test'
 
     .NOTES
-    1. If you don't know the available domains then you can exclude the -Domain parameter to see them listed (after you authenticate).
-    2. The -Domain parameter can be skipped if the user account has a default domain configured (see your administrator).
-    3. This module will automatically refresh your token after it is 330 seconds old (see Update-AutomateNOWToken for more info).
-    4. After you are finished interacting with the ANOW API, you should use Disconnect-AutomateNOW to disconnect from the instance and cleanse your PowerShell session. This doesn't invalidate your token, though.
-    5. You should periodically review and be familiar with the properties available in the global variable $anow_session. There is a wealth of information within.
-    6. For a truly silent logon you must include both the -Quiet and -SkipMOTD parameters.
-    7. Using the -Proxy parameter will forego certificate checks. This was required to enable connections through a local proxy like Fiddler Classic.
-    8. A warning will be emitted upon login if the instance license status is less than 30 days.
-
+    Automatic refresh is considered when fewer than 3300 seconds remain. Use
+    Disconnect-AutomateNOW when the session is no longer needed.
     #>
-    [OutputType([string])]
+    [OutputType([PSCustomObject])]
     [CmdletBinding(DefaultParameterSetName = 'Default')]
     Param(
         [Parameter(Mandatory = $true, ParameterSetName = 'Default')]
         [Parameter(Mandatory = $true, ParameterSetName = 'DirectCredential')]
         [Parameter(Mandatory = $true, ParameterSetName = 'AccessToken')]
         [Parameter(Mandatory = $true, ParameterSetName = 'Clipboard')]
+        [ValidateNotNullOrEmpty()]
         [string]$Instance,
+
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [Parameter(Mandatory = $false, ParameterSetName = 'DirectCredential')]
         [Parameter(Mandatory = $false, ParameterSetName = 'AccessToken')]
         [Parameter(Mandatory = $false, ParameterSetName = 'Clipboard')]
         [string]$Domain,
+
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [Parameter(Mandatory = $false, ParameterSetName = 'DirectCredential')]
         [Parameter(Mandatory = $false, ParameterSetName = 'AccessToken')]
         [Parameter(Mandatory = $false, ParameterSetName = 'Clipboard')]
-        [ValidateScript({ $_ -match '^http[s]{0,}://.{1,}:[0-9]{2,5}$' })]
+        [ValidateScript({
+                [string]$proxy_text = [string]$_
+                If ($proxy_text -cne $proxy_text.Trim()) {
+                    Throw 'Proxy cannot contain leading or trailing whitespace.'
+                }
+                [uri]$proxy_uri = $null
+                If (-not [uri]::TryCreate($proxy_text, [System.UriKind]::Absolute, [ref]$proxy_uri)) {
+                    Throw 'Proxy must be an absolute URI.'
+                }
+                If (@('http', 'https') -cnotcontains $proxy_uri.Scheme) {
+                    Throw 'Proxy must use the http or https scheme.'
+                }
+                If ([string]::IsNullOrWhiteSpace($proxy_uri.Host) -or -not [string]::IsNullOrEmpty($proxy_uri.UserInfo)) {
+                    Throw 'Proxy must contain a host and cannot contain credentials.'
+                }
+                If (($proxy_uri.AbsolutePath -ne '/') -or $proxy_uri.Query.Length -gt 0 -or $proxy_uri.Fragment.Length -gt 0) {
+                    Throw 'Proxy cannot contain a path, query, or fragment.'
+                }
+                [string]$authority_text = ($proxy_text -replace '^https?://', '') -split '/' | Select-Object -First 1
+                [System.Text.RegularExpressions.Match]$port_match = [regex]::Match($authority_text, ':(?<port>[0-9]{1,5})$')
+                [int32]$proxy_port = 0
+                If (-not $port_match.Success -or -not [int32]::TryParse($port_match.Groups['port'].Value, [ref]$proxy_port) -or $proxy_port -lt 1 -or $proxy_port -gt 65535) {
+                    Throw 'Proxy must include a port from 1 through 65535.'
+                }
+                Return $true
+            })]
         [string]$Proxy,
-        [ValidateScript({ $_ -match '^ey[a-zA-Z0-9_.-]{4,}$' })]
+
         [Parameter(Mandatory = $true, ParameterSetName = 'AccessToken')]
         [string]$AccessToken,
-        [ValidateScript({ $_ -match '^ey[a-zA-Z0-9_.-]{4,}$' })]
+
         [Parameter(Mandatory = $false, ParameterSetName = 'AccessToken')]
         [string]$RefreshToken,
+
         [Parameter(Mandatory = $false, ParameterSetName = 'AccessToken')]
+        [ValidateRange(0, [int64]::MaxValue)]
         [int64]$ExpirationDate = 0,
+
         [Parameter(Mandatory = $true, ParameterSetName = 'Clipboard')]
         [switch]$ReadJSONFromClipboard,
+
         [Parameter(Mandatory = $true, ParameterSetName = 'DirectCredential')]
+        [ValidateNotNullOrEmpty()]
         [string]$User,
+
         [Parameter(Mandatory = $true, ParameterSetName = 'DirectCredential')]
         [SecureString]$SecurePass,
+
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [Parameter(Mandatory = $false, ParameterSetName = 'DirectCredential')]
         [Parameter(Mandatory = $false, ParameterSetName = 'AccessToken')]
         [Parameter(Mandatory = $false, ParameterSetName = 'Clipboard')]
         [switch]$NotSecure,
+
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'DirectCredential')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'AccessToken')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Clipboard')]
+        [switch]$SkipCertificateCheck,
+
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [Parameter(Mandatory = $false, ParameterSetName = 'DirectCredential')]
         [Parameter(Mandatory = $false, ParameterSetName = 'AccessToken')]
         [Parameter(Mandatory = $false, ParameterSetName = 'Clipboard')]
         [switch]$Quiet,
+
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [Parameter(Mandatory = $false, ParameterSetName = 'DirectCredential')]
         [Parameter(Mandatory = $false, ParameterSetName = 'AccessToken')]
         [Parameter(Mandatory = $false, ParameterSetName = 'Clipboard')]
         [switch]$SkipMOTD,
+
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [Parameter(Mandatory = $false, ParameterSetName = 'DirectCredential')]
         [Parameter(Mandatory = $false, ParameterSetName = 'AccessToken')]
         [Parameter(Mandatory = $false, ParameterSetName = 'Clipboard')]
         [switch]$SkipPreviousSessionCheck,
+
+        [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'DirectCredential')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'AccessToken')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Clipboard')]
+        [switch]$DoNotRefresh,
+
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [Parameter(Mandatory = $false, ParameterSetName = 'DirectCredential')]
         [Parameter(Mandatory = $false, ParameterSetName = 'AccessToken')]
         [Parameter(Mandatory = $false, ParameterSetName = 'Clipboard')]
         [switch]$AllowTimeout,
+
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [Parameter(Mandatory = $false, ParameterSetName = 'DirectCredential')]
         [Parameter(Mandatory = $false, ParameterSetName = 'AccessToken')]
         [Parameter(Mandatory = $false, ParameterSetName = 'Clipboard')]
+        [ValidateCount(16, 16)]
         [byte[]]$Key = @(7, 22, 15, 11, 1, 24, 8, 13, 16, 10, 5, 17, 12, 19, 27, 9)
     )
-    Function New-ANOWAuthenticationPayload {
+
+    Function ConvertTo-ANOWAuthenticationPayload {
         [OutputType([string])]
         [CmdletBinding()]
         Param(
@@ -191,791 +518,667 @@ Function Connect-AutomateNOW {
             [string]$User,
             [Parameter(Mandatory = $true)]
             [SecureString]$SecurePass,
-            [Parameter(Mandatory = $false)]
-            [boolean]$SuperUser = $false,
-            [Parameter(Mandatory = $false)]
-            [byte[]]$Key = @(7, 22, 15, 11, 1, 24, 8, 13, 16, 10, 5, 17, 12, 19, 27, 9)
+            [Parameter(Mandatory = $true)]
+            [ValidateCount(16, 16)]
+            [byte[]]$Key
         )
-        If ($PSVersionTable.PSVersion.Major -ge 7) {
-            [string]$encrypted_string = Protect-AutomateNOWEncryptedString -String ($SecurePass | ConvertFrom-SecureString -AsPlainText) -Key $Key
+        [IntPtr]$password_pointer = [IntPtr]::Zero
+        [string]$plain_password = $null
+        Try {
+            $password_pointer = ConvertTo-ANOWSecureStringBSTR -SecureString $SecurePass
+            $plain_password = ConvertFrom-ANOWSecureStringBSTR -Pointer $password_pointer
+            [string]$encrypted_password = Protect-AutomateNOWEncryptedString -String $plain_password -Key $Key
         }
-        Else {
-            [string]$encrypted_string = Protect-AutomateNOWEncryptedString -String ([System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($SecurePass))) -Key $Key
+        Finally {
+            If ($password_pointer -ne [IntPtr]::Zero) {
+                Clear-ANOWSecureStringBSTR -Pointer $password_pointer
+            }
+            $plain_password = $null
         }
-        [hashtable]$payload = @{}
-        $payload.Add('j_username', $User)
-        $payload.Add('j_password', "ENCRYPTED::$encrypted_string")
-        $payload.Add('superuser', $SuperUser)
-        [string]$payload_json = $payload | ConvertTo-JSON -Compress -Depth 100
-        Write-Verbose -Message "Sending payload $payload_json"
-        Return $payload_json
+        [hashtable]$payload = @{
+            j_username = $User
+            j_password = "ENCRYPTED::$encrypted_password"
+            superuser = $false
+        }
+        Write-Verbose -Message "Sending authentication request for user [$User]."
+        Return ($payload | ConvertTo-Json -Compress -Depth 10)
     }
-    Function New-ANOWAuthenticationProperties {
-        [OutputType([hashtable])]
+
+    Function Get-ANOWAuthenticationResponse {
+        [OutputType([PSCustomObject])]
         [CmdletBinding()]
         Param(
+            [Parameter(Mandatory = $true)]
+            [string]$Instance,
+            [Parameter(Mandatory = $true)]
+            [ValidateSet('http', 'https')]
+            [string]$Protocol,
             [Parameter(Mandatory = $true)]
             [string]$User,
             [Parameter(Mandatory = $true)]
             [SecureString]$SecurePass,
+            [Parameter(Mandatory = $true)]
+            [ValidateCount(16, 16)]
+            [byte[]]$Key,
             [Parameter(Mandatory = $false)]
-            [string]$Proxy
+            [string]$Proxy,
+            [Parameter(Mandatory = $false)]
+            [switch]$SkipCertificateCheck
         )
-        [string]$body = New-ANOWAuthenticationPayload -User $User -SecurePass $SecurePass
-        [string]$login_url = ($protocol + '://' + $instance + '/automatenow/api/login/authenticate')
-        [hashtable]$parameters = @{}
-        [int32]$ps_version_major = $PSVersionTable.PSVersion.Major
-        If ($ps_version_major -eq 5) {
-            # The below C# code provides the equivalent of the -SkipCertificateCheck parameter for Windows PowerShell 5.1 Invoke-WebRequest
-            If (($null -eq ("TrustAllCertsPolicy" -as [type])) -and ($protocol -eq 'http')) {
-                [string]$certificate_policy = @"
-                using System.Net;
-                using System.Security.Cryptography.X509Certificates;
-                public class TrustAllCertsPolicy : ICertificatePolicy {
-                    public bool CheckValidationResult(
-                        ServicePoint srvPoint, X509Certificate certificate,
-                        WebRequest request, int certificateProblem) {
-                        return true;
-                    }
-                }
-"@
-                $Error.Clear()
-                Try {
-                    Add-Type -TypeDefinition $certificate_policy
-                }
-                Catch {
-                    [string]$Message = $_.Exception.Message
-                    Write-Warning -Message "Add-Type failed to add the custom certificate policy due to [$Message]"
-                    Break
-                }
-                $Error.Clear()
-                Try {
-                    [System.Net.ServicePointManager]::CertificatePolicy = New-Object -TypeName TrustAllCertsPolicy
-                }
-                Catch {
-                    [string]$Message = $_.Exception.Message
-                    Write-Warning -Message "New-Object failed to create a new 'TrustAllCertsPolicy' CertificatePolicy object due to [$Message]."
-                    Break
-                }
-            }
-            $parameters.Add('UseBasicParsing', $true)
+        [string]$body = ConvertTo-ANOWAuthenticationPayload -User $User -SecurePass $SecurePass -Key $Key
+        [hashtable]$request_parameters = @{
+            Uri = ($Protocol + '://' + $Instance + '/automatenow/api/login/authenticate')
+            Method = 'POST'
+            Body = $body
+            ContentType = 'application/json'
         }
-        ElseIf ( $ps_version_major -gt 5) {
-            $parameters.Add('SkipCertificateCheck', $true)
+        If ($PSVersionTable.PSVersion.Major -eq 5) {
+            $request_parameters['UseBasicParsing'] = $true
         }
-        Else {
-            Write-Warning -Message "Please use either Windows PowerShell 5.1 or PowerShell Core."
-            Break
+        If (-not [string]::IsNullOrWhiteSpace($Proxy)) {
+            $request_parameters['Proxy'] = $Proxy
         }
-        $parameters.Add('Uri', $login_url)
-        $parameters.Add('Method', 'POST')
-        $parameters.Add('Body', $body)
-        Remove-Variable -Name body
-        If ($Proxy.Length -gt 0) {
-            $parameters.Add('Proxy', $Proxy)
-        }
-        $parameters.Add('ContentType', 'application/json')
-        $Error.Clear()
         Try {
-            [Microsoft.PowerShell.Commands.BasicHtmlWebResponseObject]$results = Invoke-WebRequest @parameters
+            $authentication_response = Invoke-ANOWWebRequest -Parameters $request_parameters -SkipCertificateCheck:$SkipCertificateCheck -ErrorAction Stop
         }
         Catch {
-            [string]$Message = $_.Exception.Message
-            If ($Message -match '(The underlying connection was closed|The SSL connection could not be established)') {
-                Write-Warning -Message 'Please try again with the -NotSecure parameter if you are connecting to an insecure instance.'
-                Break
+            [int32]$status_code = 0
+            Try {
+                $status_code = [int32]$_.Exception.Response.StatusCode
             }
-            ElseIf ($Message -match 'Response status code does not indicate success:') {
-                $Error.Clear()
-                Try {
-                    [int32]$return_code = $Message -split 'success: ' -split ' ' | Select-Object -Last 1 -Skip 1
-                }
-                Catch {
-                    [string]$Message2 = $_.Exception.Message
-                    Write-Warning -Message "Unable to extract the error code from [$Message] due to [$Message2]"
-                }
+            Catch {
+                $status_code = 0
             }
-            ElseIf ($Message -match 'The remote server returned an error: ') {
-                $Error.Clear()
-                Try {
-                    [int32]$return_code = $Message -split '\(' -split '\)' | Select-Object -Skip 1 -First 1
-                }
-                Catch {
-                    [string]$Message2 = $_.Exception.Message
-                    Write-Warning -Message "Unable to extract the error code from [$Message] due to [$Message2]"
-                }
+            If ($status_code -eq 401) {
+                Throw 'Authentication was rejected by the AutomateNOW instance.'
             }
-            ElseIf ($Message -eq 'An error occurred while sending the request.') {
-                Write-Warning -Message "Received the error message '$Message' - This usually means something is wrong with the server! Contact your admins."
-                Break
+            If ($status_code -gt 0) {
+                Throw "Authentication failed with HTTP status [$status_code]."
             }
-            Else {
-                [string]$ReturnCodeWarning = "Invoke-WebRequest failed for an unexpected reason due to [$Message]"
-                Write-Warning -Message $ReturnCodeWarning
-                Break
-            }
-            [string]$ReturnCodeWarning = Switch ($return_code) {
-                401 { "You received HTTP Code $return_code (Unauthorized). DID YOU MAYBE ENTER THE WRONG PASSWORD? :-)" }
-                403 { "You received HTTP Code $return_code (Forbidden). DO YOU MAYBE NOT HAVE PERMISSION TO THIS? [$command]" }
-                404 { "You received HTTP Code $return_code (Page Not Found). ARE YOU SURE THIS ENDPOINT REALLY EXISTS? [$command]" }
-                Default { "You received HTTP Code $return_code instead of '200 OK'. Apparently, something is wrong..." }
-            }
-            Write-Warning -Message $ReturnCodeWarning
-            Break
+            Throw 'The authentication request failed before a valid response was received.'
         }
-        [string]$content = $results.Content
-        If ($content -notmatch '^{"token_type":"Bearer","access_token":"[a-zA-Z-_:,."0-9]{1,}"}$') {
-            [string]$content = "The returned content does not contain a bearer token. Please check the credential you are using."
-            Break
-        }
-        Write-Verbose -Message "`r`nToken properties: $content`r`n"
-        $Error.Clear()
         Try {
-            [PSCustomObject]$token_properties = $content | ConvertFrom-Json
+            [PSCustomObject]$authentication_properties = [string]$authentication_response.Content | ConvertFrom-Json -ErrorAction Stop
         }
         Catch {
-            [string]$Message = $_.Exception.Message
-            Write-Warning -Message "ConvertFrom-Json failed due to [$Message]."
-            Break
+            Throw 'The authentication response was not valid JSON.'
         }
-        Return $token_properties
+        [int64]$response_expiration = 0
+        If ([string]$authentication_properties.token_type -cne 'Bearer') {
+            Throw 'The authentication response did not contain the expected bearer token type.'
+        }
+        If (-not (Test-ANOWTokenValue -Token $authentication_properties.access_token)) {
+            Throw 'The authentication response did not contain a usable access token.'
+        }
+        If (-not [int64]::TryParse([string]$authentication_properties.expirationDate, [ref]$response_expiration) -or $response_expiration -le 0) {
+            Throw 'The authentication response did not contain a valid expiration date.'
+        }
+        $raw_authentication_refresh_token = $authentication_properties.refresh_token
+        If ($null -ne $raw_authentication_refresh_token -and
+            -not ($raw_authentication_refresh_token -is [string] -and [string]::IsNullOrEmpty([string]$raw_authentication_refresh_token)) -and
+            -not (Test-ANOWTokenValue -Token $raw_authentication_refresh_token)) {
+            Throw 'The authentication response contained an unusable refresh token.'
+        }
+        $authentication_properties.expirationDate = $response_expiration
+        Return $authentication_properties
     }
-    If ($Instance -match '^http[s]{0,}://') {
-        Write-Warning -Message "Please do not include https:// in the name of the instance. See Get-Help Connect-AutomateNOW -Examples for examples."
-        Break
+
+    If ($Instance -match '^https?://' -or $Instance -match '[/\\]') {
+        Write-Warning -Message 'Specify only the AutomateNOW host name in -Instance; do not include a protocol or path.'
+        Return
     }
-    ElseIf ($Instance -match '(/|\\)') {
-        Write-Warning -Message "Please do not include any forward or backward slashes in the instance name. See Get-Help Connect-AutomateNOW -Examples for examples."
-        Break
+    If ([string]::IsNullOrWhiteSpace($Domain) -eq $false -and $Domain -cne $Domain.Trim()) {
+        Write-Warning -Message 'Domain cannot contain leading or trailing whitespace.'
+        Return
     }
+
+    [string]$protocol = 'https'
     If ($NotSecure -eq $true) {
-        [string]$protocol = 'http'
+        $protocol = 'http'
     }
-    Else {
-        [string]$protocol = 'https'
+
+    $prior_session_variable = Get-Variable -Name anow_session -Scope Global -ErrorAction SilentlyContinue
+    [boolean]$prior_session_exists = $null -ne $prior_session_variable
+    $prior_session = $null
+    If ($prior_session_exists -eq $true) {
+        $prior_session = $prior_session_variable.Value
     }
-    If (($anow_session.ExpirationDate -is [datetime]) -and ($SkipPreviousSessionCheck -ne $true)) {
-        [datetime]$current_date = Get-Date
-        [datetime]$expiration_date = $anow_session.ExpirationDate
-        [timespan]$TimeRemaining = ($expiration_date - $current_date)
-        [int32]$SecondsRemaining = $TimeRemaining.TotalSeconds
-        If ($SecondsRemaining -gt 60) {
-            [string]$AlreadyConnectedInstance = ($anow_session.Instance)
-            If ($Instance -eq $AlreadyConnectedInstance) {
-                Write-Warning -Message "Please use Disconnect-AutomateNOW to disconnect from $AlreadyConnectedInstance before connecting to $Instance (Use -SkipPreviousSessionCheck to override this)"
-            }
-            Else {
-                Write-Warning -Message "Please use Disconnect-AutomateNOW to disconnect your active connection to $AlreadyConnectedInstance (It still has [$SecondsRemaining] seconds remaining) (Use -SkipPreviousSessionCheck to override this)"
-            }
-            Break
-        }
-        Else {
-            If ($expiration_date -gt (Get-Date -Date '1970-01-01 00:00:00')) {
-                If ($SecondsRemaining -lt -172800) {
-                    [int32]$DaysRemaining = ($SecondsRemaining * -1) / 86400
-                    Write-Warning -Message "Your previous token expired about $DaysRemaining days ago on $expiration_date. Cleaning up the previous session."
-                }
-                ElseIf ($SecondsRemaining -lt -7200) {
-                    [int32]$HoursRemaining = ($SecondsRemaining * -1) / 3600
-                    Write-Warning -Message "Your previous token expired about $HoursRemaining hours ago on $expiration_date. Cleaning up the previous session."
-                }
-                ElseIf ($SecondsRemaining -lt -300) {
-                    [int32]$MinutesRemaining = ($SecondsRemaining * -1) / 60
-                    Write-Warning -Message "Your previous token expired about $MinutesRemaining minutes ago on $expiration_date. Cleaning up the previous session."
+    If ($prior_session_exists -eq $true -and $SkipPreviousSessionCheck -ne $true) {
+        If ($prior_session.ExpirationDate -is [datetime]) {
+            [int64]$seconds_remaining = [math]::Floor((([datetime]$prior_session.ExpirationDate) - (Get-Date)).TotalSeconds)
+            If ($seconds_remaining -gt 0) {
+                [string]$prior_instance = [string]$prior_session.Instance
+                If ($seconds_remaining -le 60) {
+                    Write-Warning -Message "The existing session for [$prior_instance] is still valid for approximately [$seconds_remaining] seconds. Disconnect it first or use -SkipPreviousSessionCheck."
                 }
                 Else {
-                    [int32]$SecondsRemaining = $SecondsRemaining * -1
-                    Write-Warning -Message "Your previous token expired about $SecondsRemaining seconds ago on $expiration_date. Cleaning up the previous session."
+                    Write-Warning -Message "An existing session for [$prior_instance] is still valid. Disconnect it first or use -SkipPreviousSessionCheck."
                 }
+                Return
             }
-            $Error.Clear()
-            Try {
-                Remove-Variable -Name anow_session -Scope Global -Force
-            }
-            Catch {
-                [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Remove-Variable failed to remove the expired `$anow_session variable due to [$Message]."
-                Break
-            }
-        }
-    }
-    If ($ReadJSONFromClipboard -eq $true) {
-        $Error.Clear()
-        Try {
-            If ($null -eq (Get-Clipboard)) {
-                Write-Warning -Message "The clipboard cannot be read. Please use a different parameter set or fill up your clipboard with the authentication JSON payload."
-                Break
-            }
-            Else {
-                [string]$Clipboard = Get-Clipboard
-                If ($Clipboard -notmatch '[0-9a-zA-Z \n{}":,_.-]{1,}(?:"expires_in")[0-9a-zA-Z \n{}":,_.-]{1,}') {
-                    Write-Verbose -Message "The contents of the clipboard are: $Clipboard"
-                    Write-Warning -Message "The contents of the clipboard do not appear to be a valid JSON authentication payload"
-                    Break
-                }
-            }
-        }
-        Catch {
-            [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Get-Clipboard failed to read the clipboard due to [$Message]."
-            Break
-        }
-        $Error.Clear()
-        Try {
-            [PSCustomObject]$AuthenticationObject = $Clipboard | ConvertFrom-Json
-        }
-        Catch {
-            [string]$Message = $_.Exception.Message
-            Write-Warning -Message "ConvertFrom-Json failed to convert the contents of the clipboard due to [$Message]."
-            Break
-        }
-        If ($AuthenticationObject.token_type -ne 'Bearer') {
-            Write-Warning -Message "The authentication object that was extracted from the clipboard does not include the Token Type. This is fatal."
-            Break
-        }
-        ElseIf ($AuthenticationObject.expires_in -isnot [int64]) {
-            Write-Warning -Message "The authentication object that was extracted from the clipboard does not have a valid expires_in property. This is fatal."
-            Break
-        }
-        ElseIf ($AuthenticationObject.expirationDate -isnot [int64]) {
-            Write-Warning -Message "The authentication object that was extracted from the clipboard does not have a valid expirationDate property. This is fatal."
-            Break
-        }
-        [string]$AccessToken = $AuthenticationObject.access_token
-        [string]$RefreshToken = $AuthenticationObject.refresh_token
-        [int64]$ExpirationDate = $AuthenticationObject.expirationDate
-    }
-    If ($AccessToken.Length -eq 0) {
-        If ($User.Length -eq 0 ) {
-            $Error.Clear()
-            Try {
-                [string]$User = Read-Host -Prompt 'Please enter username (e.g. jsmith)'
-            }
-            Catch {
-                [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Read-Host failed to receive the current username due to [$Message]."
-                Break
-            }
-            If ($User.Length -eq 0) {
-                Write-Warning -Message 'You needed to specify a username. Please try again.'
-                Break
-            }
-        }
-        If ($SecurePass.Length -eq 0 ) {
-            $Error.Clear()
-            Try {
-                [SecureString]$SecurePass = Read-Host -Prompt 'Please enter password (e.g. ******)' -AsSecureString
-            }
-            Catch {
-                [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Read-Host failed due to [$Message]."
-                Break
-            }
-        }
-        [hashtable]$parameters = @{}
-        $parameters.Add('User', $User)
-        $parameters.Add('SecurePass', $SecurePass)
-        If ($Proxy.Length -gt 0) {
-            $parameters.Add('Proxy', $Proxy)
-        }
-        $Error.Clear()
-        Try {
-            [PSCustomObject]$token_properties = New-ANOWAuthenticationProperties @parameters
-        }
-        Catch {
-            [string]$Message = $_.Exception.Message
-            Write-Warning -Message "New-ANOWAuthenticationProperties failed due to [$Message]."
-            Break
-        }
-        If ( $token_properties.expirationDate -isnot [int64]) {
-            Write-Warning -Message "How is it that the expiration date value is not a 64-bit integer? Something must be wrong. Are we in a time machine?"
-            Break
-        }
-        [string]$AccessToken = $token_properties.access_token
-        [string]$RefreshToken = $token_properties.refresh_token
-    }
-    If ($RefreshToken.Length -eq 0) {
-        [string]$RefreshToken = 'Not set'
-    }
-    $Error.Clear()
-    Try {
-        [System.TimeZoneInfo]$timezone = Get-TimeZone
-    }
-    Catch {
-        [string]$Message = $_.Exception.Message
-        Write-Warning -Message "Get-TimeZone failed to get the local time zone due to [$Message]."
-        Break
-    }
-    [boolean]$dst = (Get-Date).IsDaylightSavingTime()
-    If ($dst -eq $true) {
-        [System.TimeSpan]$utc_offset = ($timezone.BaseUtcOffset + (New-TimeSpan -Minutes 60))
-    }
-    Else {
-        [System.TimeSpan]$utc_offset = $timezone.BaseUtcOffset
-    }
-    [datetime]$epoch_date = Get-Date -Date '1970-01-01'
-    If (($ExpirationDate -gt 0) -or ($token_properties.expirationDate -gt 0)) {
-        If ($ExpirationDate -gt 0) {
-            $Error.Clear()
-            Try {
-                [datetime]$expiration_date = $epoch_date.AddMilliseconds($ExpirationDate)
-            }
-            Catch {
-                Write-Warning -Message "Get-Date failed to process the expiration date from the `$ExpirationDate variable in milliseconds due to [$Message]"
-                Break
-            }
+            Write-Verbose -Message 'The prior global session is expired; it will be replaced only if the new connection succeeds.'
         }
         Else {
-            $Error.Clear()
+            Write-Verbose -Message 'The prior global session has no usable expiration date; it will be replaced only if the new connection succeeds.'
+        }
+    }
+
+    [string]$selected_access_token = $null
+    [string]$selected_refresh_token = $null
+    [int64]$selected_expiration = 0
+    [PSCustomObject]$token_properties = $null
+
+    Switch ($PSCmdlet.ParameterSetName) {
+        'Clipboard' {
+            If ($ReadJSONFromClipboard -ne $true) {
+                Write-Warning -Message 'Clipboard authentication was selected without the required switch.'
+                Return
+            }
             Try {
-                [datetime]$expiration_date = $epoch_date.AddMilliseconds($token_properties.expirationDate)
+                $clipboard_value = Get-Clipboard -ErrorAction Stop
             }
             Catch {
-                Write-Warning -Message "Get-Date failed to process the expiration date from the `$token_properties.expirationDate variable in milliseconds due to [$Message]"
-                Break
+                Write-Warning -Message 'The clipboard could not be read. Copy a fresh browser authentication JSON payload and try again.'
+                Return
             }
+            [string]$clipboard_json = @($clipboard_value) -join [Environment]::NewLine
+            If ([string]::IsNullOrWhiteSpace($clipboard_json)) {
+                Write-Warning -Message 'The clipboard is empty. Copy a fresh browser authentication JSON payload and try again.'
+                Return
+            }
+            Try {
+                [PSCustomObject]$authentication_object = $clipboard_json | ConvertFrom-Json -ErrorAction Stop
+            }
+            Catch {
+                Write-Warning -Message 'The clipboard did not contain valid authentication JSON.'
+                Return
+            }
+            [int64]$clipboard_expires_in = 0
+            [int64]$clipboard_expiration = 0
+            If ([string]$authentication_object.token_type -cne 'Bearer') {
+                Write-Warning -Message 'The clipboard authentication object did not contain the expected bearer token type.'
+                Return
+            }
+            If (-not (Test-ANOWTokenValue -Token $authentication_object.access_token)) {
+                Write-Warning -Message 'The clipboard authentication object did not contain a usable access token.'
+                Return
+            }
+            If (-not [int64]::TryParse([string]$authentication_object.expires_in, [ref]$clipboard_expires_in) -or $clipboard_expires_in -lt 0) {
+                Write-Warning -Message 'The clipboard authentication object did not contain a valid expires_in value.'
+                Return
+            }
+            If (-not [int64]::TryParse([string]$authentication_object.expirationDate, [ref]$clipboard_expiration) -or $clipboard_expiration -le 0) {
+                Write-Warning -Message 'The clipboard authentication object did not contain a valid expirationDate value.'
+                Return
+            }
+            $raw_clipboard_refresh_token = $authentication_object.refresh_token
+            If ($null -ne $raw_clipboard_refresh_token -and
+                -not ($raw_clipboard_refresh_token -is [string] -and [string]::IsNullOrEmpty([string]$raw_clipboard_refresh_token)) -and
+                -not (Test-ANOWTokenValue -Token $raw_clipboard_refresh_token)) {
+                Write-Warning -Message 'The clipboard authentication object contained an unusable refresh token.'
+                Return
+            }
+            $selected_access_token = [string]$authentication_object.access_token
+            $selected_refresh_token = [string]$raw_clipboard_refresh_token
+            $selected_expiration = $clipboard_expiration
+            $clipboard_json = $null
         }
-        [datetime]$Current_Date = Get-Date
-        [datetime]$expiration_date = ($expiration_date + $utc_offset) # We're adding 2 values here: the current time in UTC and the current machine's UTC offset
-        [timespan]$Remaining_Time = ($Current_Date - $expiration_date)
-        If ($Remaining_Time.TotalSeconds -gt 0) {
-            [int32]$remaining_minutes = $Remaining_Time.TotalMinutes
-            [string]$display_date = $expiration_date.ToString()
-            Write-Warning -Message "This token expired about [$remaining_minutes] minute(s) ago at [$display_date]. Please re-authenticate to obtain a new one."
-            Break
+        'AccessToken' {
+            If (-not (Test-ANOWTokenValue -Token $AccessToken)) {
+                Write-Warning -Message 'The supplied access token is empty or malformed.'
+                Return
+            }
+            If (-not [string]::IsNullOrEmpty($RefreshToken) -and -not (Test-ANOWTokenValue -Token $RefreshToken)) {
+                Write-Warning -Message 'The supplied refresh token is malformed.'
+                Return
+            }
+            $selected_access_token = $AccessToken
+            $selected_refresh_token = $RefreshToken
+            $selected_expiration = $ExpirationDate
+        }
+        Default {
+            If ($PSCmdlet.ParameterSetName -eq 'Default') {
+                Try {
+                    $User = Read-Host -Prompt 'Please enter username (e.g. jsmith)' -ErrorAction Stop
+                    $SecurePass = Read-Host -Prompt 'Please enter password' -AsSecureString -ErrorAction Stop
+                }
+                Catch {
+                    Write-Warning -Message 'The username or password prompt could not be completed.'
+                    Return
+                }
+            }
+            If ([string]::IsNullOrWhiteSpace($User) -or $null -eq $SecurePass -or $SecurePass.Length -eq 0) {
+                Write-Warning -Message 'A non-empty username and secure password are required.'
+                Return
+            }
+            [hashtable]$authentication_parameters = @{
+                Instance = $Instance
+                Protocol = $protocol
+                User = $User
+                SecurePass = $SecurePass
+                Key = $Key
+                SkipCertificateCheck = $SkipCertificateCheck
+            }
+            If (-not [string]::IsNullOrWhiteSpace($Proxy)) {
+                $authentication_parameters['Proxy'] = $Proxy
+            }
+            Try {
+                $token_properties = Get-ANOWAuthenticationResponse @authentication_parameters
+            }
+            Catch {
+                Write-Warning -Message 'Credential authentication failed. No credential or token details were emitted.'
+                Return
+            }
+            $selected_access_token = [string]$token_properties.access_token
+            $selected_refresh_token = [string]$token_properties.refresh_token
+            $selected_expiration = [int64]$token_properties.expirationDate
+        }
+    }
+
+    If (-not (Test-ANOWTokenValue -Token $selected_access_token)) {
+        Write-Warning -Message 'Authentication did not produce a usable access token.'
+        Return
+    }
+    If ([string]::IsNullOrEmpty($selected_refresh_token)) {
+        $selected_refresh_token = 'Not set'
+    }
+    ElseIf (-not (Test-ANOWTokenValue -Token $selected_refresh_token)) {
+        Write-Warning -Message 'Authentication produced an unusable refresh token.'
+        Return
+    }
+
+    [boolean]$expiration_known = $selected_expiration -gt 0
+    If ($expiration_known -eq $true) {
+        Try {
+            [datetime]$expiration_date = ConvertFrom-ANOWUnixExpiration -Value $selected_expiration
+        }
+        Catch {
+            Write-Warning -Message 'The supplied token expiration date is invalid.'
+            Return
+        }
+        If ($expiration_date -le (Get-Date)) {
+            Write-Warning -Message "The supplied token expired at [$($expiration_date.ToString('s'))]. Re-authenticate and try again."
+            Return
         }
     }
     Else {
-        [datetime]$expiration_date = $epoch_date
+        [datetime]$expiration_date = [System.DateTimeOffset]::FromUnixTimeMilliseconds(0).LocalDateTime
     }
-    [hashtable]$anow_session = @{}
-    $anow_session.Add('User', $User)
-    $anow_session.Add('Instance', $Instance)
+
+    [hashtable]$home_parameters = @{
+        Uri = ($protocol + '://' + $Instance + '/automatenow')
+    }
+    If ($PSVersionTable.PSVersion.Major -eq 5) {
+        $home_parameters['UseBasicParsing'] = $true
+    }
+    If (-not [string]::IsNullOrWhiteSpace($Proxy)) {
+        $home_parameters['Proxy'] = $Proxy
+    }
+    Try {
+        $home_response = Invoke-ANOWWebRequest -Parameters $home_parameters -SkipCertificateCheck:$SkipCertificateCheck -ErrorAction Stop
+    }
+    Catch {
+        Write-Warning -Message 'The AutomateNOW home page could not be retrieved for required instance discovery.'
+        Return
+    }
+    If ([int32]$home_response.StatusCode -ne 200) {
+        Write-Warning -Message "Required instance discovery returned HTTP status [$([int32]$home_response.StatusCode)]."
+        Return
+    }
+    Try {
+        [PSCustomObject]$instance_info = ConvertFrom-ANOWInstancePage -Content ([string]$home_response.Content)
+    }
+    Catch {
+        Write-Warning -Message 'The AutomateNOW home page did not contain usable instance information.'
+        Return
+    }
+
+    [hashtable]$instance_info_table = @{}
+    ForEach ($instance_property in ($instance_info | Get-Member -MemberType NoteProperty | Select-Object -ExpandProperty Name)) {
+        $instance_info_table[$instance_property] = $instance_info.$instance_property
+    }
+    [hashtable]$session_header = @{
+        Authorization = "Bearer $selected_access_token"
+        domain = ''
+    }
+    [hashtable]$anow_session = @{
+        User = [string]$User
+        Instance = $Instance
+        ExpirationDate = $expiration_date
+        expiration_known = $expiration_known
+        AccessToken = $selected_access_token
+        RefreshToken = $selected_refresh_token
+        do_not_refresh = ($DoNotRefresh -eq $true)
+        header = $session_header
+        current_domain = ''
+        protocol = $protocol
+        allow_timeout = ($AllowTimeout -eq $true)
+        SkipCertificateCheck = ($SkipCertificateCheck -eq $true)
+        instance_info = $instance_info_table
+        calendar_info = [PSCustomObject]@{
+            firstDayOfWeek = $instance_info.firstDayOfWeek
+            firstCalendarYear = $instance_info.firstCalendarYear
+            lastCalendarYear = $instance_info.lastCalendarYear
+        }
+    }
     If ($NotSecure -eq $true) {
-        $anow_session.Add('NotSecure', $True)
+        $anow_session['NotSecure'] = $true
     }
-    If ($Proxy.Length -gt 0) {
-        $anow_session.Add('Proxy', $Proxy)
+    If (-not [string]::IsNullOrWhiteSpace($Proxy)) {
+        $anow_session['Proxy'] = $Proxy
     }
-    $anow_session.Add('ExpirationDate', $expiration_date)
-    $anow_session.Add('AccessToken', $AccessToken)
-    $anow_session.Add('RefreshToken', $RefreshToken)
-    [hashtable]$Header = @{'Authorization' = "Bearer $AccessToken"; 'domain' = ''; }
-    $anow_session.Add('header', $Header)
-    $Error.Clear()
-    Try {
-        New-Variable -Name 'anow_session' -Scope Global -Value $anow_session -Force
-    }
-    Catch {
-        [string]$Message = $_.Exception.Message
-        Write-Warning -Message "New-Variable failed to create the session properties object due to [$Message]"
-        Break
-    }
-    Write-Verbose -Message 'Global variable $anow_session.header has been set. Refer to this as your authentication header.'
-    [string]$home_url = ($protocol + '://' + $instance + '/automatenow')
-    [hashtable]$parameters = @{}
-    $parameters.Add('UseBasicParsing', $true)
-    $parameters.Add('Uri', $home_url)
-    If ($Proxy.Length -gt 0) {
-        $parameters.Add('Proxy', $Proxy)
-        [int32]$ps_version_major = $PSVersionTable.PSVersion.Major
-        If ($ps_version_major -eq 5) {
-            # The below C# code provides the equivalent of the -SkipCertificateCheck parameter for Windows PowerShell 5.1 Invoke-WebRequest
-            If (($null -eq ("TrustAllCertsPolicy" -as [type])) -and ($protocol -eq 'http')) {
-                [string]$certificate_policy = @"
-                using System.Net;
-                using System.Security.Cryptography.X509Certificates;
-                public class TrustAllCertsPolicy : ICertificatePolicy {
-                    public bool CheckValidationResult(
-                        ServicePoint srvPoint, X509Certificate certificate,
-                        WebRequest request, int certificateProblem) {
-                        return true;
-                    }
-                }
-"@
-                $Error.Clear()
-                Try {
-                    Add-Type -TypeDefinition $certificate_policy
-                }
-                Catch {
-                    [string]$Message = $_.Exception.Message
-                    Write-Warning -Message "Add-Type failed to add the custom certificate policy due to [$Message]"
-                    Break
-                }
-                $Error.Clear()
-                Try {
-                    [System.Net.ServicePointManager]::CertificatePolicy = New-Object -TypeName TrustAllCertsPolicy
-                }
-                Catch {
-                    [string]$Message = $_.Exception.Message
-                    Write-Warning -Message "New-Object failed to create a new 'TrustAllCertsPolicy' CertificatePolicy object due to [$Message]."
-                    Break
-                }
-            }
-            $parameters.Add('UseBasicParsing', $true)
-        }
-        ElseIf ( $ps_version_major -gt 5) {
-            $parameters.Add('SkipCertificateCheck', $true)
-        }
-        Else {
-            Write-Warning -Message "Please use either Windows PowerShell 5.1 or PowerShell Core."
-            Break
-        }
-    }
-    $Error.Clear()
-    Try {
-        [Microsoft.PowerShell.Commands.BasicHtmlWebResponseObject]$results = Invoke-WebRequest @parameters
-    }
-    Catch {
-        [string]$Message = $_.Exception.Message
-        If ($Message -match '(The underlying connection was closed|The SSL connection could not be established)') {
-            Write-Warning -Message 'Please try again with the -NotSecure parameter if you are connecting to an insecure instance.'
-            Break
-        }
-        ElseIf ($Message -match 'Response status code does not indicate success:') {
-            $Error.Clear()
-            Try {
-                [int32]$return_code = $Message -split 'success: ' -split ' ' | Select-Object -Last 1 -Skip 1
-            }
-            Catch {
-                [string]$Message2 = $_.Exception.Message
-                Write-Warning -Message "Unable to extract the error code from [$Message] due to [$Message2]"
-            }
-        }
-        ElseIf ($Message -match 'The remote server returned an error: ') {
-            $Error.Clear()
-            Try {
-                [int32]$return_code = $Message -split '\(' -split '\)' | Select-Object -Skip 1 -First 1
-            }
-            Catch {
-                [string]$Message2 = $_.Exception.Message
-                Write-Warning -Message "Unable to extract the error code from [$Message] due to [$Message2]"
-            }
-        }
-        ElseIf ($Message -eq 'An error occurred while sending the request.') {
-            Write-Warning -Message "Received the error message '$Message' - This usually means something is wrong with the server! Contact your admins."
-            Break
-        }
-        Else {
-            [string]$ReturnCodeWarning = "Invoke-WebRequest failed trying to access the home page under Connect-AutomateNOW due to [$Message]"
-            Write-Warning -Message $ReturnCodeWarning
-            Break
-        }
-        [string]$ReturnCodeWarning = Switch ($return_code) {
-            401 { "You received HTTP Code $return_code (Unauthorized). DID YOU MAYBE ENTER THE WRONG PASSWORD? :-)" }
-            403 { "You received HTTP Code $return_code (Forbidden). DO YOU MAYBE NOT HAVE PERMISSION TO THIS? [$command]" }
-            404 { "You received HTTP Code $return_code (Page Not Found). ARE YOU SURE THIS ENDPOINT REALLY EXISTS? [$command]" }
-            Default { "You received HTTP Code $return_code instead of '200 OK'. Apparently, something is wrong..."; }
-        }
-        Write-Warning -Message $ReturnCodeWarning
-        Break
-    }
-    If ($results.StatusCode -eq 200) {
-        $Error.Clear()
+
+    [boolean]$domain_was_explicit = -not [string]::IsNullOrWhiteSpace($Domain)
+    [boolean]$timezone_import_completed = $false
+    Do {
         Try {
-            [PSCustomObject]$instance_info = (($results | Select-Object -ExpandProperty content) -split "`n" | Where-Object { $_ -match '^\s{0,8}{"licenseInfo":.{1,}' } | Select-Object -First 1) | ConvertFrom-Json
+            # Domain membership is not yet known. Use the local catalogue so
+            # the logged-on user can be resolved without sending a provisional
+            # or wrong-case domain header to the server.
+            $null = Import-AutomateNOWLocalTimeZone -ErrorAction Stop
+            $timezone_import_completed = $true
         }
         Catch {
-            [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Failed to parse the results of the home page details object due to [$Message]"
-            Break
+            $timezone_import_completed = $false
         }
-        If ($Null -eq $instance_info.licenseInfo) {
-            Write-Warning -Message "The response from the instance info request was empty!"
-            Break
+    } While ($false)
+    If ($timezone_import_completed -ne $true -or @($anow_session.supported_timezones).Count -eq 0) {
+        Write-Warning -Message 'The local AutomateNOW timezone catalogue could not be loaded during connection setup.'
+        Return
+    }
+    [ANOWTimeZone]$server_timezone = $anow_session.supported_timezones | Where-Object { $_.id -ceq [string]$instance_info.defaultTimeZone } | Select-Object -First 1
+    If ($null -eq $server_timezone -or [string]::IsNullOrWhiteSpace($server_timezone.id)) {
+        Write-Warning -Message 'The instance default timezone could not be resolved during connection setup.'
+        Return
+    }
+    $anow_session['server_timezone'] = $server_timezone
+
+    [boolean]$logged_on_user_completed = $false
+    [ANOWSecUserInfo]$user_info = $null
+    Do {
+        $user_info = Get-AutomateNOWSecUser -LoggedOnUser
+        $logged_on_user_completed = $true
+    } While ($false)
+    If ($logged_on_user_completed -ne $true -or $null -eq $user_info -or [string]::IsNullOrWhiteSpace($user_info.id)) {
+        Write-Warning -Message 'The logged-on user could not be resolved during connection setup.'
+        Return
+    }
+    [string]$logged_on_user_id = $user_info.id
+
+    [string[]]$domains = @()
+    ForEach ($domain_value in @($user_info.domains)) {
+        If ($null -eq $domain_value) {
+            Continue
         }
-        $Error.Clear()
-        Try {
-            [hashtable]$instance_info_table = @{}
-            [string[]]$instance_info_keys = $instance_info | Get-Member -MemberType NoteProperty | Select-Object -ExpandProperty Name
-            ForEach ($entry in $instance_info_keys) {
-                $instance_info_table.Add(($entry), ($instance_info."$entry"))
+        [string[]]$domain_parts = @([string]$domain_value)
+        If ([string]$domain_value -match ',') {
+            $domain_parts = [string]$domain_value -split ','
+        }
+        ElseIf ([string]$domain_value -match '\s') {
+            $domain_parts = [string]$domain_value -split '\s+'
+        }
+        ForEach ($domain_part in $domain_parts) {
+            [string]$normalized_domain = $domain_part.Trim()
+            If (-not [string]::IsNullOrWhiteSpace($normalized_domain) -and $domains -cnotcontains $normalized_domain) {
+                $domains += $normalized_domain
             }
         }
-        Catch {
-            [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Failed to parse the instance information into a valid object due to [$Message]. We were so close! Did something change in InfiniteDATA's code? :-)"
-            Break
-        }
-        If ($Domain.Length -gt 0) {
-            $Header['domain'] = $Domain
-            Import-AutomateNOWTimeZone
-            $Error.Clear()
-            Try {
-                [ANOWTimeZone]$server_timezone = Get-AutomateNOWTimeZone -Id ($instance_info.defaultTimeZone)
-            }
-            Catch {
-                [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Failed to parse the default time zone from [$Instance] into a valid ANOWTimeZone class object due to [$Message]. We were so close! Did something change in the ANOW code? :-)"
-                Break
-            }
-            $Error.Clear()
-            Try {
-                [ANOWTimeZone[]]$available_timezones = ($instance_info.timeZones) -split ',' | Get-AutomateNOWTimeZone
-            }
-            Catch {
-                [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Failed to parse the available time zones from [$Instance] into an array of valid ANOWTimeZone class objects due to [$Message]. We were so close! Did something change in the ANOW code? :-)"
-                Break
-            }
-            [int32]$available_timezones_count = $available_timezones.count
-            If ($available_timezones_count -gt 0) {
-                Write-Verbose -Message "[$Instance] has [$available_timezones_count] available timezones to choose from"
+    }
+    $domains = @($domains | Sort-Object)
+    If ($domains.Count -eq 0) {
+        Write-Warning -Message 'The logged-on user has no available domains.'
+        Return
+    }
+    $anow_session['available_domains'] = $domains
+
+    [string]$selected_domain = ''
+    [string]$default_domain = [string]$user_info.defaultDomain
+    [boolean]$full_user_completed = $false
+    [ANOWSecUser]$user_details = $null
+    If ($domain_was_explicit -eq $true) {
+        If ($domains -cnotcontains $Domain) {
+            [string]$available_domain_display = $domains -join ', '
+            If ($domains -contains $Domain) {
+                Write-Warning -Message "Domain names are case-sensitive. Choose one of: [$available_domain_display]."
             }
             Else {
-                Write-Warning -Message "There are no timezones available from this instance. Something must be wrong."
-                Break
+                Write-Warning -Message "The requested domain is unavailable. Choose one of: [$available_domain_display]."
             }
-            $anow_session.Add('available_timezones', $available_timezones)
+            Return
         }
-        Else {
-            Import-AutomateNOWLocalTimeZone
+        $selected_domain = $Domain
+    }
+    ElseIf ($domains.Count -eq 1) {
+        $selected_domain = $domains[0]
+    }
+    ElseIf (-not [string]::IsNullOrWhiteSpace($default_domain)) {
+        If ($domains -cnotcontains $default_domain) {
+            Write-Warning -Message 'The configured default domain is not an exact-case member of the user available domains.'
+            Return
         }
-        $anow_session.Add('server_timezone', $server_timezone)
-        $anow_session.Add('instance_info', $instance_info_table)
-        [PSCustomObject]$CalendarInfo = [PSCustomObject]@{'firstDayOfWeek' = $instance_info.firstDayOfWeek; 'firstCalendarYear' = $instance_info.firstCalendarYear; 'lastCalendarYear' = $instance_info.lastCalendarYear; }
-        $anow_session.Add('calendar_info', $CalendarInfo)
-        [string]$applicationVersion = $anow_session.instance_info.licenseInfo.applicationVersion
-        [string]$application = $anow_session.instance_info.licenseInfo.application
-        If ($Id.length -eq 0) {
-            $Error.Clear()
-            Try {
-                [ANOWSecUserInfo]$userInfo = Get-AutomateNOWSecUser -LoggedOnUser
-            }
-            Catch {
-                [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Get-AutomateNOWSecUser failed to get the currently logged in user info due to [$Message]."
-                Break
-            }
-            [string]$Id = $userInfo.Id
-        }
-        # Make sure to check that the domain supplied to the -Domain parameter actually exists within the users available domains
-        If ($userInfo.domains -match ',') {
-            [string[]]$domains = $userInfo.domains -split ',' | Sort-Object
-        }
-        Else {
-            [string[]]$domains = $userInfo.domains -split ' ' | Sort-Object
-        }
-        [int32]$domain_count = $domains.Count
-        Write-Verbose -Message "Detected $domain_count domains"
-        If ($AllowTimeout -eq $true) {
-            $anow_session.Add('allow_timeout', $true)
-        }
-        Else {
-            $anow_session.Add('allow_timeout', $false)
-        }
-        If ($domain_count -gt 0) {
-            $anow_session.Add('available_domains', $domains)
-        }
-        Else {
-            Write-Warning -Message "The count of domains is zero."
-            Break
-        }
-        If ($domain_count -eq 1) {
-            If ($Domain.Length -eq 0) {
-                [string]$Domain = $domains
-                If ($null -ne $anow_session.header.Domain) {
-                    $anow_session.header.Remove('domain')
+        $selected_domain = $default_domain
+    }
+
+    # Retain compatibility with older getUserInfo responses that omit the
+    # default domain. The full-user lookup is still performed without a domain
+    # only when it is required to discover that missing default.
+    If ([string]::IsNullOrWhiteSpace($selected_domain)) {
+        Do {
+            $user_details = Get-AutomateNOWSecUser -Id $logged_on_user_id | Select-Object -First 1
+            $full_user_completed = $true
+        } While ($false)
+        If ($full_user_completed -eq $true -and $null -ne $user_details) {
+            $default_domain = [string]$user_details.defaultDomain
+            If (-not [string]::IsNullOrWhiteSpace($default_domain)) {
+                If ($domains -cnotcontains $default_domain) {
+                    Write-Warning -Message 'The configured default domain is not an exact-case member of the user available domains.'
+                    Return
                 }
-                $anow_session.header.Add('domain', $Domain)
-                Write-Verbose -Message "Automatically choosing the [$Domain] domain as it is the only one available."
-            }
-            ElseIf ($userInfo.domains -ne $Domain) {
-                Write-Warning -Message "The domain you chose with -Domain [$Domain] is not the same as the one on [$instance]. Please check the domain name again and note that it is case-sensitive."
-                Break
+                $selected_domain = $default_domain
             }
         }
-        Else {
-            If ($domains -ccontains $Domain) {
-                If ($Domain.Length -gt 0) {
-                    $anow_session.header['domain'] = $Domain
-                }
-            }
-            ElseIf ($Domain.Length -gt 0 -and $defaultDomain.Length -eq 0) {
-                Write-Warning -Message "The domain you chose with -Domain (or your default Domain) [$Domain] is not available on [$instance]. Please check the domain name again and note that it is case-sensitive."
-                Break
-            }
-            Else {
-                Write-Verbose -Message "Proceeding without a domain selected and there is no default domain for $Id"
-            }
-        }
-        # Now that we know the name of the user and that the selected domain is available, we can omit the -LoggedOnUser parameter from Get-AutomateNOWSecUser to fetch the *full details*
-        $Error.Clear()
+    }
+    If ([string]::IsNullOrWhiteSpace($selected_domain)) {
+        [string]$domain_choices = $domains -join ', '
+        Write-Warning -Message "Reconnect with one of these case-sensitive domains: $domain_choices"
+        Return
+    }
+    $anow_session.header['domain'] = $selected_domain
+    $anow_session['current_domain'] = $selected_domain
+
+    # The domain is now an exact-case member of the logged-on user's domains.
+    # Replace the bootstrap catalogue with the authoritative server catalogue.
+    $timezone_import_completed = $false
+    Do {
         Try {
-            [ANOWSecUser]$user = Get-AutomateNOWSecUser -Id $Id
+            $null = Import-AutomateNOWTimeZone -ErrorAction Stop
+            $timezone_import_completed = $true
         }
         Catch {
-            [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Get-AutomateNOWSecUser failed to get the currently logged in users full info due to [$Message]."
-            Break
+            $timezone_import_completed = $false
         }
-        $Error.Clear()
-        If ($user.apiUser -eq $true) {
-            $anow_session['APIUser'] = $true
+    } While ($false)
+    If ($timezone_import_completed -ne $true -or @($anow_session.supported_timezones).Count -eq 0) {
+        Write-Warning -Message 'The server AutomateNOW timezone catalogue could not be loaded after domain validation.'
+        Return
+    }
+    $server_timezone = $anow_session.supported_timezones | Where-Object { $_.id -ceq [string]$instance_info.defaultTimeZone } | Select-Object -First 1
+    If ($null -eq $server_timezone -or [string]::IsNullOrWhiteSpace($server_timezone.id)) {
+        Write-Warning -Message 'The instance default timezone could not be resolved from the server catalogue.'
+        Return
+    }
+    $anow_session['server_timezone'] = $server_timezone
+
+    If ($null -eq $user_details) {
+        $full_user_completed = $false
+        Do {
+            $user_details = Get-AutomateNOWSecUser -Id $logged_on_user_id | Select-Object -First 1
+            $full_user_completed = $true
+        } While ($false)
+    }
+    If ($full_user_completed -ne $true -or $null -eq $user_details) {
+        Write-Warning -Message 'The full logged-on user record could not be resolved during connection setup.'
+        Return
+    }
+    [string]$full_user_default_domain = [string]$user_details.defaultDomain
+    If (-not [string]::IsNullOrWhiteSpace($full_user_default_domain)) {
+        If ($domains -cnotcontains $full_user_default_domain) {
+            Write-Warning -Message 'The full user record default domain is not an exact-case member of the user available domains.'
+            Return
         }
-        ElseIf ($user.apiUser -eq $false) {
-            $anow_session['APIUser'] = $false
-        }
-        Else {
-            Write-Warning -Message "It was not possible to determine if $Id is an API User."
-            Break
-        }
-        [string]$defaultDomain = $user.defaultDomain
-        [boolean]$instance_admin = $user.admin
-        $anow_session['Admin'] = $instance_admin
-        If ($defaultDomain.Length -gt 0) {
-            $anow_session.Add('default_domain', $defaultDomain)
-            Write-Verbose -Message "Detected the default domain for $Id is $defaultDomain"
-            $userInfo.defaultDomain = $defaultDomain
-            If ($Domain.Length -eq 0) {
-                Write-Verbose -Message "There was no domain specified with the -Domain parameter, therefore using the users default domain"
-                [string]$Domain = $defaultDomain
-            }
-        }
-        Else {
-            $anow_session.Add('default_domain', '')
-        }
-        $anow_session['user_details'] = $user
-        [string]$userName = $userInfo.id
-        If ($userName.Length -eq 0) {
-            Write-Warning -Message "The username property is not present for this user object. This is fatal!"
-            Break
-        }
-        $anow_session['User'] = $userName
-        If ($Domain.Length -eq 0 -and $defaultDomain.Length -eq 0) {
-            [string]$domains_display = $domains -join ', '
-            Write-Warning -Message "Please try Connect-AutomateNOW again with the -Domain parameter with one of these case-sensitive domains: $domains_display"
-            Remove-Variable anow_session -Force
-            Break
-        }
-        $anow_session.Add('current_domain', $Domain)
-        $anow_session.Add('protocol', $protocol)
-        $Error.Clear()
-        Try {
-            [ANOWTimeZone]$defaultTimeZone = $userInfo.defaultTimeZone
-        }
-        Catch {
-            [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Failed to convert the user object's default time zone into an [ANOWTimeZone] object due to [$Message]"
-            Break
-        }
-        If ($defaultTimeZone.Length -gt 0) {
-            $anow_session.Add('user_timezone', $defaultTimeZone)
-        }
-        If ($SkipMOTD -ne $true) {
-            [string]$motd_message = "`r`nWelcome to $application version $applicationVersion"
-            Write-Information -MessageData $motd_message
-        }
+        $default_domain = $full_user_default_domain
+    }
+    $anow_session['default_domain'] = $default_domain
+    $anow_session['APIUser'] = [boolean]$user_details.apiUser
+    $anow_session['Admin'] = [boolean]$user_details.admin
+    $anow_session['user_details'] = $user_details
+    $anow_session['User'] = $logged_on_user_id
+
+    [string[]]$available_timezone_ids = @()
+    If (-not [string]::IsNullOrWhiteSpace([string]$instance_info.timeZones)) {
+        $available_timezone_ids = @(([string]$instance_info.timeZones -split ',') | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    }
+    If ($available_timezone_ids.Count -gt 0) {
+        [ANOWTimeZone[]]$available_timezones = @($anow_session.supported_timezones | Where-Object { $available_timezone_ids -ccontains $_.id })
     }
     Else {
-        If ($null -eq $results.StatusCode) {
-            Write-Warning -Message "The results were empty. There must be a bigger problem..."
-            Break
-        }
-        Else {
-            [int32]$status_code = $results.StatusCode
-            Write-Warning -Message "Received HTTP status code [$status_code] instead of 200. You can try suppressing this attempt to retrieve instance info by including the -SkipMOTD parameter."
-            Break
-        }
+        [ANOWTimeZone[]]$available_timezones = @($anow_session.supported_timezones)
     }
-    [PSCustomObject]$anow_session_display = [PSCustomObject]@{ protocol = $protocol; instance = $instance; admin = $instance_admin; token_expires = $expiration_date; user = $userName; domain = $Domain; access_token = ($AccessToken.SubString(0, 5) + '..' + $AccessToken.SubString(($AccessToken.Length - 5), 5)) }
+    If ($available_timezones.Count -eq 0) {
+        Write-Warning -Message 'No usable timezones were available during connection setup.'
+        Return
+    }
+    $anow_session['available_timezones'] = $available_timezones
+
+    [string]$user_timezone_id = [string]$user_info.defaultTimeZone.id
+    [ANOWTimeZone]$user_timezone = $null
+    If (-not [string]::IsNullOrWhiteSpace($user_timezone_id)) {
+        $user_timezone = $available_timezones | Where-Object { $_.id -ceq $user_timezone_id } | Select-Object -First 1
+    }
+    If ($null -eq $user_timezone -or [string]::IsNullOrWhiteSpace($user_timezone.id)) {
+        $user_timezone = $anow_session.server_timezone
+    }
+    $anow_session['user_timezone'] = $user_timezone
+
+    Try {
+        Set-Variable -Name anow_session -Scope Global -Value $anow_session -Force -ErrorAction Stop
+    }
+    Catch {
+        Write-Warning -Message 'The completed AutomateNOW session could not be published globally.'
+        Return
+    }
+
+    [string]$application = [string]$instance_info.licenseInfo.application
+    [string]$application_version = [string]$instance_info.licenseInfo.applicationVersion
+    If ($SkipMOTD -ne $true) {
+        Write-ANOWInformation -MessageData "Welcome to $application version $application_version"
+    }
+
     If ($Quiet -ne $true) {
-        Format-Table -InputObject $anow_session_display -AutoSize -Wrap
-        [int32]$licenseExpirationDays = $anow_session.instance_info.licenseInfo.licenseExpirationDays
-        If ($licenseExpirationDays -gt 0 -and $licenseExpirationDays -lt 31) {
-            Write-Warning -Message "$instance has [$licenseExpirationDays] days of license status"
+        [int32]$license_expiration_days = 0
+        If ([int32]::TryParse([string]$instance_info.licenseInfo.licenseExpirationDays, [ref]$license_expiration_days)) {
+            If ($license_expiration_days -ge 0 -and $license_expiration_days -le 30) {
+                Write-Warning -Message "[$Instance] has [$license_expiration_days] days of license status remaining."
+            }
         }
+        [PSCustomObject]$anow_session_display = [PSCustomObject]@{
+            Protocol = $protocol
+            Instance = $Instance
+            Admin = [boolean]$anow_session.Admin
+            APIUser = [boolean]$anow_session.APIUser
+            TokenExpires = [datetime]$anow_session.ExpirationDate
+            User = $logged_on_user_id
+            Domain = $selected_domain
+            access_token = ($selected_access_token.SubString(0, 5) + '..' + $selected_access_token.SubString(($selected_access_token.Length - 5), 5))
+        }
+        Format-Table -InputObject $anow_session_display -AutoSize -Wrap
     }
 }
 
 Function Disconnect-AutomateNOW {
     <#
     .SYNOPSIS
-    Disconnects from the API of an AutomateNOW! instance
+    Disconnects from an AutomateNOW! instance and disposes the local session.
 
     .DESCRIPTION
-    The `Disconnect-AutomateNOW` function logs out of the API of an AutomateNOW! instance. It then removes the global session variable object.
+    Attempts the server logout event whenever the session contains the minimum
+    request fields. Local session cleanup is independent of token-expiration
+    knowledge and server-notification success.
 
     .PARAMETER KeepSessionVariable
-    An optional switch that is not recommended which will prevent the deletion of the existing session variable. This is intended for testing.
-
-    .INPUTS
-    None. You cannot pipe objects to Disconnect-AutomateNOW.
+    Retains the global session variable on every path. Intended for controlled
+    testing only.
 
     .OUTPUTS
-    A string indicating the results of the disconnection attempt.
+    No success-stream output. Safe status is written to the information or
+    warning stream.
 
     .EXAMPLE
     Disconnect-AutomateNOW
-
-    .NOTES
-    Although it is a good practice to disconnect your session, do be aware that the initial auth token is not revoked or terminated on the server side after logging out. This is the nature of JWT tokens.
-
     #>
     [CmdletBinding()]
     Param(
         [Parameter(Mandatory = $false)]
         [switch]$KeepSessionVariable
     )
-    If ($null -eq $anow_session.Instance) {
-        Write-Warning -Message "You are not actually connected so you can't disconnect"
-        Break
+
+    $session_variable = Get-Variable -Name anow_session -Scope Global -ErrorAction SilentlyContinue
+    If ($null -eq $session_variable) {
+        Write-ANOWInformation -MessageData 'No global AutomateNOW session was present.'
+        Return
     }
-    If ($anow_session.ExpirationDate -gt (Get-Date -Date '1970-01-01 00:00:00')) {
-        [datetime]$current_date = Get-Date
-        [datetime]$ExpirationDate = $anow_session.ExpirationDate
-        [timespan]$TimeRemaining = ($ExpirationDate - $current_date)
-        [int32]$SecondsRemaining = $TimeRemaining.TotalSeconds
-        If ($SecondsRemaining -lt 2) {
-            $Error.Clear()
+    $session_to_disconnect = $session_variable.Value
+    [boolean]$server_notification_eligible =
+        $session_to_disconnect -is [System.Collections.IDictionary] -and
+        -not [string]::IsNullOrWhiteSpace([string]$session_to_disconnect.Instance) -and
+        $session_to_disconnect.header -is [System.Collections.IDictionary] -and
+        (Test-ANOWTokenValue -Token $session_to_disconnect.AccessToken) -and
+        ([string]$session_to_disconnect.header.Authorization -match '^(?i:Bearer) ')
+
+    Try {
+        If ($server_notification_eligible -eq $true) {
+            [hashtable]$parameters = @{
+                Command = '/logoutEvent'
+                Method = 'POST'
+                WarningAction = 'Stop'
+                ErrorAction = 'Stop'
+            }
+            If ($session_to_disconnect.NotSecure -eq $true) {
+                $parameters['NotSecure'] = $true
+            }
             Try {
-                Remove-Variable -Name anow_session -Scope Global -Force
+                $logout_result = Invoke-AutomateNOWAPI @parameters
+                If ($null -ne $logout_result -and [int32]$logout_result.response.status -eq 0) {
+                    Write-ANOWInformation -MessageData "[$([string]$session_to_disconnect.Instance)] accepted the logout event."
+                }
+                Else {
+                    Write-Warning -Message 'The logout event did not return a successful response. Local session disposition will still continue.'
+                }
             }
             Catch {
-                [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Remove-Variable failed to remove the expired anow_session global variable (under Disconnect-AutomateNOW) due to [$Message]."
-                Break
+                Write-Warning -Message 'The logout event could not be confirmed. Local session disposition will still continue.'
             }
-            Write-Information -MessageData "Removed the already expired anow_session global variable from this session"
         }
         Else {
-            [string]$Instance = $anow_session.Instance
-            [string]$command = '/logoutEvent'
-            [hashtable]$parameters = @{}
-            $parameters.Add('Command', $command)
-            $parameters.Add('Method', 'POST')
-            If ($anow_session.NotSecure -eq $true) {
-                $parameters.Add('NotSecure', $true)
-            }
-            $Error.Clear()
+            Write-ANOWInformation -MessageData 'Server logout notification was skipped because the session lacked the minimum request fields.'
+        }
+    }
+    Finally {
+        If ($KeepSessionVariable -eq $true) {
+            Write-ANOWInformation -MessageData 'The global AutomateNOW session was retained by request.'
+        }
+        Else {
+            [boolean]$session_removed = $false
             Try {
-                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+                Remove-Variable -Name anow_session -Scope Global -Force -ErrorAction Stop
+                $session_removed = $true
             }
             Catch {
-                [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] while running Disconnect-AutomateNOW due to [$Message]."
-                Break
+                Write-Warning -Message 'The global AutomateNOW session could not be removed.'
             }
-            [int32]$response_code = $results.response.status
-            If ($response_code -ne 0) {
-                [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 100
-                Write-Warning -Message "The response code was not 0 but was [$response_code]. Body: $full_response_display"
-                Break
+            If ($session_removed -eq $true) {
+                Write-ANOWInformation -MessageData 'The global AutomateNOW session was removed.'
             }
-            [string]$response_text = $results.response.data
-            Write-Information -MessageData "[$Instance] reports $response_text"
-            If ($KeepSessionVariable -ne $true) {
-                $Error.Clear()
-                Try {
-                    Remove-Variable -Name anow_session -Scope Global -Force
-                }
-                Catch {
-                    [string]$Message = $_.Exception.Message
-                    Write-Warning -Message "Remove-Variable failed to remove the `$anow_session variable due to [$Message]."
-                    Break
-                }
-            }
-            Write-Information -MessageData "Removed the anow_session global variable from this session (it had $SecondsRemaining seconds remaining)"
         }
     }
 }
@@ -983,136 +1186,166 @@ Function Disconnect-AutomateNOW {
 Function Update-AutomateNOWToken {
     <#
     .SYNOPSIS
-    Updates the session token used to connect to an instance of AutomateNOW!
+    Refreshes the current AutomateNOW session token.
 
     .DESCRIPTION
-    The `Update-AutomateNOWToken` function updates the existing session token that is being used to connect to an instance of AutomateNOW!
-
-    .INPUTS
-    None. You cannot pipe objects to Update-AutomateNOWToken (yet).
+    Requests a refreshed token, validates the complete response, and commits the
+    new access token, refresh token, expiration, and authorization header
+    together. A failed refresh raises a sanitized terminating error and leaves
+    the previous session unchanged.
 
     .OUTPUTS
-    The global session variable $anow_session will be updated.
+    No success-stream output. A successful refresh writes a safe information
+    message containing only the new expiration time.
 
     .EXAMPLE
     Update-AutomateNOWToken
-
-    .NOTES
-    You must use Connect-AutomateNOW to establish the token by way of global variable.
-
-    This function has no parameters. It assumes you already have a global session variable ($anow_session)
-
     #>
-    If ($anow_session.RefreshToken.Length -eq 0) {
-        Write-Warning -Message "There is no refresh token."
-        Break
+    [OutputType([void])]
+    [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Low')]
+    Param()
+
+    [PSCustomObject]$session_validation = Get-ANOWSessionValidation -Session $anow_session -AllowExpired -AllowUnknownExpiration
+    If ($session_validation.Valid -ne $true) {
+        Throw "The AutomateNOW session cannot be refreshed because its local shape is invalid [$($session_validation.Reason)]."
     }
-    ElseIf ( $anow_session.RefreshToken -eq 'Not set' ) {
-        Write-Warning -Message "It is not possible to refresh the token if you used -AccessToken without also including -RefreshToken"
-        Break
+    If ($session_validation.RefreshAvailable -ne $true) {
+        Throw 'The AutomateNOW session does not contain a usable refresh token.'
     }
-    [string]$command = '/oauth/access_token'
-    [string]$ContentType = 'application/x-www-form-urlencoded; charset=UTF-8'
-    [string]$RefreshToken = $anow_session.RefreshToken
-    [string]$Body = 'grant_type=refresh_token&refresh_token=' + $RefreshToken
-    [hashtable]$parameters = @{}
-    $parameters.Add('Method', 'POST')
-    $parameters.Add('Command', $command)
-    $parameters.Add('ContentType', $ContentType)
-    $parameters.Add('NotAPICommand', $true)
-    $parameters.Add('Body', $Body)
-    If (($anow_session.NotSecure) -eq $true) {
-        $parameters.Add('NotSecure', $true)
+    If ($anow_session -isnot [hashtable] -or $anow_session.header -isnot [hashtable]) {
+        Throw 'The AutomateNOW session must use writable hashtables before its token can be refreshed safely.'
     }
-    $Error.Clear()
+    If (-not $PSCmdlet.ShouldProcess([string]$anow_session.Instance, 'Refresh the AutomateNOW session token')) {
+        Return
+    }
+
+    [string]$old_access_token = [string]$anow_session.AccessToken
+    [string]$old_refresh_token = [string]$anow_session.RefreshToken
+    [datetime]$old_expiration_date = $anow_session.ExpirationDate
+    [boolean]$had_expiration_known = $anow_session.Keys -contains 'expiration_known'
+    $old_expiration_known = $anow_session.expiration_known
+    $old_header = $anow_session.header
+    If ($anow_session.IsReadOnly -eq $true -or $anow_session.IsFixedSize -eq $true) {
+        Throw 'The AutomateNOW session is not writable, so its token cannot be refreshed safely.'
+    }
+    [System.Collections.Specialized.OrderedDictionary]$form_values = [ordered]@{
+        grant_type = 'refresh_token'
+        refresh_token = $old_refresh_token
+    }
+    [string]$body = ConvertTo-QueryString -InputObject $form_values
+    [hashtable]$parameters = @{
+        Method = 'POST'
+        Command = '/oauth/access_token'
+        ContentType = 'application/x-www-form-urlencoded; charset=UTF-8'
+        NotAPICommand = $true
+        Body = $body
+        WarningAction = 'Stop'
+        ErrorAction = 'Stop'
+    }
+    If ($anow_session.NotSecure -eq $true) {
+        $parameters['NotSecure'] = $true
+    }
+
     Try {
         [PSCustomObject]$token_properties = Invoke-AutomateNOWAPI @parameters
     }
     Catch {
-        [string]$Message = $_.Exception.Message
-        Write-Warning -Message "Invoke-AutomateNOWAPI failed to access the [$command] endpoint due to [$Message]."
-        Break
+        Throw 'The AutomateNOW token refresh request failed; the prior session was preserved.'
     }
-    [string]$access_token = $token_properties.access_token
-    [string]$refresh_token = $token_properties.refresh_token
-    $Error.Clear()
+    If ($null -eq $token_properties) {
+        Throw 'The AutomateNOW token refresh returned no result; the prior session was preserved.'
+    }
+    If ($token_properties.PSObject.Properties.Name -contains 'token_type' -and
+        -not [string]::IsNullOrWhiteSpace([string]$token_properties.token_type) -and
+        [string]$token_properties.token_type -cne 'Bearer') {
+        Throw 'The AutomateNOW token refresh returned an unexpected token type; the prior session was preserved.'
+    }
+    If (-not (Test-ANOWTokenValue -Token $token_properties.access_token)) {
+        Throw 'The AutomateNOW token refresh returned an unusable access token; the prior session was preserved.'
+    }
+
+    [int64]$new_expiration_value = 0
+    If (-not [int64]::TryParse([string]$token_properties.expirationDate, [ref]$new_expiration_value) -or $new_expiration_value -le 0) {
+        Throw 'The AutomateNOW token refresh returned an invalid expiration; the prior session was preserved.'
+    }
     Try {
-        [System.TimeZoneInfo]$timezone = Get-TimeZone
+        [datetime]$new_expiration_date = ConvertFrom-ANOWUnixExpiration -Value $new_expiration_value -SecondsOrMilliseconds
     }
     Catch {
-        [string]$Message = $_.Exception.Message
-        Write-Warning -Message "Get-TimeZone failed to get the time zone due to [$Message]."
-        Break
+        Throw 'The AutomateNOW token refresh returned an unsupported expiration; the prior session was preserved.'
     }
-    [boolean]$dst = (Get-Date).IsDaylightSavingTime()
-    If ($dst -eq $true) {
-        [System.TimeSpan]$utc_offset = ($timezone.BaseUtcOffset + (New-TimeSpan -Minutes 60))
+    If ($new_expiration_date -le (Get-Date) -or $new_expiration_date -le $old_expiration_date) {
+        Throw 'The AutomateNOW token refresh did not advance to a future expiration; the prior session was preserved.'
     }
-    Else {
-        [System.TimeSpan]$utc_offset = $timezone.BaseUtcOffset
-    }
-    If ($token_properties.expirationDate -ge 10000000000) {
-        $Error.Clear()
-        Try {
-            [datetime]$expiration_date_utc = (Get-Date -Date '1970-01-01').AddMilliseconds(($token_properties.expirationDate))
-        }
-        Catch {
-            [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Get-Date failed to process the authentication properties due to [$Message]"
-            Break
-        }
-    }
-    Else {
-        $Error.Clear()
-        Try {
-            [datetime]$expiration_date_utc = (Get-Date -Date '1970-01-01').AddSeconds(($token_properties.expirationDate))
-        }
-        Catch {
-            [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Get-Date failed to process the authentication properties due to [$Message]"
-            Break
-        }
 
+    [string]$new_access_token = [string]$token_properties.access_token
+    $raw_new_refresh_token = $token_properties.refresh_token
+    [string]$new_refresh_token = $null
+    If ($null -eq $raw_new_refresh_token -or
+        ($raw_new_refresh_token -is [string] -and [string]::IsNullOrEmpty([string]$raw_new_refresh_token))) {
+        $new_refresh_token = $old_refresh_token
     }
-    [datetime]$expiration_date = ($expiration_date_utc + $utc_offset) # We're adding 2 values here: the current time in UTC and the current machine's UTC offset
-    $anow_session.'ExpirationDate' = $expiration_date
-    $anow_session.'AccessToken' = $access_token
-    $anow_session.'RefreshToken' = $refresh_token
-    [string]$expiration_date_display = Get-Date -Date $expiration_date -Format 'yyyy-MM-dd HH:mm:ss'
-    $anow_session.header.'Authorization' = "Bearer $access_token"
-    Write-Verbose -Message 'Global variable $anow_session.header has been set. Use this as your authentication header.'
-    Write-Information -MessageData "Your token has been refreshed. The new expiration date is [$expiration_date_display]"
+    ElseIf (-not (Test-ANOWTokenValue -Token $raw_new_refresh_token)) {
+        Throw 'The AutomateNOW token refresh returned an unusable refresh token; the prior session was preserved.'
+    }
+    Else {
+        $new_refresh_token = [string]$raw_new_refresh_token
+    }
+    [string]$old_authorization = [string]$old_header.Authorization
+    [string]$new_authorization = "Bearer $new_access_token"
+
+    Try {
+        $anow_session['AccessToken'] = $new_access_token
+        $anow_session['RefreshToken'] = $new_refresh_token
+        $anow_session['ExpirationDate'] = $new_expiration_date
+        $anow_session['expiration_known'] = $true
+        $old_header['Authorization'] = $new_authorization
+    }
+    Catch {
+        $anow_session['AccessToken'] = $old_access_token
+        $anow_session['RefreshToken'] = $old_refresh_token
+        $anow_session['ExpirationDate'] = $old_expiration_date
+        If ($had_expiration_known -eq $true) {
+            $anow_session['expiration_known'] = $old_expiration_known
+        }
+        Else {
+            $anow_session.Remove('expiration_known')
+        }
+        $old_header['Authorization'] = $old_authorization
+        Throw 'The refreshed token could not be committed; the prior session was restored.'
+    }
+
+    Write-ANOWInformation -MessageData "Your token has been refreshed. The new expiration date is [$($new_expiration_date.ToString('yyyy-MM-dd HH:mm:ss'))]"
 }
 
 Function Confirm-AutomateNOWSession {
     <#
     .SYNOPSIS
-    Surmises from the local session variable $anow_session if the current session is authenticated and not expired yet. Returns true or false.
+    Validates whether the current AutomateNOW session is locally usable.
 
     .DESCRIPTION
-    Surmises from the local session variable $anow_session if the current session is authenticated and not expired yet. Returns true or false.
+    Validates the minimum session shape, token/header consistency, domain
+    consistency, and expiration policy. When a known-valid token is inside the
+    configured remaining-lifetime window, the function refreshes it unless
+    refresh was disabled. A refresh is accepted only after full post-refresh
+    validation and a strictly advanced future expiration.
 
     .PARAMETER Quiet
-    Switch parameter to silence the 'MOTD' that is returned by default after successfully authenticating.
+    Suppresses successful verbose and token-refresh information. Invalid-session
+    warnings are never suppressed.
 
     .PARAMETER DoNotRefresh
-    Switch parameter to ignore MaximumTokenRefreshAge
+    Validates locally without attempting automatic refresh.
 
     .PARAMETER MaximumTokenRefreshAge
-    int32 parameter to specify the minimum age (in seconds) of the refresh token before updating it occurs automatically. Default is 3300 (meaning that the token will not be refreshed if it is less than 330 seconds old)
-
-    .INPUTS
-    None. You cannot pipe objects to Confirm-AutomateNOWSession (yet).
+    Remaining token lifetime, in seconds, below which automatic refresh is
+    attempted. The default is 3300 seconds.
 
     .OUTPUTS
-    Returns a boolean $True if the local session variable appears to be valid (not expired yet) otherwise returns $false
+    Boolean. Exactly one True or False value is written to the success stream.
 
     .EXAMPLE
     Confirm-AutomateNOWSession -Quiet
-
-    .NOTES
-    You must use Connect-AutomateNOW to establish the token before you can confirm it
-
     #>
     [OutputType([boolean])]
     [CmdletBinding()]
@@ -1122,75 +1355,70 @@ Function Confirm-AutomateNOWSession {
         [Parameter(Mandatory = $false)]
         [switch]$DoNotRefresh,
         [Parameter(Mandatory = $false)]
+        [ValidateRange(0, [int32]::MaxValue)]
         [int32]$MaximumTokenRefreshAge = 3300
     )
-    If ($anow_session.header.values.count -eq 0) {
-        Write-Warning -Message "Please use Connect-AutomateNOW to establish your access token or provide your token through the -AccessToken parameter of Connect-AutomateNOW."
-        Break
+
+    [PSCustomObject]$session_validation = Get-ANOWSessionValidation -Session $anow_session -AllowExpired -AllowUnknownExpiration
+    If ($session_validation.Valid -ne $true) {
+        Write-Warning -Message "The AutomateNOW session is not usable [$($session_validation.Reason)]."
+        Return $false
     }
-    ElseIf ($anow_session.header.Authorization -notmatch '^Bearer [a-zA-Z-_/=:,."0-9]{1,}$') {
-        [string]$malformed_token = $anow_session.header.values
-        Write-Warning -Message "The access token is not in the expected format. Please contact the author with this apparently malformed token: [$malformed_token]"
-        Break
-    }
-    ElseIf ($anow_session.RefreshToken -eq 'Not set' -and $anow_session.APIUser -eq $false) {
-        Write-Warning -Message 'This connection is not an api user but is without a refresh token! Next time you connect, please remember to include -RefreshToken with Connect-AutomateNOW.'
+    If ($session_validation.ExpirationState -eq 'Unknown') {
+        Write-Warning -Message 'The AutomateNOW session expiration is unknown. The token is accepted as opaque local state, but its lifetime cannot be confirmed or refreshed automatically.'
         Return $true
     }
-    ElseIf ($anow_session.ExpirationDate -isnot [datetime]) {
-        Write-Warning -Message 'There is no expiration date available. Make sure that you allow Confirm-AutomateNOWSession to complete.'
-        Break
+
+    [datetime]$expiration_date = $session_validation.ExpirationDate
+    [int64]$seconds_remaining = [math]::Floor(($expiration_date - (Get-Date)).TotalSeconds)
+    If ($seconds_remaining -le 0) {
+        Write-Warning -Message "The AutomateNOW session token expired at [$($expiration_date.ToString('s'))]."
+        Return $false
     }
-    ElseIf ($anow_session.RefreshToken -notmatch '^[a-zA-Z-_/=:,."0-9]{1,}$' -and $anow_session.RefreshToken -ne 'Not set' -and $anow_session.RefreshToken.Length -gt 0) {
-        [string]$malformed_refresh_token = $anow_session.RefreshToken
-        Write-Warning -Message "The refresh token does not appear to be valid. Please contact the author about this apparently malformed token: [$malformed_refresh_token]"
-        Break
+
+    [boolean]$refresh_suppressed =
+        $DoNotRefresh -eq $true -or
+        $anow_session.do_not_refresh -eq $true -or
+        $MaximumTokenRefreshAge -eq 0 -or
+        $WhatIfPreference -eq $true
+    If ($seconds_remaining -lt $MaximumTokenRefreshAge -and $refresh_suppressed -ne $true) {
+        If ($session_validation.RefreshAvailable -ne $true) {
+            Write-Warning -Message 'The AutomateNOW session is currently valid but cannot be refreshed because no usable refresh token is available.'
+            Return $true
+        }
+        If ($null -eq (Get-Command -Name Invoke-AutomateNOWAPI -ErrorAction SilentlyContinue)) {
+            Write-Warning -Message 'The AutomateNOW API request function is unavailable, so the session cannot be refreshed.'
+            Return $false
+        }
+        [datetime]$pre_refresh_expiration = $expiration_date
+        [hashtable]$refresh_parameters = @{
+            ErrorAction = 'Stop'
+        }
+        If ($Quiet -eq $true) {
+            $refresh_parameters['InformationAction'] = 'SilentlyContinue'
+        }
+        Try {
+            Update-AutomateNOWToken @refresh_parameters
+        }
+        Catch {
+            Write-Warning -Message 'The AutomateNOW session refresh failed; the previous session was preserved.'
+            Return $false
+        }
+        [PSCustomObject]$post_refresh_validation = Get-ANOWSessionValidation -Session $anow_session
+        If ($post_refresh_validation.Valid -ne $true -or
+            $post_refresh_validation.ExpirationState -ne 'Future' -or
+            $post_refresh_validation.ExpirationDate -le $pre_refresh_expiration) {
+            Write-Warning -Message 'The AutomateNOW session did not pass post-refresh validation.'
+            Return $false
+        }
+        If ($Quiet -ne $true) {
+            Write-Verbose -Message 'The AutomateNOW session was refreshed and revalidated.'
+        }
+        Return $true
     }
-    If ($null -eq (Get-Command -Name Invoke-AutomateNOWAPI -EA 0)) {
-        Write-Warning -Message 'The Invoke-AutomateNOWAPI function is not available in this session. Did you install and import the module?'
-        Break
-    }
-    If ($anow_session.ExpirationDate -gt (Get-Date -Date '1970-01-01 00:00:00')) {
-        [datetime]$current_date = Get-Date
-        [datetime]$ExpirationDate = $anow_session.ExpirationDate
-        [string]$ExpirationDateDisplay = Get-Date -Date $ExpirationDate -Format 'yyyy-MM-dd HH:mm:ss'
-        [timespan]$TimeRemaining = ($ExpirationDate - $current_date)
-        [int32]$SecondsRemaining = $TimeRemaining.TotalSeconds
-        If ($SecondsRemaining -lt 0) {
-            If ($SecondsRemaining -lt -172800) {
-                [int32]$DaysRemaining = ($SecondsRemaining * -1) / 86400
-                Write-Warning -Message "This token expired about $DaysRemaining days ago at $ExpirationDateDisplay. You can request a new token using Connect-AutomateNOW."
-                Break
-            }
-            ElseIf ($SecondsRemaining -lt -7200) {
-                [int32]$HoursRemaining = ($SecondsRemaining * -1) / 3600
-                Write-Warning -Message "This token expired about $HoursRemaining hours ago at $ExpirationDateDisplay. You can request a new token using Connect-AutomateNOW."
-                Break
-            }
-            ElseIf ($SecondsRemaining -lt -300) {
-                [int32]$MinutesRemaining = ($SecondsRemaining * -1) / 60
-                Write-Warning -Message "This token expired about $MinutesRemaining minutes ago at $ExpirationDateDisplay. You can request a new token using Connect-AutomateNOW."
-                Break
-            }
-            Else {
-                [int32]$SecondsRemaining = $SecondsRemaining * -1
-                Write-Warning -Message "This token expired $SecondsRemaining seconds ago at $ExpirationDateDisplay. You can request a new token using Connect-AutomateNOW."
-                Break
-            }
-        }
-        ElseIf (($SecondsRemaining -lt $MaximumTokenRefreshAge) -and ($DoNotRefresh -ne $true)) {
-            [int32]$minutes_elapsed = ($TimeRemaining.TotalMinutes)
-            Write-Verbose -Message "This token will expire in [$minutes_elapsed] minutes. Refreshing your token automatically. Use -DoNotRefresh with Connect-AutomateNOW to stop this behavior."
-            Update-AutomateNOWToken
-        }
-        Else {
-            Write-Verbose -Message "This token still has [$SecondsRemaining] seconds remaining"
-        }
-    }
-    Else {
-        If ( $anow_session.APIUser -eq $false) {
-            Write-Warning -Message "This token has an unknown expiration date because you used -AccessToken without including -RefreshToken :|"
-        }
+
+    If ($Quiet -ne $true) {
+        Write-Verbose -Message "The AutomateNOW session has approximately [$seconds_remaining] seconds remaining."
     }
     Return $true
 }
@@ -1198,69 +1426,94 @@ Function Confirm-AutomateNOWSession {
 Function Switch-AutomateNOWDomain {
     <#
     .SYNOPSIS
-    Switches the currently selected domain for the logged on user of an AutomateNOW! instance
+    Switches the selected domain in the local AutomateNOW session.
 
     .DESCRIPTION
-    The `Switch-AutomateNOWDomain` cmdlet does not actually communicate with the AutomateNOW! instance. It modifies the $anow_session global variable.
+    Validates local session state without refreshing or contacting the server,
+    then updates header.domain and current_domain together.
 
     .PARAMETER Domain
-    Required string representing the name of the domain to switch to.
-
-    .INPUTS
-    None. You cannot pipe objects to Switch-AutomateNOWDomain.
+    Required exact, case-sensitive domain name available to the logged-on user.
 
     .OUTPUTS
-    None except for Write-Information messages.
+    No success-stream output. A safe information message is emitted on success.
 
     .EXAMPLE
     Switch-AutomateNOWDomain -Domain 'Production'
-
-    .NOTES
-    You must use Connect-AutomateNOW to establish the token by way of global variable.
-
-    This function is considered part of the Authentication functions. In the future, this function should support receiving a [ANOWDomain] object to switch to.
-
     #>
     [CmdletBinding()]
     Param(
+        [Parameter(Mandatory = $true)]
+        [ValidateScript({
+                If ([string]::IsNullOrWhiteSpace([string]$_)) {
+                    Throw 'Domain cannot be empty or whitespace.'
+                }
+                Return $true
+            })]
         [string]$Domain
     )
-    If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
-        Write-Warning -Message "There is not a valid token confirmed."
-        Break
+
+    [PSCustomObject]$session_validation = Get-ANOWSessionValidation -Session $anow_session -AllowUnknownExpiration -SkipDomainValidation
+    If ($session_validation.Valid -ne $true) {
+        Write-Warning -Message "There is no usable AutomateNOW session [$($session_validation.Reason)]."
+        Return
     }
-    If ($Domain.Length -eq 0) {
-        Write-Warning -Message 'Please specify a Domain using the -Domain parameter'
-        Break
+    If ($anow_session -isnot [hashtable] -or
+        $anow_session.header -isnot [hashtable] -or
+        $anow_session.IsReadOnly -eq $true -or
+        $anow_session.IsFixedSize -eq $true -or
+        $anow_session.header.IsReadOnly -eq $true -or
+        $anow_session.header.IsFixedSize -eq $true -or
+        @($anow_session.available_domains).Count -eq 0) {
+        Write-Warning -Message 'The AutomateNOW session does not contain writable domain state.'
+        Return
     }
-    [string]$Instance = $anow_session.Instance
-    If ($anow_session.available_domains -cnotcontains $Domain) {
-        [string]$available_domains = $anow_session.available_domains -join ', '
-        If ($anow_session.available_domains -contains $Domain) {
-            Write-Warning -Message "The domains are case-sensitive. Please choose from [$available_domains]."
-            Break
-        }
-        Write-Warning -Message "The domain [$Domain] is not on [$Instance]. Please choose from [$available_domains]."
-        Break
-    }
-    $Error.Clear()
-    Try {
-        $anow_session.header.Remove('domain')
-        $anow_session.header.Add('domain', $Domain)
-        If ($null -eq $anow_session.current_domain) {
-            $anow_session.header.Add('current_domain', $Domain)
+    [string[]]$available_domains = @($anow_session.available_domains)
+    If ($available_domains -cnotcontains $Domain) {
+        [string]$available_domain_display = $available_domains -join ', '
+        If ($available_domains -contains $Domain) {
+            Write-Warning -Message "Domain names are case-sensitive. Choose one of: [$available_domain_display]."
         }
         Else {
-            $anow_session.current_domain = $Domain
+            Write-Warning -Message "The requested domain is unavailable. Choose one of: [$available_domain_display]."
         }
+        Return
+    }
 
+    [boolean]$had_header_domain = $anow_session.header.Keys -contains 'domain'
+    [string]$old_header_domain = [string]$anow_session.header.domain
+    [boolean]$had_current_domain = $anow_session.Keys -contains 'current_domain'
+    [string]$old_current_domain = [string]$anow_session.current_domain
+    [boolean]$had_legacy_header_current_domain = $anow_session.header.Keys -contains 'current_domain'
+    $old_legacy_header_current_domain = $anow_session.header.current_domain
+
+    Try {
+        $anow_session.header['domain'] = $Domain
+        $anow_session['current_domain'] = $Domain
+        If ($had_legacy_header_current_domain -eq $true) {
+            $anow_session.header.Remove('current_domain')
+        }
     }
     Catch {
-        [string]$Message = $_.Exception.Message
-        Write-Warning -Message "The Add/Remove method failed on `$anow_session.header` due to [$Message]."
-        Break
+        If ($had_header_domain -eq $true) {
+            $anow_session.header['domain'] = $old_header_domain
+        }
+        Else {
+            $anow_session.header.Remove('domain')
+        }
+        If ($had_current_domain -eq $true) {
+            $anow_session['current_domain'] = $old_current_domain
+        }
+        Else {
+            $anow_session.Remove('current_domain')
+        }
+        If ($had_legacy_header_current_domain -eq $true) {
+            $anow_session.header['current_domain'] = $old_legacy_header_current_domain
+        }
+        Write-Warning -Message 'The AutomateNOW domain switch failed and the prior domain state was restored.'
+        Return
     }
-    Write-Information -MessageData "The [$Domain] domain has been selected for [$Instance]."
+    Write-ANOWInformation -MessageData "The [$Domain] domain has been selected for [$([string]$anow_session.Instance)]."
 }
 
 Function New-AutomateNOWServerDayTimestamp {
@@ -1330,19 +1583,22 @@ Function Reset-AutomateNOWJWTIssuerToken {
     Resets the JWT issuer token within an instance of AutomateNOW!
 
     .DESCRIPTION
-    Resets the JWT issuer token within an instance of AutomateNOW! Note: This invalidates the tokens for all API users. Use with caution!
+    Resets the JWT issuer token within an instance of AutomateNOW! This
+    invalidates the tokens for all API users. It does not invalidate ordinary
+    logged-in user sessions. Use with caution.
 
     .PARAMETER Force
-    Force the change without confirmation. This is equivalent to -Confirm:$false
+    Suppresses the confirmation prompt. Force never bypasses WhatIf.
 
     .PARAMETER Quiet
-    Optional switch to suppress the return of the [ANOWApplication] object.
+    Suppresses the safe reset-acknowledgement object.
 
     .INPUTS
     None.
 
     .OUTPUTS
-    An [ANOWApplication] object will be returned
+    PSCustomObject. Unless Quiet is used, returns a safe reset acknowledgement
+    without application-configuration data.
 
     .EXAMPLE
     Forcefully resets the JWT issuer token
@@ -1357,9 +1613,12 @@ Function Reset-AutomateNOWJWTIssuerToken {
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
 
-    This function does not impact logged in users. This function only resets the internal JWT token which API user tokens were based on. This means all API users will need to have a new token generated.
+    This function does not impact logged-in users. It resets the internal JWT
+    issuer token on which API user tokens are based, so all API users will need
+    a new token.
 
     #>
+    [OutputType([PSCustomObject])]
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
     Param(
         [Parameter(Mandatory = $false)]
@@ -1369,7 +1628,7 @@ Function Reset-AutomateNOWJWTIssuerToken {
     )
     If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
         Write-Warning -Message "There is not a valid token confirmed."
-        Break
+        Return
     }
     [string]$command = '/applicationConfiguration/resetJwtIssuerToken'
     [hashtable]$parameters = @{}
@@ -1380,45 +1639,50 @@ Function Reset-AutomateNOWJWTIssuerToken {
         $parameters.Add('NotSecure', $true)
     }
     [string]$Instance = $anow_session.Instance
-    If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("This will revoke ALL user sessions on $Instance. Are you sure you want to do this?")) -eq $true) {
-        [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
-        $BodyMetaData.Add('_operationType', 'custom')
-        $BodyMetaData.Add('_operationId', 'resetJwtIssuerToken')
-        $BodyMetaData.Add('_textMatchStyle', 'exact')
-        $BodyMetaData.Add('_dataSource', 'ApplicationConfigurationDataSource')
-        $BodyMetaData.Add('isc_metaDataPrefix', '_')
-        $BodyMetaData.Add('isc_dataFormat', 'json')
-        [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
-        $parameters.Add('Body', $Body)
-        $Error.Clear()
-        Try {
-            [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
-        }
-        Catch {
-            [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on $Instance due to [$Message]."
-            Break
-        }
-        [int32]$response_code = $results.response.status
-        If ($response_code -ne 0) {
-            [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 100
-            Write-Warning -Message "The response code was not 0 but was [$response_code]. Body: $full_response_display"
-            Break
-        }
-        Write-Warning -Message "The JWT issuer token has been reset. All user sessions on $Instance have therefore been revoked."
-        If ($Quiet -ne $true) {
-            $Error.Clear()
-            Try {
-                [ANOWTimeZone]$defaultTimeZone = Get-AutomateNOWTimeZone -Id $results.response.data[0].defaultTimeZone
-                $results.response.data[0].defaultTimeZone = [ANOWTimeZone]$defaultTimeZone
-                [ANOWApplicationConfiguration]$applicationConfiguration = $results.response.data | Select-Object -First 1
-            }
-            Catch {
-                [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Failed to parse the response into an [ANOWApplication] object (under Reset-AutomateNOWJWTIssuerToken) due to [$Message]."
-                Break
-            }
-            Return $applicationConfiguration
+    If ($Force -eq $true -and -not $PSBoundParameters.ContainsKey('Confirm')) {
+        $ConfirmPreference = 'None'
+    }
+    [string]$reset_action = 'Reset the JWT issuer token and revoke all API user tokens'
+    If (-not $PSCmdlet.ShouldProcess($Instance, $reset_action)) {
+        Return
+    }
+
+    [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+    $BodyMetaData.Add('_operationType', 'custom')
+    $BodyMetaData.Add('_operationId', 'resetJwtIssuerToken')
+    $BodyMetaData.Add('_textMatchStyle', 'exact')
+    $BodyMetaData.Add('_dataSource', 'ApplicationConfigurationDataSource')
+    $BodyMetaData.Add('isc_metaDataPrefix', '_')
+    $BodyMetaData.Add('isc_dataFormat', 'json')
+    [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+    $parameters.Add('Body', $Body)
+    $Error.Clear()
+    Try {
+        [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+    }
+    Catch {
+        Write-Warning -Message "The JWT issuer reset request failed for [$Instance]. Request and response values were withheld."
+        Return
+    }
+    If ($null -eq $results -or $null -eq $results.response) {
+        Write-Warning -Message "The JWT issuer reset returned no usable response for [$Instance]. Response values were withheld."
+        Return
+    }
+    [int32]$response_code = 0
+    If (-not [int32]::TryParse([string]$results.response.status, [ref]$response_code)) {
+        Write-Warning -Message "The JWT issuer reset returned a malformed response for [$Instance]. Response values were withheld."
+        Return
+    }
+    If ($response_code -ne 0) {
+        Write-Warning -Message "The JWT issuer reset returned response code [$response_code] for [$Instance]. Response values were withheld."
+        Return
+    }
+    Write-Warning -Message "The JWT issuer token has been reset. All API user tokens on [$Instance] have been revoked."
+    If ($Quiet -ne $true) {
+        Return [PSCustomObject]@{
+            Instance = $Instance
+            Status = 'JWT issuer token reset'
+            APIUserTokensRevoked = $true
         }
     }
 }
@@ -1483,7 +1747,7 @@ Function Get-AutomateNOWAdhocReport {
     [OutputType([ANOWAdhocReport[]])]
     [CmdletBinding( DefaultParameterSetName = 'Default' )]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $False, ParameterSetName = 'Id', ValueFromPipeline = $true)]
         [string]$Id,
         [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
@@ -1932,7 +2196,7 @@ Function New-AutomateNOWAdhocReport {
     [OutputType([ANOWAdhocReport])]
     [CmdletBinding()]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true)]
         [string]$Id,
         [Parameter(Mandatory = $true)]
@@ -2147,7 +2411,7 @@ Function Copy-AutomateNOWAdhocReport {
         [Parameter(Mandatory = $true)]
         [ANOWAdhocReport]$AdhocReport,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [ValidateScript({ $_.Length -le 255 })]
@@ -2370,7 +2634,7 @@ Function Rename-AutomateNOWAdhocReport {
         [Parameter(Mandatory = $true)]
         [ANOWAdhocReport]$AdhocReport,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -3694,7 +3958,7 @@ Function New-AutomateNOWAgent {
     [OutputType([ANOWAgent])]
     [CmdletBinding()]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true)]
         [string]$Id,
         [Parameter(Mandatory = $false, HelpMessage = "Enter a descriptive string up to 255 characters (UTF8 compatible)")]
@@ -4010,7 +4274,7 @@ Function Copy-AutomateNOWAgent {
         [Parameter(Mandatory = $true)]
         [ANOWAgent]$Agent,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [ValidateScript({ $_.Length -le 255 })]
@@ -4231,7 +4495,7 @@ Function Rename-AutomateNOWAgent {
         [Parameter(Mandatory = $true)]
         [ANOWAgent]$Agent,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -5879,7 +6143,7 @@ Function Get-AutomateNOWAnomaly {
     [OutputType([ANOWAnomaly[]])]
     [CmdletBinding( DefaultParameterSetName = 'Default' )]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $True, ParameterSetName = 'Id', ValueFromPipeline = $true)]
         [string]$Id,
         [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
@@ -6455,7 +6719,7 @@ Function New-AutomateNOWAnomaly {
     [OutputType([ANOWAnomaly])]
     [CmdletBinding(DefaultParameterSetName = 'Default')]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true, ParameterSetName = 'Default')]
         [Parameter(Mandatory = $true, ParameterSetName = 'iconSet')]
         [string]$Id,
@@ -6865,7 +7129,7 @@ Function Copy-AutomateNOWAnomaly {
         [Parameter(Mandatory = $true)]
         [ANOWAnomaly]$Anomaly,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [ValidateScript({ $_.Length -le 255 })]
@@ -7030,7 +7294,7 @@ Function Rename-AutomateNOWAnomaly {
         [Parameter(Mandatory = $true)]
         [ANOWAnomaly]$Anomaly,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -7186,7 +7450,7 @@ Function Get-AutomateNOWApproval {
     [OutputType([ANOWApproval[]])]
     [CmdletBinding( DefaultParameterSetName = 'Default' )]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $False, ParameterSetName = 'Id', ValueFromPipeline = $true)]
         [string]$Id,
         [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
@@ -7496,7 +7760,7 @@ Function New-AutomateNOWApproval {
     [OutputType([ANOWApproval])]
     [CmdletBinding()]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true)]
         [string]$Id,
         [Parameter(Mandatory = $false, HelpMessage = "Enter a descriptive string up to 255 characters (UTF8 compatible)")]
@@ -7828,7 +8092,7 @@ Function Copy-AutomateNOWApproval {
         [Parameter(Mandatory = $true)]
         [ANOWApproval]$Approval,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [ValidateScript({ $_.Length -le 255 })]
@@ -7993,7 +8257,7 @@ Function Rename-AutomateNOWApproval {
         [Parameter(Mandatory = $true)]
         [ANOWApproval]$Approval,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -8984,7 +9248,7 @@ Function Read-AutomateNOWAuditLog {
     Param(
         [Parameter(Mandatory = $False)]
         [ANOWAuditLog_tableName]$TableName,
-        [ValidateScript({ $_ -match '^\[[0-9a-zA-z_.-]{1,255}][0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^\[[0-9a-zA-Z_.-]{1,255}][0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $False)]
         [string]$ObjectId,
         [ValidateSet('UPDATE', 'INSERT', 'DELETE', IgnoreCase = $false)]
@@ -9449,7 +9713,7 @@ Function Get-AutomateNOWBusinessView {
     [OutputType([ANOWBusinessView[]])]
     [CmdletBinding(DefaultParameterSetName = 'Default')]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $True, ParameterSetName = 'Id', ValueFromPipeline = $true)]
         [string]$Id,
         [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
@@ -10027,7 +10291,7 @@ Function New-AutomateNOWBusinessView {
     [OutputType([ANOWBusinessView])]
     [CmdletBinding(DefaultParameterSetName = 'Default')]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true, ParameterSetName = 'Default')]
         [Parameter(Mandatory = $true, ParameterSetName = 'iconSet')]
         [string]$Id,
@@ -10361,7 +10625,7 @@ Function Copy-AutomateNOWBusinessView {
         [Parameter(Mandatory = $true)]
         [ANOWBusinessView]$BusinessView,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [ValidateScript({ $_.Length -le 255 })]
@@ -10582,7 +10846,7 @@ Function Rename-AutomateNOWBusinessView {
         [Parameter(Mandatory = $true)]
         [ANOWBusinessView]$BusinessView,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -11630,7 +11894,7 @@ Function New-AutomateNOWCalendar {
     [OutputType([ANOWCalendar])]
     [CmdletBinding()]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true)]
         [string]$Id,
         [Parameter(Mandatory = $true)]
@@ -11986,7 +12250,7 @@ Function Copy-AutomateNOWCalendar {
         [Parameter(Mandatory = $true)]
         [ANOWCalendar]$Calendar,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [ValidateScript({ $_.Length -le 255 })]
@@ -12207,7 +12471,7 @@ Function Rename-AutomateNOWCalendar {
         [Parameter(Mandatory = $true)]
         [ANOWCalendar]$Calendar,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -12327,7 +12591,7 @@ Function Get-AutomateNOWCodeRepository {
     Gets the Code Repositories from an AutomateNOW! instance
 
     .PARAMETER Id
-    Optional string containing the simple id of the Code Repository to fetch or you can pipeline a series of simple id strings. You may not enter an array here.
+    Mandatory string containing the simple id of the Code Repository to fetch. You can pipeline a series of simple id strings, but may not enter an array. This parameter cannot be combined with -Folder or -Tags.
 
     .PARAMETER startRow
     Integer to indicate the row to start from. This is intended for when you need to paginate the results. Default is 0.
@@ -12336,10 +12600,10 @@ Function Get-AutomateNOWCodeRepository {
     Integer to indicate the row to stop on. This is intended for when you need to paginate the results. Default is 100.
 
     .PARAMETER Folder
-    Optional string to filter by a particular Folder
+    Optional string to filter the repository list by a particular Folder. This parameter cannot be combined with -Id.
 
     .PARAMETER Tags
-    Optional string array of Tags to filter by. Note that the 'containsAny' operator will be used.
+    Optional string array of Tags to filter the repository list. The 'containsAny' operator is used. This parameter cannot be combined with -Id.
 
     .INPUTS
     Accepts a string representing the simple id of the Code Repository from the pipeline or individually (but not an array).
@@ -12373,9 +12637,9 @@ Function Get-AutomateNOWCodeRepository {
         [int32]$startRow = 0,
         [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
         [int32]$endRow = 100,
-        [Parameter(Mandatory = $False)]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
         [string]$Folder,
-        [Parameter(Mandatory = $False)]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
         [string[]]$Tags
     )
     Begin {
@@ -12502,37 +12766,37 @@ Function Set-AutomateNOWCodeRepository {
     Modifies a local Code Repository in an AutomateNOW! instance
 
     .PARAMETER CodeRepository
-    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
+    Mandatory [ANOWCodeRepository] object. Use Get-AutomateNOWCodeRepository to retrieve it.
 
     .PARAMETER sshKeyLocationType
-    Mandatory string representing the type of SSH Key Location of the remote Git repository. Possible choices are: SSH_KEY_FILE_PATH, INLINE
+    Required only in the SSH parameter set when changing SSH connection settings. Supply this together with -sshKeyPath. Possible choices are: SSH_KEY_FILE_PATH, INLINE.
 
     .PARAMETER authenticationMethod
-    Mandatory string representing the authentication method of the remote Git repository. Possible choices are: SSH, PASSWORD
+    Optional string to change the authentication method of the remote Git repository. Possible choices are: SSH, PASSWORD.
 
     .PARAMETER repositoryURL
-    Mandatory string representing the URL of the remote Git repository
+    Optional string to change the URL of the remote Git repository.
 
     .PARAMETER sshKeyPath
-    Mandatory (if authenticationMethod is SSH) string representing the path to an authorized SSH Key stored in the ANOW host server
+    Required in the SSH parameter set. Represents the path to an authorized SSH key stored on the ANOW host server.
 
     .PARAMETER sshKeyPassPhrase
     Optional (if authenticationMethod is SSH) securestring representing the pass phrase of the provided SSH key
 
     .PARAMETER User
-    Mandatory (if authenticationMethod is Username/Password) string representing the name of the git user account with access to the remote code repository (the maximum length of this string is unknown)
+    Required in the Password parameter set. Represents the Git user account with access to the remote repository.
 
     .PARAMETER Password
-    Mandatory (if authenticationMethod is Username/Password) securestring representing the password of the git user account with access to the remote code repository
+    Required in the Password parameter set. SecureString representing the password for -User.
 
     .PARAMETER skipSslVerification
-    Optional switch parameter to configure the repository to "Skip SSL Certificates' Verification". May only be used with -User and -Password parameters.
+    Optional switch in the Password parameter set to configure the repository to skip SSL certificate verification.
 
     .PARAMETER localFolder
-    Mandatory string representing where ANOW will store its local copy of the Git repository in the host server
+    Optional string to change where ANOW stores its local copy of the Git repository on the host server.
 
     .PARAMETER codeRepositoryRoot
-    Optional string representing the sub-folder of the Git repository to which the ANOW JSON files will be stored
+    Optional string to change the sub-folder of the Git repository in which ANOW stores JSON files.
 
     .PARAMETER Description
     Optional string to set on the Code Repository object.
@@ -12562,7 +12826,7 @@ Function Set-AutomateNOWCodeRepository {
     ONLY [ANOWCodeRepository] objects are accepted (including from the pipeline)
 
     .OUTPUTS
-    The updated [ANOWCodeRepository] object will be returned
+    The updated [ANOWCodeRepository] object is returned unless -Quiet is specified.
 
     .EXAMPLE
     Sets multiple tags on a local Code Repository named 'CodeRepository1'
@@ -12575,6 +12839,12 @@ Function Set-AutomateNOWCodeRepository {
 
     $repository = Get-AutomateNOWCodeRepository -Id 'CodeRepository1'
     Set-AutomateNOWCodeRepository -CodeRepository $repository -localfolder '/appl/archive/Anow/Prod/Git-repos/Prod/CodeRepository1' -Force
+
+    .EXAMPLE
+    Shows a metadata-only update without making a request.
+
+    $repository = Get-AutomateNOWCodeRepository -Id 'CodeRepository1'
+    Set-AutomateNOWCodeRepository -CodeRepository $repository -Description 'Repository for production automation' -WhatIf
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
@@ -12888,34 +13158,34 @@ Function New-AutomateNOWCodeRepository {
     Mandatory string representing the name of the Code Repository. The name of the Code Repository may consist only of alphanumeric characters and 3 special characters (._-) and not to exceed 1024 characters in length.
 
     .PARAMETER sshKeyLocationType
-    Mandatory string representing the type of SSH Key Location of the remote Git repository. Possible choices are: SSH_KEY_FILE_PATH, INLINE
+    Required in the SSH parameter set. Represents the SSH key location type for the remote Git repository. Possible choices are: SSH_KEY_FILE_PATH, INLINE.
 
     .PARAMETER authenticationMethod
-    Mandatory string representing the authentication method of the remote Git repository. Possible choices are: SSH, PASSWORD
+    Mandatory string representing the authentication method of the remote Git repository. Possible choices are: SSH, PASSWORD.
 
     .PARAMETER repositoryURL
-    Mandatory string representing the URL of the remote Git repository
+    Mandatory string representing the URL of the remote Git repository.
 
     .PARAMETER sshKeyPath
-    Mandatory (if authenticationMethod is SSH) string representing the path to an authorized SSH Key stored in the ANOW host server
+    Required in the SSH parameter set. Represents the path to an authorized SSH key stored on the ANOW host server.
 
     .PARAMETER sshKeyPassPhrase
     Optional (if authenticationMethod is SSH) Secure String representing the pass phrase of the provided SSH key
 
     .PARAMETER User
-    Mandatory (if authenticationMethod is Username/Password) string representing the name of the git user account with access to the remote code repository (the maximum length of this string is unknown)
+    Required in the Password parameter set. Represents the Git user account with access to the remote repository.
 
     .PARAMETER Password
-    Mandatory (if authenticationMethod is Username/Password) securestring representing the password of the git user account with access to the remote code repository
+    Required in the Password parameter set. SecureString representing the password for -User.
 
     .PARAMETER skipSslVerification
-    Optional switch parameter to configure the repository to "Skip SSL Certificates' Verification". May only be used with -User and -Password parameters.
+    Required switch in the Password parameter set. Configures the repository to skip SSL certificate verification and is not available in the SSH parameter set.
 
     .PARAMETER localFolder
-    Mandatory string representing where ANOW will store its local copy of the Git repository in the host server
+    Mandatory string representing where ANOW stores its local copy of the Git repository on the host server.
 
     .PARAMETER codeRepositoryRoot
-    Optional string representing the sub-folder of the Git repository to which the ANOW JSON files will be stored
+    Mandatory string representing the sub-folder of the Git repository in which ANOW stores JSON files.
 
     .PARAMETER Description
     Optional description of the Code Repository (may not exceed 255 characters). Note that the ANOW console does not currently show this.
@@ -12936,7 +13206,7 @@ Function New-AutomateNOWCodeRepository {
     `New-AutomateNOWCodeRepository` does not accept inputs from the pipeline.
 
     .OUTPUTS
-    The newly created Code Repository object will be returned.
+    The newly created [ANOWCodeRepository] object is returned unless -Quiet is specified.
 
     .EXAMPLE
     Creates a new SSH-based local Code Repository named 'CodeRepository1' with a secure Passphrase
@@ -12945,10 +13215,10 @@ Function New-AutomateNOWCodeRepository {
     New-AutomateNOWCodeRepository -Id 'CodeRepository1' -repositoryURL 'git@git.contoso.com:projects/CodeRepository1' -authenticationMethod SSH -sshKeyLocationType SSH_KEY_FILE_PATH -sshKeyPath '/appl/anow/.ssh/my-git-account' -sshKeyPassPhrase $sshPassPhrase -localFolder '/appl/archive/Anow/Prod/Git-repos/Prod/CodeRepository1' -codeRepositoryRoot '/'
 
     .EXAMPLE
-    Creates a new user-based local Code Repository named 'CodeRepository1' with SSL verification disabled
+    Shows a Password-authentication creation request without creating a repository.
 
-    $Password = Read-Host -Prompt 'Please enter the password' -AsSecureString
-    New-AutomateNOWCodeRepository -Id 'CodeRepository1' -repositoryURL 'git@git.contoso.com:projects/CodeRepository1' -authenticationMethod PASSWORD -skipSslVerification -User 'username1' -Password $Password -localFolder '/anow/CodeRepository1' -codeRepositoryRoot '/'
+    $password = ConvertTo-SecureString 'placeholder-only' -AsPlainText -Force
+    New-AutomateNOWCodeRepository -Id 'CodeRepository1' -repositoryURL 'https://git.contoso.example/projects/CodeRepository1' -authenticationMethod PASSWORD -skipSslVerification -User 'git-user' -Password $password -localFolder '/anow/CodeRepository1' -codeRepositoryRoot '/' -WhatIf
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
@@ -13174,17 +13444,21 @@ Function New-AutomateNOWCodeRepository {
                 Write-Warning -Message "The response code was not 0 but was [$response_code]. Body: $full_response_display"
                 Break
             }
-            # Note this code is untested
-            $Error.Clear()
-            Try {
-                [ANOWCodeRepository]$CodeRepository = $results.response.data | Select-Object -First 1
-            }
-            Catch {
-                [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Failed to parse the result into an [ANOWCodeRepository] object due to [$Message]."
-                Break
-            }
+            # Note that the API does not return back the repository so we need to fetch it in a second step.
             If ($Quiet -ne $True) {
+                $Error.Clear()
+                Try {
+                    [ANOWCodeRepository]$CodeRepository = Get-AutomateNOWCodeRepository -Id $Id
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Get-AutomateNOWCodeRepository failed to retrieve the newly created [ANOWCodeRepository] object ($Id) (under New-AutomateNOWCodeRepository) due to [$Message]."
+                    Break
+                }
+                If($null -eq $CodeRepository) {
+                    Write-Warning -Message "Get-AutomateNOWCodeRepository failed to retrieve the newly created [ANOWCodeRepository] object ($Id) (under New-AutomateNOWCodeRepository)."
+                    Break
+                }
                 Return $CodeRepository
             }
         }
@@ -13408,13 +13682,13 @@ Function Confirm-AutomateNOWCodeRepository {
     Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
 
     .PARAMETER Quiet
-    Provides the result in a boolean true/false instead of a string.
+    Returns Boolean $true when the repository is available and $false when the API status is unsuccessful. Without -Quiet, the command writes status information instead of success-stream output.
 
     .INPUTS
     ONLY [ANOWCodeRepository] objects are accepted (including from the pipeline)
 
     .OUTPUTS
-    A string with the results from the API will returned.
+    With -Quiet, Boolean $true or $false. Without -Quiet, the command writes an information record and emits no success-stream result.
 
     .EXAMPLE
     Validates a single Code Repository named 'CodeRepository1' (one-liner)
@@ -13433,7 +13707,7 @@ Function Confirm-AutomateNOWCodeRepository {
     [OutputType([boolean])]
     [CmdletBinding()]
     Param(
-        [Parameter(Mandatory = $false, ValueFromPipeline = $True)]
+        [Parameter(Mandatory = $true, ValueFromPipeline = $True)]
         [ANOWCodeRepository]$CodeRepository,
         [Parameter(Mandatory = $false)]
         [switch]$Quiet
@@ -13517,6 +13791,9 @@ Function Sync-AutomateNOWCodeRepository {
     .PARAMETER Force
     Force the synchronization without confirmation. This is equivalent to -Confirm:$false
 
+    .PARAMETER ConflictResolutionType
+    Optional, case-sensitive conflict resolution strategy for the Synchronize operation that first encounters a merge conflict. Valid values are 'yours' (ANOW-local repository content) and 'theirs' (remote Git branch content). This parameter cannot resolve a conflict already persisted by an earlier Synchronize operation.
+
     .PARAMETER Quiet
     Optional switch to suppress the display of the results
 
@@ -13534,119 +13811,19 @@ Function Sync-AutomateNOWCodeRepository {
     .EXAMPLE
     Forcibly synchronizes a single repository
 
+    $repo = Get-AutomateNOWCodeRepository -Id 'CodeRepository1'
     Sync-AutomateNOWCodeRepository -CodeRepository $repo -Force
 
-    .NOTES
-    You must use Connect-AutomateNOW to establish the token by way of global variable.
-
-    #>
-    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
-    Param(
-        [Parameter(Mandatory = $false, ValueFromPipeline = $True)]
-        [ANOWCodeRepository]$CodeRepository,
-        [Parameter(Mandatory = $false)]
-        [switch]$Force,
-        [Parameter(Mandatory = $false)]
-        [switch]$Quiet
-    )
-    Begin {
-        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
-            Write-Warning -Message "There is not a valid token confirmed."
-            Break
-        }
-        [hashtable]$parameters = @{}
-        $parameters.Add('Method', 'POST')
-        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
-        If ($anow_session.NotSecure -eq $true) {
-            $parameters.Add('NotSecure', $true)
-        }
-    }
-    Process {
-        If ($_.id.Length -gt 0) {
-            [ANOWCodeRepository]$CodeRepository = $_
-            [string]$CodeRepository_id = $CodeRepository.id
-            If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($CodeRepository_id)")) -eq $true) {
-                [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
-                $BodyMetaData.Add('id', $CodeRepository_id )
-                $BodyMetaData.Add('_operationType', 'custom')
-                $BodyMetaData.Add('_operationId', 'synchronizeAll')
-                $BodyMetaData.Add('_textMatchStyle', 'exact')
-                $BodyMetaData.Add('_dataSource', 'CodeRepositoryDataSource')
-                $BodyMetaData.Add('isc_metaDataPrefix', '_')
-                $BodyMetaData.Add('isc_dataFormat', 'json')
-                [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
-                $parameters.Add('Body', $Body)
-                [string]$command = ('/codeRepository/synchronizeAll')
-                $parameters.Add('Command', $command)
-                $Error.Clear()
-                Try {
-                    [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
-                }
-                Catch {
-                    [string]$Message = $_.Exception.Message
-                    Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$CodeRepository_id] due to [$Message]."
-                    Break
-                }
-                [int32]$response_code = $results.response.status
-                If ($response_code -ne 0) {
-                    If ($Quiet -eq $true) {
-                        Return $false
-                    }
-                    [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 100
-                    Write-Warning -Message "The response code was [$response_code] instead of 0. The Code Repository $CodeRepository_id sync was not successful. Please see the full response $full_response_display"
-                }
-                Else {
-                    If ($Quiet -ne $true) {
-                        $sync_table = $results.response.data
-                        $sync_table | Format-Table -Autosize -Wrap
-                        Write-Information -MessageData "The Code Repository $CodeRepository_id synchronized successfully."
-                    }
-                    Else {
-                        Write-Verbose -MessageData "The Code Repository $CodeRepository_id synchronized successfully."
-                    }
-                }
-            }
-        }
-    }
-    End {
-
-    }
-}
-
-Function Receive-AutomateNOWCodeRepository {
-    <#
-    .SYNOPSIS
-    Pulls (downloads) changes from the remote repository.
-
-    .DESCRIPTION
-    Pulls (downloads) changes from the remote repository.
-
-    .PARAMETER CodeRepository
-    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
-
-    .PARAMETER Force
-    Force the pull without confirmation. This is equivalent to -Confirm:$false
-
-    .PARAMETER Quiet
-    Optional switch to suppress the display of the results
-
-    .INPUTS
-    ONLY [ANOWCodeRepository] objects are accepted (including from the pipeline)
-
-    .OUTPUTS
-    An informational message will be displayed similar to the console (e.g. "@{message=Ok; status=OK; branch=refs/heads/development}"). Use the -Quiet parameter to suppress this.
-
     .EXAMPLE
-    Forcibly pulls a single git repository using the pipeline
+    Synchronizes a repository and automatically resolves conflicts using the 'yours' strategy
 
-    Get-AutomateNOWCodeRepository -Id 'CodeRepository1' | Receive-AutomateNOWCodeRepository -Force
+    $repo = Get-AutomateNOWCodeRepository -Id 'CodeRepository1'
+    Sync-AutomateNOWCodeRepository -CodeRepository $repo -ConflictResolutionType 'yours' -Force
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
 
-    This function is the equivalent to the 'Push' button in the UI.
-
-    Use Receive-AutomateNOWCodeRepository if you need to perform a Pull operation from the remote repository to the local one.
+    In the normal outgoing workflow on the already selected branch, run this command after Publish-AutomateNOWCodeRepository and Send-AutomateNOWCodeRepository. Synchronize does not commit pending repository items or push local commits; use Publish-AutomateNOWCodeRepository and Send-AutomateNOWCodeRepository first.
 
     #>
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
@@ -13655,6 +13832,9 @@ Function Receive-AutomateNOWCodeRepository {
         [ANOWCodeRepository]$CodeRepository,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [ValidateSet('yours', 'theirs', IgnoreCase = $false)]
+        [string]$ConflictResolutionType,
         [Parameter(Mandatory = $false)]
         [switch]$Quiet
     )
@@ -13678,6 +13858,145 @@ Function Receive-AutomateNOWCodeRepository {
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($CodeRepository_id)")) -eq $true) {
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
             $BodyMetaData.Add('id', $CodeRepository_id )
+            If ($PSBoundParameters.ContainsKey('ConflictResolutionType')) {
+                $BodyMetaData.Add('conflictResolutionType', $ConflictResolutionType)
+            }
+            $BodyMetaData.Add('_operationType', 'custom')
+            $BodyMetaData.Add('_operationId', 'synchronizeAll')
+            $BodyMetaData.Add('_textMatchStyle', 'exact')
+            $BodyMetaData.Add('_dataSource', 'CodeRepositoryDataSource')
+            $BodyMetaData.Add('isc_metaDataPrefix', '_')
+            $BodyMetaData.Add('isc_dataFormat', 'json')
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            If ($null -eq $parameters['Body']) {
+                $parameters.Add('Body', $Body)
+            }
+            Else {
+                $parameters['Body'] = $Body
+            }
+            [string]$command = ('/codeRepository/synchronizeAll')
+            If ($null -eq $parameters['Command']) {
+                $parameters.Add('Command', $command)
+            }
+            Else {
+                $parameters['Command'] = $command
+            }
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                [string]$Message = $_.Exception.Message
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$CodeRepository_id] due to [$Message]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                If ($Quiet -eq $true) {
+                    Return $false
+                }
+                [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 100
+                Write-Warning -Message "The response code was [$response_code] instead of 0. The Code Repository $CodeRepository_id sync was not successful. Please see the full response $full_response_display"
+            }
+            Else {
+                If ($Quiet -ne $true) {
+                    $sync_table = $results.response.data
+                    $sync_table | Format-Table -Autosize -Wrap
+                    Write-Information -MessageData "The Code Repository $CodeRepository_id synchronized successfully."
+                }
+                Else {
+                    Write-Verbose -Message "The Code Repository $CodeRepository_id synchronized successfully."
+                }
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+Function Receive-AutomateNOWCodeRepository {
+    <#
+    .SYNOPSIS
+    Pulls (downloads) changes from the remote repository.
+
+    .DESCRIPTION
+    Pulls (downloads) changes from the remote repository.
+
+    .PARAMETER CodeRepository
+    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
+
+    .PARAMETER Force
+    Force the pull without confirmation. This is equivalent to -Confirm:$false
+
+    .PARAMETER ConflictResolutionType
+    Optional, case-sensitive conflict resolution strategy for the Pull operation that first encounters a merge conflict. Valid values are 'yours' (ANOW-local repository content) and 'theirs' (remote Git branch content). This parameter cannot resolve a conflict already persisted by an earlier Pull operation.
+
+    .PARAMETER Quiet
+    Optional switch to suppress the display of the results
+
+    .INPUTS
+    ONLY [ANOWCodeRepository] objects are accepted (including from the pipeline)
+
+    .OUTPUTS
+    An informational message will be displayed similar to the console (e.g. "@{message=Ok; status=OK; branch=refs/heads/development}"). Use the -Quiet parameter to suppress this.
+
+    .EXAMPLE
+    Forcibly pulls a single git repository using the pipeline
+
+    Get-AutomateNOWCodeRepository -Id 'CodeRepository1' | Receive-AutomateNOWCodeRepository -Force
+
+    .EXAMPLE
+    Pulls a repository and automatically resolves conflicts using the 'theirs' strategy
+
+    $repo = Get-AutomateNOWCodeRepository -Id 'CodeRepository1'
+    Receive-AutomateNOWCodeRepository -CodeRepository $repo -ConflictResolutionType 'theirs' -Force
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    This function is the equivalent to the 'Pull' button in the UI.
+
+    Use Receive-AutomateNOWCodeRepository if you need to perform a Pull operation from the remote repository to the local one.
+
+    ConflictResolutionType is only sent when explicitly supplied and only applies to the Pull operation that first encounters a merge conflict. It cannot resolve a persisted conflict from an earlier Pull operation.
+
+    #>
+    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $false, ValueFromPipeline = $True)]
+        [ANOWCodeRepository]$CodeRepository,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [ValidateSet('yours', 'theirs', IgnoreCase = $false)]
+        [string]$ConflictResolutionType,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "There is not a valid token confirmed."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        If ($_.id.Length -gt 0) {
+            [ANOWCodeRepository]$CodeRepository = $_
+        }
+        [string]$CodeRepository_id = $CodeRepository.id
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($CodeRepository_id)")) -eq $true) {
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.Add('id', $CodeRepository_id )
+            If ($PSBoundParameters.ContainsKey('ConflictResolutionType')) {
+                $BodyMetaData.Add('conflictResolutionType', $ConflictResolutionType)
+            }
             $BodyMetaData.Add('_operationType', 'custom')
             $BodyMetaData.Add('_operationId', 'pull')
             $BodyMetaData.Add('_textMatchStyle', 'exact')
@@ -13743,7 +14062,7 @@ Function Send-AutomateNOWCodeRepository {
     ONLY [ANOWCodeRepository] objects are accepted (including from the pipeline)
 
     .OUTPUTS
-    #An informational message will be displayed similar to the console (e.g. "Committed [1] objects"). Use the -Quiet parameter to skip this.
+    An informational message displays the response from the Push request. Use -Quiet to suppress this message.
 
     .EXAMPLE
     Forcibly pushes a single git repository using the pipeline
@@ -13752,6 +14071,8 @@ Function Send-AutomateNOWCodeRepository {
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    Run Publish-AutomateNOWCodeRepository before this command. Send-AutomateNOWCodeRepository pushes commits already present in the local ANOW repository; it does not commit pending repository items. The normal outgoing workflow on the already selected branch is: change a tracked object, Publish-AutomateNOWCodeRepository, Send-AutomateNOWCodeRepository, then Sync-AutomateNOWCodeRepository.
 
     This function is the equivalent to the 'Push' button in the UI.
 
@@ -13821,7 +14142,7 @@ Function Send-AutomateNOWCodeRepository {
                         Write-Warning -Message "There was no response data from executing [$command] on $CodeRepository_id even though the response code indicated success."
                         Break
                     }
-                    Write-Information -Message "The Code Repository $CodeRepository_id replied to this pull request with: $results_string."
+                    Write-Information -Message "The Code Repository $CodeRepository_id replied to this push request with: $results_string."
                 }
             }
         }
@@ -13843,10 +14164,10 @@ Function Publish-AutomateNOWCodeRepository {
     Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
 
     .PARAMETER ForceCommit
-    Optional switch to use the /forceCommit endpoint instead of the /commit endpoint. Use this when you want to force the commit despite that none of the items have changed.
+    Optional switch to use the /forceCommit endpoint (Commit All Items) instead of the /commit endpoint (Commit Changed Items). This commits all objects in the Code Repository.
 
     .PARAMETER Force
-    Force the commit without confirmation. This is equivalent to -Confirm:$false
+    Skip the PowerShell confirmation prompt. This is equivalent to -Confirm:$false and does not select the /forceCommit endpoint.
 
     .PARAMETER Quiet
     Optional switch to suppress the display of the results
@@ -13858,14 +14179,21 @@ Function Publish-AutomateNOWCodeRepository {
     An informational message will be displayed similar to the console (e.g. "Committed [1] objects"). Use the -Quiet parameter to skip this.
 
     .EXAMPLE
-    Commits a single git repository using the pipeline
+    Commits changed items in a single git repository using the pipeline
 
-    Get-AutomateNOWCodeRepository -Id 'CodeRepository1' -Branch 'master' | Publish-AutomateNOWCodeRepository
+    Get-AutomateNOWCodeRepository -Id 'CodeRepository1' | Publish-AutomateNOWCodeRepository
+
+    .EXAMPLE
+    Commits all items in a single git repository without a confirmation prompt
+
+    Get-AutomateNOWCodeRepository -Id 'CodeRepository1' | Publish-AutomateNOWCodeRepository -ForceCommit -Force
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
 
-    This function is the equivalent to the 'Commit All' button in the UI.
+    Without -ForceCommit, this function is equivalent to the 'Commit Changed Items' button in the UI. With -ForceCommit, it is equivalent to the 'Commit All Items' button.
+
+    For the normal outgoing workflow on the already selected branch, change a tracked object, run this command to commit changed items locally, then run Send-AutomateNOWCodeRepository and Sync-AutomateNOWCodeRepository. This command does not push commits to the remote repository. Use -ForceCommit only when committing all repository items is intentional.
 
     Use Unpublish-AutomateNOWCodeRepository if you need to revert a commit.
 
@@ -13971,12 +14299,12 @@ Function Unpublish-AutomateNOWCodeRepository {
     ONLY [ANOWCodeRepository] objects are accepted (including from the pipeline)
 
     .OUTPUTS
-    An informational message will be displayed similar to the console (e.g. "Committed [1] objects"). Use the -Quiet parameter to skip this.
+    An informational message displays the response from the Rollback request. Use -Quiet to suppress this message.
 
     .EXAMPLE
     Forcibly reverts a single git repository using the pipeline
 
-    Get-AutomateNOWCodeRepository -Id 'CodeRepository1' | UnPublish-AutomateNOWCodeRepository -Force
+    Get-AutomateNOWCodeRepository -Id 'CodeRepository1' | Unpublish-AutomateNOWCodeRepository -Force
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
@@ -14062,10 +14390,10 @@ Function Unpublish-AutomateNOWCodeRepository {
 Function Resolve-AutomateNOWCodeRepository {
     <#
     .SYNOPSIS
-    Starts the process of resolving a conflict in a code repository by confirming the status of the repository as out-of-sync on an instance of AutomateNOW!
+    Starts the process of resolving a conflict in a code repository by confirming its current merge-conflict status on an instance of AutomateNOW!
 
     .DESCRIPTION
-    Starts the process of resolving a conflict in a code repository by confirming the status of the repository as out-of-sync on an instance of AutomateNOW!
+    Starts the process of resolving a conflict in a code repository by confirming its current merge-conflict status on an instance of AutomateNOW! Retrieve the Code Repository immediately before calling this command so its `mergeConflict` property is current.
 
     .PARAMETER CodeRepository
     Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
@@ -14080,14 +14408,14 @@ Function Resolve-AutomateNOWCodeRepository {
     The same [ANOWCodeRepository] object will be returned if there is still a conflict that needs to be resolved otherwise a warning will be emitted
 
     .EXAMPLE
-    "Resolves" a repository named 'CodeRepository1'
+    Starts conflict resolution for a repository named 'CodeRepository1'
 
     Get-AutomateNOWCodeRepository -Id 'CodeRepository1' | Resolve-AutomateNOWCodeRepository
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
 
-    It is not yet fully understood exactly what the purpose of the /resolveConflicts endpoint is. The operationType is 'custom', not 'fetch'. The operationId is 'resolveConflicts', not 'status'. Hence this is not the same as Get-AutomateNOWCodeRepository.
+    The `/codeRepository/resolveConflicts` request uses the Code Repository simple id. The operationType is 'custom', not 'fetch', and the operationId is 'resolveConflicts', not 'status'. Hence this is not the same as Get-AutomateNOWCodeRepository.
 
     #>
     [OutputType([ANOWCodeRepository])]
@@ -14112,16 +14440,21 @@ Function Resolve-AutomateNOWCodeRepository {
     }
     Process {
         If ($_.id.Length -gt 0) {
-            [ANOWCodeRepository]$CodeRepository
+            [ANOWCodeRepository]$CodeRepository = $_
         }
         [string]$CodeRepository_id = $CodeRepository.id
+        [string]$CodeRepository_simpleId = $CodeRepository.simpleId
+        If ([string]::IsNullOrWhiteSpace($CodeRepository_simpleId)) {
+            Write-Warning -Message "The Code Repository [$CodeRepository_id] does not contain a simpleId required to resolve conflicts. Retrieve a current Code Repository object and try again."
+            Break
+        }
         [boolean]$merge_conflict = $CodeRepository.mergeConflict
         If ($merge_conflict -ne $true) {
             Write-Warning -Message "There is no merge conflict within $CodeRepository_id. There is nothing to try to resolve."
             Break
         }
         [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
-        $BodyMetaData.Add('id', $CodeRepository_id )
+        $BodyMetaData.Add('id', $CodeRepository_simpleId)
         $BodyMetaData.Add('_operationType', 'custom')
         $BodyMetaData.Add('_operationId', 'resolveConflicts')
         $BodyMetaData.Add('_textMatchStyle', 'exact')
@@ -14129,9 +14462,19 @@ Function Resolve-AutomateNOWCodeRepository {
         $BodyMetaData.Add('isc_metaDataPrefix', '_')
         $BodyMetaData.Add('isc_dataFormat', 'json')
         [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
-        $parameters.Add('Body', $Body)
+        If ($null -eq $parameters['Body']) {
+            $parameters.Add('Body', $Body)
+        }
+        Else {
+            $parameters['Body'] = $Body
+        }
         [string]$command = ('/codeRepository/resolveConflicts')
-        $parameters.Add('Command', $command)
+        If ($null -eq $parameters['Command']) {
+            $parameters.Add('Command', $command)
+        }
+        Else {
+            $parameters['Command'] = $command
+        }
         $Error.Clear()
         Try {
             [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
@@ -14188,13 +14531,13 @@ Function Get-AutomateNOWCodeRepositoryBranch {
     Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
 
     .PARAMETER Name
-    Optional string to filter the results to a single branch by name. Use this when you only want a specific branch.
+    Mandatory string in the Single parameter set to select a branch by name from the requested page.
 
     .PARAMETER startRow
-    Integer to indicate the row to start from. This is intended for when you need to paginate the results. Default is 0.
+    Integer to indicate the row to start from. Available in both parameter sets so a named branch can be selected from a later page. Default is 0.
 
     .PARAMETER endRow
-    Integer to indicate the row to stop on. This is intended for when you need to paginate the results. Default is 100.
+    Integer to indicate the row to stop on. Available in both parameter sets. Default is 100.
 
     .PARAMETER StringOnly
     Switch parameter that will reduce the output to a string array of the names of the branches instead of returning [ANOWCodeRepositoryBranch] objects
@@ -14209,7 +14552,7 @@ Function Get-AutomateNOWCodeRepositoryBranch {
     Gets the names of the branches from a Code Repository
 
     $repo = Get-AutomateNOWCodeRepository -Id 'Repository1'
-    $branches = Get-AutomateNOWCodeRepositoryBranch -CodeRepository $repo
+    $branches = Get-AutomateNOWCodeRepositoryBranch -CodeRepository $repo -StringOnly
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
@@ -14224,8 +14567,10 @@ Function Get-AutomateNOWCodeRepositoryBranch {
         [Parameter(Mandatory = $true, ParameterSetName = 'Single')]
         [string]$Name,
         [Parameter(Mandatory = $False, ParameterSetName = 'All')]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Single')]
         [int32]$startRow = 0,
         [Parameter(Mandatory = $False, ParameterSetName = 'All')]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Single')]
         [int32]$endRow = 100,
         [Parameter(Mandatory = $false, ParameterSetName = 'All')]
         [Parameter(Mandatory = $false, ParameterSetName = 'Single')]
@@ -14345,7 +14690,7 @@ Function New-AutomateNOWCodeRepositoryBranch {
     You must present [ANOWCodeRepository] objects
 
     .OUTPUTS
-    An informational message indicating the results. Use -Quiet to suppress this.
+    An [ANOWCodeRepositoryBranch] object is returned unless -Quiet is specified.
 
     .EXAMPLE
     Creates a new branch named 'DevBranch2' on a repository named 'CodeRepository1'.
@@ -14488,13 +14833,13 @@ Function Remove-AutomateNOWCodeRepositoryBranch {
     Deletes a branch named 'Branch1' on a repository named 'CodeRepository1' (multi-line format)
 
     $repo = Get-AutomateNOWCodeRepository -Id 'CodeRepository1'
-    $branch = $repo | Get-AutomateNOWCodeRepositoryBranch -Id 'Branch1'
+    $branch = $repo | Get-AutomateNOWCodeRepositoryBranch -Name 'Branch1'
     Remove-AutomateNOWCodeRepositoryBranch -CodeRepositoryBranch $branch
 
     .EXAMPLE
     Quietly and forcibly deletes a branch named 'Branch1' on a repository named 'CodeRepository1' (one-liner)
 
-    Get-AutomateNOWCodeRepository -Id 'CodeRepository1' | Get-AutomateNOWCodeRepositoryBranch -Id 'Branch1' | Remove-AutomateNOWCodeRepositoryBranch -Force -Quiet
+    Get-AutomateNOWCodeRepository -Id 'CodeRepository1' | Get-AutomateNOWCodeRepositoryBranch -Name 'Branch1' | Remove-AutomateNOWCodeRepositoryBranch -Force -Quiet
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
@@ -14715,10 +15060,10 @@ Function Select-AutomateNOWCodeRepositoryBranch {
 Function Merge-AutomateNOWCodeRepositoryBranch {
     <#
     .SYNOPSIS
-    Merges two branches of a Code Repository on an instance of AutomateNOW! into a single Merge Request object
+    Creates a merge request from a source branch to a target branch in a Code Repository on an AutomateNOW! instance.
 
     .DESCRIPTION
-    Merges two branches of a Code Repository on an instance of AutomateNOW! into a single Merge Request object
+    Creates a merge request from a source branch to a target branch. This command does not complete the branch merge; approve or deny the returned merge request separately.
 
     .PARAMETER CodeRepository
     Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
@@ -14730,7 +15075,7 @@ Function Merge-AutomateNOWCodeRepositoryBranch {
     Mandatory [ANOWCodeRepositoryBranch] object to where you want to merge (Use Get-AutomateNOWCodeRepositoryBranch to get the list of available branches)
 
     .PARAMETER Description
-    Option description of the Merge Request.
+    Optional description of the merge request.
 
     .PARAMETER Force
     Force the merger without confirmation. This is equivalent to -Confirm:$false
@@ -14739,23 +15084,24 @@ Function Merge-AutomateNOWCodeRepositoryBranch {
     Optional switch to suppress the display of the results
 
     .INPUTS
-    You must present both the [ANOWCodeRepository] object and the name of the branch. You may not pipe objects to Merge-AutomateNOWCodeRepositoryBranch.
+    Accepts an [ANOWCodeRepository] object directly or from the pipeline. SourceBranch and TargetBranch must be supplied as [ANOWCodeRepositoryBranch] objects.
 
     .OUTPUTS
-    An informational message indicating that the branch was successfully selected. Use the -Quiet parameter to silence this notification.
+    An [ANOWCodeRepositoryMergeRequest] object is returned unless -Quiet is specified.
 
     .EXAMPLE
     Forcibly creates a Merge Request from a branch named 'master1' to a branch named 'master2' in a Code Repository named 'Repository1'
 
     $repository = Get-AutomateNOWCodeRepository -Id 'Repository1'
-    $source_branch = Get-AutomatenowCodeRepositoryBranch -CodeRepository $repository -Id 'master1'
-    $target_branch = Get-AutomatenowCodeRepositoryBranch -CodeRepository $repository -Id 'master2'
-    Merge-AutomateNOWCodeRepositoryBranch -CodeRepository $repository -SourceBranch $source_branch -TargetBranch $target_branch -Description $desc -Force
+    $sourceBranch = Get-AutomateNOWCodeRepositoryBranch -CodeRepository $repository -Name 'master1'
+    $targetBranch = Get-AutomateNOWCodeRepositoryBranch -CodeRepository $repository -Name 'master2'
+    $description = 'Merge master1 into master2'
+    Merge-AutomateNOWCodeRepositoryBranch -CodeRepository $repository -SourceBranch $sourceBranch -TargetBranch $targetBranch -Description $description -Force
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
 
-    This function will attempt to ensure that both branches exist before attempting to merge them. You will receive back a modified [ANOWCodeRepository] object with the branch selected.
+    This function verifies that both branches exist before creating the merge request. Use Approve-AutomateNOWCodeRepositoryMergeRequest or Deny-AutomateNOWCodeRepositoryMergeRequest to act on the returned request.
 
     #>
     [OutputType([ANOWCodeRepositoryMergeRequest])]
@@ -14878,10 +15224,10 @@ Function Merge-AutomateNOWCodeRepositoryBranch {
 Function Get-AutomateNOWCodeRepositoryConflictItem {
     <#
     .SYNOPSIS
-    Gets all of the conflict items from a local Code Repository in an AutomateNOW! instance
+    Gets file-based Git merge-conflict items from a local Code Repository in an AutomateNOW! instance
 
     .DESCRIPTION
-    Gets all of the conflict items from a local Code Repository in an AutomateNOW! instance
+    Gets file-based Git merge-conflict items from a local Code Repository in an AutomateNOW! instance.
 
     .PARAMETER CodeRepository
     Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
@@ -14899,13 +15245,13 @@ Function Get-AutomateNOWCodeRepositoryConflictItem {
     [ANOWCodeRepositoryConflictItem] objects
 
     .EXAMPLE
-    Gets the conflict items from a Code Repository
+    Gets the Git merge-conflict items from a Code Repository
 
     $repo = Get-AutomateNOWCodeRepository -Id 'Repository1'
     $conflicts = Get-AutomateNOWCodeRepositoryConflictItem -CodeRepository $repo
 
     .EXAMPLE
-    Confirms first that the Code Repository is in conflict status and then retrieves the conflict items
+    Confirms first that the Code Repository is in conflict status and then retrieves the Git merge-conflict items
 
     $repo = Get-AutomateNOWCodeRepository -Id 'Repository1' | Resolve-AutomateNOWCodeRepository
     $conflicts = Get-AutomateNOWCodeRepositoryConflictItem -CodeRepository $repo
@@ -14979,35 +15325,17 @@ Function Get-AutomateNOWCodeRepositoryConflictItem {
         }
         [PSCustomObject[]]$temp_results = ForEach ($result in $results.response.data) {
             [PSCustomObject]$result = $result | Select-Object -ExcludeProperty codeRepository
-            If ($result.file.Length -eq 0) {
-                [boolean]$Conflict = $true
-            }
-            Else {
-                [boolean]$Conflict = $false
-            }
             $result | Add-Member -MemberType 'NoteProperty' -Name 'codeRepository' -value $CodeRepository -Force
             $result
         }
         $Error.Clear()
-        If ($Conflict -eq $true) {
-            Try {
-                [ANOWCodeRepositoryConflictItem[]]$Items = $temp_results
-            }
-            Catch {
-                [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Failed to parse the response into a series of [ANOWCodeRepositoryConflictItem] objects due to [$Message]."
-                Break
-            }
+        Try {
+            [ANOWCodeRepositoryConflictItem[]]$Items = $temp_results
         }
-        Else {
-            Try {
-                [ANOWCodeRepositoryOutOfSyncItem[]]$Items = $temp_results
-            }
-            Catch {
-                [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Failed to parse the response into a series of [ANOWCodeRepositoryOutOfSyncItem] objects due to [$Message]."
-                Break
-            }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Failed to parse the response into a series of [ANOWCodeRepositoryConflictItem] objects due to [$Message]."
+            Break
         }
         If ($Items.Count -gt 0) {
             Return $Items
@@ -15021,25 +15349,26 @@ Function Get-AutomateNOWCodeRepositoryConflictItem {
 Function Compare-AutomateNOWCodeRepositoryConflictItem {
     <#
     .SYNOPSIS
-    Compares the local branch and remote branch of a conflict item in a Code Repository on an instance of AutomateNOW!
+    Compares the ANOW-local and remote Git versions of a file-based conflict item in a Code Repository on an instance of AutomateNOW!
 
     .DESCRIPTION
-    Compares the local branch and remote branch of a conflict item in a Code Repository on an instance of AutomateNOW!
+    Compares the ANOW-local and remote Git versions of a file-based conflict item in a Code Repository on an instance of AutomateNOW! Yours is the ANOW-local repository content shown on the left; theirs is the remote Git branch content shown on the right.
 
     .PARAMETER ConflictItem
-    Mandatory [ANOWCodeRepositoryConflictItem] object (Use Get-AutomateNOWCodeRepositoryConflictItem to retrieve them)
+    Mandatory file-based [ANOWCodeRepositoryConflictItem] object (Use Get-AutomateNOWCodeRepositoryConflictItem to retrieve them)
 
     .INPUTS
     You must present [ANOWCodeRepositoryConflictItem] objects
 
     .OUTPUTS
-    A comparison table
+    A comparison object containing ANOW-local (`your_version`) and remote-Git (`their_version`) file content.
 
     .EXAMPLE
-    Returns a custom comparison object showing the differences within a Conflict item from a Code Repository named 'CodeRepository1' on the 'master' branch
+    Returns a custom comparison object showing the ANOW-local and remote Git versions of a conflicted file from a Code Repository named 'CodeRepository1' on the 'master' branch.
 
     $repository = Get-AutomateNOWCodeRepository -Id 'CodeRepository1'
-    Select-AutomateNOWCodeRepositoryBranch -CodeRepository $repository -Branch 'master' -Quiet -Force
+    $branch = Get-AutomateNOWCodeRepositoryBranch -CodeRepository $repository -Name 'master'
+    $branch | Select-AutomateNOWCodeRepositoryBranch -Quiet -Force
     $repository | Get-AutomateNOWCodeRepositoryConflictItem | Compare-AutomateNOWCodeRepositoryConflictItem
 
     .NOTES
@@ -15047,9 +15376,7 @@ Function Compare-AutomateNOWCodeRepositoryConflictItem {
 
     This function is the equivalent to what happens when selecting a conflicted item in a Code Repository and the window appears with left/right sides for merger consideration.
 
-    The intention for this function is to send its results to Show-AutomateNOWCodeRepositoryConflictItemComparison which would help to decide whether to use the -AcceptYours or -AcceptTheirs parameter with Merge-AutomateNOWCodeRepositoryConflictItem.
-
-    The domainClassName is still resolved here even though ANOW doesn't seem to ask for it anymore
+    Yours is the ANOW-local repository content displayed on the left. Theirs is the remote Git branch content displayed on the right. Send the result to Show-AutomateNOWCodeRepositoryConflictItemComparison to decide whether to use -AcceptYours or -AcceptTheirs with Merge-AutomateNOWCodeRepositoryConflictItem.
 
     #>
     [OutputType([PSCustomObject])]
@@ -15069,43 +15396,37 @@ Function Compare-AutomateNOWCodeRepositoryConflictItem {
             [ANOWCodeRepositoryConflictItem]$ConflictItem = $_
         }
         [ANOWCodeRepository]$CodeRepository = $ConflictItem.codeRepository
+        [string]$ConflictItem_Id = $ConflictItem.id
+        [string]$ConflictItem_file = $ConflictItem.file
+        If ([string]::IsNullOrWhiteSpace($ConflictItem_file)) {
+            Write-Warning -Message "The Git conflict item [$ConflictItem_Id] does not contain a file value. Retrieve a valid file-based conflict record before comparing versions."
+            Break
+        }
+        If ($null -eq $CodeRepository -or [string]::IsNullOrWhiteSpace($CodeRepository.id)) {
+            Write-Warning -Message "The Git conflict item [$ConflictItem_Id] does not contain a Code Repository id. Retrieve a valid conflict record before comparing versions."
+            Break
+        }
         [hashtable]$parameters = @{}
         $parameters.Add('Method', 'POST')
         $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
         If ($anow_session.NotSecure -eq $true) {
             $parameters.Add('NotSecure', $true)
         }
-        [string]$ConflictItem_Id = $ConflictItem.id
-        If ($ConflictItem_Id -notmatch '^\[([-._0-9a-zA-Z]{1,})\][-._0-9a-zA-Z]{1,}\|[a-zA-Z]{1,}\|[-._0-9a-zA-Z]{1,}$') {
-            Write-Warning -Message "The Id of the Conflict Item object $ConflictItem_Id did not match the expected format."
-            Break
-        }
-        $Error.Clear()
-        Try {
-            [ANOWCodeRepositoryObjectSourceCode_domainClassName]$domainClassName = $ConflictItem_id -split '\|' -split '/' | Select-Object -Skip 1 -First 1
-        }
-        Catch {
-            [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Failed to cast $ConflictItem_id to an [ANOWCodeRepositoryObjectSourceCode_domainClassName] enumerator due to [$Message]."
-            Break
-        }
-        If ($domainClassName.Length -eq 0) {
-            Write-Warning "The domainClassName could not be extracted from the Conflict item."
-            Break
-        }
+        [string]$CodeRepository_Id = $CodeRepository.id
         [string]$ConflictItem_domain = $ConflictItem.domain
         # Getting "your" version
         [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
-        $BodyMetaData.Add('id', $ConflictItem_Id )
+        $BodyMetaData.Add('file', $ConflictItem_file)
+        $BodyMetaData.Add('codeRepository', $CodeRepository_Id)
         $BodyMetaData.Add('_operationType', 'fetch')
         $BodyMetaData.Add('_operationId', 'getYourVersion')
         $BodyMetaData.Add('_textMatchStyle', 'exact')
-        $BodyMetaData.Add('_dataSource', 'OutOfSyncObjectDataSource')
+        $BodyMetaData.Add('_dataSource', 'CodeRepositoryConflictDataSource')
         $BodyMetaData.Add('isc_metaDataPrefix', '_')
         $BodyMetaData.Add('isc_dataFormat', 'json')
         [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
         $parameters.Add('Body', $Body)
-        [string]$command = ('/outOfSyncObject/getYourVersion')
+        [string]$command = ('/codeRepositoryConflict/getYourVersion')
         $parameters.Add('Command', $command)
         $Error.Clear()
         Try {
@@ -15123,12 +15444,11 @@ Function Compare-AutomateNOWCodeRepositoryConflictItem {
             Break
         }
         # Getting "their" version
-        $parameters.Remove('Body')
-        [string]$Body = $Body -replace 'getYourVersion', 'getTheirVersion'
-        $parameters.Add('Body', $Body)
-        $parameters.Remove('Command')
-        [string]$command = ('/outOfSyncObject/getTheirVersion')
-        $parameters.Add('Command', $command)
+        $BodyMetaData['_operationId'] = 'getTheirVersion'
+        [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+        $parameters.Body = $Body
+        [string]$command = ('/codeRepositoryConflict/getTheirVersion')
+        $parameters.Command = $command
         $Error.Clear()
         Try {
             [PSCustomObject]$their_results = Invoke-AutomateNOWAPI @parameters
@@ -15142,6 +15462,7 @@ Function Compare-AutomateNOWCodeRepositoryConflictItem {
         If ($response_code -ne 0) {
             [string]$full_response_display = $their_results.response | ConvertTo-JSON -Compress -Depth 100
             Write-Warning -Message "The response code was [$response_code] instead of 0 while attempting to execute [$command] on $ConflictItem_id. Please see the full response $full_response_display"
+            Break
         }
         [string]$your_version = $your_results.response.data
         [string]$their_version = $their_results.response.data
@@ -15149,7 +15470,7 @@ Function Compare-AutomateNOWCodeRepositoryConflictItem {
             Write-Warning -Message "Both objects are empty. There is nothing to compare."
             Break
         }
-        [PSCustomObject]$results = [PSCustomObject]@{item_id = $ConflictItem_id; item_domain = $ConflictItem_domain; domainClassName = $domainClassName; codeRepository = $CodeRepository; your_version = $your_version; their_version = $their_version; }
+        [PSCustomObject]$results = [PSCustomObject]@{item_id = $ConflictItem_id; simpleId = $ConflictItem.simpleId; item_domain = $ConflictItem_domain; domainClassName = $ConflictItem.domainClassName; file = $ConflictItem_file; filePath = $ConflictItem.filePath; codeRepository = $CodeRepository; your_version = $your_version; their_version = $their_version; }
         Return $results
     }
     End {
@@ -15161,10 +15482,10 @@ Function Show-AutomateNOWCodeRepositoryConflictItemComparison {
 
     <#
     .SYNOPSIS
-    Shows the comparison details of a conflict item from a local Code Repository in an AutomateNOW! instance and allows a left/right decision to be made with Merge-AutomateNOWCodeRepositoryConflictItem
+    Shows ANOW-local and remote Git versions of a file-based conflict item and supports a left/right decision with Merge-AutomateNOWCodeRepositoryConflictItem.
 
     .DESCRIPTION
-    Shows the comparison details of a conflict item from a local Code Repository in an AutomateNOW! instance and allows a left/right decision to be made with Merge-AutomateNOWCodeRepositoryConflictItem
+    Shows the comparison details of a file-based Git conflict item from a local Code Repository in an AutomateNOW! instance. The left side is the ANOW-local repository version (yours); the right side is the remote Git branch version (theirs).
 
     .PARAMETER AutomateNOWCodeRepositoryConflictItemComparison
     Mandatory results object [PSCustomObject] from Compare-AutomateNOWCodeRepositoryConflictItem
@@ -15173,10 +15494,10 @@ Function Show-AutomateNOWCodeRepositoryConflictItemComparison {
     Optional string to change the color of the git diff hunk header from the default blue.
 
     .PARAMETER your_version_color
-    Optional string to change the color of 'your changes' (left side - database) in the git diff results from the default Red
+    Optional string to change the color of ANOW-local changes (left side, yours) in the git diff results from the default Red
 
     .PARAMETER their_version_color
-    Optional string to change the color of 'their changes' (right side - repository) in the git diff results from the default Green
+    Optional string to change the color of remote Git changes (right side, theirs) in the git diff results from the default Green
 
     .PARAMETER same_version_color
     Optional string to change the color of git diff results where there is no change from the default Gray
@@ -15194,33 +15515,31 @@ Function Show-AutomateNOWCodeRepositoryConflictItemComparison {
     Optional switch which skips showing the legend after the git diff results are shown. Use this if you don't need an explanation on the colors used.
 
     .INPUTS
-    Show-AutomateNOWCodeRepositoryConflictItemComparison accepts [PSCustomObject] result objects emitted from Compare-AutomateNOWCodeRepositoryConflictcItem (including on the pipeline)
+    Show-AutomateNOWCodeRepositoryConflictItemComparison accepts [PSCustomObject] result objects emitted from Compare-AutomateNOWCodeRepositoryConflictItem (including on the pipeline)
 
     .OUTPUTS
-    Informational messages with the results.
+    With -RawGitDiff, returns a [string[]] containing the Git diff. Otherwise, writes the comparison for display using host and information output.
 
     .EXAMPLE
-    Shows the left/right sides of a Code Repository Item in conflict residing on a Code Repository named 'CodeRepository1' in a multi-line format
+    Shows the ANOW-local and remote Git versions of a file conflict in a Code Repository named 'CodeRepository1' in a multi-line format.
 
-    $out_of_sync_repository = Get-AutomateNOWCodeRepository -Id 'CodeRepository1' | Resolve-AutomateNOWCodeRepository
-    $conflict_results = $out_of_sync_repository | Get-AutomateNOWCodeRepositoryConflictItem | Compare-AutomateNOWCodeRepositoryConflictItem -CodeRepository $repository
-    Show-AutomateNOWCodeRepositoryConflictItemComparison -AutomateNOWCodeRepositoryConflictItemComparison $results
+    $repository = Get-AutomateNOWCodeRepository -Id 'CodeRepository1' | Resolve-AutomateNOWCodeRepository
+    $conflictResults = $repository | Get-AutomateNOWCodeRepositoryConflictItem | Compare-AutomateNOWCodeRepositoryConflictItem
+    Show-AutomateNOWCodeRepositoryConflictItemComparison -AutomateNOWCodeRepositoryConflictItemComparison $conflictResults
 
     .EXAMPLE
-    Shows the left/right sides of a Code Repository Item in conflict residing on a Code Repository named 'CodeRepository1' in a one-liner format
+    Shows the ANOW-local and remote Git versions of a file conflict in a Code Repository named 'CodeRepository1' in a one-liner format.
 
-    Get-AutomateNOWCodeRepository -Id 'CodeRepository1' | Resolve-AutomateNOWCodeRepository | Get-AutomateNOWCodeRepositoryConflictItem | Compare-AutomateNOWCodeRepositoryConflictItem -CodeRepository (Get-AutomateNOWCodeRepository -Id 'CodeRepository1' | Resolve-AutomateNOWCodeRepository) | Show-AutomateNOWCodeRepositoryConflictItemComparison
+    Get-AutomateNOWCodeRepository -Id 'CodeRepository1' | Resolve-AutomateNOWCodeRepository | Get-AutomateNOWCodeRepositoryConflictItem | Compare-AutomateNOWCodeRepositoryConflictItem | Show-AutomateNOWCodeRepositoryConflictItemComparison
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
 
-    Use the left/right results to help you determine whether to use the -AcceptYours or -AcceptTheirs parameter for Sync-AutomateNOWCodeRepositoryConflictItem
+    Use the left/right results to determine whether to use -AcceptYours (ANOW-local) or -AcceptTheirs (remote Git) with Merge-AutomateNOWCodeRepositoryConflictItem.
 
     Alternate colors may be specified using any of the standard 16 colors available to Write-Host.
 
     You can no longer select a branch if it has a merge conflict.
-
-    You cannot pipe the Code Repository object, too. You must include the -repository parameter every time. See the one-liner example.
 
     #>
 
@@ -15406,10 +15725,10 @@ Function Show-AutomateNOWCodeRepositoryConflictItemComparison {
                 Write-Host -MessageData "] are the header for each git diff chunk"
                 Write-Host -MessageData "Entries in [" -NoNewLine
                 Write-Host -MessageData $your_version_color -NoNewLine -ForegroundColor $your_version_color
-                Write-Host -MessageData "] are your different lines in the ANOW database (left side) [-AcceptYours]"
+                Write-Host -MessageData "] are your different lines in the ANOW-local repository version (left side) [-AcceptYours]"
                 Write-Host -MessageData "Entries in [" -NoNewLine
                 Write-Host -MessageData $their_version_color -NoNewLine -ForegroundColor $their_version_color
-                Write-Host -MessageData "] are their different lines in the repository branch (right side) [-AcceptTheirs]"
+                Write-Host -MessageData "] are their different lines in the remote Git branch version (right side) [-AcceptTheirs]"
                 Write-Host -MessageData "Entries in [" -NoNewLine
                 Write-Host -MessageData $same_version_color -NoNewLine -ForegroundColor $same_version_color
                 Write-Host -MessageData "] are identical on both sides"
@@ -15428,22 +15747,22 @@ Function Merge-AutomateNOWCodeRepositoryConflictItem {
 
     <#
     .SYNOPSIS
-    Merges a Conflict item (Out of Sync item) in a local Code Repository in an AutomateNOW! instance between the database version (yours, left side) and the repository version (theirs, right side)
+    Resolves a file-based Git merge conflict in a local Code Repository in an AutomateNOW! instance by accepting the ANOW-local or remote Git version.
 
     .DESCRIPTION
-    Merges a Conflict item (Out of Sync item) in a local Code Repository in an AutomateNOW! instance between the database version (yours, left side) and the repository version (theirs, right side)
+    Resolves a file-based Git merge conflict in a local Code Repository in an AutomateNOW! instance. Yours is the ANOW-local repository content shown on the left; theirs is the remote Git branch content shown on the right.
 
     .PARAMETER CodeRepository
-    Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
+    Mandatory [ANOWCodeRepository] object that owns the conflict item (Use Get-AutomateNOWCodeRepository to retrieve it)
 
     .PARAMETER ConflictItem
-    Mandatory [ANOWCodeRepositoryConflictItem] object (Use Get-AutomateNOWCodeRepositoryConflictItem to retreive them)
+    Mandatory file-based [ANOWCodeRepositoryConflictItem] object (Use Get-AutomateNOWCodeRepositoryConflictItem to retrieve it)
 
     .PARAMETER AcceptYours
-    Mandatory switch parameter if accepting left side (Yours) on the local code repository
+    Mandatory switch parameter to accept the ANOW-local version on the left side.
 
     .PARAMETER AcceptTheirs
-    Mandatory switch parameter if accepting right side (Theirs) on the remote code repository
+    Mandatory switch parameter to accept the remote Git branch version on the right side.
 
     .PARAMETER Force
     Force the merging of the object without confirmation. This is equivalent to -Confirm:$false
@@ -15455,25 +15774,27 @@ Function Merge-AutomateNOWCodeRepositoryConflictItem {
     A [ANOWCodeRepository] object must be presented. [ANOWCodeRepositoryConflictItem] objects are also required and can be sent across the pipeline.
 
     .OUTPUTS
-    The [ANOWCodeRepositoryConflictItem] object that was Merged will be returned.
+    The original [ANOWCodeRepositoryConflictItem] object is returned after the Git-conflict request succeeds unless -Quiet is specified.
 
     .EXAMPLE
-    Forcibly and quietly gets the Conflict items (Out Of Sync items) from a Code Repository named 'CodeRepository1' and then accepts the left side (Yours) in a multi-line format.
+    Forcibly and quietly gets the Git merge-conflict items from a Code Repository named 'CodeRepository1' and then accepts the ANOW-local version (Yours).
 
     $repository = Get-AutomateNOWCodeRepository -Id 'CodeRepository1'
     $conflict_items = Get-AutomateNOWCodeRepositoryConflictItem -CodeRepository $repository
     $conflict_items | Merge-AutomateNOWCodeRepositoryConflictItem -AcceptYours -CodeRepository $repository -Force -Quiet
 
     .EXAMPLE
-    Gets the Conflict items (Out Of Sync items) from a Code Repository named 'CodeRepository1' and then accepts the left side (Yours) in a one-liner format.
+    Resolves the repository once, retrieves its Git merge-conflict items, and accepts the ANOW-local version (Yours).
 
-    Get-AutomateNOWCodeRepository -Id 'CodeRepository1' | Resolve-AutomateNOWCodeRepository | Get-AutomateNOWCodeRepositoryConflictItem | Merge-AutomateNOWCodeRepositoryConflictItem -AcceptYours -CodeRepository (Get-AutomateNOWCodeRepository -Id 'CodeRepository1' | Resolve-AutomateNOWCodeRepository)
+    $repository = Get-AutomateNOWCodeRepository -Id 'CodeRepository1' | Resolve-AutomateNOWCodeRepository
+    $conflictItems = Get-AutomateNOWCodeRepositoryConflictItem -CodeRepository $repository
+    $conflictItems | Merge-AutomateNOWCodeRepositoryConflictItem -AcceptYours -CodeRepository $repository
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
 
     #>
-    [OutputType([PSCustomObject])]
+    [OutputType([ANOWCodeRepositoryConflictItem])]
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
     Param(
         [Parameter(Mandatory = $true)]
@@ -15507,58 +15828,47 @@ Function Merge-AutomateNOWCodeRepositoryConflictItem {
             [ANOWCodeRepositoryConflictItem]$ConflictItem = $_
         }
         [string]$ConflictItem_Id = $ConflictItem.id
-        If ($ConflictItem_Id -notmatch '^\[([-._0-9a-zA-Z]{1,})\][-._0-9a-zA-Z]{1,}\|[a-zA-Z]{1,}\|[-._0-9a-zA-Z]{1,}$') {
-            Write-Warning -Message "The Id of the Conflict Item object $ConflictItem_Id did not match the expected format."
+        [string]$ConflictItem_file = $ConflictItem.file
+        If ([string]::IsNullOrWhiteSpace($ConflictItem_file)) {
+            Write-Warning -Message "The Git conflict item [$ConflictItem_Id] does not contain a file value. Retrieve a valid file-based conflict record before accepting a version."
             Break
         }
-        $Error.Clear()
-        Try {
-            [ANOWCodeRepositoryObjectSourceCode_domainClassName]$domainClassName = $ConflictItem_Id -split '\|' -split '/' | Select-Object -Skip 1 -First 1
-        }
-        Catch {
-            [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Failed to cast $ConflictItem_Id to an [ANOWCodeRepositoryObjectSourceCode_domainClassName] enumerator due to [$Message]."
+        [ANOWCodeRepository]$ConflictItem_CodeRepository = $ConflictItem.codeRepository
+        If ($null -eq $ConflictItem_CodeRepository -or [string]::IsNullOrWhiteSpace($ConflictItem_CodeRepository.id)) {
+            Write-Warning -Message "The Git conflict item [$ConflictItem_Id] does not contain a Code Repository id. Retrieve a valid conflict record before accepting a version."
             Break
         }
-        If ($domainClassName.Length -eq 0) {
-            Write-Warning "The domainClassName could not be extracted from the Conflict item."
+        [string]$CodeRepository_Id = $ConflictItem_CodeRepository.id
+        If ([string]::IsNullOrWhiteSpace($CodeRepository.id) -or $CodeRepository.id -ne $CodeRepository_Id) {
+            Write-Warning -Message "The supplied Code Repository [$($CodeRepository.id)] does not match the Git conflict item's Code Repository [$CodeRepository_Id]."
             Break
         }
-        [string]$CodeRepository_Id = $CodeRepository.Id
-        [string]$itemId = $ConflictItem.itemId
         If ($AcceptYours -eq $true) {
             [string]$accept = 'acceptYours'
+            [string]$selection = 'ANOW-local version (yours)'
         }
         ElseIf ($AcceptTheirs -eq $true) {
             [string]$accept = 'acceptTheirs'
+            [string]$selection = 'remote Git version (theirs)'
         }
         Else {
-            Write-Warning -Message "It was not possible to determine if Merge-AutomateNOWCodeRepositoryConflictItem is accepting yours (left side, database) or their changes (right side, repository)."
+            Write-Warning -Message "It was not possible to determine whether Merge-AutomateNOWCodeRepositoryConflictItem should accept the ANOW-local or remote Git version."
             Break
         }
-        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Merge Conflict Item $($ConflictItem_Id) with decision: $($accept)?")) -eq $true) {
-            $BodyMetaData.'object' = ('{"itemId":"' + $itemId + '","itemType":"' + $domainClassName + '"}')
+        [string]$target = "Git conflict file [$ConflictItem_file] in Code Repository [$CodeRepository_Id]"
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess($target, "Accept $selection")) -eq $true) {
+            $BodyMetaData.'file' = $ConflictItem_file
             $BodyMetaData.'codeRepository' = $CodeRepository_Id
             $BodyMetaData.'_operationType' = 'custom'
             $BodyMetaData.'_operationId' = $accept
             $BodyMetaData.'_textMatchStyle' = 'exact'
-            $BodyMetaData.'_dataSource' = 'OutOfSyncObjectDataSource'
+            $BodyMetaData.'_dataSource' = 'CodeRepositoryConflictDataSource'
             $BodyMetaData.'isc_metaDataPrefix' = '_'
             $BodyMetaData.'isc_dataFormat' = 'json'
             [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
-            If ($null -eq $parameters["Body"]) {
-                $parameters.Add('Body', $Body)
-            }
-            Else {
-                $parameters.Body = $Body
-            }
-            If ($null -eq $parameters["Command"]) {
-                [string]$command = ("/outOfSyncObject/$accept")
-                $parameters.Add('Command', $command)
-            }
-            Else {
-                $parameters.Command = $command
-            }
+            $parameters.Body = $Body
+            [string]$command = ("/codeRepositoryConflict/$accept")
+            $parameters.Command = $command
             $Error.Clear()
             Try {
                 [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
@@ -15574,40 +15884,8 @@ Function Merge-AutomateNOWCodeRepositoryConflictItem {
                 Write-Warning -Message "The response code was not 0 but was [$response_code]. Body: $full_response_display"
                 Break
             }
-            [PSCustomObject]$temp_result = ForEach ($result in $results.response.data) {
-                [PSCustomObject]$result = $result | Select-Object -ExcludeProperty codeRepository
-                $result | Add-Member -MemberType 'NoteProperty' -Name 'codeRepository' -value $CodeRepository -Force
-                $result
-            }
-            $Error.Clear()
-            Try {
-                [ANOWCodeRepositoryConflictItem]$MergedCodeRepositoryItem = $temp_result
-            }
-            Catch {
-                [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Failed to parse the response into an [ANOWCodeRepositoryConflictItem] object due to [$Message]."
-                Break
-            }
-            [string]$MergedCodeRepositoryItem_Id = $MergedCodeRepositoryItem.Id
-            If ($MergedCodeRepositoryItem_Id.Length -eq 0) {
-                If ($anow_session.allow_timeout -ne $true) {
-                    Write-Warning -Message "The returned item from this Code Repository Merge Request was empty."
-                    Break
-                }
-                Else {
-                    Write-Warning -Message "The reply from the Code Repository Merge Request was empty but this was probably expected since -AllowTimeout was used."
-                    Return
-                }
-            }
-            [string]$formatted_conflict_id = ($ConflictItem_id -split '\]' | Select-Object -Skip 1)
-            If ($MergedCodeRepositoryItem_Id -eq $formatted_conflict_id) {
-                If ($Quiet -ne $true) {
-                    Return $MergedCodeRepositoryItem
-                }
-            }
-            Else {
-                Write-Warning -Message "The returned Item $MergedCodeRepositoryItem_Id doesn't match $formatted_conflict_id after merging. Something must be wrong."
-                Break
+            If ($Quiet -ne $true) {
+                Return $ConflictItem
             }
         }
     }
@@ -15642,7 +15920,7 @@ Function Read-AutomateNOWCodeRepositoryItem {
     Integer to indicate the row to stop on. This is intended for when you need to paginate the results. Default is 100.
 
     .INPUTS
-    Accepts a string representing the simple id of the Code Repository from the pipeline or individually (but not an array).
+    Accepts an [ANOWCodeRepository] object directly or from the pipeline.
 
     .OUTPUTS
     An array of PSCustomObjects representing the selected item types.
@@ -15660,7 +15938,7 @@ Function Read-AutomateNOWCodeRepositoryItem {
     $items = Read-AutomateNOWCodeRepositoryItem -CodeRepository $repo -itemType 'ProcessingTemplates'
 
     .EXAMPLE
-    Works around a bug to get all of the items that may exist within a Code Repository named 'CodeRepository1' (multi-line)
+    Combines the first page of the default item list with the first page of item types omitted by the API's ItemsList response (multi-line)
 
     $repo = Get-AutomateNOWCodeRepository -Id 'CodeRepository1'
     ($repo | Read-AutomateNOWCodeRepositoryItem) + ($repo | Read-AutomateNOWCodeRepositoryItem -ItemType 'BusinessViews') + ($repo | Read-AutomateNOWCodeRepositoryItem -ItemType 'Folders') + ($repo | Read-AutomateNOWCodeRepositoryItem -ItemType 'Workspaces')
@@ -15874,6 +16152,304 @@ Function Read-AutomateNOWCodeRepositoryItem {
                 Return $FormattedCodeRepositoryItems
             }
             Return $CodeRepositoryItems
+        }
+    }
+    End {
+
+    }
+}
+
+Function Get-AutomateNOWCodeRepositoryItemDataSource {
+    [OutputType([string])]
+    [CmdletBinding()]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [ANOWCodeRepositoryObjectSourceCode_domainClassName]$DomainClassName
+    )
+    Switch ($DomainClassName) {
+        'ProcessingTemplate' { Return 'ProcessingTemplateDataSource' }
+        'BusinessView' { Return 'BusinessViewDataSource' }
+        'Workspace' { Return 'WorkspaceDataSource' }
+        'ResultMapping' { Return 'ResultMappingDataSource' }
+        'ApprovalConfiguration' { Return 'ApprovalConfigurationDataSource' }
+        'ServerNode' { Return 'ServerNodeDataSource' }
+        'ServerNodeGroup' { Return 'ServerNodeGroupDataSource' }
+        'Agent' { Return 'AgentDataSource' }
+        'Endpoint' { Return 'EndpointDataSource' }
+        'Resource' { Return 'ResourceDataSource' }
+        'DataSource' { Return 'DataSourceDataSource' }
+        'Anomaly' { Return 'AnomalyDataSource' }
+        'Integration' { Return 'IntegrationDataSource' }
+        'NotificationGroup' { Return 'NotificationGroupDataSource' }
+        'NotificationChannel' { Return 'NotificationChannelDataSource' }
+        'NotificationMessageTemplate' { Return 'NotificationMessageTemplateDataSource' }
+        'ProcessingAction' { Return 'ProcessingActionDataSource' }
+        'Dashboard' { Return 'DashboardDataSource' }
+        'AdhocReport' { Return 'AdhocReportDataSource' }
+        'UserReport' { Return 'UserReportDataSource' }
+        'Folder' { Return 'FolderDataSource' }
+        'Tag' { Return 'TagDataSource' }
+    }
+}
+
+Function Invoke-AutomateNOWCodeRepositoryItemCommit {
+    <#
+    .SYNOPSIS
+    Commits changes for one selected item in a local Code Repository in an AutomateNOW! instance.
+
+    .DESCRIPTION
+    Invokes the vendor selected-item commit action for one item in a local Code Repository in an AutomateNOW! instance.
+    This command is distinct from Publish-AutomateNOWCodeRepository, which commits changed or all items in a repository.
+
+    .PARAMETER Item
+    Mandatory Code Repository item emitted by Read-AutomateNOWCodeRepositoryItem.
+
+    .PARAMETER Comment
+    Optional commit comment recorded with the selected item.
+
+    .PARAMETER Reason
+    Optional commit reason recorded with the selected item.
+
+    .PARAMETER Force
+    Skips the PowerShell confirmation prompt. This is equivalent to -Confirm:$false.
+
+    .PARAMETER Quiet
+    Optional switch to suppress output of the committed Code Repository item.
+
+    .INPUTS
+    [PSCustomObject] Code Repository items emitted by Read-AutomateNOWCodeRepositoryItem.
+
+    .OUTPUTS
+    The original [PSCustomObject] Code Repository item after a successful selected-item commit, unless -Quiet is specified.
+
+    .EXAMPLE
+    Commits a selected Code Repository item with a comment and reason.
+
+    $repository = Get-AutomateNOWCodeRepository -Id 'CodeRepository1'
+    $item = $repository | Read-AutomateNOWCodeRepositoryItem | Where-Object simpleId -eq 'ExampleResource' | Select-Object -First 1
+    $item | Invoke-AutomateNOWCodeRepositoryItemCommit -Comment 'Approved change' -Reason 'CR-1234'
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    This command calls the vendor selected-item /codeRepository/commitObject action, which is the action used by the corresponding AutomateNOW UI control. It does not call the repository-wide Commit Changed Items or Commit All Items operations.
+
+    KNOWN ISSUE / POSSIBLE VENDOR BUG: selected-item commit may clear an item's pending-change indicator without creating a local Git commit that Send-AutomateNOWCodeRepository can push. Matching behavior was reported for the corresponding UI action. Do not rely on this command alone for the normal publication workflow; use Publish-AutomateNOWCodeRepository, Send-AutomateNOWCodeRepository, then Sync-AutomateNOWCodeRepository. Vendor follow-up is required to confirm the endpoint behavior.
+
+    #>
+    [OutputType([PSCustomObject])]
+    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [PSCustomObject]$Item,
+        [Parameter(Mandatory = $false)]
+        [AllowEmptyString()]
+        [string]$Comment = '',
+        [Parameter(Mandatory = $false)]
+        [AllowEmptyString()]
+        [string]$Reason = '',
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "There is not a valid token confirmed."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        [string]$ItemSimpleId = $Item.simpleId
+        If ([string]::IsNullOrWhiteSpace($ItemSimpleId)) {
+            Write-Warning -Message "The Item passed to Invoke-AutomateNOWCodeRepositoryItemCommit does not have a simpleId."
+            Break
+        }
+        [string]$ItemDomain = $Item.domain
+        If ([string]::IsNullOrWhiteSpace($ItemDomain)) {
+            Write-Warning -Message "The Item [$ItemSimpleId] passed to Invoke-AutomateNOWCodeRepositoryItemCommit does not have a domain."
+            Break
+        }
+        [string]$ItemDomainClassName = $Item.domainClassName
+        Try {
+            [ANOWCodeRepositoryObjectSourceCode_domainClassName]$DomainClassName = $ItemDomainClassName
+        }
+        Catch {
+            Write-Warning -Message "The Item [$ItemSimpleId] has an invalid domainClassName [$ItemDomainClassName]."
+            Break
+        }
+        [string]$DataSource = Get-AutomateNOWCodeRepositoryItemDataSource -DomainClassName $DomainClassName
+        If ([string]::IsNullOrWhiteSpace($DataSource)) {
+            Write-Warning -Message "The Item [$ItemSimpleId] has a domainClassName [$DomainClassName] that is not supported for selected Code Repository commits."
+            Break
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("[$ItemDomain]$ItemSimpleId ($DomainClassName)", 'Commit selected Code Repository item')) -eq $true) {
+            # KNOWN ISSUE / POSSIBLE VENDOR BUG: the vendor /codeRepository/commitObject action may clear an item's pending state without creating a pushable local Git commit. Preserve the request mapping for compatibility; prefer Publish-AutomateNOWCodeRepository, Send-AutomateNOWCodeRepository, then Sync-AutomateNOWCodeRepository for the normal publication workflow.
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.Add('domain', $ItemDomain)
+            $BodyMetaData.Add('domainClassName', [string]$DomainClassName)
+            $BodyMetaData.Add('id', $ItemSimpleId)
+            $BodyMetaData.Add('comment', $Comment)
+            $BodyMetaData.Add('reason', $Reason)
+            $BodyMetaData.Add('_operationType', 'update')
+            $BodyMetaData.Add('_operationId', 'commitObject')
+            $BodyMetaData.Add('_textMatchStyle', 'exact')
+            $BodyMetaData.Add('_dataSource', $DataSource)
+            $BodyMetaData.Add('isc_metaDataPrefix', '_')
+            $BodyMetaData.Add('isc_dataFormat', 'json')
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            [string]$command = '/codeRepository/commitObject'
+            $parameters['Body'] = $Body
+            $parameters['Command'] = $command
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] for selected Code Repository item [$ItemSimpleId]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                If ($Quiet -eq $true) {
+                    Return $false
+                }
+                Write-Warning -Message "The response code was [$response_code] instead of 0. The selected Code Repository item [$ItemSimpleId] was not committed."
+                Break
+            }
+            If ($Quiet -ne $true) {
+                Return $Item
+            }
+        }
+    }
+    End {
+
+    }
+}
+
+Function Invoke-AutomateNOWCodeRepositoryItemRollback {
+    <#
+    .SYNOPSIS
+    Rolls back changes for one selected item in a local Code Repository in an AutomateNOW! instance.
+
+    .DESCRIPTION
+    Discards changes for one selected item and restores its last state from the local Code Repository in an AutomateNOW! instance.
+    This command is distinct from Unpublish-AutomateNOWCodeRepository, which rolls back all items in a repository.
+
+    .PARAMETER Item
+    Mandatory Code Repository item emitted by Read-AutomateNOWCodeRepositoryItem.
+
+    .PARAMETER Force
+    Skips the PowerShell confirmation prompt. This is equivalent to -Confirm:$false.
+
+    .PARAMETER Quiet
+    Optional switch to suppress output of the rolled-back Code Repository item.
+
+    .INPUTS
+    [PSCustomObject] Code Repository items emitted by Read-AutomateNOWCodeRepositoryItem.
+
+    .OUTPUTS
+    The original [PSCustomObject] Code Repository item after a successful selected-item rollback, unless -Quiet is specified.
+
+    .EXAMPLE
+    Rolls back a selected Code Repository item without a confirmation prompt.
+
+    $repository = Get-AutomateNOWCodeRepository -Id 'CodeRepository1'
+    $item = $repository | Read-AutomateNOWCodeRepositoryItem | Where-Object simpleId -eq 'ExampleResource' | Select-Object -First 1
+    $item | Invoke-AutomateNOWCodeRepositoryItemRollback -Force
+
+    .NOTES
+    You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    This command is equivalent to rolling back one selected item in the AutomateNOW UI. It does not call the repository-wide Rollback All operation.
+
+    #>
+    [OutputType([PSCustomObject])]
+    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    Param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [PSCustomObject]$Item,
+        [Parameter(Mandatory = $false)]
+        [switch]$Force,
+        [Parameter(Mandatory = $false)]
+        [switch]$Quiet
+    )
+    Begin {
+        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
+            Write-Warning -Message "There is not a valid token confirmed."
+            Break
+        }
+        [hashtable]$parameters = @{}
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+    }
+    Process {
+        [string]$ItemSimpleId = $Item.simpleId
+        If ([string]::IsNullOrWhiteSpace($ItemSimpleId)) {
+            Write-Warning -Message "The Item passed to Invoke-AutomateNOWCodeRepositoryItemRollback does not have a simpleId."
+            Break
+        }
+        [string]$ItemDomain = $Item.domain
+        If ([string]::IsNullOrWhiteSpace($ItemDomain)) {
+            Write-Warning -Message "The Item [$ItemSimpleId] passed to Invoke-AutomateNOWCodeRepositoryItemRollback does not have a domain."
+            Break
+        }
+        [string]$ItemDomainClassName = $Item.domainClassName
+        Try {
+            [ANOWCodeRepositoryObjectSourceCode_domainClassName]$DomainClassName = $ItemDomainClassName
+        }
+        Catch {
+            Write-Warning -Message "The Item [$ItemSimpleId] has an invalid domainClassName [$ItemDomainClassName]."
+            Break
+        }
+        [string]$DataSource = Get-AutomateNOWCodeRepositoryItemDataSource -DomainClassName $DomainClassName
+        If ([string]::IsNullOrWhiteSpace($DataSource)) {
+            Write-Warning -Message "The Item [$ItemSimpleId] has a domainClassName [$DomainClassName] that is not supported for selected Code Repository rollbacks."
+            Break
+        }
+        If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("[$ItemDomain]$ItemSimpleId ($DomainClassName)", 'Rollback selected Code Repository item')) -eq $true) {
+            [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+            $BodyMetaData.Add('domain', $ItemDomain)
+            $BodyMetaData.Add('domainClassName', [string]$DomainClassName)
+            $BodyMetaData.Add('id', $ItemSimpleId)
+            $BodyMetaData.Add('_operationType', 'update')
+            $BodyMetaData.Add('_operationId', 'rollbackObject')
+            $BodyMetaData.Add('_textMatchStyle', 'exact')
+            $BodyMetaData.Add('_dataSource', $DataSource)
+            $BodyMetaData.Add('isc_metaDataPrefix', '_')
+            $BodyMetaData.Add('isc_dataFormat', 'json')
+            [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+            [string]$command = '/codeRepository/rollbackObject'
+            $parameters['Body'] = $Body
+            $parameters['Command'] = $command
+            $Error.Clear()
+            Try {
+                [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+            }
+            Catch {
+                Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] for selected Code Repository item [$ItemSimpleId]."
+                Break
+            }
+            [int32]$response_code = $results.response.status
+            If ($response_code -ne 0) {
+                If ($Quiet -eq $true) {
+                    Return $false
+                }
+                Write-Warning -Message "The response code was [$response_code] instead of 0. The selected Code Repository item [$ItemSimpleId] was not rolled back."
+                Break
+            }
+            If ($Quiet -ne $true) {
+                Return $Item
+            }
         }
     }
     End {
@@ -16394,22 +16970,22 @@ Function ConvertFrom-AutomateNOWCodeRepositoryItem {
 
     <#
     .SYNOPSIS
-    Converts an [ANOWCodeRepositoryItem] object to the object on which the item is based on
+    Converts a Code Repository item emitted by Read-AutomateNOWCodeRepositoryItem to its underlying AutomateNOW object.
 
     .DESCRIPTION
-    Converts an [ANOWCodeRepositoryItem] object to the object on which the item is based on
+    Converts a [PSCustomObject] item emitted by Read-AutomateNOWCodeRepositoryItem to the underlying AutomateNOW object.
 
     .PARAMETER CodeRepositoryItem
-    Mandatory [ANOWCodeRepositoryItem] object (Use Read-AutomateNOWCodeRepository to retrieve these)
+    Mandatory [PSCustomObject] item emitted by Read-AutomateNOWCodeRepositoryItem.
 
     .INPUTS
-    Only [ANOWCodeRepositoryItem] objects are accepted (including across the pipeline)
+    Accepts [PSCustomObject] items emitted by Read-AutomateNOWCodeRepositoryItem, including from the pipeline.
 
     .OUTPUTS
     An [ANOW] object will be returned based on its type.
 
     .EXAMPLE
-    Converts all of the objects within a Code Repository named 'Repository1' (except for BusinessViews and Workspaces due to a bug). Note that the output will most likely be a mixed bag (array) of different object types.
+    Converts objects from the first default item page of a Code Repository named 'Repository1'. Business Views, Folders, and Workspaces require separate reads. The output can contain different object types.
 
     Get-AutomateNOWCodeRepository -Id 'Repository1' | Read-AutomateNOWCodeRepositoryItem | ConvertFrom-AutomateNOWCodeRepositoryItem
 
@@ -16421,13 +16997,13 @@ Function ConvertFrom-AutomateNOWCodeRepositoryItem {
     $repo_items | ConvertFrom-AutomateNOWCodeRepositoryItem
 
     .EXAMPLE
-    Uses a workaround to convert all of the objects within a Code Repository named 'Repository1' (which will include BusinessViews and Workspaces) (multi-line)
+    Combines first pages for the default item list and the item types omitted by ItemsList, then converts the results (multi-line)
 
     $repository = Get-AutomateNOWCodeRepository -Id 'CodeRepository1'
     $repo_items = ($repository | Read-AutomateNOWCodeRepositoryItem) + ($repository | Read-AutomateNOWCodeRepositoryItem -ItemType 'BusinessViews') + ($repository | Read-AutomateNOWCodeRepositoryItem -ItemType 'Folders') + ($repository | Read-AutomateNOWCodeRepositoryItem -ItemType 'Workspaces')
     $repo_items | ConvertFrom-AutomateNOWCodeRepositoryItem
 
-    Hint: You can then pipe the $repo_items objects to Export-AutomateNOWMigration to mimic the Migration Export functionality
+    # Hint: You can then pipe the $repo_items objects to Export-AutomateNOWMigration to mimic the Migration Export functionality
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
@@ -16703,7 +17279,7 @@ Function ConvertFrom-AutomateNOWCodeRepositoryItem {
                 }
                 Catch {
                     [string]$Message = $_.Exception.Message
-                    Write-Warning -Message "Get-AutomateNOWNotificationTemplate failed to retrieve ($Item_Id) under Convertfrom-AutomateNOWCodeRepositoryItem due to [$Message]."
+                    Write-Warning -Message "Get-AutomateNOWNotificationMessageTemplate failed to retrieve ($Item_Id) under Convertfrom-AutomateNOWCodeRepositoryItem due to [$Message]."
                     Break
                 }
                 Return $NotificationMessageTemplate
@@ -16802,13 +17378,13 @@ Function Get-AutomateNOWCodeRepositoryMergeRequest {
     Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
 
     .PARAMETER Id
-    Optional int64 to filter the results to a single merge request by name. Use this when you only want a specific merge request.
+    Mandatory int64 in the Single parameter set to select a merge request by ID from the requested page.
 
     .PARAMETER startRow
-    Integer to indicate the row to start from. This is intended for when you need to paginate the results. Default is 0.
+    Integer to indicate the row to start from. Available in both parameter sets so a merge request can be selected from a later page. Default is 0.
 
     .PARAMETER endRow
-    Integer to indicate the row to stop on. This is intended for when you need to paginate the results. Default is 100.
+    Integer to indicate the row to stop on. Available in both parameter sets. Default is 100.
 
     .INPUTS
     You must present an [ANOWCodeRepository] object
@@ -16817,7 +17393,7 @@ Function Get-AutomateNOWCodeRepositoryMergeRequest {
     [ANOWCodeRepositoryMergeRequest] objects
 
     .EXAMPLE
-    Gets all of the merge requests from a Code Repository named 'Repository1'
+    Gets the first page of merge requests from a Code Repository named 'Repository1'
 
     $repo = Get-AutomateNOWCodeRepository -Id 'Repository1'
     $merge_requests = Get-AutomateNOWCodeRepositoryMergeRequest -CodeRepository $repo
@@ -16835,8 +17411,10 @@ Function Get-AutomateNOWCodeRepositoryMergeRequest {
         [Parameter(Mandatory = $true, ParameterSetName = 'Single')]
         [int64]$Id,
         [Parameter(Mandatory = $False, ParameterSetName = 'All')]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Single')]
         [int32]$startRow = 0,
         [Parameter(Mandatory = $False, ParameterSetName = 'All')]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Single')]
         [int32]$endRow = 100
     )
     Begin {
@@ -16927,7 +17505,7 @@ Function Approve-AutomateNOWCodeRepositoryMergeRequest {
     Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
 
     .PARAMETER MergeRequest
-    Mandatory [ANOWCodeRepositoryMergeRequest] object (Use Get-AutomateNOWMergeRequest to retrieve them)
+    Mandatory [ANOWCodeRepositoryMergeRequest] object. Use Get-AutomateNOWCodeRepositoryMergeRequest to retrieve it.
 
     .PARAMETER Force
     Force the acceptance of the Merge Request without confirmation. This is equivalent to -Confirm:$false
@@ -16946,14 +17524,14 @@ Function Approve-AutomateNOWCodeRepositoryMergeRequest {
 
     $repository = Get-AutomateNOWCodeRepository -Id 'Repository1'
     $merge_request = Get-AutomateNOWCodeRepositoryMergeRequest -CodeRepository $repository -Id 9
-    Approve-AutomateNOwCodeRepositoryMergeRequest -CodeRepository $repository -MergeRequest $merge_request
+    Approve-AutomateNOWCodeRepositoryMergeRequest -CodeRepository $repository -MergeRequest $merge_request
 
     .EXAMPLE
     Forcibly accepts a Merge Request with the id of 9 on a Code Repository named 'Repository1'
 
     $repository = Get-AutomateNOWCodeRepository -Id 'Repository1'
     $merge_request = Get-AutomateNOWCodeRepositoryMergeRequest -CodeRepository $repository -Id 9
-    $merge_request | Approve-AutomateNOwCodeRepositoryMergeRequest -CodeRepository $repository -Force
+    $merge_request | Approve-AutomateNOWCodeRepositoryMergeRequest -CodeRepository $repository -Force
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
@@ -16962,6 +17540,7 @@ Function Approve-AutomateNOWCodeRepositoryMergeRequest {
     [OutputType([ANOWCodeRepositoryMergeRequest])]
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
     Param(
+        [Parameter(Mandatory = $true)]
         [ANOWCodeRepository]$CodeRepository,
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [ANOWCodeRepositoryMergeRequest]$MergeRequest,
@@ -17059,7 +17638,7 @@ Function Deny-AutomateNOWCodeRepositoryMergeRequest {
     Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
 
     .PARAMETER MergeRequest
-    Mandatory [ANOWCodeRepositoryMergeRequest] object (Use Get-AutomateNOWMergeRequest to retrieve them)
+    Mandatory [ANOWCodeRepositoryMergeRequest] object. Use Get-AutomateNOWCodeRepositoryMergeRequest to retrieve it.
 
     .PARAMETER Force
     Force the rejection of the object without confirmation. This is equivalent to -Confirm:$false
@@ -17078,14 +17657,14 @@ Function Deny-AutomateNOWCodeRepositoryMergeRequest {
 
     $repository = Get-AutomateNOWCodeRepository -Id 'Repository1'
     $merge_request = Get-AutomateNOWCodeRepositoryMergeRequest -CodeRepository $repository -Id 9
-    Deny-AutomateNOwCodeRepositoryMergeRequest -CodeRepository $repository -MergeRequest $merge_request
+    Deny-AutomateNOWCodeRepositoryMergeRequest -CodeRepository $repository -MergeRequest $merge_request
 
     .EXAMPLE
     Forcibly denies (rejects) a Merge Request with the id of 9 on a Code Repository named 'Repository1'
 
     $repository = Get-AutomateNOWCodeRepository -Id 'Repository1'
     $merge_request = Get-AutomateNOWCodeRepositoryMergeRequest -CodeRepository $repository -Id 9
-    $merge_request | Deny-AutomateNOwCodeRepositoryMergeRequest -CodeRepository $repository -Force
+    $merge_request | Deny-AutomateNOWCodeRepositoryMergeRequest -CodeRepository $repository -Force
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
@@ -17094,6 +17673,7 @@ Function Deny-AutomateNOWCodeRepositoryMergeRequest {
     [OutputType([ANOWCodeRepositoryMergeRequest])]
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
     Param(
+        [Parameter(Mandatory = $true)]
         [ANOWCodeRepository]$CodeRepository,
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [ANOWCodeRepositoryMergeRequest]$MergeRequest,
@@ -17266,7 +17846,7 @@ Function Get-AutomateNOWCodeRepositoryObjectSource {
     [ANOWNotificationChannel] object to retrieve the source code of. Use Get-AutomateNOWNotificationChannel to obtain these objects.
 
     .PARAMETER NotificationMessageTemplate
-    [ANOWNotificationMessageTemplate] object to retrieve the source code of. Use Get-AutomateNOWNotificationTemplate to obtain these objects.
+    [ANOWNotificationMessageTemplate] object to retrieve the source code of. Use Get-AutomateNOWNotificationMessageTemplate to obtain these objects.
 
     .PARAMETER RuntimeAction
     [ANOWProcessingAction] object to retrieve the source code of. Use Get-AutomateNOWRuntimeAction to obtain these objects.
@@ -17330,6 +17910,7 @@ Function Get-AutomateNOWCodeRepositoryObjectSource {
     Get-AutomateNOWNotificationMessageTemplate -startRow 0 -endRow 1 | Get-AutomateNOWCodeRepositoryObjectSource
     Get-AutomateNOWPhysicalResource -startRow 0 -endRow 1 | Get-AutomateNOWCodeRepositoryObjectSource
     Get-AutomateNOWResultMapping -startRow 0 -endRow 1 | Get-AutomateNOWCodeRepositoryObjectSource
+    Get-AutomateNOWRuntimeAction -startRow 0 -endRow 1 | Get-AutomateNOWCodeRepositoryObjectSource
     Get-AutomateNOWScheduleTemplate -startRow 0 -endRow 1 | Get-AutomateNOWCodeRepositoryObjectSource
     Get-AutomateNOWSemaphore -startRow 0 -endRow 1 | Get-AutomateNOWCodeRepositoryObjectSource
     Get-AutomateNOWServerNode -startRow 0 -endRow 1 | Get-AutomateNOWCodeRepositoryObjectSource
@@ -17346,7 +17927,7 @@ Function Get-AutomateNOWCodeRepositoryObjectSource {
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
 
-    This function is almost complete, of the known domain classes, only Runtime Actions is still missing.
+    Runtime Actions are supported through the -RuntimeAction parameter and are represented by the ProcessingAction domain class.
 
     #>
     [OutputType([ANOWCodeRepositoryObjectSourceCode])]
@@ -17666,11 +18247,12 @@ Function Get-AutomateNOWCodeRepositoryObjectSource {
         }
         ElseIf ($_ -is [ANOWProcessingAction] -or $RuntimeAction.Id.Length -gt 0) {
             [ANOWCodeRepositoryObjectSourceCode_domainClassName]$domainClassName = 'ProcessingAction'
-            If ($RuntimeAction.id.Length -gt 0) {
-                $BodyMetaData.'id' = $RuntimeAction.id
+            If ($RuntimeAction.simpleId.Length -gt 0) {
+                # The ProcessingAction source endpoint accepts the Runtime Action simpleId, not its GUID Id.
+                $BodyMetaData.'id' = $RuntimeAction.simpleId
             }
             Else {
-                $BodyMetaData.'id' = $_.'id'
+                $BodyMetaData.'id' = $_.'simpleId'
             }
         }
         ElseIf ($_ -is [ANOWDashboard] -or $Dashboard.Id.Length -gt 0) {
@@ -17788,7 +18370,7 @@ Function Export-AutomateNOWCodeRepositoryObjectSource {
     ONLY [ANOWCodeRepositoryObjectSourceCode] objects are accepted (including from the pipeline)
 
     .OUTPUTS
-    The [ANOWCodeRepositoryObjectSourceCode] objects are exported to the local disk in CSV format
+    No success-stream output. The command writes one tab-delimited .tsv file in the current directory and reports its filename through the information stream.
 
     .EXAMPLE
     Exports the Code Repository Object Source of a Task Template named 'TaskTemplate1' to disk.
@@ -17798,9 +18380,7 @@ Function Export-AutomateNOWCodeRepositoryObjectSource {
     .NOTES
     You must present [ANOWCodeRepositoryObjectSourceCode] objects to the pipeline to use this function.
 
-    Carriage returns are replaced with '\r'
-    New lines are replaced with '\n'
-    Tabs are replaced with '\t'
+    Carriage returns are written as '\r', new lines as '\n', and tabs as '\t' in the exported sourceCode field. The supplied input object is not modified.
 
     #>
 
@@ -17811,7 +18391,7 @@ Function Export-AutomateNOWCodeRepositoryObjectSource {
     )
     Begin {
         [string]$current_time = Get-Date -Format 'yyyyMMddHHmmssfff'
-        [string]$ExportFileName = 'Export-AutomateNOW-ObjectSource-' + $current_time + '.csv'
+        [string]$ExportFileName = 'Export-AutomateNOW-ObjectSource-' + $current_time + '.tsv'
         [string]$ExportFilePath = ((Get-Location | Select-Object -ExpandProperty Path) + '\' + $ExportFileName)
         [hashtable]$parameters = @{}
         $parameters.Add('Path', $ExportFilePath)
@@ -17825,10 +18405,11 @@ Function Export-AutomateNOWCodeRepositoryObjectSource {
         If ($_.id.Length -gt 0) {
             [ANOWCodeRepositoryObjectSourceCode]$ObjectSource = $_
         }
-        $ObjectSource.sourceCode = ($ObjectSource.sourceCode -replace "`r", '\r' -replace "`n", '\n' -replace "`t", '\t')
+        $ExportObject = $ObjectSource | Select-Object -Property *
+        $ExportObject.sourceCode = ($ExportObject.sourceCode -replace "`r", '\r' -replace "`n", '\n' -replace "`t", '\t')
         $Error.Clear()
         Try {
-            $ObjectSource | Export-CSV @parameters
+            $ExportObject | Export-CSV @parameters
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -18132,10 +18713,10 @@ Function Edit-AutomateNOWCodeRepositoryObjectSource {
 Function Get-AutomateNOWCodeRepositoryOutOfSyncItem {
     <#
     .SYNOPSIS
-    Gets all of the out-of-sync items from a local Code Repository in an AutomateNOW! instance
+    Gets a page of out-of-sync items from a local Code Repository in an AutomateNOW! instance.
 
     .DESCRIPTION
-    Gets all of the out-of-sync items from a local Code Repository in an AutomateNOW! instance
+    Gets a page of out-of-sync items from a local Code Repository in an AutomateNOW! instance. The default page is rows 0 through 100.
 
     .PARAMETER CodeRepository
     Mandatory [ANOWCodeRepository] object (Use Get-AutomateNOWCodeRepository to retrieve them)
@@ -18273,13 +18854,14 @@ Function Get-AutomateNOWCodeRepositoryTag {
     You must present an [ANOWCodeRepository] object
 
     .OUTPUTS
-    An array of PSCustomObjects representing the git tags in the repository.
+    An array of [ANOWCodeRepositoryTag] objects representing the Git tags in the repository.
 
     .EXAMPLE
     Gets the names of the git tags from a Code Repository
 
     $repo = Get-AutomateNOWCodeRepository -Id 'Repository1'
-    $branches = Get-AutomateNOWCodeRepositoryTag -CodeRepository $repo
+    $tags = Get-AutomateNOWCodeRepositoryTag -CodeRepository $repo
+    $tags.name
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
@@ -18394,7 +18976,7 @@ Function New-AutomateNOWCodeRepositoryTag {
     You must present [ANOWCodeRepository] objects
 
     .OUTPUTS
-    An informational message indicating the results. Use -Quiet to suppress this.
+    An [ANOWCodeRepositoryTag] object is returned unless -Quiet is specified.
 
     .EXAMPLE
     Creates a new tag named 'tag1' on a repository named 'CodeRepository1'.
@@ -21550,7 +22132,7 @@ Function Get-AutomateNOWDashboard {
     [OutputType([ANOWDashboard[]])]
     [CmdletBinding( DefaultParameterSetName = 'Default' )]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $False, ParameterSetName = 'Id', ValueFromPipeline = $true)]
         [string]$Id,
         [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
@@ -22158,7 +22740,7 @@ Function New-AutomateNOWDashboard {
     [OutputType([ANOWDashboard])]
     [CmdletBinding(DefaultParameterSetName = 'Default')]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true, ParameterSetName = 'Default')]
         [Parameter(Mandatory = $true, ParameterSetName = 'iconSet')]
         [string]$Id,
@@ -22624,7 +23206,7 @@ Function Copy-AutomateNOWDashboard {
         [Parameter(Mandatory = $true)]
         [ANOWDashboard]$Dashboard,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,128}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,128}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [ValidateScript({ $_.length -le 32 })]
@@ -22855,7 +23437,7 @@ Function Rename-AutomateNOWDashboard {
         [Parameter(Mandatory = $true)]
         [ANOWDashboard]$Dashboard,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -24009,7 +24591,7 @@ Function Get-AutomateNOWDataSource {
     Param(
         [Parameter(Mandatory = $True, ParameterSetName = 'Id', ValueFromPipeline = $true)]
         [string]$Id,
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
         [ANOWDataSource_dataSourceType]$DataSourceType,
         [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
@@ -24264,7 +24846,7 @@ Function New-AutomateNOWDataSource {
     [OutputType([ANOWDataSource])]
     [CmdletBinding()]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true)]
         [string]$Id,
         [Parameter(Mandatory = $true)]
@@ -24919,7 +25501,7 @@ Function Copy-AutomateNOWDataSource {
         [Parameter(Mandatory = $true)]
         [ANOWDataSource]$DataSource,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [ValidateScript({ $_.Length -le 255 })]
@@ -25144,7 +25726,7 @@ Function Rename-AutomateNOWDataSource {
         [Parameter(Mandatory = $true)]
         [ANOWDataSource]$DataSource,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -27992,7 +28574,7 @@ Function New-AutomateNOWDesignTemplate {
     [OutputType([ANOWDesignTemplate])]
     [CmdletBinding()]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true)]
         [string]$Id,
         [ValidateScript({ $_.processingType -ne 'TRIGGER' })] # this is to ensure that Schedule Templates are not passed here
@@ -28310,7 +28892,7 @@ Function Copy-AutomateNOWDesignTemplate {
         [Parameter(Mandatory = $true)]
         [ANOWDesignTemplate]$DesignTemplate,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -28456,7 +29038,7 @@ Function Rename-AutomateNOWDesignTemplate {
         [Parameter(Mandatory = $true)]
         [ANOWDesignTemplate]$DesignTemplate,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -31024,7 +31606,7 @@ Function New-AutomateNOWDomain {
     [OutputType([ANOWDomain])]
     [CmdletBinding(DefaultParameterSetName = 'Default')]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true, ParameterSetName = 'Default')]
         [Parameter(Mandatory = $true, ParameterSetName = 'WithIcon')]
         [string]$Id,
@@ -31198,7 +31780,7 @@ Function Copy-AutomateNOWDomain {
         [Parameter(Mandatory = $true)]
         [ANOWDomain]$Domain,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -31374,7 +31956,7 @@ Function Rename-AutomateNOWDomain {
         [Parameter(Mandatory = $true)]
         [ANOWDomain]$Domain,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -32347,7 +32929,6 @@ Function Get-AutomateNOWEndpoint {
         }
         [hashtable]$parameters = @{}
         $parameters.Add('Method', 'GET')
-        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
         If ($anow_session.NotSecure -eq $true) {
             $parameters.Add('NotSecure', $true)
         }
@@ -32566,7 +33147,7 @@ Function New-AutomateNOWEndpoint {
     [OutputType([ANOWEndpoint])]
     [CmdletBinding()]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true)]
         [string]$Id,
         [Parameter(Mandatory = $true)]
@@ -33091,7 +33672,7 @@ Function Copy-AutomateNOWEndpoint {
         [Parameter(Mandatory = $true)]
         [ANOWEndpoint]$Endpoint,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [ValidateScript({ $_.Length -le 255 })]
@@ -33312,7 +33893,7 @@ Function Rename-AutomateNOWEndpoint {
         [Parameter(Mandatory = $true)]
         [ANOWEndpoint]$Endpoint,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -34218,7 +34799,7 @@ Function New-AutomateNOWEvent {
     [OutputType([ANOWEvent])]
     [CmdletBinding()]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true)]
         [string]$Id,
         [ValidateScript({ $_.Length -le 255 })]
@@ -34540,7 +35121,7 @@ Function Copy-AutomateNOWEvent {
         [Parameter(Mandatory = $true)]
         [ANOWEvent]$Event,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [ValidateScript({ $_.Length -le 255 })]
@@ -34761,7 +35342,7 @@ Function Rename-AutomateNOWEvent {
         [Parameter(Mandatory = $true)]
         [ANOWEvent]$Event,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -35851,7 +36432,7 @@ Function New-AutomateNOWFolder {
     [OutputType([ANOWFolder])]
     [CmdletBinding()]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true)]
         [string]$Id,
         [Parameter(Mandatory = $false, HelpMessage = "Enter a descriptive string up to 255 characters (UTF8 compatible)")]
@@ -36583,7 +37164,7 @@ Function Get-AutomateNOWInterface {
     [OutputType([ANOWIntegration[]])]
     [CmdletBinding( DefaultParameterSetName = 'Default' )]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $False, ParameterSetName = 'Id', ValueFromPipeline = $true)]
         [string]$Id,
         [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
@@ -37340,7 +37921,7 @@ Function New-AutomateNOWLock {
     [OutputType([ANOWLock])]
     [CmdletBinding()]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true)]
         [string]$Id,
         [ValidateScript({ $_.Length -le 255 })]
@@ -37662,7 +38243,7 @@ Function Copy-AutomateNOWLock {
         [Parameter(Mandatory = $true)]
         [ANOWLock]$Lock,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [ValidateScript({ $_.Length -le 255 })]
@@ -37883,7 +38464,7 @@ Function Rename-AutomateNOWLock {
         [Parameter(Mandatory = $true)]
         [ANOWLock]$Lock,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -39267,7 +39848,7 @@ Function New-AutomateNOWMetric {
     [OutputType([ANOWMetric])]
     [CmdletBinding()]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true)]
         [string]$Id,
         [Parameter(Mandatory = $false)]
@@ -39595,7 +40176,7 @@ Function Copy-AutomateNOWMetric {
         [Parameter(Mandatory = $true)]
         [ANOWMetric]$Metric,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [ValidateScript({ $_.Length -le 255 })]
@@ -39818,7 +40399,7 @@ Function Rename-AutomateNOWMetric {
         [Parameter(Mandatory = $true)]
         [ANOWMetric]$Metric,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -42254,7 +42835,7 @@ Function Get-AutomateNOWNotificationChannel {
     [OutputType([ANOWNotificationChannel[]])]
     [CmdletBinding(DefaultParameterSetName = 'Default')]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $False, ParameterSetName = 'Id', ValueFromPipeline = $true)]
         [string]$Id,
         [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
@@ -42845,7 +43426,7 @@ Function New-AutomateNOWNotificationChannel {
     [OutputType([ANOWNotificationChannel])]
     [CmdletBinding()]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true)]
         [string]$Id,
         [Parameter(Mandatory = $true)]
@@ -43164,7 +43745,7 @@ Function Copy-AutomateNOWNotificationChannel {
         [Parameter(Mandatory = $true)]
         [ANOWNotificationChannel]$NotificationChannel,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [ValidateScript({ $_.Length -le 255 })]
@@ -43385,7 +43966,7 @@ Function Rename-AutomateNOWNotificationChannel {
         [Parameter(Mandatory = $true)]
         [ANOWNotificationChannel]$NotificationChannel,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -43535,7 +44116,7 @@ Function Get-AutomateNOWNotificationGroup {
     [OutputType([ANOWNotificationGroup[]])]
     [CmdletBinding(DefaultParameterSetName = 'Default')]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $False, ParameterSetName = 'Id', ValueFromPipeline = $true)]
         [string]$Id,
         [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
@@ -44063,7 +44644,7 @@ Function New-AutomateNOWNotificationGroup {
     [OutputType([ANOWNotificationGroup])]
     [CmdletBinding()]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true)]
         [string]$Id,
         [Parameter(Mandatory = $false)]
@@ -44379,7 +44960,7 @@ Function Copy-AutomateNOWNotificationGroup {
         [Parameter(Mandatory = $true)]
         [ANOWNotificationGroup]$NotificationGroup,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [ValidateScript({ $_.Length -le 255 })]
@@ -44600,7 +45181,7 @@ Function Rename-AutomateNOWNotificationGroup {
         [Parameter(Mandatory = $true)]
         [ANOWNotificationGroup]$NotificationGroup,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -45597,7 +46178,7 @@ Function Get-AutomateNOWNotificationMessageTemplate {
     [OutputType([ANOWNotificationMessageTemplate[]])]
     [CmdletBinding(DefaultParameterSetName = 'Default')]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $False, ParameterSetName = 'Id', ValueFromPipeline = $true)]
         [string]$Id,
         [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
@@ -46163,7 +46744,7 @@ Function New-AutomateNOWNotificationMessageTemplate {
     [OutputType([ANOWNotificationMessageTemplate])]
     [CmdletBinding()]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true)]
         [string]$Id,
         [Parameter(Mandatory = $false)]
@@ -46479,7 +47060,7 @@ Function Copy-AutomateNOWNotificationMessageTemplate {
         [Parameter(Mandatory = $true)]
         [ANOWNotificationMessageTemplate]$NotificationMessageTemplate,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [ValidateScript({ $_.Length -le 255 })]
@@ -46700,7 +47281,7 @@ Function Rename-AutomateNOWNotificationMessageTemplate {
         [Parameter(Mandatory = $true)]
         [ANOWNotificationMessageTemplate]$NotificationMessageTemplate,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -47604,7 +48185,7 @@ Function New-AutomateNOWPhysicalResource {
     [OutputType([ANOWPhysicalResource])]
     [CmdletBinding()]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true)]
         [string]$Id,
         [ValidateScript({ $_.Length -le 255 })]
@@ -47926,7 +48507,7 @@ Function Copy-AutomateNOWPhysicalResource {
         [Parameter(Mandatory = $true)]
         [ANOWPhysicalResource]$PhysicalResource,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [ValidateScript({ $_.Length -le 255 })]
@@ -48147,7 +48728,7 @@ Function Rename-AutomateNOWPhysicalResource {
         [Parameter(Mandatory = $true)]
         [ANOWPhysicalResource]$PhysicalResource,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -49606,7 +50187,7 @@ Function New-AutomateNOWProcessingFunction {
     [OutputType([ANOWProcessingFunction])]
     [CmdletBinding()]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true)]
         [string]$Id,
         [Parameter(Mandatory = $true)]
@@ -49915,7 +50496,7 @@ Function Copy-AutomateNOWProcessingFunction {
         [Parameter(Mandatory = $true)]
         [ANOWProcessingFunction]$ProcessingFunction,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [ValidateScript({ $_.Length -le 255 })]
@@ -50070,7 +50651,7 @@ Function Rename-AutomateNOWProcessingFunction {
         [Parameter(Mandatory = $true)]
         [ANOWProcessingFunction]$ProcessingFunction,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -52446,7 +53027,7 @@ Function Read-AutomateNOWProcessingTemplateAction {
                 Break
             }
         }
-        ElseIf ($_.id -match '^[0-9a-zA-z_.-]{1,}$') {
+        ElseIf ($_.id -match '^[0-9a-zA-Z_.-]{1,}$') {
             Try {
                 [ANOWProcessingTemplate]$ProcessingTemplate = $_
             }
@@ -53216,7 +53797,7 @@ Function Read-AutomateNOWProcessingTemplateDesignParameter {
         }
     }
     Process {
-        If ($_.id -match '^[0-9a-zA-z_.-]{1,}$') {
+        If ($_.id -match '^[0-9a-zA-Z_.-]{1,}$') {
             Try {
                 [ANOWProcessingTemplate]$ProcessingTemplate = $_
             }
@@ -53662,7 +54243,7 @@ Function Read-AutomateNOWProcessingTemplateDependency {
             }
             [string]$ProcessingTemplateItem_Name = $ProcessingTemplateItem.name
         }
-        ElseIf ($_.id -match '^[0-9a-zA-z_.-]{1,}$') {
+        ElseIf ($_.id -match '^[0-9a-zA-Z_.-]{1,}$') {
             [ANOWProcessingTemplate]$ProcessingTemplate = $_
         }
         ElseIf ($_ -match '^[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}$') {
@@ -58361,7 +58942,7 @@ Function New-AutomateNOWResultMapping {
     [OutputType([ANOWResultMapping])]
     [CmdletBinding()]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true)]
         [string]$Id,
         [Parameter(Mandatory = $false, HelpMessage = "Enter a descriptive string up to 255 characters (UTF8 compatible)")]
@@ -58576,7 +59157,7 @@ Function Copy-AutomateNOWResultMapping {
         [Parameter(Mandatory = $true)]
         [ANOWResultMapping]$ResultMapping,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [ValidateScript({ $_.Length -le 255 })]
@@ -58797,7 +59378,7 @@ Function Rename-AutomateNOWResultMapping {
         [Parameter(Mandatory = $true)]
         [ANOWResultMapping]$ResultMapping,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -60033,7 +60614,7 @@ Function Get-AutomateNOWRuntimeAction {
         [ValidateScript({ $_ -match '^[0-9a-z]{8}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{12}$' })]
         [Parameter(Mandatory = $False, ParameterSetName = 'Id', ValueFromPipeline = $true)]
         [string]$Id,
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $False, ParameterSetName = 'SimpleId')]
         [string]$SimpleId,
         [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
@@ -60062,7 +60643,7 @@ Function Get-AutomateNOWRuntimeAction {
             If ( $_ -match '^[0-9a-z]{8}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{12}$') {
                 [string]$Id = $_
             }
-            ElseIf ($_ -match '^[0-9a-zA-z_.-]{1,}$' ) {
+            ElseIf ($_ -match '^[0-9a-zA-Z_.-]{1,}$' ) {
                 [string]$SimpleId = $_
             }
             Else {
@@ -60374,7 +60955,7 @@ Function Set-AutomateNOWRuntimeAction {
         [Parameter(Mandatory = $false, ParameterSetName = 'Task')]
         [Parameter(Mandatory = $false, ParameterSetName = 'Workflow')]
         [Parameter(Mandatory = $false, ParameterSetName = 'Service')]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [string]$simpleId,
         [Parameter(Mandatory = $false, ParameterSetName = 'Default')]
         [Parameter(Mandatory = $false, ParameterSetName = 'Task')]
@@ -61489,7 +62070,7 @@ Function Copy-AutomateNOWRuntimeAction {
         [Parameter(Mandatory = $true)]
         [ANOWProcessingAction]$RuntimeAction,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewSimpleId,
         [Parameter(Mandatory = $false)]
         [ValidateScript({ $_.Length -le 255 })]
@@ -63116,7 +63697,7 @@ Function Get-AutomateNOWScheduleTemplate {
     [OutputType([ANOWScheduleTemplate[]])]
     [CmdletBinding(DefaultParameterSetName = 'Default' )]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $False, ValueFromPipeline = $true, ParameterSetName = 'Default')]
         [string]$Id,
         [Parameter(Mandatory = $False, ParameterSetName = 'All')]
@@ -63458,7 +64039,7 @@ Function Set-AutomateNOWScheduleTemplate {
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
             Try {
-                [boolean]$ScheduleTemplate_exists = ($null -eq (Get-AutomateNOWScheduleTemplate -Id $ScheduleTemplate_id))
+                [boolean]$ScheduleTemplate_exists = ($null -eq (Get-AutomateNOWScheduleTemplate -Id $ScheduleTemplate.simpleId))
             }
             Catch {
                 [string]$Message = $_.Exception.Message
@@ -63767,7 +64348,7 @@ Function New-AutomateNOWScheduleTemplate {
     [OutputType([ANOWScheduleTemplate])]
     [CmdletBinding()]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true)]
         [string]$Id,
         [Parameter(Mandatory = $true)]
@@ -64122,7 +64703,7 @@ Function Copy-AutomateNOWScheduleTemplate {
         [Parameter(Mandatory = $true)]
         [ANOWScheduleTemplate]$ScheduleTemplate,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [ValidateScript({ $_.Length -le 255 })]
@@ -64325,7 +64906,7 @@ Function Rename-AutomateNOWScheduleTemplate {
         [Parameter(Mandatory = $true)]
         [ANOWScheduleTemplate]$ScheduleTemplate,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -64356,7 +64937,7 @@ Function Rename-AutomateNOWScheduleTemplate {
         [string]$ScheduleTemplate_id = $ScheduleTemplate.id
         $Error.Clear()
         Try {
-            [boolean]$old_Schedule_template_exists = ($null -ne (Get-AutomateNOWScheduleTemplate -Id $ScheduleTemplate_id))
+            [boolean]$old_Schedule_template_exists = ($null -ne (Get-AutomateNOWScheduleTemplate -Id $ScheduleTemplate.simpleId))
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -65801,7 +66382,7 @@ Function Copy-AutomateNOWSecretVault {
         [Parameter(Mandatory = $true)]
         [ANOWSecretVault]$SecretVault,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [ValidateScript({ $_.Length -le 255 })]
@@ -65966,7 +66547,7 @@ Function Rename-AutomateNOWSecretVault {
         [Parameter(Mandatory = $true)]
         [ANOWSecretVault]$SecretVault,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -67928,6 +68509,60 @@ Function Export-AutomateNOWSecurityEventLog {
 
 #region - Security Role
 
+Function ConvertTo-AutomateNOWSecRoleDomain {
+    <#
+    .SYNOPSIS
+    Converts a raw SecRoleDomain response into the supported typed contract.
+
+    .DESCRIPTION
+    This private response normalizer copies only properties exposed by
+    ANOWSecRoleDomain. It preserves the public secRole contract as a role-id
+    string, accepts nullable server dates, and deliberately ignores unknown
+    raw properties.
+    #>
+    [OutputType([ANOWSecRoleDomain])]
+    [CmdletBinding()]
+    Param(
+        [Parameter(Mandatory = $true)]
+        [PSObject]$InputObject,
+        [Parameter(Mandatory = $false)]
+        [string]$DefaultSecRoleId
+    )
+
+    [ANOWSecRoleDomain]$normalizedDomainRole = [ANOWSecRoleDomain]::new()
+    ForEach ($rawProperty in $InputObject.PSObject.Properties) {
+        # The class property list is the allow-list. Browser-only and other
+        # unsupported response fields intentionally do not cross this boundary.
+        $supportedProperty = $normalizedDomainRole.PSObject.Properties[$rawProperty.Name]
+        If ($null -eq $supportedProperty -or $null -eq $rawProperty.Value) {
+            Continue
+        }
+        If ($rawProperty.Name -eq 'secRole') {
+            If ($rawProperty.Value -is [string]) {
+                $normalizedDomainRole.secRole = [string]$rawProperty.Value
+            }
+            Else {
+                $roleIdProperty = $rawProperty.Value.PSObject.Properties['id']
+                If ($null -ne $roleIdProperty -and -not [string]::IsNullOrWhiteSpace([string]$roleIdProperty.Value)) {
+                    $normalizedDomainRole.secRole = [string]$roleIdProperty.Value
+                }
+            }
+            Continue
+        }
+        Try {
+            $supportedProperty.Value = $rawProperty.Value
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Throw "Unable to normalize SecRoleDomain property [$($rawProperty.Name)] due to [$Message]."
+        }
+    }
+    If ([string]::IsNullOrWhiteSpace($normalizedDomainRole.secRole) -and -not [string]::IsNullOrWhiteSpace($DefaultSecRoleId)) {
+        $normalizedDomainRole.secRole = $DefaultSecRoleId
+    }
+    Return $normalizedDomainRole
+}
+
 Function Get-AutomateNOWSecurityRole {
     <#
     .SYNOPSIS
@@ -67986,7 +68621,7 @@ Function Get-AutomateNOWSecurityRole {
     [OutputType([ANOWSecRole[]])]
     [CmdletBinding( DefaultParameterSetName = 'Default' )]
     Param(
-        [ValidateScript({ $_ -match '((^[0-9a-zA-z_.-]{1,}$)|(^[0-9a-zA-z_.-]{1,}[:]{2}[a-z0-9]{32}$)|(^[0-9a-zA-z_.-]{1,})([a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}$))' })]
+        [ValidateScript({ $_ -match '((^[0-9a-zA-Z_.-]{1,}$)|(^[0-9a-zA-Z_.-]{1,}[:]{2}[a-z0-9]{32}$)|(^[0-9a-zA-Z_.-]{1,})([a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}$))' })]
         [Parameter(Mandatory = $False, ParameterSetName = 'Id', ValueFromPipeline = $true)]
         [string]$Id,
         [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
@@ -68089,7 +68724,7 @@ Function Get-AutomateNOWSecurityRole {
                     [string]$domainRole_Id = $domainRole.Id
                     $Error.Clear()
                     Try {
-                        [ANOWSecRoleDomain]$DomainRole_Object = $domainRole
+                        [ANOWSecRoleDomain]$DomainRole_Object = ConvertTo-AutomateNOWSecRoleDomain -InputObject $domainRole
                     }
                     Catch {
                         [string]$Message = $_.Exception.Message
@@ -68143,7 +68778,7 @@ Function Export-AutomateNOWSecurityRole {
 
     .EXAMPLE
     Exports a series of Security Roles by sending the Id's across the pipeline
-    'SecurityRole01', 'SecurityRole2 | Get-AutomateNOWSecurityRole | Export-AutomateNOWSecurityRole
+    'SecurityRole01', 'SecurityRole2' | Get-AutomateNOWSecurityRole | Export-AutomateNOWSecurityRole
 
     .NOTES
     You must present [ANOWSecRole] objects to the pipeline to use this function.
@@ -68223,11 +68858,13 @@ Function New-AutomateNOWSecurityRole {
 
     The name (id) of the SecurityRole must be unique (per domain). It may consist only of letters, numbers, underscore, dot or hyphen.
 
+    Supports -WhatIf and -Confirm.
+
     #>
     [OutputType([ANOWSecRole])]
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true)]
         [string]$Id,
         [Parameter(Mandatory = $false, HelpMessage = "Enter a descriptive string up to 255 characters (UTF8 compatible)")]
@@ -68244,7 +68881,10 @@ Function New-AutomateNOWSecurityRole {
     ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
     $Error.Clear()
     Try {
-        [boolean]$SecurityRole_exists = ($null -ne (Get-AutomateNOWSecurityRole -Id $Id))
+        # A no-match is the expected create precondition. Suppress only the
+        # reader's diagnostic so WarningPreference = Stop cannot turn it into
+        # a terminating condition for this wrapper.
+        [boolean]$SecurityRole_exists = ($null -ne (Get-AutomateNOWSecurityRole -Id $Id -WarningAction SilentlyContinue))
     }
     Catch {
         [string]$Message = $_.Exception.Message
@@ -68257,59 +68897,61 @@ Function New-AutomateNOWSecurityRole {
         Break
     }
     ## End warning ##
-    [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
-    $BodyMetaData.'id' = $Id
-    If ($Description.Length -gt 0) {
-        $BodyMetaData.'description' = $Description
-    }
-    $BodyMetaData.'_operationType' = 'add'
-    $BodyMetaData.'_textMatchStyle' = 'exact'
-    $BodyMetaData.'_oldValues' = '{}'
-    $BodyMetaData.'_componentId' = 'SecRoleCreateWindow_form'
-    $BodyMetaData.'_dataSource' = 'SecRoleDataSource'
-    $BodyMetaData.'isc_metaDataPrefix' = '_'
-    $BodyMetaData.'isc_dataFormat' = 'json'
-    [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
-    [string]$command = '/secRole/create'
-    [hashtable]$parameters = @{}
-    $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
-    $parameters.Add('Command', $command)
-    $parameters.Add('Method', 'POST')
-    $parameters.Add('Body', $Body)
-    If ($anow_session.NotSecure -eq $true) {
-        $parameters.Add('NotSecure', $true)
-    }
-    [string]$parameters_display = $parameters | ConvertTo-JSON -Compress -Depth 100
-    $Error.Clear()
-    Try {
-        [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
-    }
-    Catch {
-        [string]$Message = $_.Exception.Message
-        Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] with parameters $parameters_display due to [$Message]."
-        Break
-    }
-    [int32]$response_code = $results.response.status
-    If ($response_code -ne 0) {
-        [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 100
-        Write-Warning -Message "The response code was not 0 but was [$response_code]. Body: $full_response_display"
-        Break
-    }
-    $Error.Clear()
-    Try {
-        [ANOWSecRole]$SecurityRole = $results.response.data | Select-Object -First 1
-    }
-    Catch {
-        [string]$Message = $_.Exception.Message
-        Write-Warning -Message "Failed to create [ANOWSecRole] object due to [$Message]."
-        Break
-    }
-    If ($SecurityRole.id.Length -eq 0) {
-        Write-Warning -Message 'The newly created [ANOWSecRole] object is empty!'
-        Break
-    }
-    If ($Quiet -ne $true) {
-        Return $SecurityRole
+    If (($PSCmdlet.ShouldProcess("Security Role [$Id]", 'Create')) -eq $true) {
+        [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
+        $BodyMetaData.'id' = $Id
+        If ($Description.Length -gt 0) {
+            $BodyMetaData.'description' = $Description
+        }
+        $BodyMetaData.'_operationType' = 'add'
+        $BodyMetaData.'_textMatchStyle' = 'exact'
+        $BodyMetaData.'_oldValues' = '{}'
+        $BodyMetaData.'_componentId' = 'SecRoleCreateWindow_form'
+        $BodyMetaData.'_dataSource' = 'SecRoleDataSource'
+        $BodyMetaData.'isc_metaDataPrefix' = '_'
+        $BodyMetaData.'isc_dataFormat' = 'json'
+        [string]$Body = ConvertTo-QueryString -InputObject $BodyMetaData
+        [string]$command = '/secRole/create'
+        [hashtable]$parameters = @{}
+        $parameters.Add('ContentType', 'application/x-www-form-urlencoded; charset=UTF-8')
+        $parameters.Add('Command', $command)
+        $parameters.Add('Method', 'POST')
+        $parameters.Add('Body', $Body)
+        If ($anow_session.NotSecure -eq $true) {
+            $parameters.Add('NotSecure', $true)
+        }
+        [string]$parameters_display = $parameters | ConvertTo-JSON -Compress -Depth 100
+        $Error.Clear()
+        Try {
+            [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] with parameters $parameters_display due to [$Message]."
+            Break
+        }
+        [int32]$response_code = $results.response.status
+        If ($response_code -ne 0) {
+            [string]$full_response_display = $results.response | ConvertTo-Json -Compress -Depth 100
+            Write-Warning -Message "The response code was not 0 but was [$response_code]. Body: $full_response_display"
+            Break
+        }
+        $Error.Clear()
+        Try {
+            [ANOWSecRole]$SecurityRole = $results.response.data | Select-Object -First 1
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "Failed to create [ANOWSecRole] object due to [$Message]."
+            Break
+        }
+        If ($SecurityRole.id.Length -eq 0) {
+            Write-Warning -Message 'The newly created [ANOWSecRole] object is empty!'
+            Break
+        }
+        If ($Quiet -ne $true) {
+            Return $SecurityRole
+        }
     }
 }
 
@@ -68467,7 +69109,7 @@ Function Copy-AutomateNOWSecurityRole {
         [Parameter(Mandatory = $true)]
         [ANOWSecRole]$SecurityRole,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [ValidateScript({ $_.Length -le 255 })]
@@ -68613,7 +69255,7 @@ Function Rename-AutomateNOWSecurityRole {
     Rename-AutomateNOWSecurityRole -SecurityRole $SecurityRole -NewId 'SecurityRole1'
 
     .EXAMPLE
-    Rename-AutomateNOWSecurityRole -SecurityRole (Get-AutomateNOWSecurityRole -Id 'SecurityRole1') -NewId 'SecurityRole1'
+    Rename-AutomateNOWSecurityRole -SecurityRole (Get-AutomateNOWSecurityRole -Id 'SecurityRole1') -NewId 'SecurityRole2'
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
@@ -68628,7 +69270,7 @@ Function Rename-AutomateNOWSecurityRole {
         [Parameter(Mandatory = $true)]
         [ANOWSecRole]$SecurityRole,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -68793,6 +69435,10 @@ Function Set-AutomateNOWSecurityRole {
             Write-Warning -Message "You cannot set the description and unset it at the same time. Please choose one or the other."
             Break
         }
+        If ($UnsetLDAPMapping -eq $true -and $LDAPMapping.Length -gt 0) {
+            Write-Warning -Message "You cannot set the LDAP mapping and unset it at the same time. Please choose one or the other."
+            Break
+        }
         [string]$command = '/secRole/update'
         [hashtable]$parameters = @{}
         $parameters.Add('Command', $command)
@@ -68906,16 +69552,19 @@ Function Set-AutomateNOWSecurityRole {
 Function Read-AutomateNOWSecurityRoleDomain {
     <#
     .SYNOPSIS
-    Reads the Security Role Domain objects within a Security Role from an AutomateNOW! instance
+    Reads Security Role Domain objects from an AutomateNOW! instance.
 
     .DESCRIPTION
     Reads the Security Role Domain objects within a Security Role from an AutomateNOW! instance
 
     .PARAMETER SecurityRole
-    A mandatory [ANOWSecRole] object representing the Security Role object to be read.
+    An [ANOWSecRole] object representing the Security Role whose Domain Role
+    records are to be listed. This is required for the parent-role parameter
+    set and is not required with -Id.
 
     .PARAMETER Id
-    An optional Id string representing the single Security Domain Role Id to filter against. This is a 36-character guid.
+    The exact Security Domain Role Id to read directly. This is a 36-character
+    guid and does not require -SecurityRole.
 
     .PARAMETER Domain
     An optional string representing the ANOW Domain to filter the results by.
@@ -68927,32 +69576,42 @@ Function Read-AutomateNOWSecurityRoleDomain {
     Optional integer to indicate the row to stop on. This is intended for when you need to paginate the results. Default is 100.
 
     .INPUTS
-    An [ANOWSecRole] object is required and can be sent across the pipeline. Including an Id will filter the results.
+    An [ANOWSecRole] object can be sent across the pipeline to list its
+    Domain Role records. Use -Id alone for one exact Domain Role record.
 
     .OUTPUTS
-    [ANOWSecRoleDomain] objects that representing the Security Domain Roles
+    Typed [ANOWSecRoleDomain] objects representing the Security Domain Roles.
+    Their secRole property is the parent Security Role id string. Unsupported
+    raw response fields are intentionally omitted.
 
     .EXAMPLE
     Reads the first page of Domain Roles from within a Security Role named 'SecurityRole5'
 
     Get-AutomateNOWSecurityRole -Id 'SecurityRole5' | Read-AutomateNOWSecurityRoleDomain
 
+    .EXAMPLE
+    Reads one Domain Role directly by its exact id.
+
+    Read-AutomateNOWSecurityRoleDomain -Id 'fae6a025-6639-4e1e-8e7d-74da7fd6b4d1'
+
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
 
     #>
     [OutputType([ANOWSecRoleDomain[]])]
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'SecurityRole')]
     Param(
-        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true, ParameterSetName = 'SecurityRole')]
         [ANOWSecRole]$SecurityRole,
-        [Parameter(Mandatory = $false)]
+        [Parameter(Mandatory = $true, ParameterSetName = 'Id')]
         [string]$Id,
-        [Parameter(Mandatory = $false)]
+        [Parameter(Mandatory = $false, ParameterSetName = 'SecurityRole')]
         [string]$Domain,
-        [Parameter(Mandatory = $False)]
+        [Parameter(Mandatory = $False, ParameterSetName = 'SecurityRole')]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Id')]
         [int32]$startRow = 0,
-        [Parameter(Mandatory = $False)]
+        [Parameter(Mandatory = $False, ParameterSetName = 'SecurityRole')]
+        [Parameter(Mandatory = $False, ParameterSetName = 'Id')]
         [int32]$endRow = 100
     )
     Begin {
@@ -68972,10 +69631,13 @@ Function Read-AutomateNOWSecurityRoleDomain {
         }
     }
     Process {
-        If ($_.id.Length -gt 0) {
+        [string]$SecurityRole_id = $null
+        If ($null -ne $_ -and $_.id.Length -gt 0) {
             [ANOWSecRole]$SecurityRole = $_
         }
-        [string]$SecurityRole_id = $SecurityRole.Id
+        If ($null -ne $SecurityRole) {
+            [string]$SecurityRole_id = $SecurityRole.Id
+        }
         If ($Id.Length -gt 0) {
             If ($Id -notmatch '^[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}$') {
                 Write-Warning -Message "Was expecting the Id of the destination SecurityRoleDomain Id to match a 36-character GUID, instead received [$Id]."
@@ -69012,13 +69674,17 @@ Function Read-AutomateNOWSecurityRoleDomain {
         Else {
             $parameters.'Command' = $command
         }
+        $readerTarget = $SecurityRole_id
+        If ([string]::IsNullOrWhiteSpace($readerTarget)) {
+            $readerTarget = $Id
+        }
         $Error.Clear()
         Try {
             [PSCustomObject]$results = Invoke-AutomateNOWAPI @parameters
         }
         Catch {
             [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$SecurityRole_id] due to [$Message]."
+            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$readerTarget] due to [$Message]."
             Break
         }
         [int32]$response_code = $results.response.status
@@ -69030,18 +69696,20 @@ Function Read-AutomateNOWSecurityRoleDomain {
         If ($results.response.data.count -gt 0) {
             $Error.Clear()
             Try {
-                [ANOWSecRoleDomain[]]$FormattedDomainRoles = $results.response.data
+                [ANOWSecRoleDomain[]]$FormattedDomainRoles = ForEach ($rawDomainRole in $results.response.data) {
+                    ConvertTo-AutomateNOWSecRoleDomain -InputObject $rawDomainRole -DefaultSecRoleId $SecurityRole_id
+                }
             }
             Catch {
                 [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Failed to parse the Domain Roles from $SecurityRole_id into formatted [ANOWSecRoleDomain] objects due to [$Message]"
+                Write-Warning -Message "Failed to parse the Domain Roles from [$readerTarget] into formatted [ANOWSecRoleDomain] objects due to [$Message]"
                 Break
             }
-            Write-Verbose -Message "Domain Roles successfully read from $SecurityRole_id"
+            Write-Verbose -Message "Domain Roles successfully read from $readerTarget"
             Return $FormattedDomainRoles
         }
         Else {
-            Write-Verbose -Message "There were no Domain Roles within $SecurityRole_id"
+            Write-Verbose -Message "There were no Domain Roles within $readerTarget"
         }
     }
     End {
@@ -69388,8 +70056,7 @@ Function Add-AutomateNOWSecurityRoleDomain {
             If ($results.response.data.count -gt 0) {
                 $Error.Clear()
                 Try {
-                    $results.response.data[0].secRole = $SecurityRole
-                    [ANOWSecRoleDomain]$domainRole = $results.response.data | Select-Object -First 1
+                    [ANOWSecRoleDomain]$domainRole = ConvertTo-AutomateNOWSecRoleDomain -InputObject ($results.response.data | Select-Object -First 1) -DefaultSecRoleId $SecurityRole_id
                 }
                 Catch {
                     [string]$Message = $_.Exception.Message
@@ -69441,7 +70108,7 @@ Function Copy-AutomateNOWSecurityRoleDomain {
     Quietly and forcefully copies the settings from a Security Role Domain (i.e. Domain Role) with Id 'fae6a025-6639-4e1e-8e7d-74da7fd6b4d1') into a new Security Role Domain based on a domain named 'Domain1' that will be placed into a Security Role named 'SecurityRole1'
     $domain = Get-AutomateNOWDomain -Id 'Domain1'
     $secRole = Get-AutomateNOWSecurityRole -Id 'SecurityRole1'
-    $sourceSecurityRoleDomain = Read-AutomateNOWSecurityRoleDomain -ItemId 'fae6a025-6639-4e1e-8e7d-74da7fd6b4d1'
+    $sourceSecurityRoleDomain = Read-AutomateNOWSecurityRoleDomain -Id 'fae6a025-6639-4e1e-8e7d-74da7fd6b4d1'
     Copy-AutomateNOWSecurityRoleDomain -SecurityRole $secRole -SourceDomainRole $sourceSecurityRoleDomain -DestinationDomain $domain -Force -Quiet
 
     .NOTES
@@ -69469,20 +70136,7 @@ Function Copy-AutomateNOWSecurityRoleDomain {
         }
         [string]$SecurityRole_id = $SecurityRole.Id
         [string]$SourceDomainRole_id = $SourceDomainRole.Id
-        # This section counts the memmbers from the source domain role before the pipeline starts
-        $Error.Clear()
-        Try {
-            [PSCustomObject[]]$MembersToAdd = $SourceDomainRole | Get-Member -MemberType Property | Where-Object { $_.Name -notin ('designCoreModify', 'id', 'roleDomain', 'secRole', 'userIp') } | ForEach-Object { [PSCustomObject]@{Name = $_.Name; Value = $SourceDomainRole.($_.Name); Type = ($_.Definition -split ' ' | Select-Object -First 1); } }
-        }
-        Catch {
-            [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Get-Member failed to extract the properties from [$SourceDomainRole_id] due to [$Message]."
-            Break
-        }
-        [int32]$MembersToAdd_Count = $MembersToAdd.Count
-        If ($MembersToAdd_Count -eq 0) {
-            Write-Warning -Message "$SourceDomainRole_id does not have any members"
-        }
+        [string[]]$DomainRolePrivileges = New-AutomateNOWSecUserPrivilegeList -IncludeUndocumented
         [string]$command = '/secRoleDomain/create'
         [hashtable]$parameters = @{}
         $parameters.Add('Command', $command)
@@ -69523,32 +70177,23 @@ Function Copy-AutomateNOWSecurityRoleDomain {
             $BodyMetaData.Add('secRole', $SecurityRole_id )
             $Error.Clear()
             Try {
-                ForEach ($Member in $MembersToAdd) {
-                    [string]$name = $Member.Name
-                    [string]$value = $Member.Value
-                    [string]$type = $Member.Type
-                    If ($type -eq 'bool') {
-                        If ($value -eq $true) {
-                            [string]$value = 'true'
+                ForEach ($DomainRolePrivilege in $DomainRolePrivileges) {
+                    $SourceProperty = $SourceDomainRole.PSObject.Properties[$DomainRolePrivilege]
+                    If ($null -eq $SourceProperty -or $null -eq $SourceProperty.Value) {
+                        Continue
+                    }
+                    If ($SourceProperty.Value -is [boolean]) {
+                        $BodyMetaData.Add($DomainRolePrivilege, $SourceProperty.Value.ToString().ToLowerInvariant())
+                    }
+                    ElseIf ($SourceProperty.Value -is [array]) {
+                        [int32]$loop = 1
+                        ForEach ($tag_id in $SourceProperty.Value) {
+                            If (-not [string]::IsNullOrWhiteSpace([string]$tag_id)) {
+                                $BodyMetaData.Add(($DomainRolePrivilege + $loop), [string]$tag_id)
+                                $loop++
+                            }
                         }
-                        ElseIf ($value -eq $false) {
-                            [string]$value = 'false'
-                        }
-                        Else {
-                            Write-Warning -Message "Failed to determine the value of a boolean member property [$name/$value] while extracting properties from Domain Role: $SourceDomainRole_id"
-                            Break
-                        }
                     }
-                    ElseIf ($type -eq 'string') {
-                        # This space left blank
-                    }
-                    ElseIf ($type -eq 'datetime') {
-                        [string]$value = Get-Date -Date $value -Format "yyyy-MM-ddTHH:mm:ss.fff"
-                    }
-                    Else {
-                        Write-Warning -Message "Failed to determine the type of an unknown type member property [$name/$type] while extracting properties from Domain Role: $SourceDomainRole_id"
-                    }
-                    $BodyMetaData.Add($name, $value)
                 }
             }
             Catch {
@@ -69586,8 +70231,7 @@ Function Copy-AutomateNOWSecurityRoleDomain {
             If ($results.response.data.count -gt 0) {
                 $Error.Clear()
                 Try {
-                    $results.response.data[0].secRole = $SecurityRole
-                    [ANOWSecRoleDomain]$domainRole = $results.response.data | Select-Object -First 1
+                    [ANOWSecRoleDomain]$domainRole = ConvertTo-AutomateNOWSecRoleDomain -InputObject ($results.response.data | Select-Object -First 1) -DefaultSecRoleId $SecurityRole_id
                 }
                 Catch {
                     [string]$Message = $_.Exception.Message
@@ -69735,16 +70379,35 @@ Function Set-AutomateNOWSecurityRoleDomain {
     [boolean] parameter to enable 'Allow Design Core Modification'
 
     .PARAMETER AllowDesignCoreModificationTags
-    [string] array for limiting to tags on 'Allow Design Core Modification'
+    [string] array for limiting to tags on 'Allow Design Core Modification'.
+    This writes `designModifyTags`. A controlled Test probe established that
+    ANOW accepts the literal UI tag label: with Design Access limited to a
+    parent and L3 label, this field read back as exactly one L3 value. The
+    parent shown beside the L3 value in the editor is not a second returned
+    `designModifyTags` value. Tag-record `id` and `simpleId` inputs did not
+    persist in the earlier probes; use the UI label form evidenced for the
+    target role and verify any new tag convention on a disposable role. A
+    second controlled probe seeded this field with parent plus L3, fresh-read
+    the role, and then set L3 only; ANOW replaced the list with exactly L3.
 
     .PARAMETER AllowWorkflowItemsModification
-    [boolean] parameter to enable 'Allow Workflow Items Modification'
+    [boolean] parameter to enable 'Allow Workflow Items Modification' through
+    `designDependencyModify`. No companion tag-scoping parameter exists:
+    `designDependencyModifyTags` is unsupported because a controlled nonempty
+    Test-domain update did not retain it on exact raw read-back.
 
     .PARAMETER AllowDesignResourceModification
-    [boolean] parameter to enable 'Allow Design Resource Modification'
+    [boolean] parameter to enable 'Allow Design Resource Modification' through
+    `designResourceModify`. No companion tag-scoping parameter exists:
+    `designResourceModifyTags` is unsupported by product policy following
+    browser empty-submission evidence.
 
     .PARAMETER AllowDesignActionModification
-    [boolean] parameter to enable 'Allow Design Action Modification'
+    [boolean] parameter to enable or disable only the Boolean
+    `designActionModify` property. No supported companion tag-scoping
+    parameter exists: a controlled nonempty Test-domain
+    `designActionModifyTags` probe did not persist. This result does not
+    establish authorization behavior.
 
     .PARAMETER AllowResultMappingAccess
     [boolean] parameter to enable 'Allow Result Mapping Access'
@@ -69918,10 +70581,14 @@ Function Set-AutomateNOWSecurityRoleDomain {
     [string] array for limiting to tags on 'Allow Notification Access'
 
     .PARAMETER AllowNotificationModification
-    [boolean] parameter to enable 'Allow Notification Modification'
+    [boolean] parameter to enable 'Allow Notification Modification' through
+    `notificationModify`. This is distinct from the unsupported browser-only
+    `designNotificationModify` field.
 
     .PARAMETER AllowNotificationModificationTags
     [string] array for limiting to tags on 'Allow Notification Modification'
+    through the supported `notificationModifyTags` property. This is distinct
+    from the unsupported browser-only `designNotificationModifyTags` field.
 
     .PARAMETER AllowManagementofCodeRepositories
     [boolean] parameter to enable 'Allow Management of Code Repositories'
@@ -69960,19 +70627,38 @@ Function Set-AutomateNOWSecurityRoleDomain {
     [string] array for limiting to tags on 'Allow Self Service'
 
     .PARAMETER AllowDesignCoreModify
-    Undocumented [boolean] parameter to enable 'Unknown' - Use this with caution!
+    Hidden compatibility [boolean] parameter for the `designCoreModify` API
+    property. The property is present in the current Swagger schema, PowerShell
+    class, and raw Test-domain reads. A controlled Test-domain update persisted
+    and restored it, but current Security Role UI source evidence contains no
+    reference to the field. Its authorization effect is not established.
 
     .PARAMETER AllowDesignCoreModifyTags
-    [string] array for limiting to tags on 'designCoreModify (unknown)' - Use this with caution!
+    Deprecated compatibility parameter for the module-only
+    `designCoreModifyTags` request field. A controlled Test-domain update with
+    a valid nonempty tag did not persist this field, so the command rejects the
+    parameter whenever it is explicitly bound, including null and empty values,
+    before making an API request. Do not use it as a tag permission.
 
     .PARAMETER AllowDesignVerification
-    Undocumented [boolean] parameter to enable 'Unknown' (this was probably related to approving Collaborate -> Migration -> Import objects) - Use this with caution!
+    Supported [boolean] parameter for `designVerification`. The property is
+    present in the current Swagger schema and PowerShell class, and is visible
+    in the Test Security Role editor. A controlled Test-domain update persisted
+    and restored the property. Its authorization effect is not independently
+    established here.
 
     .PARAMETER AllowTaskLog
-    Undocumented [boolean] parameter to enable 'Unknown' - Use this with caution!
+    Hidden compatibility [boolean] parameter for `taskLog`. The property is
+    present in the current Swagger schema, PowerShell class, and raw Test-domain
+    reads, but is not exposed by the supplied Test UI evidence. A controlled
+    Test-domain update persisted and restored the property. Its authorization
+    effect is not established.
+
+    .PARAMETER AllowAdminDowngrade
+    Explicitly confirms that applying a granular permission update to a current Domain Admin will remove Domain Admin access. -Force does not bypass this safeguard.
 
     .PARAMETER Force
-    Force the addition of the object without confirmation. This is equivalent to -Confirm:$false
+    Force the update without ordinary confirmation. This is equivalent to -Confirm:$false, except it does not bypass the -AllowAdminDowngrade safeguard.
 
     .PARAMETER Quiet
     Switch parameter to silence the emitted [ANOWSecRoleDomain] object
@@ -70005,15 +70691,46 @@ Function Set-AutomateNOWSecurityRoleDomain {
 
     Changes to the assigned tags on a privilege will be ignored by the API if the privilege is not set to $true. This function will not warn you in this scenario.
 
-    The current full list of all 118 domain rights rights (including domainAdmin): domainAdmin, anomaly, anomalyModify, anomalyModifyTags, anomalyTags, approvalConfiguration, approveMergeRequest, archive, businessView, businessViewTags, codeRepository, codeRepositoryTags, createMergeRequest, dashboard, dashboardModify, dashboardModifyTags, dashboardTags, dataMigration, dataMigrationViewer, dataSourceAccess, dataSourceAccessTags, dataSourceModify, dataSourceModifyTags, design, designActionModify, designBusinessView, designBusinessViewModify, designCoreModify, designDependencyModify, designModify, designModifyTags, designResourceModify, designTags, designVerification, endpoint, endpointModify, endpointModifyTags, endpointTags, highLevelApproval, highLevelApprovalTags, integrator, integratorModify, integratorModifyTags, integratorTags, lowLevelApproval, lowLevelApprovalTags, mediumLevelApproval, mediumLevelApprovalTags, monitor, monitorBusinessView, monitorForceCompleted, monitorForceCompletedTags, monitorForceFailed, monitorForceFailedTags, monitorForceLaunch, monitorForceLaunchTags, monitorHold, monitorHoldTags, monitorInternalActions, monitorInternalActionsTags, monitorKill, monitorKillTags, monitorPassBy, monitorPassByTags, monitorRestart, monitorRestartTags, monitorTags, node, nodeHold, nodeHoldTags, nodeKill, nodeKillTags, nodeModify, nodeModifyEndpoint, nodeModifyEndpointTags, nodeModifyTags, nodePassBy, nodePassByTags, nodeStart, nodeStartTags, nodeTags, notification, notificationModify, notificationModifyTags, notificationTags, processingArchive, processingArchiveTags, processingLaunch, processingLaunchTags, processingModify, processingModifyTags, pull, push, report, reportModify, reportModifyTags, reportTags, resource, resourceModify, resourceModifyTags, resourceTags, resultMapping, resultMappingModify, resultMappingModifyTags, resultMappingTags, runtimeActionModify, selfService, selfServiceTags, taskLog, userReport, userReportModify, userReportModifyTags, userReportTags, workspace, workspaceModify, workspaceModifyTags, workspaceTags
+    The permission worksheet contains 118 historical request fields: 68
+    Boolean rights and 50 tag-array rights. The 117 Swagger-backed properties
+    are represented by ANOWSecRoleDomain. `designCoreModifyTags` is the one
+    additional module-only field; its controlled nonempty Test-domain update
+        did not persist, so this command rejects every explicitly bound value
+        before making an API request.
 
-    4 of the 118 domain rights are invisible and undocumented: DesignCoreModify, DesignCoreModifyTags*, DesignVerification, TaskLog
+    `designVerification` is a supported public Boolean permission. It is
+    present in the current Swagger/class contract, visible in the Test Security
+    Role editor, and persisted in a controlled Test-domain update. Its
+    authorization effect is not independently established.
 
-    Of the remaining 114 visible domain rights, 65 are privileges and 49 relate to adding tags to one of the 64. Put it another way, 14 of the 64 privileges do not have tag capability.
+    `designCoreModify` and `taskLog` are retained as hidden compatibility
+    Boolean properties. Controlled Test-domain updates persisted and restored
+    both. Current Security Role UI source evidence contains no
+    `designCoreModify` reference, and the supplied UI evidence does not expose
+    a `taskLog` control. Neither has an established authorization effect.
 
-    Use this function with caution! Test extensively.
+    The browser-only `designActionModifyTags` and
+    `designDependencyModifyTags` fields are unsupported. Each had a controlled
+    nonempty Test-domain update with application status 0, followed by an exact
+    raw read in which the field was absent. `designNotificationModify`,
+    `designNotificationModifyTags`, and `designResourceModifyTags` are also
+    unsupported by product policy; their browser evidence was empty submission
+    only. None of these fields has a class member, setter parameter, privilege
+    catalogue entry, or documented tag scope. These decisions do not establish
+    authorization behavior or every possible encoding.
 
-    * DesignCoreModifyTags does not appear anywhere except for the schema
+    -AllowDesignCoreModificationTags correctly targets `designModifyTags`.
+    A controlled Test-domain role with two Design Access labels and one L3
+    Design Core Modification label read back one exact L3 value for
+    `designModifyTags`; the UI's additional parent pill is not a second stored
+    core-modification scope. Earlier tag-record `id` and `simpleId` inputs did
+    not persist, so retain the literal UI-label form for this convention and
+    verify any new convention on a disposable role. A separate parent-plus-L3
+    seed followed by a fresh-read L3-only update proved that ANOW replaces,
+    rather than appends to, the current core-modification tag list.
+
+    Use this function with caution. Test permission changes in a disposable
+    Test-domain role before relying on them.
 
     #>
     [OutputType([ANOWSecRoleDomain])]
@@ -70258,6 +70975,8 @@ Function Set-AutomateNOWSecurityRoleDomain {
         [Parameter(Mandatory = $false)]
         [Nullable[boolean]]$AllowTaskLog,
         [Parameter(Mandatory = $false)]
+        [switch]$AllowAdminDowngrade,
+        [Parameter(Mandatory = $false)]
         [switch]$Force,
         [Parameter(Mandatory = $false)]
         [switch]$Quiet
@@ -70277,6 +70996,16 @@ Function Set-AutomateNOWSecurityRoleDomain {
         }
     }
     Process {
+        If ($PSBoundParameters.ContainsKey('AllowDesignCoreModifyTags')) {
+            Write-Warning -Message "AllowDesignCoreModifyTags targets designCoreModifyTags, which did not persist in a controlled nonempty Test-domain probe. The parameter is not supported and no API request was made."
+            Break
+        }
+        [string[]]$controlParameterNames = 'DomainRole', 'AllowAdminDowngrade', 'Force', 'Quiet', 'Verbose', 'Debug', 'ErrorAction', 'WarningAction', 'InformationAction', 'ErrorVariable', 'WarningVariable', 'InformationVariable', 'OutVariable', 'OutBuffer', 'PipelineVariable', 'WhatIf', 'Confirm'
+        [string[]]$mutableParameterNames = $PSBoundParameters.Keys | Where-Object { $_ -notin $controlParameterNames }
+        If ($mutableParameterNames.Count -eq 0) {
+            Write-Warning -Message "No mutable Security Role Domain permission parameter was supplied. No API request was made."
+            Break
+        }
         If ($_.id.Length -gt 0) {
             [ANOWSecRoleDomain]$DomainRole = $_
         }
@@ -70313,6 +71042,11 @@ Function Set-AutomateNOWSecurityRoleDomain {
             }
             If ( $DomainRole_Id -notin $ExistingRoleDomains.id) {
                 Write-Warning -Message "$DomainRole_Id is not actually attached to $SecurityRole_id!"
+                Break
+            }
+            [ANOWSecRoleDomain]$CurrentDomainRole = $ExistingRoleDomains | Where-Object { $_.Id -eq $DomainRole_Id } | Select-Object -First 1
+            If ($CurrentDomainRole.domainAdmin -eq $true -and $DomainAdmin -ne $true -and $AllowAdminDowngrade -ne $true) {
+                Write-Warning -Message "Applying granular permissions to Domain Admin [$DomainRole_Domain] in [$SecurityRole_id] will remove Domain Admin access. Re-run with -AllowAdminDowngrade to explicitly confirm. -Force does not override this safeguard."
                 Break
             }
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
@@ -70756,22 +71490,21 @@ Function Set-AutomateNOWSecurityRoleDomain {
                     $BodyMetaData.Add('selfServiceTags', $null)
                 }
                 If ($AllowDesignCoreModify -eq $true) {
-                    # this is an undocumented permission
+                    # Hidden compatibility property.
                     $BodyMetaData.Add('designCoreModify', 'true')
                 }
                 ElseIf ($AllowDesignCoreModify -eq $false) {
                     $BodyMetaData.Add('designCoreModify', 'false')
-                    $BodyMetaData.Add('designCoreModifyTags', $null)
                 }
                 If ($AllowDesignVerification -eq $true) {
-                    # this is an undocumented permission
+                    # Public supported property.
                     $BodyMetaData.Add('designVerification', 'true')
                 }
                 ElseIf ($AllowDesignVerification -eq $false) {
                     $BodyMetaData.Add('designVerification', 'false')
                 }
                 If ($AllowTaskLog -eq $true) {
-                    # this is an undocumented permission
+                    # Hidden compatibility property.
                     $BodyMetaData.Add('taskLog', 'true')
                 }
                 ElseIf ($AllowTaskLog -eq $false) {
@@ -70908,7 +71641,7 @@ Function Set-AutomateNOWSecurityRoleDomain {
                 If ($AllowDesignCoreModificationTags.Count -gt 0) {
                     [int32]$loop = 1
                     ForEach ( $tag_id in $AllowDesignCoreModificationTags) {
-                        $BodyMetaData.Add(('designCoreModifyTags' + $loop), $tag_id)
+                        $BodyMetaData.Add(('designModifyTags' + $loop), $tag_id)
                         $loop++
                         $TagsToConfirm += $tag_id
                     }
@@ -71169,15 +71902,11 @@ Function Set-AutomateNOWSecurityRoleDomain {
                         $TagsToConfirm += $tag_id
                     }
                 }
-                If ($AllowDesignCoreModifyTags.Count -gt 0) {
-                    # this is an undocumented permission
-                    [int32]$loop = 1
-                    ForEach ( $tag_id in $AllowDesignCoreModifyTags) {
-                        $BodyMetaData.Add(('designCoreModifyTags' + $loop), $tag_id)
-                        $loop++
-                        $TagsToConfirm += $tag_id
-                    }
-                }
+            }
+            [string[]]$effectiveChangeFields = $BodyMetaData.Keys | Where-Object { $_ -notin @('id', 'domainAdmin') }
+            If ($effectiveChangeFields.Count -eq 0 -and -not $PSBoundParameters.ContainsKey('DomainAdmin')) {
+                Write-Warning -Message "No effective Security Role Domain permission change was supplied. No API request was made."
+                Break
             }
             [string]$old_values = $DomainRole.CreateOldValues()
             $BodyMetaData.Add('_oldValues', $old_values)
@@ -71212,8 +71941,7 @@ Function Set-AutomateNOWSecurityRoleDomain {
             If ($results.response.data.count -gt 0) {
                 $Error.Clear()
                 Try {
-                    $results.response.data[0].secRole = $SecurityRole
-                    [ANOWSecRoleDomain]$FormattedDomainRole = $results.response.data | Select-Object -First 1
+                    [ANOWSecRoleDomain]$FormattedDomainRole = ConvertTo-AutomateNOWSecRoleDomain -InputObject ($results.response.data | Select-Object -First 1) -DefaultSecRoleId $SecurityRole_id
                 }
                 Catch {
                     [string]$Message = $_.Exception.Message
@@ -71325,7 +72053,7 @@ Function Get-AutomateNOWSecUser {
     [OutputType([ANOWSecUser])]
     [CmdletBinding(DefaultParameterSetName = 'Default')]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z _.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z _.-]{1,}$' })]
         [Parameter(Mandatory = $true, ParameterSetName = 'SpecificUser', ValueFromPipeline = $true)]
         [string]$Id,
         [Parameter(Mandatory = $true, ParameterSetName = 'LoggedOnUser')]
@@ -72221,9 +72949,14 @@ Function New-AutomateNOWSecUser {
 
     #>
     [OutputType([ANOWSecUser])]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
+        'PSAvoidUsingUsernameAndPasswordParams',
+        '',
+        Justification = 'SecurePass is a SecureString; PasswordValidDays is a lifetime setting, not a credential.'
+    )]
     [CmdletBinding(DefaultParameterSetName = 'NonAPIUser')]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true)]
         [string]$Id,
         [Parameter(Mandatory = $true)]
@@ -73019,34 +73752,56 @@ Function Disable-AutomateNOWSecUser {
 Function Measure-AutomateNOWSecUserPermission {
     <#
     .SYNOPSIS
-    Measures (reports on) the granular permissions for each domain a user on an AutomateNOW! instance
+    Measures the effective granular permissions for each domain available to an AutomateNOW! user
 
     .DESCRIPTION
-    Measures (reports on) the granular permissions for each domain for a user on an AutomateNOW! instance
+    Measures the effective granular permissions for each domain for a user on an AutomateNOW! instance.
+
+    The effective scope is calculated independently for each exact domain and
+    base permission across every applicable Security Role Domain. A valid
+    contribution requires the base Boolean permission to be $true. A nonempty
+    companion *Tags property makes that individual contribution tag-restricted;
+    otherwise it is unrestricted. Orphan tag values never grant a permission.
+
+    The returned base-permission rows are authoritative and contain a Scope of
+    Denied, Unrestricted, or TagRestricted. Tag rows remain compatibility and
+    provenance records; they are not standalone grants. A same-domain
+    domainAdmin contribution grants every supported base permission without a
+    tag restriction.
 
     .PARAMETER User
-    An [ANOWSecUser] object representing the User account to be disabled. This parameter is exclusive from -Me.
+    An [ANOWSecUser] object representing the user account to measure. This
+    parameter is exclusive from -Me.
 
     .PARAMETER Me
-    Switch parameter that will use the current logged on user instead of the -User parameter. This parameter is exclusive from -User.
+    Uses the current logged-on user instead of the -User parameter. This
+    parameter is exclusive from -User.
 
     .PARAMETER Domain
     An optional string parameter that will limit the results to only permissions that relate to a specific domain. This is optional.
 
     .PARAMETER FullReport
-    An optional switch parameter that will return all 114 (or 118) permissions regardless of whether the permission was granted or not. Use this when you want to verbosely see all possible permissions.
+    Returns every supported report property, including denied base permissions
+    and empty tag-evidence rows. Without this switch, only effective grants and
+    valid tag-evidence rows are returned.
 
     .PARAMETER PermissionList
-    An optional string array containing the list of permissions to filter against. Use this when you only want to see one or a few particular permissions.
+    An optional string array containing the exact permission property names to
+    return. Both base permissions and supported *Tags properties are accepted.
+    A *Tags property returns tag evidence and provenance, not an independent
+    grant. This parameter cannot be combined with -FullReport.
 
     .PARAMETER IncludeUndocumented
-    An optional switch parameter that will include the 4 undocumented permissions. This parameter will throw a warning if -FullReport was not included.
+    Includes the hidden compatibility Boolean properties in the report
+    catalogue. The rejected designCoreModifyTags property is never accepted or
+    reported as a usable tag scope.
 
     .INPUTS
     ONLY [ANOWSecUser] objects are accepted (including from the pipeline)
 
     .OUTPUTS
-    An array of 114 [PSCustomObject] granular permission objects for each domain that the user has access to (or 118 if -IncludeUndocumented is used)
+    An array of [PSCustomObject] permission objects. Base rows include Scope,
+    EffectiveTags, UnrestrictedSecRole, TagSecRole, and DomainAdminSecRole.
 
     .EXAMPLE
     Creates a user permission report for the currently logged in user (one-liner)
@@ -73057,54 +73812,68 @@ Function Measure-AutomateNOWSecUserPermission {
     Get-AutomateNOWSecUser -Id 'User1' | Measure-AutomateNOWSecUserPermission
 
     .EXAMPLE
-    Returns back the specific permission 'domainAdmin' for the currently logged in user. Do not use permissions that are tag-restricted here.
+    Returns the effective scope of the specific permission 'domainAdmin' for
+    the currently logged-in user.
 
     Measure-AutomateNOWSecUserPermission -Me -PermissionList 'domainAdmin'
 
     .EXAMPLE
-    Returns back the specific permissions 'monitorHold', 'monitorKill' for a user named 'User1'. Do not use permissions that are tag-restricted here. (one-liner)
+    Returns the effective scope of two specific permissions for a user named
+    'User1' (one-liner).
 
     Get-AutomateNOWSecUser -Id 'User1' | Measure-AutomateNOWSecUserPermission -PermissionList 'monitorHold', 'monitorKill'
+
+    .EXAMPLE
+    Returns the tag evidence for Monitoring Access for the current user.
+
+    Measure-AutomateNOWSecUserPermission -Me -PermissionList 'monitorTags'
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
 
-    There are 118 total permissions (including domainAdmin) with 4 of them undocumented. There are 64 (67 if including undocumented) core permissions (plus 1 for domainAdmin). There are 49 permissions (50 if including undocumented) which limit its related core permission with a tag restriction. That means there are 15 (or 17) permissions that cannot be limited by tags (again not including domainAdmin)
+    The normal report catalogue has 115 properties: 66 base Boolean properties
+    (including domainAdmin and designVerification) and 49 tag-evidence
+    properties. -IncludeUndocumented adds designCoreModify and taskLog as
+    hidden compatibility Boolean properties. designCoreModifyTags is
+    intentionally excluded because it is rejected and unsupported.
 
-    This function is intended to be used by other functions such as: Export-AutomateNOWSecUserPermission and Compare-AutomateNOWSecUserPermission (coming soon)
+    Scope values describe effective access. Tags associated with an
+    Unrestricted scope remain available only through the companion *Tags
+    provenance row because they no longer restrict access.
 
     #>
     [OutputType([PSCustomObject[]])]
     [CmdletBinding( DefaultParameterSetName = 'User')]
     Param(
-        [Parameter(Mandatory = $true, ParameterSetName = 'User', ValueFromPipeline = $True)]
-        [Parameter(Mandatory = $true, ParameterSetName = 'FullReport', ValueFromPipeline = $True)]
-        [Parameter(Mandatory = $true, ParameterSetName = 'Permissions', ValueFromPipeline = $True)]
+        [Parameter(Mandatory = $true, ParameterSetName = 'User', ValueFromPipeline = $true)]
         [ANOWSecUser]$User,
         [Parameter(Mandatory = $true, ParameterSetName = 'Me')]
-        [Parameter(Mandatory = $true, ParameterSetName = 'FullReport')]
-        [Parameter(Mandatory = $true, ParameterSetName = 'Permissions')]
         [switch]$Me,
-        [Parameter(Mandatory = $false)]
+        [Parameter(Mandatory = $false, ParameterSetName = 'User')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Me')]
         [string]$Domain,
-        [Parameter(Mandatory = $false, ParameterSetName = 'Me')]
         [Parameter(Mandatory = $false, ParameterSetName = 'User')]
-        [Parameter(Mandatory = $false, ParameterSetName = 'FullReport')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Me')]
         [switch]$FullReport,
-        [Parameter(Mandatory = $false, ParameterSetName = 'Me')]
         [Parameter(Mandatory = $false, ParameterSetName = 'User')]
-        [Parameter(Mandatory = $false, ParameterSetName = 'Permissions')]
-        [ANOWSecUserPermission_permissionName[]]$PermissionList,
-        [Parameter(Mandatory = $false)]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Me')]
+        [string[]]$PermissionList,
+        [Parameter(Mandatory = $false, ParameterSetName = 'User')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'Me')]
         [switch]$IncludeUndocumented
     )
     Begin {
+        If (($FullReport -eq $true) -and $PSBoundParameters.ContainsKey('PermissionList')) {
+            Throw 'The FullReport and PermissionList parameters cannot be used together. Use FullReport for the full catalogue or PermissionList for a selected report.'
+        }
+        If ($Me -eq $true) {
+            If ((Confirm-AutomateNOWSession -Quiet -DoNotRefresh) -ne $true) {
+                Throw 'There is not a valid local AutomateNOW session available for -Me.'
+            }
+        }
     }
     Process {
-        If ($_.id.Length -gt 0) {
-            [ANOWSecUser]$User = $_
-        }
-        ElseIf ($Me -eq $true) {
+        If ($Me -eq $true) {
             $Error.Clear()
             Try {
                 [ANOWSecUser]$User = $anow_session.user_details
@@ -73116,11 +73885,12 @@ Function Measure-AutomateNOWSecUserPermission {
             }
         }
         [string]$user_id = $User.id
+        If ($user_id.Length -eq 0) {
+            Throw 'The supplied user does not contain an Id that can be measured.'
+        }
         [boolean]$user_admin_status = $User.admin
         If ($user_admin_status -eq $true) {
-            [string]$instance = $anow_session.instance
-            Write-Warning -Message "$user_id is an admin of $instance. There aren't any permissions to measure."
-            Break
+            Throw "$user_id is an instance administrator. Measure-AutomateNOWSecUserPermission does not model instance-wide universal access; use an explicit non-admin user report instead."
         }
         [ANOWSecRole[]]$secRoles = $User.secRoles
         [int32]$secRoles_count = $secRoles.Count
@@ -73131,13 +73901,29 @@ Function Measure-AutomateNOWSecUserPermission {
             Write-Warning -Message "$user_id does not have any security roles"
             Break
         }
-        [string[]]$unique_domains = $secRoles.domainRoles.roleDomain | Sort-Object -Unique
+        [System.Collections.Generic.HashSet[string]]$domain_set = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+        ForEach ($secRole in $secRoles) {
+            ForEach ($domainRole in $secRole.domainRoles) {
+                [string]$role_domain = $domainRole.roleDomain
+                If ($role_domain.Length -gt 0) {
+                    [void]$domain_set.Add($role_domain)
+                }
+            }
+        }
+        [string[]]$unique_domains = @($domain_set)
+        [System.Array]::Sort($unique_domains, [System.StringComparer]::Ordinal)
         If ($domain.Length -gt 0) {
-            If ($domain -notin $unique_domains) {
-                Write-Warning -Message "$user_id does not have any permissions to the $domain"
+            If ($domain_set.Contains($domain) -ne $true) {
+                [string[]]$case_insensitive_domain_matches = $unique_domains | Where-Object { $_ -eq $domain }
+                If ($case_insensitive_domain_matches.Count -gt 0) {
+                    Write-Warning -Message "Domains are case-sensitive. Try using '$($case_insensitive_domain_matches[0])' instead of '$domain'."
+                }
+                Else {
+                    Write-Warning -Message "$user_id does not have any permissions to the $domain"
+                }
                 Break
             }
-            [string[]]$unique_domains = $unique_domains | Where-Object { $_ -eq $domain }
+            [string[]]$unique_domains = @($domain)
         }
         [int32]$unique_domains_count = $unique_domains.count
         If ($unique_domains_count -eq 0) {
@@ -73151,19 +73937,43 @@ Function Measure-AutomateNOWSecUserPermission {
         Else {
             $parameters.Add('IncludeUndocumented', $true)
         }
-        If ($PermissionList.Count -eq 0) {
-            $Error.Clear()
-            Try {
-                [string[]]$privilege_list = New-AutomateNOWSecUserPrivilegeList @parameters
+        $Error.Clear()
+        Try {
+            [string[]]$available_privileges = New-AutomateNOWSecUserPrivilegeList @parameters
+        }
+        Catch {
+            [string]$Message = $_.Exception.Message
+            Write-Warning -Message "New-AutomateNOWSecUserPrivilegeList failed while measuring $user_id (under Measure-AutomateNOWSecUserPermission) due to [$Message]"
+            Break
+        }
+        # This historical module-only property is nonpersisting/rejected by the
+        # API and must never be reported as a supported tag-restriction field.
+        [string[]]$available_privileges = $available_privileges | Where-Object { $_ -cne 'designCoreModifyTags' }
+        [System.Collections.Generic.HashSet[string]]$available_privilege_set = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+        ForEach ($available_privilege in $available_privileges) {
+            [void]$available_privilege_set.Add($available_privilege)
+        }
+        If ($PermissionList.Count -gt 0) {
+            [System.Collections.Generic.HashSet[string]]$requested_privilege_set = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+            [System.Collections.Generic.List[string]]$requested_privileges = [System.Collections.Generic.List[string]]::new()
+            ForEach ($requested_privilege in $PermissionList) {
+                If ([string]::IsNullOrEmpty($requested_privilege)) {
+                    Throw 'PermissionList cannot contain an empty permission name.'
+                }
+                If ($requested_privilege -ceq 'designCoreModifyTags') {
+                    Throw 'designCoreModifyTags is nonpersisting and unsupported. It cannot be measured as a usable tag scope.'
+                }
+                If ($available_privilege_set.Contains($requested_privilege) -ne $true) {
+                    Throw "[$requested_privilege] is not an available permission for this report. Permission names are case-sensitive; use -IncludeUndocumented only for hidden compatibility Boolean properties."
+                }
+                If ($requested_privilege_set.Add($requested_privilege)) {
+                    [void]$requested_privileges.Add($requested_privilege)
+                }
             }
-            Catch {
-                [string]$Message = $_.Exception.Message
-                Write-Warning -Message "New-AutomateNOWSecUserPrivilegeList failed while measuring $user_id (under Measure-AutomateNOWSecUserRolePermission) due to [$Message]"
-                Break
-            }
+            [string[]]$privilege_list = $requested_privileges.ToArray()
         }
         Else {
-            [string[]]$privilege_list = $PermissionList
+            [string[]]$privilege_list = $available_privileges
         }
         $Error.Clear()
         Try {
@@ -73174,71 +73984,155 @@ Function Measure-AutomateNOWSecUserPermission {
             Write-Warning -Message "New-AutomateNOWSecUserPrivilegeLookupTable while measuring $user_id (under Measure-AutomateNOWSecUserRolePermission) due to [$Message]"
             Break
         }
-        [PSCustomObject[]]$domain_reports = ForEach ($domain in $unique_domains) {
-            $Error.Clear()
-            Try {
-                [PSCustomObject]$current_domain_report = New-AutomateNOWSecUserPrivilegeReport @parameters # Note that this function creates a blank report.
+        [string[]]$base_privileges = $available_privileges | Where-Object { $_ -cnotmatch 'Tags$' }
+        [string[]]$tag_privileges = $available_privileges | Where-Object { $_ -cmatch 'Tags$' }
+        [System.Collections.Generic.HashSet[string]]$tag_privilege_set = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+        ForEach ($tag_privilege in $tag_privileges) {
+            [void]$tag_privilege_set.Add($tag_privilege)
+        }
+        [string[]]$hidden_compatibility_base_privileges = @('designCoreModify', 'taskLog')
+        [string[]]$domain_admin_base_privileges = $base_privileges | Where-Object { $_ -cnotin $hidden_compatibility_base_privileges }
+        [string[]]$undocumented_privileges = $hidden_compatibility_base_privileges
+        [string]$instance = $anow_session.instance
+        [PSCustomObject[]]$domain_reports = ForEach ($current_domain in $unique_domains) {
+            [hashtable]$effective_permission_states = @{}
+            ForEach ($base_privilege in $base_privileges) {
+                $effective_permission_states[$base_privilege] = [PSCustomObject]@{
+                    HasGrant            = $false
+                    HasUnrestrictedGrant = $false
+                    HasTagGrant         = $false
+                    GrantRoles          = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+                    UnrestrictedRoles   = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+                    TagRoles            = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+                    DomainAdminRoles    = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+                    TagValues           = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+                }
             }
-            Catch {
-                [string]$Message = $_.Exception.Message
-                Write-Warning -Message "New-AutomateNOWSecUserPrivilegeReport failed to create a new blank privilege report while measuring $user_id (under Measure-AutomateNOWSecUserRolePermission) due to [$Message]"
-                Break
-            }
-            [ANOWSecRole[]]$applicable_secRoles = $secRoles | Where-Object { $_.domainRoles.roleDomain -eq $domain }
-            [int32]$applicable_secRoles_count = $applicable_secRoles.count
-            Write-Verbose -Message "$user_id has $applicable_secRoles_count security roles that include a domain role for the [$domain] domain"
-            ForEach ($applicable_secRole in $applicable_secRoles) {
-                [string]$current_secRole_id = $applicable_secRole.id
-                [ANOWSecRoleDomain[]]$applicable_domainRoles = $applicable_secRole.domainRoles | Where-Object { $_.roleDomain -eq $domain }
+            [int32]$applicable_domain_role_count = 0
+            ForEach ($applicable_secRole in $secRoles) {
+                [ANOWSecRoleDomain[]]$applicable_domainRoles = $applicable_secRole.domainRoles | Where-Object { $_.roleDomain -ceq $current_domain }
                 ForEach ($applicable_domainRole in $applicable_domainRoles) {
-                    ForEach ($privilege in $privilege_list) {
-                        Write-Verbose -Message "Processing privilege [$privilege] for the [$domain] domain (within the secRole '$current_secRole_id')"
-                        $privilege_description = $null
-                        [string]$privilege_description = $privilege_lookup_table.$privilege
-                        If ($privilege_description.length -eq 0) {
-                            Write-Warning -Message "It was not possible to lookup the description of an individual permission (under Measure-AutomateNOWSecUserPermission)"
-                            Break
+                    $applicable_domain_role_count++
+                    [string]$current_secRole_id = $applicable_secRole.id
+                    If ($current_secRole_id.Length -eq 0) {
+                        [string]$current_secRole_id = $applicable_domainRole.secRole
+                    }
+                    If ($applicable_domainRole.domainAdmin -eq $true) {
+                        ForEach ($base_privilege in $domain_admin_base_privileges) {
+                            [PSCustomObject]$state = $effective_permission_states[$base_privilege]
+                            $state.HasGrant = $true
+                            $state.HasUnrestrictedGrant = $true
+                            If ($current_secRole_id.Length -gt 0) {
+                                [void]$state.GrantRoles.Add($current_secRole_id)
+                                [void]$state.UnrestrictedRoles.Add($current_secRole_id)
+                                [void]$state.DomainAdminRoles.Add($current_secRole_id)
+                            }
                         }
-                        $current_domain_report_privilege = $null
-                        [PSCustomObject]$current_domain_report_privilege = $current_domain_report | Where-Object { $_.privilege -eq $privilege }
-                        If ($current_domain_report_privilege.privilege.Length -eq 0) {
-                            Write-Warning -Message "The [$privilege] privilege could not be detected within the domain role for $domain within security role $current_secRole_id (under Measure-AutomateNOWSecUserPermission)"
-                            Break
+                        Continue
+                    }
+                    ForEach ($base_privilege in $base_privileges) {
+                        $base_property = $applicable_domainRole.PSObject.Properties[$base_privilege]
+                        If (($null -eq $base_property) -or ($base_property.Value -ne $true)) {
+                            Continue
                         }
-                        $current_domain_report_privilege.domain = $domain
-                        $current_domain_report_privilege.user_name = $user_id
-                        $current_domain_report_privilege.description = $privilege_description
-                        $current_domain_report_privilege.granted = $false
-                        If (($applicable_domainRole.$privilege -eq $true) -or ($applicable_domainRole.$privilege -is [array] -and $applicable_domainRole.$privilege.Count -gt 0)) {
-                            $current_domain_report = $current_domain_report | Where-Object { $_.privilege -ne $privilege }
-                            If ($applicable_domainRole.$privilege -eq $true) {
-                                $current_domain_report_privilege.granted = $true
+                        [PSCustomObject]$state = $effective_permission_states[$base_privilege]
+                        $state.HasGrant = $true
+                        If ($current_secRole_id.Length -gt 0) {
+                            [void]$state.GrantRoles.Add($current_secRole_id)
+                        }
+                        [string]$tag_privilege = ($base_privilege + 'Tags')
+                        [string[]]$valid_tags = @()
+                        If ($tag_privilege_set.Contains($tag_privilege)) {
+                            $tag_property = $applicable_domainRole.PSObject.Properties[$tag_privilege]
+                            If ($null -ne $tag_property) {
+                                [string[]]$valid_tags = @($tag_property.Value | Where-Object { $null -ne $_ -and [string]::IsNullOrEmpty([string]$_) -ne $true })
                             }
-                            ElseIf ($applicable_domainRole.$privilege -is [array] -and $applicable_domainRole.$privilege.Count -gt 0) {
-                                $current_domain_report_privilege.tags = $applicable_domainRole.$privilege
-                                $current_domain_report_privilege.granted = $true
+                        }
+                        If ($valid_tags.Count -gt 0) {
+                            $state.HasTagGrant = $true
+                            If ($current_secRole_id.Length -gt 0) {
+                                [void]$state.TagRoles.Add($current_secRole_id)
                             }
-                            Else {
-                                Write-Warning -Message "It was not possible to determine what type of privilege [$privilege] in the $domain domain for $user_id was (under Measure-AutomateNOWSecUserPermission)"
-                                Break
+                            ForEach ($tag_value in $valid_tags) {
+                                [void]$state.TagValues.Add($tag_value)
                             }
-                            If ($current_domain_report_privilege.secRole -notcontains $current_SecRole_id) {
-                                $current_domain_report_privilege.secRole += $current_SecRole_id
+                        }
+                        Else {
+                            $state.HasUnrestrictedGrant = $true
+                            If ($current_secRole_id.Length -gt 0) {
+                                [void]$state.UnrestrictedRoles.Add($current_secRole_id)
                             }
-                            $current_domain_report += $current_domain_report_privilege
                         }
                     }
                 }
             }
+            Write-Verbose -Message "$user_id has $applicable_domain_role_count applicable Security Role Domain records for the [$current_domain] domain"
             [PSCustomObject[]]$formatted_domain_report = ForEach ($privilege in $privilege_list) {
-                $current_domain_report | Where-Object { $_.privilege -eq $privilege }
+                [string]$privilege_description = $privilege_lookup_table.$privilege
+                If ($privilege_description.Length -eq 0) {
+                    Throw "It was not possible to look up the description of [$privilege] under Measure-AutomateNOWSecUserPermission."
+                }
+                If ($privilege -cnotmatch 'Tags$') {
+                    [PSCustomObject]$state = $effective_permission_states[$privilege]
+                    [string[]]$grant_roles = @($state.GrantRoles)
+                    [string[]]$unrestricted_roles = @($state.UnrestrictedRoles)
+                    [string[]]$tag_roles = @($state.TagRoles)
+                    [string[]]$domain_admin_roles = @($state.DomainAdminRoles)
+                    [string[]]$tag_values = @($state.TagValues)
+                    [System.Array]::Sort($grant_roles, [System.StringComparer]::Ordinal)
+                    [System.Array]::Sort($unrestricted_roles, [System.StringComparer]::Ordinal)
+                    [System.Array]::Sort($tag_roles, [System.StringComparer]::Ordinal)
+                    [System.Array]::Sort($domain_admin_roles, [System.StringComparer]::Ordinal)
+                    [System.Array]::Sort($tag_values, [System.StringComparer]::Ordinal)
+                    If ($state.HasGrant -ne $true) {
+                        [string]$scope = 'Denied'
+                        [boolean]$granted = $false
+                        [string[]]$effective_tags = @()
+                    }
+                    ElseIf ($state.HasUnrestrictedGrant -eq $true) {
+                        [string]$scope = 'Unrestricted'
+                        [boolean]$granted = $true
+                        [string[]]$effective_tags = @()
+                    }
+                    Else {
+                        [string]$scope = 'TagRestricted'
+                        [boolean]$granted = $true
+                        [string[]]$effective_tags = $tag_values
+                    }
+                    If ($IncludeUndocumented -eq $true) {
+                        [boolean]$undocumented = $privilege -cin $undocumented_privileges
+                        [PSCustomObject]@{'instance' = $instance; 'domain' = $current_domain; 'user_name' = $user_id; 'secRole' = $grant_roles; 'privilege' = $privilege; 'granted' = $granted; 'value' = $false; 'tags' = @(); 'description' = $privilege_description; 'undocumented' = $undocumented; 'scope' = $scope; 'effectiveTags' = $effective_tags; 'unrestrictedSecRole' = $unrestricted_roles; 'tagSecRole' = $tag_roles; 'domainAdminSecRole' = $domain_admin_roles; }
+                    }
+                    Else {
+                        [PSCustomObject]@{'instance' = $instance; 'domain' = $current_domain; 'user_name' = $user_id; 'secRole' = $grant_roles; 'privilege' = $privilege; 'granted' = $granted; 'value' = $false; 'tags' = @(); 'description' = $privilege_description; 'scope' = $scope; 'effectiveTags' = $effective_tags; 'unrestrictedSecRole' = $unrestricted_roles; 'tagSecRole' = $tag_roles; 'domainAdminSecRole' = $domain_admin_roles; }
+                    }
+                }
+                Else {
+                    [string]$base_privilege = $privilege.Substring(0, $privilege.Length - 4)
+                    [PSCustomObject]$state = $effective_permission_states[$base_privilege]
+                    [string[]]$tag_roles = @($state.TagRoles)
+                    [string[]]$tag_values = @($state.TagValues)
+                    [System.Array]::Sort($tag_roles, [System.StringComparer]::Ordinal)
+                    [System.Array]::Sort($tag_values, [System.StringComparer]::Ordinal)
+                    [boolean]$granted = $state.HasTagGrant
+                    If ($IncludeUndocumented -eq $true) {
+                        [PSCustomObject]@{'instance' = $instance; 'domain' = $current_domain; 'user_name' = $user_id; 'secRole' = $tag_roles; 'privilege' = $privilege; 'granted' = $granted; 'value' = $false; 'tags' = $tag_values; 'description' = $privilege_description; 'undocumented' = $false; }
+                    }
+                    Else {
+                        [PSCustomObject]@{'instance' = $instance; 'domain' = $current_domain; 'user_name' = $user_id; 'secRole' = $tag_roles; 'privilege' = $privilege; 'granted' = $granted; 'value' = $false; 'tags' = $tag_values; 'description' = $privilege_description; }
+                    }
+                }
             }
             If ($FullReport -ne $true) {
-                [PSCustomObject[]]$formatted_domain_report = $formatted_domain_report | Where-Object { $_.granted -eq $true }
+                $formatted_domain_report | Where-Object { $_.granted -eq $true }
             }
-            $formatted_domain_report
+            Else {
+                $formatted_domain_report
+            }
         }
-        Return $domain_reports
+        # A typed array assigned from a no-grant ForEach can contain one null
+        # element.  Do not emit that as a success-stream record.
+        Return @($domain_reports | Where-Object { $null -ne $_ })
     }
     End {
 
@@ -73251,7 +74145,7 @@ Function Export-AutomateNOWSecUserPermission {
     Exports the the granular permissions for each domain a user on an AutomateNOW! instance to a local .csv file
 
     .DESCRIPTION
-    Exports the the granular permissions for each domain a user on an AutomateNOW! instance to a local .csv file
+    Exports the granular permissions for each domain a user on an AutomateNOW! instance to a local .csv file. Effective-scope and provenance fields emitted by Measure-AutomateNOWSecUserPermission are retained as additive CSV columns.
 
     .PARAMETER Permission
     Mandatory [PSCustomObject] object array from Measure-AutomateNOWSecUserPermission
@@ -73297,12 +74191,25 @@ Function Export-AutomateNOWSecUserPermission {
         }
         $Error.Clear()
         Try {
-            If ($null -eq $Permission.undocumented) {
-                [PSCustomObject]$FormattedPermission = [PSCustomObject]@{'instance' = $Permission.instance; 'domain' = $Permission.domain; 'user_name' = $Permission.user_name; 'secRole' = ($Permission.secRole -join ', '); 'privilege' = $Permission.privilege; 'granted' = $Permission.granted; 'tags' = ($Permission.tags -join ', '); 'description' = $Permission.description; }
+            [System.Collections.Specialized.OrderedDictionary]$formatted_permission_properties = [ordered]@{
+                'instance'              = $Permission.instance
+                'domain'                = $Permission.domain
+                'user_name'             = $Permission.user_name
+                'secRole'               = ($Permission.secRole -join ', ')
+                'privilege'             = $Permission.privilege
+                'granted'               = $Permission.granted
+                'tags'                  = ($Permission.tags -join ', ')
+                'description'           = $Permission.description
+                'scope'                 = $Permission.scope
+                'effectiveTags'         = ($Permission.effectiveTags -join ', ')
+                'unrestrictedSecRole'   = ($Permission.unrestrictedSecRole -join ', ')
+                'tagSecRole'            = ($Permission.tagSecRole -join ', ')
+                'domainAdminSecRole'    = ($Permission.domainAdminSecRole -join ', ')
             }
-            Else {
-                [PSCustomObject]$FormattedPermission = [PSCustomObject]@{'instance' = $Permission.instance; 'domain' = $Permission.domain; 'user_name' = $Permission.user_name; 'secRole' = ($Permission.secRole -join ', '); 'privilege' = $Permission.privilege; 'granted' = $Permission.granted; 'tags' = ($Permission.tags -join ', '); 'description' = $Permission.description; 'undocumented' = $Permission.undocumented; }
+            If ($null -ne $Permission.PSObject.Properties['undocumented']) {
+                $formatted_permission_properties.Add('undocumented', $Permission.undocumented)
             }
+            [PSCustomObject]$FormattedPermission = [PSCustomObject]$formatted_permission_properties
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -73345,71 +74252,74 @@ Function Export-AutomateNOWSecUserPermission {
 Function Compare-AutomateNOWSecUserPermission {
     <#
     .SYNOPSIS
-    Compares the the granular permissions for two users on a given domain with an instance of AutomateNOW!
+    Compares effective granular permissions for two users in one AutomateNOW! domain
 
     .DESCRIPTION
-    Compares the the granular permissions for two users on a given domain with an instance of AutomateNOW!
+    Compares the authoritative base-permission rows from
+    Measure-AutomateNOWSecUserPermission -FullReport. Companion *Tags rows are
+    intentionally not compared as standalone permissions.
+
+    Use -Basic for the established Boolean comparison: a permission is equal
+    when both users are granted or both are denied. Use -EffectiveScope for an
+    explicit tag-aware comparison: a permission is equal only when its scope
+    matches and, for TagRestricted scope, its normalized effective tag set also
+    matches. Role provenance does not change effective equality.
 
     .PARAMETER ReferenceUser
-    Mandatory [ANOWSecUser] representing the user you are referencing from
+    Mandatory [ANOWSecUser] representing the reference user.
 
     .PARAMETER DifferenceUser
-    Mandatory [ANOWSecUser] representing the user you are referencing against. This parameter has pipeline support.
+    Mandatory [ANOWSecUser] representing the user to compare against the
+    reference user. This parameter accepts pipeline input.
 
     .PARAMETER Domain
-    Mandatory string representing the domain that you are comparing the two users from.
+    Mandatory exact, case-sensitive domain name to compare.
 
     .PARAMETER Basic
-    Optional switch parameter that removes the Tags property from the output. Use this when you do not want tag restrictions included in the output.
+    Selects the legacy Boolean-only comparison mode. This switch is mutually
+    exclusive with -EffectiveScope.
+
+    .PARAMETER EffectiveScope
+    Selects the explicit tag-aware comparison mode. This mode compares Scope
+    and EffectiveTags for TagRestricted permissions. This switch is mutually
+    exclusive with -Basic.
 
     .PARAMETER IncludeUndocumented
-    Optional switch parameter that includes the 4 known undocumented privileges. Use this when you want to explore the API.
+    Includes hidden compatibility Boolean properties in the comparison.
 
     .PARAMETER ExcludeDifferent
-    Optional switch parameter that excludes differing permissions. Use this when you are only concerned with if some mutual permissions were granted from more than security role.
+    Returns only equal permissions, including permissions denied to both users.
 
     .PARAMETER IncludeEqual
-    Optional switch parameter that includes mutual permissions. Use this when you want to see all 64 permissions for both users.
+    Returns every base permission, including permissions denied to both users.
 
     .INPUTS
-    Only [ANOWSecUser] objects are needed.
+    [ANOWSecUser] objects.
 
     .OUTPUTS
-    [PSCustomObjects] containing the compared permissions
+    [PSCustomObject] comparison records. The established directional fields
+    are retained first for compatibility. The paired Reference*/Difference*
+    fields are authoritative, especially for -EffectiveScope.
 
     .EXAMPLE
-    Performs a standard comparison (differences only) on a domain named 'Domain1' between two users named 'User1' and 'User2' (multi-line).
+    Compares Boolean grants only and returns differences.
 
-    $User1 = Get-AutomateNOWSecUser -Id 'User1'
-    $User2 = Get-AutomateNOWSecUser -Id 'User2'
-
-    Compare-AutomateNOWSecUserPermission -ReferenceUser $User1 -DifferenceUser $User2 -Domain 'Domain1'
+    Compare-AutomateNOWSecUserPermission -ReferenceUser $User1 -DifferenceUser $User2 -Domain 'Domain1' -Basic
 
     .EXAMPLE
-    While taking advantage of positional parameters, performs a standard comparison (differences only) in basic mode on a domain named 'Domain1' between two users named 'User1' and 'User2' (one-liner)
+    Compares effective scopes and tag restrictions, returning differences.
 
-    Compare-AutomateNOWSecUserPermission (Get-AutomateNOWSecUser -Id 'User1') (Get-AutomateNOWSecUser -Id 'User2') 'Domain1' -Basic
-
-    .EXAMPLE
-    Performs an 'include equal' basic comparison on a domain named 'Domain1' between two users named 'User1' and 'User2' (multi-liner). This means you will get back 64 permissions regardless if they are shared or not.
-
-    $User1 = Get-AutomateNOWSecUser -Id 'User1'
-    $User2 = Get-AutomateNOWSecUser -Id 'User2'
-
-    Compare-AutomateNOWSecUserPermission -ReferenceUser $User1 -DifferenceUser $User2 -Domain 'Domain1' -IncludeEqual -Basic
+    Compare-AutomateNOWSecUserPermission -ReferenceUser $User1 -DifferenceUser $User2 -Domain 'Domain1' -EffectiveScope
 
     .EXAMPLE
-    Performs an 'exclude different' basic comparison on a domain named 'Domain1' between two users named 'User1' and 'User2' (multi-liner). This means you will only get back permissions that were granted for both users.
+    Returns every Boolean comparison, including permissions denied to both users.
 
-    $User1 = Get-AutomateNOWSecUser -Id 'User1'
-    $User2 = Get-AutomateNOWSecUser -Id 'User2'
-
-    Compare-AutomateNOWSecUserPermission -ReferenceUser $User1 -DifferenceUser $User2 -Domain 'Domain1' -ExcludeDifferent -Basic
+    Compare-AutomateNOWSecUserPermission -ReferenceUser $User1 -DifferenceUser $User2 -Domain 'Domain1' -Basic -IncludeEqual
 
     .NOTES
-    This function makes use of Measure-AutomateNOWSecUserPermission
-
-    This function is very much experimental. Use the results with caution.
+    Instance administrators are rejected because this command does not model
+    instance-wide universal access. A missing or incomplete Measure FullReport
+    is also rejected rather than being interpreted as denied access.
 
     #>
     [OutputType([PSCustomObject[]])]
@@ -73424,6 +74334,8 @@ Function Compare-AutomateNOWSecUserPermission {
         [Parameter(Mandatory = $false)]
         [switch]$Basic,
         [Parameter(Mandatory = $false)]
+        [switch]$EffectiveScope,
+        [Parameter(Mandatory = $false)]
         [switch]$IncludeUndocumented,
         [Parameter(Mandatory = $true, ParameterSetName = 'ExcludeDifferent')]
         [switch]$ExcludeDifferent,
@@ -73431,159 +74343,178 @@ Function Compare-AutomateNOWSecUserPermission {
         [switch]$IncludeEqual
     )
     Begin {
-        If ((Confirm-AutomateNOWSession -Quiet) -ne $true) {
-            Write-Warning -Message "There is not a valid token confirmed."
-            Break
+        If (($Basic -eq $EffectiveScope) -eq $true) {
+            Throw 'Specify exactly one comparison mode: -Basic or -EffectiveScope.'
         }
-        If ($Basic -ne $true) {
-            Write-Warning -Message "Advanced comparisons are not ready yet. Please include the -Basic switch."
-            Break
+        If ((Confirm-AutomateNOWSession -Quiet -DoNotRefresh) -ne $true) {
+            Throw 'There is not a valid local AutomateNOW session available for this comparison.'
         }
         [string[]]$available_domains = $anow_session.available_domains
         If ($Domain -cnotin $available_domains) {
-            [string]$available_domains_display = $available_domains -join ', '
-            If ($Domain -in $available_domains) {
-                [string]$correct_domain = $available_domains | Where-Object { $_ -eq $Domain }
-                Write-Warning -Message "Domains are case-sensitive. Try using '$correct_domain' instead of '$Domain'"
-                Break
+            [string[]]$case_insensitive_domain_matches = $available_domains | Where-Object { $_ -eq $Domain }
+            If ($case_insensitive_domain_matches.Count -gt 0) {
+                Throw "Domains are case-sensitive. Try using '$($case_insensitive_domain_matches[0])' instead of '$Domain'."
             }
-            Write-Warning -Message "$Domain does not exist in the list of available domains to you ($available_domains_display) You cannot make this comparison if $Domain doesn't exist or you do not have access to it."
-            Break
+            [string]$available_domains_display = $available_domains -join ', '
+            Throw "$Domain does not exist in the available domain list ($available_domains_display)."
+        }
+        function ConvertTo-AutomateNOWPermissionOrdinalArray {
+            [OutputType([string[]])]
+            Param(
+                [object[]]$Value
+            )
+            [System.Collections.Generic.HashSet[string]]$unique_values = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+            ForEach ($item in @($Value)) {
+                If (($null -ne $item) -and ([string]::IsNullOrEmpty([string]$item) -ne $true)) {
+                    [void]$unique_values.Add([string]$item)
+                }
+            }
+            [string[]]$normalized_values = @($unique_values)
+            [System.Array]::Sort($normalized_values, [System.StringComparer]::Ordinal)
+            Return $normalized_values
         }
     }
     Process {
-        If ($_.id.Length -gt 0) {
+        If (($null -ne $_) -and ($_.id.Length -gt 0)) {
             [ANOWSecUser]$DifferenceUser = $_
         }
-        $Error.Clear()
         [string]$ReferenceUser_id = $ReferenceUser.id
         [string]$DifferenceUser_id = $DifferenceUser.id
+        If (($ReferenceUser_id.Length -eq 0) -or ($DifferenceUser_id.Length -eq 0)) {
+            Throw 'Both users must contain an Id before their permissions can be compared.'
+        }
         If ($ReferenceUser_Id -ceq $DifferenceUser_Id) {
-            Write-Warning -Message "The Reference User ($ReferenceUser_id) and the Difference User ($DifferenceUser_id) are the same user!"
-            Break
+            Throw "The Reference User ($ReferenceUser_id) and the Difference User ($DifferenceUser_id) are the same user."
         }
-        [hashtable]$parameters = @{}
-        If ($IncludeUndocumented -ne $true) {
-            $parameters.Add('IncludeUndocumented', $false)
+        If ($ReferenceUser.admin -eq $true -or $DifferenceUser.admin -eq $true) {
+            Throw 'Compare-AutomateNOWSecUserPermission does not model instance-wide universal access. Instance administrators cannot be compared as normal permission reports.'
         }
-        Else {
-            $parameters.Add('IncludeUndocumented', $true)
-        }
+        [hashtable]$privilege_parameters = @{ IncludeUndocumented = ($IncludeUndocumented -eq $true) }
         $Error.Clear()
         Try {
-            [System.Collections.Specialized.OrderedDictionary]$privilege_lookup_table = New-AutomateNOWSecUserPrivilegeLookupTable @parameters
+            [string[]]$available_privileges = New-AutomateNOWSecUserPrivilegeList @privilege_parameters
+            [System.Collections.Specialized.OrderedDictionary]$privilege_lookup_table = New-AutomateNOWSecUserPrivilegeLookupTable @privilege_parameters
         }
         Catch {
             [string]$Message = $_.Exception.Message
-            Write-Warning -Message "New-AutomateNOWSecUserPrivilegeLookupTable while trying to compare $ReferenceUser_id against $DifferenceUser_id (under Compare-AutomateNOWSecUserRolePermission) on the $Domain domain due to [$Message]"
-            Break
+            Throw "The permission catalogue could not be created while comparing $ReferenceUser_id to $DifferenceUser_id on ${Domain}: $Message"
+        }
+        [string[]]$base_privileges = $available_privileges | Where-Object { ($_ -cnotmatch 'Tags$') -and ($_ -cne 'designCoreModifyTags') }
+        [hashtable]$reference_user_parameters = @{ User = $ReferenceUser; Domain = $Domain; FullReport = $true; IncludeUndocumented = ($IncludeUndocumented -eq $true) }
+        [hashtable]$difference_user_parameters = @{ User = $DifferenceUser; Domain = $Domain; FullReport = $true; IncludeUndocumented = ($IncludeUndocumented -eq $true) }
+        [PSCustomObject[]]$ReferenceUserReport = @(Measure-AutomateNOWSecUserPermission @reference_user_parameters)
+        [PSCustomObject[]]$DifferenceUserReport = @(Measure-AutomateNOWSecUserPermission @difference_user_parameters)
+        [hashtable]$reference_base_permissions = @{}
+        [hashtable]$difference_base_permissions = @{}
+        ForEach ($privilege in $base_privileges) {
+            [PSCustomObject[]]$reference_matches = @($ReferenceUserReport | Where-Object { ($_.domain -ceq $Domain) -and ($_.privilege -ceq $privilege) })
+            [PSCustomObject[]]$difference_matches = @($DifferenceUserReport | Where-Object { ($_.domain -ceq $Domain) -and ($_.privilege -ceq $privilege) })
+            If (($reference_matches.Count -ne 1) -or ($difference_matches.Count -ne 1)) {
+                Throw "Measure-AutomateNOWSecUserPermission returned an incomplete FullReport for [$privilege] in [$Domain]. The comparison was stopped rather than treating missing data as denied access."
+            }
+            $reference_base_permissions[$privilege] = $reference_matches[0]
+            $difference_base_permissions[$privilege] = $difference_matches[0]
         }
         [string]$instance = $anow_session.instance
-        [hashtable]$reference_user_parameters = @{}
-        [hashtable]$difference_user_parameters = @{}
-        $reference_user_parameters.Add('User', $ReferenceUser)
-        $difference_user_parameters.Add('User', $DifferenceUser)
-        $reference_user_parameters.Add('Domain', $Domain)
-        $difference_user_parameters.Add('Domain', $Domain)
-        If ($IncludeUndocumented -eq $true) {
-            $reference_user_parameters.Add('IncludeUndocumented', $true)
-            $difference_user_parameters.Add('IncludeUndocumented', $true)
-        }
-        [PSCustomObject[]]$ReferenceUserReport = Measure-AutomateNOWSecUserPermission @reference_user_parameters
-        [PSCustomObject[]]$DifferenceUserReport = Measure-AutomateNOWSecUserPermission @difference_user_parameters
-        [hashtable]$parameters = @{}
-        [string[]]$ReferenceUserReport_privilege = $ReferenceUserReport | Where-Object { ($_.privilege -notmatch 'Tags$') -and ($_.domain -eq $Domain) } | Select-Object -ExpandProperty privilege
-        [string[]]$DifferenceUserReport_privilege = $DifferenceUserReport | Where-Object { ($_.privilege -notmatch 'Tags$') -and ($_.domain -eq $Domain) } | Select-Object -ExpandProperty privilege
-        $parameters.Add('ReferenceObject', $ReferenceUserReport_privilege)
-        $parameters.Add('DifferenceObject', $DifferenceUserReport_privilege)
-        If ($ExcludeDifferent -eq $true) {
-            $parameters.Add('ExcludeDifferent', $true)
-        }
-        ElseIf ($IncludeEqual -eq $true) {
-            $parameters.Add('IncludeEqual', $true)
-        }
-        $Error.Clear()
-        Try {
-            [PSCustomObject]$comparison = Compare-Object @parameters
-        }
-        Catch {
-            [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Compare-Object (under Compare-AutomateNOWSecUserRolePermission) failed while comparing the basic privileges of $ReferenceUser_id and $DifferenceUser_id on the $Domain domain due to [$Message]"
-            Break
-        }
-        If (($IncludeUndocumented -ne $true) -or ($IncludeEqual -eq $true)) {
-            [int32]$comparison_count = $comparison.InputObject.Count
-            If ($comparison_count -eq 0) {
-                Write-Warning -Message "There were no differences between $ReferenceUser_id and $DifferenceUser_id on the $Domain domain"
-                Break
-            }
-        }
-        [string[]]$compared_privileges = $comparison.InputObject
-        If ($compared_privileges -contains 'domainAdmin') {
-            [string[]]$compared_privileges = 'domainAdmin'
-        }
-        [PSCustomObject[]]$formatted_compared_privileges = ForEach ($privilege in $compared_privileges) {
+        [PSCustomObject[]]$formatted_compared_privileges = ForEach ($privilege in $base_privileges) {
+            [PSCustomObject]$reference_permission = $reference_base_permissions[$privilege]
+            [PSCustomObject]$difference_permission = $difference_base_permissions[$privilege]
+            [boolean]$reference_granted = $reference_permission.granted
+            [boolean]$difference_granted = $difference_permission.granted
+            [string]$reference_scope = $reference_permission.scope
+            [string]$difference_scope = $difference_permission.scope
+            [string[]]$reference_effective_tags = ConvertTo-AutomateNOWPermissionOrdinalArray -Value $reference_permission.effectiveTags
+            [string[]]$difference_effective_tags = ConvertTo-AutomateNOWPermissionOrdinalArray -Value $difference_permission.effectiveTags
+            [string[]]$reference_secRole = ConvertTo-AutomateNOWPermissionOrdinalArray -Value $reference_permission.secRole
+            [string[]]$difference_secRole = ConvertTo-AutomateNOWPermissionOrdinalArray -Value $difference_permission.secRole
+            [string[]]$reference_unrestricted_secRole = ConvertTo-AutomateNOWPermissionOrdinalArray -Value $reference_permission.unrestrictedSecRole
+            [string[]]$difference_unrestricted_secRole = ConvertTo-AutomateNOWPermissionOrdinalArray -Value $difference_permission.unrestrictedSecRole
+            [string[]]$reference_tag_secRole = ConvertTo-AutomateNOWPermissionOrdinalArray -Value $reference_permission.tagSecRole
+            [string[]]$difference_tag_secRole = ConvertTo-AutomateNOWPermissionOrdinalArray -Value $difference_permission.tagSecRole
+            [string[]]$reference_domain_admin_secRole = ConvertTo-AutomateNOWPermissionOrdinalArray -Value $reference_permission.domainAdminSecRole
+            [string[]]$difference_domain_admin_secRole = ConvertTo-AutomateNOWPermissionOrdinalArray -Value $difference_permission.domainAdminSecRole
             If ($Basic -eq $true) {
-                [PSCustomObject]$comparison_object = $comparison | Where-Object { $_.InputObject -eq $privilege }
+                [string]$comparison_mode = 'Basic'
+                [boolean]$is_equal = $reference_granted -eq $difference_granted
             }
             Else {
-
+                [string]$comparison_mode = 'EffectiveScope'
+                If (($reference_scope -cnotin @('Denied', 'Unrestricted', 'TagRestricted')) -or ($difference_scope -cnotin @('Denied', 'Unrestricted', 'TagRestricted'))) {
+                    Throw "Measure-AutomateNOWSecUserPermission did not provide a valid effective scope for [$privilege] in [$Domain]."
+                }
+                [boolean]$tags_equal = $reference_effective_tags.Count -eq $difference_effective_tags.Count
+                If ($tags_equal -eq $true) {
+                    For ($index = 0; $index -lt $reference_effective_tags.Count; $index++) {
+                        If ($reference_effective_tags[$index] -cne $difference_effective_tags[$index]) {
+                            $tags_equal = $false
+                            Break
+                        }
+                    }
+                }
+                [boolean]$is_equal = ($reference_scope -ceq $difference_scope) -and (($reference_scope -cne 'TagRestricted') -or $tags_equal)
             }
-            [string]$privilege_comparison_arrow = $comparison_object.SideIndicator
-            If ($privilege_comparison_arrow.Length -eq 0) {
-                Write-Warning -Message "Compare-AutomateNOWSecUserPermission consumed an invalid comparison object while comparing $ReferenceUser_id and $DifferenceUser_id under Compare-AutomateNOWSecUserPermission on the $Domain domain."
-                Break
+            If (($ExcludeDifferent -eq $true) -and ($is_equal -ne $true)) {
+                Continue
+            }
+            If (($IncludeEqual -ne $true) -and ($ExcludeDifferent -ne $true) -and ($is_equal -eq $true)) {
+                Continue
             }
             [string]$privilege_description = $privilege_lookup_table.$privilege
             If ($privilege_description.Length -eq 0) {
-                Write-Warning -Message "A privilege ($privilege) doesn't have a description. Something is wrong while comparing $ReferenceUser_id and $DifferenceUser_id under Compare-AutomateNOWSecUserPermission on the $Domain domain."
-                Break
+                Throw "A description could not be found for [$privilege] while comparing permissions."
             }
-            $extracted_granted_to_permission = $null
-            $extracted_compared_to_permission = $null
-            If ($privilege_comparison_arrow -eq '<=') {
+            If ($reference_granted -eq $true -and $difference_granted -eq $false) {
                 [string]$granted_to = $ReferenceUser_id
                 [string]$compared_to = $DifferenceUser_id
-                [PSCustomObject]$extracted_granted_to_permission = $ReferenceUserReport | Where-Object { ($_.privilege -eq $privilege) -and ($_.domain -eq $Domain) }
-                If ($extracted_granted_to_permission.privilege.Length -eq 0 -and $extracted_granted_to_permission.privilege -notmatch 'Tags$') {
-                    Write-Warning -Message "It was not possible to trace the origin of a granular permission ($privilege) (on a left-arrow comparison) from the Reference User Report for $ReferenceUser_id."
-                    Break
-                }
-                [PSCustomObject]$extracted_compared_to_permission = $DifferenceUserReport | Where-Object { ($_.privilege -eq $privilege) -and ($_.domain -eq $Domain) }
+                [string[]]$granted_to_secRole = $reference_secRole
+                [string[]]$compared_to_secRole = $difference_secRole
             }
-            ElseIf ($privilege_comparison_arrow -eq '=>') {
+            ElseIf ($reference_granted -eq $false -and $difference_granted -eq $true) {
                 [string]$granted_to = $DifferenceUser_id
                 [string]$compared_to = $ReferenceUser_id
-                [PSCustomObject]$extracted_granted_to_permission = $DifferenceUserReport | Where-Object { ($_.privilege -eq $privilege) -and ($_.domain -eq $Domain) }
-                If ($extracted_granted_to_permission.privilege.Length -eq 0 -and $extracted_granted_to_permission.privilege -notmatch 'Tags$') {
-                    Write-Warning -Message "It was not possible to trace the origin of a granular permission ($privilege) (on a right-arrow comparison) from the Difference User Report for $DifferenceUser_id."
-                    Break
-                }
-                [PSCustomObject]$extracted_compared_to_permission = $ReferenceUserReport | Where-Object { ($_.privilege -eq $privilege) -and ($_.domain -eq $Domain) }
+                [string[]]$granted_to_secRole = $difference_secRole
+                [string[]]$compared_to_secRole = $reference_secRole
             }
-            ElseIf ($privilege_comparison_arrow -eq '==') {
-                [string]$granted_to = 'Both'
-                [string]$compared_to = 'Both'
+            ElseIf ($reference_granted -eq $true) {
                 [string]$granted_to = $ReferenceUser_id
                 [string]$compared_to = $DifferenceUser_id
-                [PSCustomObject]$extracted_granted_to_permission = $ReferenceUserReport | Where-Object { ($_.privilege -eq $privilege) -and ($_.domain -eq $Domain) }
-                If ($extracted_granted_to_permission.privilege.Length -eq 0 -and $extracted_granted_to_permission.privilege -notmatch 'Tags$') {
-                    Write-Warning -Message "It was not possible to trace the origin of a granular permission ($privilege) (on an equal comparison) from the Reference User Report for $ReferenceUser_id."
-                    Break
-                }
-                [PSCustomObject]$extracted_compared_to_permission = $DifferenceUserReport | Where-Object { ($_.privilege -eq $privilege) -and ($_.domain -eq $Domain) }
-                If ($extracted_compared_to_permission.privilege.Length -eq 0 -and $extracted_compared_to_permission.privilege -notmatch 'Tags$') {
-                    Write-Warning -Message "It was not possible to trace the origin of a granular permission ($privilege) (on an equal comparison) from the Difference User Report for $DifferenceUser_id."
-                    Break
-                }
+                [string[]]$granted_to_secRole = $reference_secRole
+                [string[]]$compared_to_secRole = $difference_secRole
             }
             Else {
-                Write-Warning -Message "It was not possible to determine the direction of the comparison arrow while comparing $ReferenceUser_id and $DifferenceUser_id under Compare-AutomateNOWSecUserPermission on the $Domain domain."
-                Break
+                [string]$granted_to = 'Neither'
+                [string]$compared_to = 'Neither'
+                [string[]]$granted_to_secRole = @()
+                [string[]]$compared_to_secRole = @()
             }
-            [string[]]$granted_to_secRole = $extracted_granted_to_permission.secRole
-            [string[]]$compared_to_secRole = $extracted_compared_to_permission.secRole
-            [PSCustomObject]@{ 'granted_to' = $granted_to; 'privilege' = $privilege; 'description' = $privilege_description; 'granted_to_secRole' = $granted_to_secRole; 'domain' = $Domain; 'instance' = $instance; 'compared_to' = $compared_to; 'compared_to_secRole' = $compared_to_secRole; }
+            [PSCustomObject][ordered]@{
+                'granted_to'                    = $granted_to
+                'privilege'                     = $privilege
+                'description'                   = $privilege_description
+                'granted_to_secRole'            = $granted_to_secRole
+                'domain'                        = $Domain
+                'instance'                      = $instance
+                'compared_to'                   = $compared_to
+                'compared_to_secRole'           = $compared_to_secRole
+                'comparisonMode'                = $comparison_mode
+                'isEqual'                       = $is_equal
+                'referenceUser'                 = $ReferenceUser_id
+                'differenceUser'                = $DifferenceUser_id
+                'referenceGranted'              = $reference_granted
+                'differenceGranted'             = $difference_granted
+                'referenceScope'                = $reference_scope
+                'differenceScope'               = $difference_scope
+                'referenceEffectiveTags'        = $reference_effective_tags
+                'differenceEffectiveTags'       = $difference_effective_tags
+                'referenceSecRole'              = $reference_secRole
+                'differenceSecRole'             = $difference_secRole
+                'referenceUnrestrictedSecRole'  = $reference_unrestricted_secRole
+                'differenceUnrestrictedSecRole' = $difference_unrestricted_secRole
+                'referenceTagSecRole'           = $reference_tag_secRole
+                'differenceTagSecRole'          = $difference_tag_secRole
+                'referenceDomainAdminSecRole'   = $reference_domain_admin_secRole
+                'differenceDomainAdminSecRole'  = $difference_domain_admin_secRole
+            }
         }
         Return $formatted_compared_privileges
     }
@@ -73595,19 +74526,33 @@ Function Compare-AutomateNOWSecUserPermission {
 Function Resolve-AutomateNOWSecUserPermission {
     <#
     .SYNOPSIS
-    Resolves (explains) the granular permission objects provided from Compare-AutomateNOWSecUserPermission or Measure-AutomateNOWSecUserPermission in human readable format.
+    Resolves effective granular permission records into human-readable strings.
 
     .DESCRIPTION
-    Resolves (explains) the granular permission objects provided from Compare-AutomateNOWSecUserPermission or Measure-AutomateNOWSecUserPermission in human readable format.
+    Resolves authoritative base-permission records from
+    Measure-AutomateNOWSecUserPermission or
+    Compare-AutomateNOWSecUserPermission into human-readable strings.
+
+    Measure base rows use Scope, EffectiveTags, and role provenance directly.
+    Companion *Tags rows are compatibility/provenance evidence rather than
+    independent grants and are skipped. This command never searches another
+    record for a privilege's tag values, so permissions from different domains
+    cannot affect each other's explanation.
+
+    Current Compare output provides paired Reference*/Difference* fields. They
+    are used as the authoritative comparison state. Older directional Compare
+    records are accepted as a Boolean-only compatibility fallback.
 
     .PARAMETER Permission
-    Mandatory [PSCustomObject] object array from Compare-AutomateNOWSecUserPermission
+    A base permission object from Measure-AutomateNOWSecUserPermission or a
+    comparison object from Compare-AutomateNOWSecUserPermission. Direct input
+    and pipeline input behave identically.
 
     .INPUTS
     ONLY objects from Compare-AutomateNOWSecUserPermission or Measure-AutomateNOWSecUserPermission are accepted (including to the pipeline)
 
     .OUTPUTS
-    The results are written to the host.
+    [string] explanation records.
 
     .EXAMPLE
     Explains the privileges to the currently logged-in user.
@@ -73615,239 +74560,219 @@ Function Resolve-AutomateNOWSecUserPermission {
     Measure-AutomateNOWSecUserPermission -Me -FullReport | Resolve-AutomateNOWSecUserPermission
 
     .EXAMPLE
-    Explains both the different and same permissions between between two users ('USER1' and 'USER2') on the 'Domain1' domain (multi-line format)
+    Explains both the different and same permissions between two users
+    ('USER1' and 'USER2') on the 'Domain1' domain.
 
     $user1 = Get-AutomateNOWSecUser -id 'USER1'
     $user2 = Get-AutomateNOWSecUser -id 'USER2'
     Compare-AutomateNOWSecUserPermission -ReferenceUser $user1 -DifferenceUser $user2 -Domain 'Domain1' -Basic -IncludeEqual | Resolve-AutomateNOWSecUserPermission
 
     .EXAMPLE
-    Explains only the different permissions between between two users ('USER1' and 'USER2') on the 'Domain1' domain (one-liner)
+    Explains only the different permissions between two users ('USER1' and
+    'USER2') on the 'Domain1' domain.
 
     Compare-AutomateNOWSecUserPermission -ReferenceUser (Get-AutomateNOWSecUser -Id 'USER1') -DifferenceUser (Get-AutomateNOWSecUser -Id 'USER2') -Domain 'Domain1' -Basic | Resolve-AutomateNOWSecUserPermission
 
     .EXAMPLE
-    Explains only the same permissions between between two users ('USER1' and 'USER2') on the 'Domain1' domain (one-liner)
+    Explains only the same permissions between two users ('USER1' and 'USER2')
+    on the 'Domain1' domain.
 
-    Compare-AutomateNOWSecUserPermission -ReferenceUser (Get-AutomateNOWSecUser -Id 'USER1') -DifferenceUser (Get-AutomateNOWSecUser -Id 'USER2') -Domain 'Domain1' -Basic -ExcludeDifferences | Resolve-AutomateNOWSecUserPermission
+    Compare-AutomateNOWSecUserPermission -ReferenceUser (Get-AutomateNOWSecUser -Id 'USER1') -DifferenceUser (Get-AutomateNOWSecUser -Id 'USER2') -Domain 'Domain1' -Basic -ExcludeDifferent | Resolve-AutomateNOWSecUserPermission
 
     .NOTES
-    This function requires output from Compare-AutomateNOWSecUserPermission in basic mode. Basic mode means that there is no consideration of tags. Only a true/false for each permission is performed regardless if the permission was granted through a tag assignment or not. To get the full details, use Export-AutomateNOWSecurityPermission and compare with a text editing tool. Advanced mode will be added in the future.
-
-    Known Issues: If a privilege exists on a given domain from multiple domain roles and is restricted by tags even once then the privilege will show as restricted by tags. This needs to be improved.
-
-    This function is very much experimental and a work in progress. Use the results with caution.
+    -EffectiveScope comparison output explains effective scope and tag values.
+    -Basic comparison output still includes the paired effective fields, but its
+    equality decision is Boolean-only. Use the Compare output itself when a
+    structured report is needed.
 
     #>
-    [OutputType([PSCustomObject[]])]
+    [OutputType([string[]])]
     [CmdletBinding()]
     Param(
-        [Parameter(Mandatory = $true, ValueFromPipeline = $true, ParameterSetName = 'Compare')]
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [PSCustomObject]$Permission
     )
     Begin {
-        [PSCustomObject[]]$ComparePermissions = @()
-        [PSCustomObject[]]$MyPermissions = @()
+        function ConvertTo-AutomateNOWPermissionOrdinalArray {
+            [OutputType([string[]])]
+            Param(
+                [object[]]$Value
+            )
+            [System.Collections.Generic.HashSet[string]]$unique_values = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+            ForEach ($item in @($Value)) {
+                If (($null -ne $item) -and ([string]::IsNullOrEmpty([string]$item) -ne $true)) {
+                    [void]$unique_values.Add([string]$item)
+                }
+            }
+            [string[]]$normalized_values = @($unique_values)
+            [System.Array]::Sort($normalized_values, [System.StringComparer]::Ordinal)
+            Return $normalized_values
+        }
+        function Format-AutomateNOWPermissionList {
+            [OutputType([string])]
+            Param(
+                [object[]]$Value
+            )
+            [string[]]$normalized_values = ConvertTo-AutomateNOWPermissionOrdinalArray -Value $Value
+            If ($normalized_values.Count -eq 0) {
+                Return ''
+            }
+            [string[]]$quoted_values = $normalized_values | ForEach-Object { "'$_'" }
+            Return ($quoted_values -join ', ')
+        }
+        function Format-AutomateNOWPermissionRoleProvenance {
+            [OutputType([string])]
+            Param(
+                [object[]]$SecRole,
+                [object[]]$DomainAdminSecRole
+            )
+            [string[]]$roles = ConvertTo-AutomateNOWPermissionOrdinalArray -Value $SecRole
+            [string[]]$domain_admin_roles = ConvertTo-AutomateNOWPermissionOrdinalArray -Value $DomainAdminSecRole
+            If ($roles.Count -eq 0) {
+                Return ''
+            }
+            [string]$role_display = Format-AutomateNOWPermissionList -Value $roles
+            If ($roles.Count -eq 1) {
+                [string]$role_word = 'role'
+            }
+            Else {
+                [string]$role_word = 'roles'
+            }
+            [string]$provenance = " granted by security $role_word $role_display"
+            If ($domain_admin_roles.Count -gt 0) {
+                [string]$domain_admin_display = Format-AutomateNOWPermissionList -Value $domain_admin_roles
+                If ($domain_admin_roles.Count -eq 1) {
+                    [string]$domain_admin_role_word = 'role'
+                }
+                Else {
+                    [string]$domain_admin_role_word = 'roles'
+                }
+                $provenance += " (including domain-admin $domain_admin_role_word $domain_admin_display)"
+            }
+            Return $provenance
+        }
+        function Format-AutomateNOWPermissionScope {
+            [OutputType([string])]
+            Param(
+                [string]$Scope,
+                [object[]]$EffectiveTags,
+                [object[]]$SecRole,
+                [object[]]$UnrestrictedSecRole,
+                [object[]]$TagSecRole,
+                [object[]]$DomainAdminSecRole
+            )
+            If ($Scope -ceq 'Denied') {
+                Return 'no effective access'
+            }
+            If ($Scope -ceq 'Unrestricted') {
+                [string[]]$unrestricted_roles = ConvertTo-AutomateNOWPermissionOrdinalArray -Value $UnrestrictedSecRole
+                If ($unrestricted_roles.Count -eq 0) {
+                    $unrestricted_roles = ConvertTo-AutomateNOWPermissionOrdinalArray -Value $SecRole
+                }
+                [string]$role_provenance = Format-AutomateNOWPermissionRoleProvenance -SecRole $unrestricted_roles -DomainAdminSecRole $DomainAdminSecRole
+                Return "Unrestricted access$role_provenance"
+            }
+            If ($Scope -ceq 'TagRestricted') {
+                [string]$tag_display = Format-AutomateNOWPermissionList -Value $EffectiveTags
+                If ($tag_display.Length -eq 0) {
+                    $tag_display = 'no reported effective tags'
+                }
+                [string[]]$tag_roles = ConvertTo-AutomateNOWPermissionOrdinalArray -Value $TagSecRole
+                If ($tag_roles.Count -eq 0) {
+                    $tag_roles = ConvertTo-AutomateNOWPermissionOrdinalArray -Value $SecRole
+                }
+                [string]$role_provenance = Format-AutomateNOWPermissionRoleProvenance -SecRole $tag_roles -DomainAdminSecRole $DomainAdminSecRole
+                Return "TagRestricted access to $tag_display$role_provenance"
+            }
+            [string]$role_provenance = Format-AutomateNOWPermissionRoleProvenance -SecRole $SecRole -DomainAdminSecRole $DomainAdminSecRole
+            Return "an unrecognized effective scope [$Scope]$role_provenance"
+        }
     }
     Process {
-        If ($_.granted_to.Length -gt 0) {
-            [PSCustomObject]$Permission = $_
+        [PSCustomObject]$current_permission = $Permission
+        [string]$privilege = $current_permission.privilege
+        If ($privilege -cmatch 'Tags$') {
+            Write-Verbose -Message "Skipping the [$privilege] companion tag-evidence row. Resolve-AutomateNOWSecUserPermission explains only authoritative base-permission rows."
         }
-        ElseIf ($_.user_name.Length -gt 0) {
-            [PSCustomObject]$Permission = $_
+        ElseIf (($null -ne $current_permission.PSObject.Properties['referenceUser']) -and ($null -ne $current_permission.PSObject.Properties['differenceUser']) -and ($null -ne $current_permission.PSObject.Properties['referenceGranted']) -and ($null -ne $current_permission.PSObject.Properties['differenceGranted'])) {
+            [string]$reference_user = $current_permission.referenceUser
+            [string]$difference_user = $current_permission.differenceUser
+            [string]$description = $current_permission.description
+            [string]$domain = $current_permission.domain
+            [boolean]$reference_granted = $current_permission.referenceGranted
+            [boolean]$difference_granted = $current_permission.differenceGranted
+            [string]$reference_scope = $current_permission.referenceScope
+            [string]$difference_scope = $current_permission.differenceScope
+            If (($reference_user.Length -eq 0) -or ($difference_user.Length -eq 0) -or ($privilege.Length -eq 0) -or ($domain.Length -eq 0)) {
+                Write-Warning -Message 'The supplied comparison record is missing a user, privilege, or domain and could not be resolved.'
+            }
+            Else {
+                [string]$reference_access = Format-AutomateNOWPermissionScope -Scope $reference_scope -EffectiveTags $current_permission.referenceEffectiveTags -SecRole $current_permission.referenceSecRole -UnrestrictedSecRole $current_permission.referenceUnrestrictedSecRole -TagSecRole $current_permission.referenceTagSecRole -DomainAdminSecRole $current_permission.referenceDomainAdminSecRole
+                [string]$difference_access = Format-AutomateNOWPermissionScope -Scope $difference_scope -EffectiveTags $current_permission.differenceEffectiveTags -SecRole $current_permission.differenceSecRole -UnrestrictedSecRole $current_permission.differenceUnrestrictedSecRole -TagSecRole $current_permission.differenceTagSecRole -DomainAdminSecRole $current_permission.differenceDomainAdminSecRole
+                If ($description.Length -eq 0) {
+                    $description = 'no description available'
+                }
+                If (($reference_granted -eq $true) -and ($difference_granted -eq $true)) {
+                    "Both '$reference_user' and '$difference_user' have the [$privilege] ($description) privilege on the '$domain' domain. '${reference_user}': $reference_access. '${difference_user}': $difference_access."
+                }
+                ElseIf ($reference_granted -eq $true) {
+                    "'$reference_user' has the [$privilege] ($description) privilege on the '$domain' domain with $reference_access. '$difference_user' does not have this privilege."
+                }
+                ElseIf ($difference_granted -eq $true) {
+                    "'$difference_user' has the [$privilege] ($description) privilege on the '$domain' domain with $difference_access. '$reference_user' does not have this privilege."
+                }
+                Else {
+                    "Neither '$reference_user' nor '$difference_user' has the [$privilege] ($description) privilege on the '$domain' domain."
+                }
+            }
         }
-        If (($_.granted_to.Length -gt 0) -and ($_.compared_to.Length -gt 0) -and ($_.instance.Length -gt 0) -and ($_.privilege.Length -gt 0)) {
-            [PSCustomObject[]]$ComparePermissions += $Permission
+        ElseIf (($null -ne $current_permission.PSObject.Properties['user_name']) -and ($null -ne $current_permission.PSObject.Properties['granted']) -and ($null -ne $current_permission.PSObject.Properties['domain'])) {
+            [string]$user_name = $current_permission.user_name
+            [string]$description = $current_permission.description
+            [string]$domain = $current_permission.domain
+            [boolean]$granted = $current_permission.granted
+            If (($user_name.Length -eq 0) -or ($privilege.Length -eq 0) -or ($domain.Length -eq 0)) {
+                Write-Warning -Message 'The supplied Measure record is missing a user, privilege, or domain and could not be resolved.'
+            }
+            Else {
+                If ($description.Length -eq 0) {
+                    $description = 'no description available'
+                }
+                If ($null -ne $current_permission.PSObject.Properties['scope']) {
+                    [string]$scope = $current_permission.scope
+                }
+                ElseIf ($granted -eq $true) {
+                    [string]$scope = 'Unrestricted'
+                }
+                Else {
+                    [string]$scope = 'Denied'
+                }
+                [string]$access = Format-AutomateNOWPermissionScope -Scope $scope -EffectiveTags $current_permission.effectiveTags -SecRole $current_permission.secRole -UnrestrictedSecRole $current_permission.unrestrictedSecRole -TagSecRole $current_permission.tagSecRole -DomainAdminSecRole $current_permission.domainAdminSecRole
+                If ($granted -eq $true) {
+                    "'$user_name' has the [$privilege] ($description) privilege on the '$domain' domain with $access."
+                }
+                Else {
+                    "'$user_name' does not have the [$privilege] ($description) privilege on the '$domain' domain."
+                }
+            }
         }
-        ElseIf (($_.user_name.Length -gt 0) -and ($_.granted -is [boolean]) -and ($_.instance.Length -gt 0) -and ($_.privilege.Length -gt 0)) {
-            [PSCustomObject[]]$MyPermissions += $Permission
+        ElseIf (($null -ne $current_permission.PSObject.Properties['granted_to']) -and ($null -ne $current_permission.PSObject.Properties['compared_to']) -and ($null -ne $current_permission.PSObject.Properties['domain'])) {
+            [string]$granted_to = $current_permission.granted_to
+            [string]$compared_to = $current_permission.compared_to
+            [string]$description = $current_permission.description
+            [string]$domain = $current_permission.domain
+            If (($granted_to.Length -eq 0) -or ($compared_to.Length -eq 0) -or ($privilege.Length -eq 0) -or ($domain.Length -eq 0) -or ($granted_to -ceq 'Neither') -or ($compared_to -ceq 'Neither')) {
+                Write-Warning -Message 'The supplied legacy comparison record does not contain enough directional user information to be resolved.'
+            }
+            Else {
+                If ($description.Length -eq 0) {
+                    $description = 'no description available'
+                }
+                "'$granted_to' has the [$privilege] ($description) privilege on the '$domain' domain. '$compared_to' does not have this privilege. This legacy comparison record does not contain effective-scope details."
+            }
         }
         Else {
-            Write-Warning -Message "It was not possible to determine the object that was sent to Resolve-AutomateNOWSecUserPermission"
-            Break
-        }
-    }
-    End {
-        If ($ComparePermissions.Count -gt 0) {
-            [string[]]$unique_user_names = (@($ComparePermissions.granted_to) + @($ComparePermissions.compared_to)) | Sort-Object -Unique
-            [string]$User1 = $unique_user_names | Select-Object -First 1 -Skip 0
-            [string]$User2 = $unique_user_names | Select-Object -First 1 -Skip 1
-            If (($User1.Length -eq 0) -or ($User2.Length -eq 0)) {
-                Write-Warning -Message "The unique user names from the combined permission comparison list couldn't be derived"
-                Break
-            }
-            [PSCustomObject]$ResolvedPermissionsGraph = ForEach ($ComparePermission in $ComparePermissions) {
-                $granted_to = $null
-                $compared_to = $null
-                $privilege = $null
-                $description = $null
-                $tags = $null
-                $granted_to_secRole = $null
-                $compared_to_secRole = $null
-                $Domain = $null
-                $instance = $null
-                [string]$granted_to = $ComparePermission.granted_to
-                [string]$compared_to = $ComparePermission.compared_to
-                [string]$privilege = $ComparePermission.privilege
-                [string]$description = $ComparePermission.description
-                [string[]]$tags = $ComparePermission.tags
-                [string[]]$granted_to_secRole = $ComparePermission.granted_to_secRole
-                [string[]]$compared_to_secRole = $ComparePermission.compared_to_secRole
-                [string]$Domain = $ComparePermission.domain
-                [string]$instance = $ComparePermission.instance
-                If ($privilege -notmatch 'Tags$') {
-                    # "restricted" in this sense means that the permission exists for both users being compared, but only 1 of them is restricted by a tag assignment(s).
-                    [boolean]$restricted_permission = $false
-                }
-                Else {
-                    [boolean]$restricted_permission = $true
-                }
-                If ($compared_to_secRole.count -eq 0) {
-                    If ($restricted_permission -eq $false) {
-                        If ($granted_to -eq $User1) {
-                            [string]$User1_value = $true
-                            [string]$User2_value = $false
-                        }
-                        ElseIf ($compared_to -eq $User1) {
-                            [string]$User1_value = $false
-                            [string]$User2_value = $true
-                        }
-                        [PSCustomObject]@{$User1 = $User1_value; $User2 = $User2_value; 'Privilege' = $privilege; 'Description' = $description; 'Tags' = $tags; 'Domain' = $Domain; 'granted_to_secRole' = $granted_to_secRole; 'compared_to_secRole' = $compared_to_secRole; 'instance' = $instance; 'granted_to_user' = $granted_to; 'compared_to_user' = $compared_to; }
-                    }
-                    Else {
-                        [PSCustomObject]@{$User1 = $User1_value; $User2 = $User2_value; 'Privilege' = $privilege; 'Description' = $description; 'Tags' = $tags; 'Domain' = $Domain; 'granted_to_secRole' = $granted_to_secRole; 'compared_to_secRole' = $compared_to_secRole; 'instance' = $instance; 'granted_to_user' = $granted_to; 'compared_to_user' = $compared_to; }
-                    }
-                }
-                Else {
-                    If ($restricted_permission -eq $false) {
-                        [PSCustomObject]@{$User1 = $True; $User2 = $True; 'Privilege' = $privilege; 'Description' = $description; 'Tags' = $tags; 'Domain' = $Domain; 'granted_to_secRole' = $granted_to_secRole; 'compared_to_secRole' = $compared_to_secRole; 'instance' = $instance; 'granted_to_user' = $granted_to; 'compared_to_user' = $compared_to; }
-                    }
-                    Else {
-                        [PSCustomObject]@{$User1 = $True; $User2 = $True; 'Privilege' = $privilege; 'Description' = $description; 'Tags' = $tags; 'Domain' = $Domain; 'granted_to_secRole' = $granted_to_secRole; 'compared_to_secRole' = $compared_to_secRole; 'instance' = $instance; 'granted_to_user' = $granted_to; 'compared_to_user' = $compared_to; }
-                    }
-                }
-            }
-            [string[]]$ResolvedPermissionReport = @()
-            [string[]]$ResolvedPermissionReport = ForEach ($ResolvedPermission in $ResolvedPermissionsGraph) {
-                $explanation = $null
-                $granted_to_user1 = $null
-                $granted_to_user2 = $null
-                $privilege = $null
-                $description = $null
-                $granted_to_secRole_display = $null
-                $compared_to_secRole_display = $null
-                [string]$privilege = $ResolvedPermission.privilege
-                [string]$description = $ResolvedPermission.description
-                If ($ResolvedPermission.$User1 -eq $true) {
-                    [string]$granted_to_user1 = $User1
-                }
-                If ($ResolvedPermission.$User2 -eq $true) {
-                    [string]$granted_to_user2 = $User2
-                }
-                If ($ResolvedPermission.granted_to_secRole.count -gt 0) {
-                    If ($ResolvedPermission.granted_to_secRole.count -eq 1) {
-                        [string]$granted_to_secRole_display = $ResolvedPermission.granted_to_secRole
-                        [string]$granted_to_security_role_word = 'role'
-                    }
-                    Else {
-                        [string]$granted_to_secRole_display = $ResolvedPermission.granted_to_secRole -join ', '
-                        [string]$granted_to_security_role_word = 'roles'
-                    }
-                }
-                If ($ResolvedPermission.compared_to_secRole.count -gt 0) {
-                    If ($ResolvedPermission.compared_to_secRole.count -eq 1) {
-                        [string]$compared_to_secRole_display = $ResolvedPermission.compared_to_secRole
-                        [string]$compared_to_security_role_word = 'role'
-                    }
-                    Else {
-                        [string]$compared_to_secRole_display = $ResolvedPermission.compared_to_secRole -join ', '
-                        [string]$compared_to_security_role_word = 'roles'
-                    }
-                }
-                If ($granted_to_user1 -eq $User1 -and $granted_to_user2 -eq $User2) {
-                    [string]$granted_to_user = $ResolvedPermission.granted_to_user
-                    If ($granted_to_user -eq $User1) {
-                        [string]$explanation = "Both '$User1' and '$User2' have the [$privilege] ($description) privilege on the '$Domain' domain. '$User1' was granted by the '$granted_to_secRole_display' $granted_to_security_role_word while '$User2' was granted by the '$compared_to_secRole_display' $compared_to_security_role_word."
-                    }
-                    Else {
-                        [string]$explanation = "Both '$User1' and '$User2' have the [$privilege] ($description) privilege on the '$Domain' domain. '$User2' was granted by the '$granted_to_secRole_display' $granted_to_security_role_word while '$User1' was granted by the '$compared_to_secRole_display' $compared_to_security_role_word."
-                    }
-                }
-                ElseIf ($granted_to_user1 -eq $User1) {
-                    [string]$explanation = "'$User1' has the [$privilege] ($description) privilege on the '$Domain' domain granted by the '$granted_to_secRole_display' $granted_to_security_role_word. '$User2' does not have this privilege."
-                }
-                ElseIf ($granted_to_user2 -eq $User2) {
-                    [string]$explanation = "'$User2' has the [$privilege] ($description) privilege on the '$Domain' domain granted by the '$granted_to_secRole_display' $granted_to_security_role_word. '$User1' does not have this privilege."
-                }
-                Else {
-                    Write-Warning -Message "It was not possible to determine to whom the '$privilege' privilege was granted to under Resolve-AutomateNOWSecurityPermission"
-                    Break
-                }
-                $explanation
-            }
-            If ($ResolvedPermissionReport.Count -gt 0) {
-                Return $ResolvedPermissionReport
-            }
-            Else {
-                Write-Verbose -Message "There were no resolved permissions to explain"
-            }
-        }
-        ElseIf ($MyPermissions.Count -gt 0) {
-            [PSCustomObject[]]$MyPermissionsWithoutTags = $MyPermissions | Where-Object { $_.privilege -notmatch 'Tags$' }
-            [string[]]$ResolvedPermissionReport = ForEach ($Permission in $MyPermissionsWithoutTags) {
-                [string]$secRole_display = 'not set'
-                [string]$security_role_word = 'not set'
-                [string]$tag_display = 'not set'
-                [string]$tag_word = 'not set'
-                [string]$privilege = 'not set'
-                [string]$description = 'not set'
-                [string]$explanation = 'not set'
-                [string]$Domain = 'not set'
-                [string]$privilege = $Permission.privilege
-                [string]$description = $Permission.description
-                [string]$Domain = $Permission.domain
-                [boolean]$granted = $false
-                [boolean]$granted = $Permission.granted
-                If ($granted -eq $true) {
-                    If ($Permission.secRole.count -gt 0) {
-                        If ($Permission.secRole.count -eq 1) {
-                            [string]$secRole_display = $Permission.secRole
-                            [string]$security_role_word = 'role'
-                        }
-                        Else {
-                            [string]$secRole_display = $Permission.secRole -join ', '
-                            [string]$security_role_word = 'roles'
-                        }
-                    }
-                    [string]$PermissionNameWithTags = ($Permission.privilege + 'Tags')
-                    [PSCustomObject]$PermissionWithTags = ($MyPermissions | Where-Object { $_.privilege -eq $PermissionNameWithTags }) | Select-Object -First 1
-                    If ($PermissionWithTags.tags.Count -gt 0) {
-                        If ($PermissionWithTags.tags.Count -eq 1) {
-                            [string]$tag_display = $PermissionWithTags.tags
-                            [string]$tag_word = 'tag'
-                        }
-                        Else {
-                            [string]$tag_display = $PermissionWithTags.tags -join ', '
-                            [string]$tag_word = 'tags'
-                        }
-                        [string]$description = $description -replace ' \(Tags\)'
-                        [string]$explanation = "You have the [$privilege] ($description) privilege (restricted by the '$tag_display' $tag_word) on the '$Domain' domain granted by the '$secRole_display' $security_role_word"
-                    }
-                    Else {
-                        [string]$explanation = "You have the [$privilege] ($description) privilege on the '$Domain' domain granted by the '$secRole_display' $security_role_word."
-                    }
-                }
-                Else {
-                    [string]$explanation = "You do not have the [$privilege] ($description) privilege on the '$Domain' domain."
-                }
-                $explanation
-            }
-            If ($ResolvedPermissionReport.Count -gt 0) {
-                Return $ResolvedPermissionReport
-            }
-            Else {
-                Write-Verbose -Message "There were no resolved permissions to explain"
-            }
+            Write-Warning -Message 'It was not possible to determine the permission object that was sent to Resolve-AutomateNOWSecUserPermission.'
         }
     }
 }
@@ -73950,33 +74875,43 @@ Function Read-AutomateNOWSecurityRoleUser {
     Reads the Security Role User objects within a Security Role from an AutomateNOW! instance
 
     .PARAMETER Id
-    An optional Id string representing the Security Role object to be read.
+    An Id string representing the exact Security User Role assignment record to
+    be read.
 
     .PARAMETER SecurityRole
-    An optional [ANOWSecRole] object representing the Security Role object to be read.
-
-    .PARAMETER ItemId
-    An optional Id string representing the Security User Role object to be read. Note: This is not supported by the console
+    An [ANOWSecRole] object representing the Security Role object to be read.
 
     .PARAMETER startRow
     Integer to indicate the row to start from. This is intended for when you need to paginate the results. Default is 0.
 
     .PARAMETER endRow
     Integer to indicate the row to stop on. This is intended for when you need to paginate the results. Default is 100.
+
     .INPUTS
-    ONLY [ANOWSecRole] objects are accepted (including from the pipeline)
+    An [ANOWSecRole] object or a Security Role id can be supplied to list that
+    role's assignments. An exact Security User Role assignment id can be
+    supplied through -Id.
 
     .OUTPUTS
-    [ANOWSecUserRole] objects that represent the Security User Roles will be returned.
+    [ANOWSecUserRole] objects that represent the Security User Roles will be
+    returned with hydrated user and role objects. For -Id, the role is resolved
+    from the returned assignment's role id.
 
     .EXAMPLE
     Get the first page of User Roles within a Security Role
 
-    $security_role = Get-AutomateNOWSecurityRole1 -Id 'SecurityRole1'
+    $security_role = Get-AutomateNOWSecurityRole -Id 'SecurityRole1'
     $user_roles = $security_role | Read-AutomateNOWSecurityRoleUser
+
+    .EXAMPLE
+    Read one Security User Role assignment by its exact assignment id.
+
+    Read-AutomateNOWSecurityRoleUser -Id '232bbbb0-c34e-426f-99db-b8cd8f468fd9'
 
     .NOTES
     You must use Connect-AutomateNOW to establish the token by way of global variable.
+
+    -Id addresses a Security User Role assignment, not a Security Role.
 
     #>
     [OutputType([ANOWSecUserRole[]])]
@@ -73986,8 +74921,6 @@ Function Read-AutomateNOWSecurityRoleUser {
         [string]$Id,
         [Parameter(Mandatory = $true, ParameterSetName = 'Default', ValueFromPipeline = $true)]
         [ANOWSecRole]$SecurityRole,
-        [Parameter(Mandatory = $true, ParameterSetName = 'ItemId')]
-        [string]$ItemId,
         [Parameter(Mandatory = $False)]
         [int32]$startRow = 0,
         [Parameter(Mandatory = $False)]
@@ -74010,41 +74943,35 @@ Function Read-AutomateNOWSecurityRoleUser {
         }
     }
     Process {
-        If ($_.id.Length -gt 0 -or $SecurityRole.Id.Length -gt 0) {
-            If ($_.id.Length -gt 0) {
+        [string]$SecurityRole_id = $null
+        If ($Id.Length -eq 0) {
+            If ($null -ne $_ -and $_.id.Length -gt 0) {
                 [ANOWSecRole]$SecurityRole = $_
             }
-            [string]$SecurityRole_id = $SecurityRole.Id
-        }
-        ElseIf ($_.Length -gt 0) {
-            [string]$SecurityRole_id = $_
-        }
-        ElseIf ($Id.Length -gt 0) {
-            [string]$SecurityRole_id = $Id
-        }
-        ElseIf ($ItemId.Length -gt 0) {
-            If ($ItemId -notmatch '^[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}$') {
-                Write-Warning -Message "Was expecting the Id of the destination SecurityRoleUser Id to match a 36-character GUID, instead received [$ItemId]."
+            If ($null -ne $SecurityRole -and $SecurityRole.Id.Length -gt 0) {
+                [string]$SecurityRole_id = $SecurityRole.Id
+            }
+            ElseIf ($null -ne $_ -and $_.Length -gt 0) {
+                [string]$SecurityRole_id = $_
+            }
+            Else {
+                Write-Warning -Message "Was not able to determine the Id of the Security Role under Read-AutomateNOWSecurityRoleUser."
                 Break
             }
-        }
-        Else {
-            Write-Warning -Message "Was not able to determine the Id of the Security Role under Read-AutomateNOWSecurityRoleUser."
-            Break
-        }
-        If ($null -eq $SecurityRole) {
-            $Error.Clear()
-            Try {
-                [ANOWSecRole]$SecurityRole = Get-AutomateNOWSecurityRole -Id $SecurityRole_id
-            }
-            Catch {
-                [string]$Message = $_.Exception.Message
-                Write-Warning -Message "Get-AutomateNOWSecurityRole failed to retrieve the Security Role object for [$SecurityRole_id] under Read-AutomateNOWSecurityRoleUser due to [$Message]."
-                Break
+            If ($null -eq $SecurityRole) {
+                $Error.Clear()
+                Try {
+                    [ANOWSecRole]$SecurityRole = Get-AutomateNOWSecurityRole -Id $SecurityRole_id
+                }
+                Catch {
+                    [string]$Message = $_.Exception.Message
+                    Write-Warning -Message "Get-AutomateNOWSecurityRole failed to retrieve the Security Role object for [$SecurityRole_id] under Read-AutomateNOWSecurityRoleUser due to [$Message]."
+                    Break
+                }
             }
         }
         [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
-        If ($ItemId.Length -eq 0) {
+        If ($Id.Length -eq 0) {
             $BodyMetaData.Add('_constructor', 'AdvancedCriteria')
             $BodyMetaData.Add('operator', 'and')
             $BodyMetaData.Add('criteria1', '{"fieldName":"role","operator":"equals","value":"' + $SecurityRole_id + '"}')
@@ -74054,7 +74981,7 @@ Function Read-AutomateNOWSecurityRoleUser {
             $BodyMetaData.Add('_componentId', 'SecRoleUserList')
         }
         Else {
-            $BodyMetaData.Add('id', $ItemId)
+            $BodyMetaData.Add('id', $Id)
             $BodyMetaData.Add('_operationId', 'read')
             $BodyMetaData.Add('_textMatchStyle', 'exactCase')
         }
@@ -74076,7 +75003,7 @@ Function Read-AutomateNOWSecurityRoleUser {
         }
         Catch {
             [string]$Message = $_.Exception.Message
-            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] on [$SecurityRole_id] due to [$Message]."
+            Write-Warning -Message "Invoke-AutomateNOWAPI failed to execute [$command] due to [$Message]."
             Break
         }
         [int32]$response_code = $results.response.status
@@ -74097,9 +75024,40 @@ Function Read-AutomateNOWSecurityRoleUser {
                     Write-Warning -Message "Get-AutomateNOWSecUser failed to retrieve information about $user_id under Read-AutomateNOWSecurityRoleUser due to [$Message]."
                     Break
                 }
+                [ANOWSecRole]$assignmentRole = $SecurityRole
+                If ($Id.Length -gt 0) {
+                    $roleValue = $secRoleUser.role
+                    [string]$assignmentRoleId = $null
+                    If ($roleValue -is [string]) {
+                        $assignmentRoleId = $roleValue
+                    }
+                    ElseIf ($null -ne $roleValue) {
+                        $assignmentRoleIdProperty = $roleValue.PSObject.Properties['id']
+                        If ($null -ne $assignmentRoleIdProperty) {
+                            $assignmentRoleId = [string]$assignmentRoleIdProperty.Value
+                        }
+                    }
+                    If ([string]::IsNullOrWhiteSpace($assignmentRoleId)) {
+                        Write-Warning -Message "Security User Role assignment [$($secRoleUser.id)] did not include a Security Role id and could not be hydrated."
+                        Break
+                    }
+                    $Error.Clear()
+                    Try {
+                        [ANOWSecRole]$assignmentRole = Get-AutomateNOWSecurityRole -Id $assignmentRoleId
+                    }
+                    Catch {
+                        [string]$Message = $_.Exception.Message
+                        Write-Warning -Message "Get-AutomateNOWSecurityRole failed to retrieve the Security Role object for assignment [$($secRoleUser.id)] using role id [$assignmentRoleId] under Read-AutomateNOWSecurityRoleUser due to [$Message]."
+                        Break
+                    }
+                    If ($null -eq $assignmentRole) {
+                        Write-Warning -Message "Security User Role assignment [$($secRoleUser.id)] could not hydrate Security Role [$assignmentRoleId]."
+                        Break
+                    }
+                }
                 $Error.Clear()
                 Try {
-                    $secRoleUser.role = $SecurityRole
+                    $secRoleUser.role = $assignmentRole
                     $secRoleUser.user = $user_object
                 }
                 Catch {
@@ -74119,9 +75077,7 @@ Function Read-AutomateNOWSecurityRoleUser {
                 Break
             }
             Write-Verbose -Message "User Roles successfully read from $SecurityRole_id"
-            If ($Quiet -ne $true) {
-                Return $userRoles
-            }
+            Return $userRoles
         }
         Else {
             Write-Verbose -Message "There were no User Roles within $SecurityRole_id"
@@ -74279,7 +75235,15 @@ Function Add-AutomateNOWSecurityRoleUser {
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("Add $($User_id) to $($SecurityRole_id)")) -eq $true) {
             $Error.Clear()
             Try {
-                [ANOWSecUserRole[]]$ExistingRoleUsers = Read-AutomateNOWSecurityRoleUser -SecurityRole $SecurityRole
+                [ANOWSecUserRole[]]$ExistingRoleUsers = @()
+                [int32]$startRow = 0
+                [int32]$endRow = 10000
+                Do {
+                    [ANOWSecUserRole[]]$CurrentRoleUsers = @(Read-AutomateNOWSecurityRoleUser -SecurityRole $SecurityRole -startRow $startRow -endRow $endRow)
+                    $ExistingRoleUsers += $CurrentRoleUsers
+                    $startRow = $endRow
+                    $endRow += 10000
+                } While ($CurrentRoleUsers.Count -eq 10000)
             }
             Catch {
                 [string]$Message = $_.Exception.Message
@@ -74457,7 +75421,15 @@ Function Remove-AutomateNOWSecurityRoleUser {
         If (($Force -eq $true) -or ($PSCmdlet.ShouldProcess("$($SecUserRole_name) from $($SecurityRole_Id)")) -eq $true) {
             $Error.Clear()
             Try {
-                [PSCustomObject]$SecurityRoleUsers = Read-AutomateNOWSecurityRoleUser -Id $SecurityRole_Id
+                [ANOWSecUserRole[]]$SecurityRoleUsers = @()
+                [int32]$startRow = 0
+                [int32]$endRow = 10000
+                Do {
+                    [ANOWSecUserRole[]]$CurrentRoleUsers = @(Read-AutomateNOWSecurityRoleUser -SecurityRole $SecurityRole -startRow $startRow -endRow $endRow)
+                    $SecurityRoleUsers += $CurrentRoleUsers
+                    $startRow = $endRow
+                    $endRow += 10000
+                } While ($CurrentRoleUsers.Count -eq 10000)
             }
             Catch {
                 [string]$Message = $_.Exception.Message
@@ -75204,7 +76176,7 @@ Function New-AutomateNOWSemaphore {
     [OutputType([ANOWSemaphore])]
     [CmdletBinding()]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true)]
         [string]$Id,
         [ValidateScript({ $_.Length -le 255 })]
@@ -75531,7 +76503,7 @@ Function Copy-AutomateNOWSemaphore {
         [Parameter(Mandatory = $true)]
         [ANOWSemaphore]$Semaphore,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [ValidateScript({ $_.Length -le 255 })]
@@ -75752,7 +76724,7 @@ Function Rename-AutomateNOWSemaphore {
         [Parameter(Mandatory = $true)]
         [ANOWSemaphore]$Semaphore,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -76987,7 +77959,7 @@ Function New-AutomateNOWServerNode {
     [OutputType([ANOWServerNode])]
     [CmdletBinding()]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true)]
         [string]$Id,
         [Parameter(Mandatory = $true)]
@@ -77208,7 +78180,7 @@ Function Copy-AutomateNOWServerNode {
         [Parameter(Mandatory = $true)]
         [ANOWServerNode]$ServerNode,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [ValidateScript({ $_.Length -le 255 })]
@@ -77536,7 +78508,7 @@ Function Rename-AutomateNOWServerNode {
         [Parameter(Mandatory = $true)]
         [ANOWServerNode]$ServerNode,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -80026,7 +80998,7 @@ Function Get-AutomateNOWServerNodeGroup {
     [OutputType([ANOWServerNodeGroup[]])]
     [CmdletBinding()]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $False, ValueFromPipeline = $true)]
         [string]$Id,
         [Parameter(Mandatory = $False)]
@@ -80545,7 +81517,7 @@ Function New-AutomateNOWServerNodeGroup {
     [OutputType([ANOWServerNodeGroup])]
     [CmdletBinding()]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true)]
         [string]$Id,
         [Parameter(Mandatory = $true)]
@@ -80858,7 +81830,7 @@ Function Copy-AutomateNOWServerNodeGroup {
         [Parameter(Mandatory = $true)]
         [ANOWServerNodeGroup]$ServerNodeGroup,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [ValidateScript({ $_.Length -le 255 })]
@@ -81079,7 +82051,7 @@ Function Rename-AutomateNOWServerNodeGroup {
         [Parameter(Mandatory = $true)]
         [ANOWServerNodeGroup]$ServerNodeGroup,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -81979,7 +82951,7 @@ Function Get-AutomateNOWServiceManager {
     [OutputType([ANOWServiceManager[]])]
     [CmdletBinding(DefaultParameterSetName = 'All')]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $True, ParameterSetName = 'Id', ValueFromPipeline = $true)]
         [int64]$Id,
         [Parameter(Mandatory = $True, ParameterSetName = 'launchedById')]
@@ -83507,7 +84479,7 @@ Function Get-AutomateNOWServiceManagerTemplate {
     [OutputType([ANOWServiceManagerTemplate[]])]
     [CmdletBinding()]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $False, ValueFromPipeline = $true)]
         [string]$Id,
         [Parameter(Mandatory = $False)]
@@ -84145,7 +85117,7 @@ Function Set-AutomateNOWServiceManagerTemplate {
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
             Try {
-                [boolean]$ServiceManagerTemplate_exists = ($null -eq (Get-AutomateNOWServiceManagerTemplate -Id $ServiceManagerTemplate_id))
+                [boolean]$ServiceManagerTemplate_exists = ($null -eq (Get-AutomateNOWServiceManagerTemplate -Id $ServiceManagerTemplate.simpleId))
             }
             Catch {
                 [string]$Message = $_.Exception.Message
@@ -84613,7 +85585,7 @@ Function New-AutomateNOWServiceManagerTemplate {
     [OutputType([ANOWServiceManagerTemplate])]
     [CmdletBinding()]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true)]
         [string]$Id,
         [Parameter(Mandatory = $true)]
@@ -85002,7 +85974,7 @@ Function Copy-AutomateNOWServiceManagerTemplate {
         [Parameter(Mandatory = $true)]
         [ANOWServiceManagerTemplate]$ServiceManagerTemplate,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [ValidateScript({ $_.Length -le 255 })]
@@ -85207,7 +86179,7 @@ Function Rename-AutomateNOWServiceManagerTemplate {
         [Parameter(Mandatory = $true)]
         [ANOWServiceManagerTemplate]$ServiceManagerTemplate,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -85238,7 +86210,7 @@ Function Rename-AutomateNOWServiceManagerTemplate {
         [string]$ServiceManagerTemplate_id = $ServiceManagerTemplate.id
         $Error.Clear()
         Try {
-            [boolean]$old_ServiceManager_template_exists = ($null -ne (Get-AutomateNOWServiceManagerTemplate -Id $ServiceManagerTemplate_id))
+            [boolean]$old_ServiceManager_template_exists = ($null -ne (Get-AutomateNOWServiceManagerTemplate -Id $ServiceManagerTemplate.simpleId))
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -86759,7 +87731,7 @@ Function New-AutomateNOWStock {
     [OutputType([ANOWStock])]
     [CmdletBinding()]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true)]
         [string]$Id,
         [ValidateScript({ $_.Length -le 255 })]
@@ -87081,7 +88053,7 @@ Function Copy-AutomateNOWStock {
         [Parameter(Mandatory = $true)]
         [ANOWStock]$Stock,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [ValidateScript({ $_.Length -le 255 })]
@@ -87302,7 +88274,7 @@ Function Rename-AutomateNOWStock {
         [Parameter(Mandatory = $true)]
         [ANOWStock]$Stock,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -87920,7 +88892,7 @@ Function New-AutomateNOWTag {
     [OutputType([ANOWTag])]
     [CmdletBinding(DefaultParameterSetName = 'Default')]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true, ParameterSetName = 'Default')]
         [Parameter(Mandatory = $true, ParameterSetName = 'WithIcon')]
         [string]$Id,
@@ -88195,7 +89167,7 @@ Function Copy-AutomateNOWTag {
         [Parameter(Mandatory = $true)]
         [ANOWTag]$Tag,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -89830,7 +90802,7 @@ Function Get-AutomateNOWTaskTemplate {
     [OutputType([ANOWTaskTemplate[]])]
     [CmdletBinding(DefaultParameterSetName = 'Default' )]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $False, ValueFromPipeline = $true, ParameterSetName = 'Default')]
         [string]$Id,
         [Parameter(Mandatory = $True, ParameterSetName = 'taskType')]
@@ -90191,6 +91163,8 @@ Function Set-AutomateNOWTaskTemplate {
 
     When using the -processingCommand parameter there is no need to convert any strings to JSON as that will happen automatically.
 
+    When this Task Template is tracked by a Code Repository, this update creates a pending repository change. To publish it on the already selected branch, run Publish-AutomateNOWCodeRepository, then Send-AutomateNOWCodeRepository, then Sync-AutomateNOWCodeRepository. This command does not commit, push, or synchronize the repository.
+
     #>
     [OutputType([ANOWTaskTemplate])]
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
@@ -90363,7 +91337,7 @@ Function Set-AutomateNOWTaskTemplate {
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
             Try {
-                [boolean]$TaskTemplate_exists = ($null -eq (Get-AutomateNOWTaskTemplate -Id $TaskTemplate_id))
+                [boolean]$TaskTemplate_exists = ($null -eq (Get-AutomateNOWTaskTemplate -Id $TaskTemplate.simpleId))
             }
             Catch {
                 [string]$Message = $_.Exception.Message
@@ -90890,7 +91864,7 @@ Function New-AutomateNOWTaskTemplate {
     [OutputType([ANOWTaskTemplate])]
     [CmdletBinding()]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true)]
         [string]$Id,
         [Parameter(Mandatory = $true, ParameterSetName = 'NodeTask')]
@@ -91310,7 +92284,7 @@ Function Copy-AutomateNOWTaskTemplate {
         [Parameter(Mandatory = $true)]
         [ANOWTaskTemplate]$TaskTemplate,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [ValidateScript({ $_.Length -le 255 })]
@@ -91513,7 +92487,7 @@ Function Rename-AutomateNOWTaskTemplate {
         [Parameter(Mandatory = $true)]
         [ANOWTaskTemplate]$TaskTemplate,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -91544,7 +92518,7 @@ Function Rename-AutomateNOWTaskTemplate {
         [string]$TaskTemplate_id = $TaskTemplate.id
         $Error.Clear()
         Try {
-            [boolean]$old_Task_template_exists = ($null -ne (Get-AutomateNOWTaskTemplate -Id $TaskTemplate_id))
+            [boolean]$old_Task_template_exists = ($null -ne (Get-AutomateNOWTaskTemplate -Id $TaskTemplate.simpleId))
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -92723,9 +93697,15 @@ Function Read-AutomateNOWTimeTrigger {
                     If ($result.processingTemplate.Length -gt 0) {
                         If ($ScheduleTemplate.id.Length -eq 0) {
                             [string]$ScheduleTemplate_id = $result.processingTemplate
+                            [string]$ScheduleTemplate_simpleId = If ($ScheduleTemplate_id -match '^\[[^\]]+\](?<SimpleId>.+)$') {
+                                $Matches['SimpleId']
+                            }
+                            Else {
+                                $ScheduleTemplate_id
+                            }
                             $Error.Clear()
                             Try {
-                                [ANOWScheduleTemplate]$ScheduleTemplate = Get-AutomateNOWScheduleTemplate -Id $ScheduleTemplate_id
+                                [ANOWScheduleTemplate]$ScheduleTemplate = Get-AutomateNOWScheduleTemplate -Id $ScheduleTemplate_simpleId
                             }
                             Catch {
                                 [string]$Message = $_.Exception.Message
@@ -94782,7 +95762,7 @@ Function New-AutomateNOWTimeWindow {
     [OutputType([ANOWTimeWindow])]
     [CmdletBinding()]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true)]
         [string]$Id,
         [ValidateScript({ $_.Length -le 255 })]
@@ -95109,7 +96089,7 @@ Function Copy-AutomateNOWTimeWindow {
         [Parameter(Mandatory = $true)]
         [ANOWTimeWindow]$TimeWindow,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [ValidateScript({ $_.Length -le 255 })]
@@ -95330,7 +96310,7 @@ Function Rename-AutomateNOWTimeWindow {
         [Parameter(Mandatory = $true)]
         [ANOWTimeWindow]$TimeWindow,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -95486,7 +96466,7 @@ Function Get-AutomateNOWTimeZone {
     [CmdletBinding()]
     Param(
         [Parameter(Mandatory = $false, ValueFromPipeline = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z/+-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z/+-_]{1,}$' })]
         [string]$Id
     )
     Begin {
@@ -95546,7 +96526,7 @@ Function Export-AutomateNOWTimeZone {
     Param(
         [Parameter(Mandatory = $true, ValueFromPipeline = $true, ParameterSetName = 'Pipeline')]
         [ANOWTimeZone]$TimeZone,
-        [ValidateScript({ $_ -match '^[0-9a-zA-z/+-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z/+-]{1,}$' })]
         [Parameter(Mandatory = $false, ParameterSetName = 'Individual')]
         [string]$Id
     )
@@ -95833,7 +96813,7 @@ Function Get-AutomateNOWUserReport {
     [OutputType([ANOWUserReport[]])]
     [CmdletBinding( DefaultParameterSetName = 'Default' )]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $False, ParameterSetName = 'Id', ValueFromPipeline = $true)]
         [string]$Id,
         [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
@@ -96505,7 +97485,7 @@ Function Copy-AutomateNOWUserReport {
         [Parameter(Mandatory = $true)]
         [ANOWUserReport]$UserReport,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [ValidateScript({ $_.Length -le 255 })]
@@ -96730,7 +97710,7 @@ Function Rename-AutomateNOWUserReport {
         [Parameter(Mandatory = $true)]
         [ANOWUserReport]$UserReport,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -97246,6 +98226,11 @@ Function Set-AutomateNOWVariable {
             [System.Collections.Specialized.OrderedDictionary]$BodyMetaData = [System.Collections.Specialized.OrderedDictionary]@{}
             $BodyMetaData.'id' = $Variable_id
             If ($Value.Length -gt 0) {
+                [string]$Variable_domain = $Variable.domain
+                If ([string]::IsNullOrWhiteSpace($Variable_domain)) {
+                    Write-Warning -Message "The Variable [$Variable_simpleId] does not have a domain required to set its value."
+                    Break
+                }
                 If ($Value -eq $current_Variable_value) {
                     Write-Warning -Message "No action is required. The Variable [$Variable_simpleId] is already set to [$Value]"
                     Break
@@ -97254,6 +98239,7 @@ Function Set-AutomateNOWVariable {
                     Write-Verbose -Message "Changing the value of [$Variable_simpleId] from [$current_Variable_value] to [$Value]"
                 }
                 $BodyMetaData.'newValue' = $Value
+                $BodyMetaData.'domain' = $Variable_domain
                 [string]$operationId = 'setValue'
                 [string]$operationType = 'custom'
                 $BodyMetaData.'_operationId' = $operationId
@@ -97510,7 +98496,7 @@ Function New-AutomateNOWVariable {
     [OutputType([ANOWVariable])]
     [CmdletBinding()]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true)]
         [string]$Id,
         [ValidateScript({ $_.Length -le 255 })]
@@ -97832,7 +98818,7 @@ Function Copy-AutomateNOWVariable {
         [Parameter(Mandatory = $true)]
         [ANOWVariable]$Variable,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [ValidateScript({ $_.Length -le 255 })]
@@ -98053,7 +99039,7 @@ Function Rename-AutomateNOWVariable {
         [Parameter(Mandatory = $true)]
         [ANOWVariable]$Variable,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -99116,7 +100102,7 @@ Function New-AutomateNOWViewSetup {
     [OutputType([ANOWViewSetup])]
     [CmdletBinding()]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [string]$Id,
         [ValidateSet('admin-configuration', 'admin-deleted-domain-list', 'admin-domain', 'admin-domain-list', 'admin-failed-events', 'admin-license', 'admin-log-queue', 'admin-monitoring', 'admin-processing-function-list', 'admin-security', 'archive-event-log', 'archive-list', 'archive-overview', 'collaborate-approval-configuration-list', 'collaborate-migration-export', 'collaborate-migration-import', 'collaborate-note-list', 'collaborate-note-wall', 'collaborate-workspace-list', 'dashboard', 'design-business-view-list', 'design-interface-list', 'design-list', 'design-result-mapping-list', 'domain-audit-log', 'domain-cost-center-list', 'domain-deleted-object-list', 'domain-design-template-list', 'domain-diagram', 'domain-folder-list', 'domain-processing-consumption-log-list', 'domain-processing-type-list', 'domain-secret-vault-list', 'domain-tag-list', 'domain-trigger-log', 'domain-view-setup-list', 'node-agent-list', 'node-endpoint-list', 'node-event-log', 'node-group-list', 'node-list', 'node-tree', 'processing-business-view-list', 'processing-calendar', 'processing-domain-failed-events', 'processing-event-log', 'processing-list', 'processing-overview', 'processing-overview-across-domain', 'processing-runtime-action-edit', 'processing-runtime-action-list', 'processing-state', 'processing-tiles', 'processing-timeline', 'processing-week', 'report-adhoc', 'report-dashboard', 'report-user', 'resource-anomaly-list', 'resource-data-source-list', 'resource-event-log', 'resource-list', 'schedule-calendar', 'schedule-item-calendar', 'schedule-item-instance-list', 'schedule-items', 'schedule-list', 'schedule-timeline', 'schedule-time-triggers', 'self-service-design', 'self-service-processing', 'welcome', 'collaborate-notification-channel-list', 'collaborate-notification-group-list', 'collaborate-notification-list', 'collaborate-notification-message-template-list', 'self-service-trigger')]
@@ -99483,7 +100469,7 @@ Function Copy-AutomateNOWViewSetup {
         [Parameter(Mandatory = $true)]
         [ANOWViewSetup]$ViewSetup,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -99629,7 +100615,7 @@ Function Rename-AutomateNOWViewSetup {
         [Parameter(Mandatory = $true)]
         [ANOWViewSetup]$ViewSetup,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -99810,7 +100796,7 @@ Function Get-AutomateNOWWorkflow {
     [OutputType([ANOWWorkflow[]])]
     [CmdletBinding(DefaultParameterSetName = 'All')]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $True, ValueFromPipeline = $true, ParameterSetName = 'Id')]
         [int64]$Id,
         [Parameter(Mandatory = $False, ValueFromPipeline = $true, ParameterSetName = 'All')]
@@ -101516,7 +102502,7 @@ Function Get-AutomateNOWWorkflowTemplate {
     [OutputType([ANOWWorkflowTemplate[]])]
     [CmdletBinding()]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $False, ValueFromPipeline = $true)]
         [string]$Id,
         [Parameter(Mandatory = $False)]
@@ -101986,7 +102972,7 @@ Function Set-AutomateNOWWorkflowTemplate {
             ## Do not tamper with this below code which makes sure that the object exists before attempting to change it.
             $Error.Clear()
             Try {
-                [boolean]$WorkflowTemplate_exists = ($null -eq (Get-AutomateNOWWorkflowTemplate -Id $WorkflowTemplate_id))
+                [boolean]$WorkflowTemplate_exists = ($null -eq (Get-AutomateNOWWorkflowTemplate -Id $WorkflowTemplate.simpleId))
             }
             Catch {
                 [string]$Message = $_.Exception.Message
@@ -102422,7 +103408,7 @@ Function New-AutomateNOWWorkflowTemplate {
     [OutputType([ANOWWorkflowTemplate])]
     [CmdletBinding()]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true)]
         [string]$Id,
         [Parameter(Mandatory = $true)]
@@ -102785,7 +103771,7 @@ Function Copy-AutomateNOWWorkflowTemplate {
         [Parameter(Mandatory = $true)]
         [ANOWWorkflowTemplate]$WorkflowTemplate,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [ValidateScript({ $_.Length -le 255 })]
@@ -102988,7 +103974,7 @@ Function Rename-AutomateNOWWorkflowTemplate {
         [Parameter(Mandatory = $true)]
         [ANOWWorkflowTemplate]$WorkflowTemplate,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -103019,7 +104005,7 @@ Function Rename-AutomateNOWWorkflowTemplate {
         [string]$WorkflowTemplate_id = $WorkflowTemplate.id
         $Error.Clear()
         Try {
-            [boolean]$old_Workflow_template_exists = ($null -ne (Get-AutomateNOWWorkflowTemplate -Id $WorkflowTemplate_id))
+            [boolean]$old_Workflow_template_exists = ($null -ne (Get-AutomateNOWWorkflowTemplate -Id $WorkflowTemplate.simpleId))
         }
         Catch {
             [string]$Message = $_.Exception.Message
@@ -103951,7 +104937,7 @@ Function Get-AutomateNOWWorkspace {
     [OutputType([ANOWWorkspace[]])]
     [CmdletBinding(DefaultParameterSetName = 'Default')]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $False, ParameterSetName = 'Id', ValueFromPipeline = $true)]
         [string]$Id,
         [Parameter(Mandatory = $False, ParameterSetName = 'Default')]
@@ -104671,7 +105657,7 @@ Function New-AutomateNOWWorkspace {
     [OutputType([ANOWWorkspace])]
     [CmdletBinding(DefaultParameterSetName = 'Default')]
     Param(
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,}$' })]
         [Parameter(Mandatory = $true, ParameterSetName = 'Default')]
         [Parameter(Mandatory = $true, ParameterSetName = 'iconSet')]
         [string]$Id,
@@ -105004,7 +105990,7 @@ Function Copy-AutomateNOWWorkspace {
         [Parameter(Mandatory = $true)]
         [ANOWWorkspace]$Workspace,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [ValidateScript({ $_.Length -le 255 })]
@@ -105225,7 +106211,7 @@ Function Rename-AutomateNOWWorkspace {
         [Parameter(Mandatory = $true)]
         [ANOWWorkspace]$Workspace,
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ $_ -match '^[0-9a-zA-z_.-]{1,1024}$' })]
+        [ValidateScript({ $_ -match '^[0-9a-zA-Z_.-]{1,1024}$' })]
         [string]$NewId,
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -105396,6 +106382,7 @@ Function Invoke-AutomateNOWAPI {
     You must use Connect-AutomateNOW to establish the token by way of global variable.
     #>
 
+    [OutputType([object], [object[]], [int32])]
     [CmdletBinding()]
     Param(
         [Parameter(Mandatory = $true)]
@@ -105426,33 +106413,52 @@ Function Invoke-AutomateNOWAPI {
         [Parameter(Mandatory = $false)]
         [switch]$IncludeAttachmentFilename
     )
-    If ($anow_session.header.values.count -eq 0 -or $anow_session.Instance.Length -eq 0) {
-        Write-Warning -Message "Please use Connect-AutomateNOW to establish your access token."
-        Break
+    If ($Command -ceq '/logoutEvent') {
+        [boolean]$logout_session_valid =
+            $anow_session -is [System.Collections.IDictionary] -and
+            -not [string]::IsNullOrWhiteSpace([string]$anow_session.Instance) -and
+            $anow_session.header -is [System.Collections.IDictionary] -and
+            (Test-ANOWTokenValue -Token $anow_session.AccessToken) -and
+            ([string]$anow_session.header.Authorization -match '^(?i:Bearer) (?<token>.+)$') -and
+            (Test-ANOWTokenValue -Token $Matches['token']) -and
+            ([string]$Matches['token'] -ceq [string]$anow_session.AccessToken)
+        If ($logout_session_valid -ne $true) {
+            Write-Warning -Message 'The AutomateNOW session lacks the minimum safe fields required for logout notification.'
+            Return
+        }
     }
-    ElseIf ($anow_session.header.Authorization -notmatch '^Bearer [a-zA-Z-_:,."0-9]{1,}$') {
-        [string]$malformed_token = $anow_session.header.values
-        Write-Warning -Message "The access token is not in the expected format. Please contact the author with this apparently malformed token: $malformed_token"
-        Break
+    Else {
+        [hashtable]$session_validation_parameters = @{
+            Session = $anow_session
+            AllowUnknownExpiration = $true
+        }
+        If ($Command -ceq '/oauth/access_token') {
+            $session_validation_parameters['AllowExpired'] = $true
+        }
+        [PSCustomObject]$session_validation = Get-ANOWSessionValidation @session_validation_parameters
+        If ($session_validation.Valid -ne $true) {
+            Write-Warning -Message "The AutomateNOW session cannot be used for this request [$($session_validation.Reason)]."
+            Return
+        }
     }
-    ElseIf ($command -notmatch '^/.{1,}') {
+    If ($command -notmatch '^/.{1,}') {
         Write-Warning -Message "Please prefix the command with a forward slash (for example: /secUser/getUserInfo)."
-        Break
+        Return
     }
     If ($Instance.Length -eq 0) {
         [string]$Instance = $anow_session.Instance
     }
     If ($Body.Length -gt 0 -and $BinaryBody.Count -gt 0) {
         Write-Warning -Message "You cannot specify a binary body and a text body. Please choose one or the other."
-        Break
+        Return
     }
     If ($Headers.keys.count -gt 0 -and $NoHeaders -eq $true) {
         Write-Warning -Message "You cannot specify -Headers and -NoHeaders. Please choose one or the other."
-        Break
+        Return
     }
     If ($Headers.keys.count -gt 0 -and $NoDomain -eq $true) {
         Write-Warning -Message "You cannot specify -Headers and -NoDomain. Please choose one or the other."
-        Break
+        Return
     }
     If ($Headers.keys.count -gt 0) {
         $Error.Clear()
@@ -105462,7 +106468,7 @@ Function Invoke-AutomateNOWAPI {
         Catch {
             [string]$Message = $_.Exception.Message
             Write-Warning -Message "ConvertTo-Json failed to convert the provided headers due to [$Message]."
-            Break
+            Return
         }
     }
     [hashtable]$parameters = @{}
@@ -105473,15 +106479,12 @@ Function Invoke-AutomateNOWAPI {
         [string]$protocol = 'https'
     }
     [int32]$ps_version_major = $PSVersionTable.PSVersion.Major
-    $parameters.Add('UseBasicParsing', $true)
-    If ($ps_version_major -gt 5) {
-        If ($protocol -eq 'http') {
-            $parameters.Add('SkipCertificateCheck', $true)
-        }
+    If ($ps_version_major -eq 5) {
+        $parameters.Add('UseBasicParsing', $true)
     }
     If ($ps_version_major -lt 5) {
         Write-Warning -Message "Please use either Windows PowerShell 5.x or PowerShell Core. This module is not compatible with Windows PowerShell below version 5."
-        Break
+        Return
     }
     If ($NotAPICommand -ne $true) {
         [string]$api_url = ($protocol + '://' + $instance + '/automatenow/api' + $command)
@@ -105508,7 +106511,7 @@ Function Invoke-AutomateNOWAPI {
     $parameters.Add('Method', $Method)
     $parameters.Add('ContentType', $ContentType)
     If ($Body.Length -gt 0) {
-        Write-Verbose -Message "Sending body: $Body"
+        Write-Verbose -Message "A request body is present with [$($Body.Length)] characters. Its value is suppressed."
         If ($Method -eq 'GET') {
             [string]$api_url = $api_url + '?' + $Body
         }
@@ -105521,57 +106524,29 @@ Function Invoke-AutomateNOWAPI {
     }
     If ($anow_session.Proxy.Length -gt 0) {
         $parameters.Add('Proxy', $anow_session.Proxy)
-        [int32]$ps_version_major = $PSVersionTable.PSVersion.Major
-        If ($ps_version_major -eq 5) {
-            # The below C# code provides the equivalent of the -SkipCertificateCheck parameter for Windows PowerShell 5.1 Invoke-WebRequest
-            If (($null -eq ("TrustAllCertsPolicy" -as [type])) -and ($protocol -eq 'http')) {
-                [string]$certificate_policy = @"
-                using System.Net;
-                using System.Security.Cryptography.X509Certificates;
-                public class TrustAllCertsPolicy : ICertificatePolicy {
-                    public bool CheckValidationResult(
-                        ServicePoint srvPoint, X509Certificate certificate,
-                        WebRequest request, int certificateProblem) {
-                        return true;
-                    }
-                }
-"@
-                $Error.Clear()
-                Try {
-                    Add-Type -TypeDefinition $certificate_policy
-                }
-                Catch {
-                    [string]$Message = $_.Exception.Message
-                    Write-Warning -Message "Add-Type failed to add the custom certificate policy due to [$Message]"
-                    Break
-                }
-                $Error.Clear()
-                Try {
-                    [System.Net.ServicePointManager]::CertificatePolicy = New-Object -TypeName TrustAllCertsPolicy
-                }
-                Catch {
-                    [string]$Message = $_.Exception.Message
-                    Write-Warning -Message "New-Object failed to create a new 'TrustAllCertsPolicy' CertificatePolicy object due to [$Message]."
-                    Break
-                }
-            }
-        }
-        ElseIf ( $ps_version_major -gt 5) {
-            $parameters.Add('SkipCertificateCheck', $true)
-        }
-        Else {
-            Write-Warning -Message "Please use either Windows PowerShell 5.1 or PowerShell Core."
-            Break
-        }
     }
-    [string]$parameters_debug_display = $parameters | ConvertTo-Json
-    Write-Debug -Message "Sending the following parameters to $api_url -> $parameters_debug_display."
-    [string]$parameters_verbose_display = $parameters | Select-Object -ExcludeProperty Headers | ConvertTo-Json
-    Write-Verbose -Message "Sending the following parameters to $api_url -> $parameters_verbose_display."
+    [string]$safe_api_url = $api_url -replace '\?.*$', ''
+    [string[]]$safe_header_names = @()
+    If ($parameters.Headers -is [System.Collections.IDictionary]) {
+        $safe_header_names = @($parameters.Headers.Keys | ForEach-Object { [string]$_ } | Sort-Object)
+    }
+    [PSCustomObject]$safe_request_summary = [PSCustomObject]@{
+        Method = $Method
+        Uri = $safe_api_url
+        ContentType = $ContentType
+        HeaderNames = $safe_header_names
+        BodyPresent = ($Body.Length -gt 0)
+        BodyLength = [int32]$Body.Length
+        BinaryBodyLength = [int32]$BinaryBody.Count
+        ProxyUsed = ($anow_session.Proxy.Length -gt 0)
+    }
+    [string]$parameters_debug_display = $safe_request_summary | ConvertTo-Json -Compress
+    Write-Debug -Message "Sending request metadata: $parameters_debug_display"
+    Write-Verbose -Message "Sending request metadata: $parameters_debug_display"
     $ProgressPreference = 'SilentlyContinue'
     $Error.Clear()
     Try {
-        [Microsoft.PowerShell.Commands.BasicHtmlWebResponseObject]$results = Invoke-WebRequest @parameters
+        $results = Invoke-ANOWWebRequest -Parameters $parameters -SkipCertificateCheck:([boolean]$anow_session.SkipCertificateCheck) -ErrorAction Stop
     }
     Catch {
         [string]$Message = $_.Exception.Message
@@ -105582,7 +106557,7 @@ Function Invoke-AutomateNOWAPI {
             }
             Else {
                 Write-Warning -Message 'The underlying connection was closed. This is probably a timeout error. Exiting...'
-                Break
+                Return
             }
         }
         ElseIf ($Message -match 'Response status code does not indicate success:') {
@@ -105592,8 +106567,8 @@ Function Invoke-AutomateNOWAPI {
             }
             Catch {
                 [string]$Message2 = $_.Exception.Message
-                Write-Warning -Message "Unable to extract the error code from [$Message] due to [$Message2]"
-                Break
+                Write-Warning -Message 'The HTTP status code could not be extracted. Request and exception values were withheld.'
+                Return
             }
         }
         ElseIf ($Message -match 'The remote server returned an error: ') {
@@ -105603,20 +106578,20 @@ Function Invoke-AutomateNOWAPI {
             }
             Catch {
                 [string]$Message2 = $_.Exception.Message
-                Write-Warning -Message "Unable to extract the error code from [$Message] due to [$Message2]"
-                Break
+                Write-Warning -Message 'The HTTP status code could not be extracted. Request and exception values were withheld.'
+                Return
             }
         }
         ElseIf ($Message -match 'value of type "Microsoft.PowerShell.Commands.WebResponseObject" to type "Microsoft.PowerShell.Commands.BasicHtmlWebResponseObject"') {
             Write-Verbose -Message "Detected a WebResponseObject was returned instead of the expected BasicHtmlWebResponseObject... Will try again for WebResponseObject."
             $Error.Clear()
             Try {
-                [Microsoft.PowerShell.Commands.WebResponseObject]$results = Invoke-WebRequest @parameters
+                $results = Invoke-ANOWWebRequest -Parameters $parameters -SkipCertificateCheck:([boolean]$anow_session.SkipCertificateCheck) -ErrorAction Stop
             }
             Catch {
                 [string]$Message2 = $_.Exception.Message
-                Write-Warning -Message "Invoke-WebRequest failed to failover to due WebResponseObject object due to [$Message2]"
-                Break
+                Write-Warning -Message 'The fallback web request failed. Request values were withheld.'
+                Return
             }
             [int32]$return_code = 0
             [string]$received_payload_type = (($results.content | Select-Object -First 1).GetType()).Name
@@ -105630,9 +106605,9 @@ Function Invoke-AutomateNOWAPI {
                 Return
             }
             Else {
-                [string]$ReturnCodeWarning = "Invoke-WebRequest failed for unknown reasons under Invoke-AutomateNOWAPI due to [$Message]. This is not normal (at this point) to fail like this so you should check for possible performance problems on the ANOW instance or something else unexpected. Here are the parameters that were sent: $parameters_debug_display"
+                [string]$ReturnCodeWarning = "Invoke-WebRequest failed for an unexpected reason. Request values were withheld. Safe metadata: $parameters_debug_display"
                 Write-Warning -Message $ReturnCodeWarning
-                Break
+                Return
             }
         }
         If ($return_code -gt 0) {
@@ -105643,7 +106618,7 @@ Function Invoke-AutomateNOWAPI {
                 Default { "You received HTTP Code $return_code instead of '200 OK'. Apparently, something is wrong..." }
             }
             Write-Warning -Message $ReturnCodeWarning
-            Break
+            Return
         }
     }
     $ProgressPreference = 'Continue'
@@ -105666,7 +106641,7 @@ Function Invoke-AutomateNOWAPI {
         }
         Catch {
             [string]$Message = $_.Exception.Message
-            Write-Verbose -Message "ConvertFrom-JSON failed to convert the returned results due to [$Message]. Let's try to deserialize as a backup option..."
+            Write-Verbose -Message 'ConvertFrom-JSON could not parse the response. Trying the compatibility deserializer; response values are withheld.'
             If ($ps_version_major -eq 5) {
                 $Error.Clear()
                 Try {
@@ -105675,7 +106650,7 @@ Function Invoke-AutomateNOWAPI {
                 Catch {
                     [string]$Message = $_.Exception.Message
                     Write-Warning -Message "The [System.AppDomain] class failed to invoke the due to CurrentDomain.GetAssemblies method due to [$Message]"
-                    Break
+                    Return
                 }
                 If ($system_web_extensions_type_present -eq 0) {
                     $Error.Clear()
@@ -105685,7 +106660,7 @@ Function Invoke-AutomateNOWAPI {
                     Catch {
                         [string]$Message = $_.Exception.Message
                         Write-Warning -Message "Add-Type failed to add System.Web.Extensions due to [$Message]"
-                        Break
+                        Return
                     }
                 }
                 $Error.Clear()
@@ -105698,8 +106673,8 @@ Function Invoke-AutomateNOWAPI {
                 }
                 Catch {
                     [string]$Message = $_.Exception.Message
-                    Write-Warning -Message "Failed to deserialize a difficult payload due to [$Message]. Parameters used: $parameters_debug_display"
-                    Break
+                    Write-Warning -Message "The compatibility deserializer failed. Response values were withheld. Safe request metadata: $parameters_debug_display"
+                    Return
                 }
                 Write-Verbose -Message "Success! The deserialization in Windows PowerShell worked. We are able to continue..."
             }
@@ -105710,8 +106685,8 @@ Function Invoke-AutomateNOWAPI {
                 }
                 Catch {
                     [string]$Message = $_.Exception.Message
-                    Write-Warning -Message "ConvertFrom-JSON with the -AsHashTable parameter still failed to convert the returned results due to [$Message]"
-                    Break
+                    Write-Warning -Message 'The PowerShell compatibility JSON deserializer failed. Response values were withheld.'
+                    Return
                 }
                 Write-Verbose -Message "Success! The deserialization in PowerShell Core worked. We are able to continue..."
             }
@@ -105724,7 +106699,7 @@ Function Invoke-AutomateNOWAPI {
         [string]$content = $content -split "`n" -match 'messageType' | Select-Object -First 1
         If ($content.Length -eq 0) {
             Write-Warning -Message "The returned content lacked a messageType after a binary payload was sent under Invoke-AutomateNOWAPI"
-            Break
+            Return
         }
         [string]$content = $content.Trim()
         [PSCustomObject]$content_object = $content | ConvertFrom-Json -Depth 100
@@ -105732,7 +106707,7 @@ Function Invoke-AutomateNOWAPI {
             [int32]$response_code = $content_object.response.status
             [string]$message = $content_object.response.data
             Write-Warning -Message "The ANOW API returned a response code [$response_code] due to [$Message] in response to a sent binary payload."
-            Break
+            Return
         }
         [string]$MessageType = $content_object.messageType
         If ($content_object.response.data.id -match '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') {
@@ -106147,19 +107122,67 @@ Function Unprotect-AutomateNOWEncryptedString {
 }
 
 Function New-AutomateNOWSecUserPrivilegeList {
+    <#
+    .SYNOPSIS
+    Returns the supported Security Role Domain permission property names.
+
+    .DESCRIPTION
+    Returns the property names used by Security Role Domain permission reports
+    and copy operations. The default catalogue includes the public
+    designVerification Boolean property. -IncludeUndocumented also returns the
+    hidden compatibility properties designCoreModify and taskLog, plus the
+    rejected historical designCoreModifyTags field for compatibility-aware
+    callers. The rejected field is not a usable permission scope.
+
+    .PARAMETER IncludeUndocumented
+    Includes hidden compatibility and rejected historical property names.
+
+    .OUTPUTS
+    [string[]] permission property names.
+
+    .EXAMPLE
+    Returns the normal supported permission catalogue.
+
+    New-AutomateNOWSecUserPrivilegeList
+
+    .EXAMPLE
+    Returns the catalogue including compatibility properties.
+
+    New-AutomateNOWSecUserPrivilegeList -IncludeUndocumented
+    #>
     [OutputType([string[]])]
     [CmdletBinding()]
     Param(
         [switch]$IncludeUndocumented
     )
     [string[]]$Privileges = 'domainAdmin', 'businessView', 'businessViewTags', 'designBusinessView', 'designBusinessViewModify', 'monitorBusinessView', 'monitor', 'monitorTags', 'monitorRestart', 'monitorRestartTags', 'monitorPassBy', 'monitorPassByTags', 'monitorHold', 'monitorHoldTags', 'monitorKill', 'monitorKillTags', 'monitorForceCompleted', 'monitorForceCompletedTags', 'monitorForceFailed', 'monitorForceFailedTags', 'monitorForceLaunch', 'monitorForceLaunchTags', 'monitorInternalActions', 'monitorInternalActionsTags', 'processingModify', 'processingModifyTags', 'runtimeActionModify', 'processingArchive', 'processingArchiveTags', 'lowLevelApproval', 'lowLevelApprovalTags', 'mediumLevelApproval', 'mediumLevelApprovalTags', 'highLevelApproval', 'highLevelApprovalTags', 'archive', 'design', 'designTags', 'designModify', 'designModifyTags', 'designDependencyModify', 'designResourceModify', 'designActionModify', 'resultMapping', 'resultMappingTags', 'resultMappingModify', 'resultMappingModifyTags', 'integrator', 'integratorTags', 'integratorModify', 'integratorModifyTags', 'node', 'nodeTags', 'nodeModify', 'nodeModifyTags', 'nodeHold', 'nodeHoldTags', 'nodePassBy', 'nodePassByTags', 'nodeStart', 'nodeStartTags', 'nodeKill', 'nodeKillTags', 'nodeModifyEndpoint', 'nodeModifyEndpointTags', 'endpoint', 'endpointTags', 'endpointModify', 'endpointModifyTags', 'resource', 'resourceTags', 'resourceModify', 'resourceModifyTags', 'dataSourceAccess', 'dataSourceAccessTags', 'dataSourceModify', 'dataSourceModifyTags', 'anomaly', 'anomalyTags', 'anomalyModify', 'anomalyModifyTags', 'report', 'reportTags', 'reportModify', 'reportModifyTags', 'dashboard', 'dashboardTags', 'dashboardModify', 'dashboardModifyTags', 'userReport', 'userReportTags', 'userReportModify', 'userReportModifyTags', 'workspace', 'workspaceTags', 'workspaceModify', 'workspaceModifyTags', 'approvalConfiguration', 'notification', 'notificationTags', 'notificationModify', 'notificationModifyTags', 'codeRepository', 'codeRepositoryTags', 'push', 'pull', 'createMergeRequest', 'approveMergeRequest', 'dataMigrationViewer', 'dataMigration', 'processingLaunch', 'processingLaunchTags', 'selfService', 'selfServiceTags'
+    $Privileges += 'designVerification'
     If ($IncludeUndocumented -eq $true) {
-        $Privileges += 'designCoreModify', 'designCoreModifyTags', 'designVerification', 'taskLog'
+        $Privileges += 'designCoreModify', 'designCoreModifyTags', 'taskLog'
     }
     Return $Privileges
 }
 
 Function New-AutomateNOWSecUserPrivilegeReport {
+    <#
+    .SYNOPSIS
+    Creates empty Security Role Domain permission report records.
+
+    .DESCRIPTION
+    Creates local placeholder records for every catalogue property. These are
+    report-shape records, not a measurement of a user's effective access.
+
+    .PARAMETER IncludeUndocumented
+    Includes hidden compatibility and rejected historical property names.
+
+    .OUTPUTS
+    [PSCustomObject[]] placeholder permission records.
+
+    .EXAMPLE
+    Creates placeholder records for the normal permission catalogue.
+
+    New-AutomateNOWSecUserPrivilegeReport
+    #>
     [OutputType([PSCustomObject[]])]
     [CmdletBinding()]
     Param(
@@ -106179,7 +107202,7 @@ Function New-AutomateNOWSecUserPrivilegeReport {
             [PSCustomObject]@{'instance' = $instance; 'domain' = $null; 'user_name' = $null; 'secRole' = @(); 'privilege' = $privilege; 'granted' = $false; 'value' = $false; 'tags' = @(); 'description' = $null; }
         }
         Else {
-            If ($privilege -notin @('designCoreModify', 'designCoreModifyTags', 'designVerification', 'taskLog')) {
+            If ($privilege -notin @('designCoreModify', 'designCoreModifyTags', 'taskLog')) {
                 [boolean]$undocumented = $false
             }
             Else {
@@ -106192,6 +107215,28 @@ Function New-AutomateNOWSecUserPrivilegeReport {
 }
 
 Function New-AutomateNOWSecUserPrivilegeLookupTable {
+    <#
+    .SYNOPSIS
+    Returns display descriptions for Security Role Domain permission properties.
+
+    .DESCRIPTION
+    Returns an ordered property-to-display-name lookup table for Security Role
+    Domain permission reports. The normal table includes public permissions;
+    -IncludeUndocumented adds hidden compatibility and rejected historical
+    fields with their status in the display description.
+
+    .PARAMETER IncludeUndocumented
+    Includes display descriptions for hidden compatibility and rejected
+    historical property names.
+
+    .OUTPUTS
+    [System.Collections.Specialized.OrderedDictionary] property descriptions.
+
+    .EXAMPLE
+    Returns display descriptions for the normal permission catalogue.
+
+    New-AutomateNOWSecUserPrivilegeLookupTable
+    #>
     [OutputType([System.Collections.Specialized.OrderedDictionary])]
     [CmdletBinding()]
     Param(
@@ -106241,6 +107286,7 @@ Function New-AutomateNOWSecUserPrivilegeLookupTable {
     $privilege_list.Add('designDependencyModify', 'Allow Workflow Items Modification')
     $privilege_list.Add('designResourceModify', 'Allow Design Resource Modification')
     $privilege_list.Add('designActionModify', 'Allow Design Action Modification')
+    $privilege_list.Add('designVerification', 'Allow Design Verification')
     $privilege_list.Add('resultMapping', 'Allow Result Mapping Access')
     $privilege_list.Add('resultMappingTags', 'Allow Result Mapping Access (Tags)')
     $privilege_list.Add('resultMappingModify', 'Allow Result Mapping Modification')
@@ -106313,10 +107359,9 @@ Function New-AutomateNOWSecUserPrivilegeLookupTable {
     $privilege_list.Add('selfService', 'Allow Self Service')
     $privilege_list.Add('selfServiceTags', 'Allow Self Service (Tags)')
     If ($IncludeUndocumented -eq $true) {
-        $privilege_list.Add('designCoreModify', 'Unknown/Undocumented')
-        $privilege_list.Add('designCoreModifyTags', 'Unknown/Undocumented')
-        $privilege_list.Add('designVerification', 'Unknown/Undocumented')
-        $privilege_list.Add('taskLog', 'Unknown/Undocumented')
+        $privilege_list.Add('designCoreModify', 'Hidden compatibility: Design Core Modify (UI-absent; authorization effect unknown)')
+        $privilege_list.Add('designCoreModifyTags', 'Rejected/non-persisting (not supported)')
+        $privilege_list.Add('taskLog', 'Hidden compatibility: Task Log (UI-absent; authorization effect unknown)')
     }
     Return $privilege_list
 }
@@ -107119,6 +108164,9 @@ Function Resolve-AutomateNOWTaskType2ServerNodeType {
    "AWS_LAMBDA_DELETE_FUNCTION":[
       "AWS"
    ],
+   "AWS_SQS_SEND":[
+      "SQS"
+   ],
    "AWS_S3_DELETE_OBJECT":[
       "AWS"
    ],
@@ -107331,6 +108379,15 @@ Function Resolve-AutomateNOWTaskType2ServerNodeType {
    ],
    "DATASOURCE_DELETE_FILE":[
       "INTERNAL"
+   ],
+   "DYNAMIC_BS2000_TASK":[
+      "BS2000"
+   ],
+   "STORED_BS2000_TASK":[
+      "BS2000"
+   ],
+   "BS2000_COMMAND_TASK":[
+      "BS2000"
    ],
    "RAINCODE_DYNAMIC_JCL":[
       "RAINCODE"

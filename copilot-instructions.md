@@ -1,9 +1,9 @@
 # AutomateNOW PowerShell Module - Code Review Guidelines
-**Last Updated:** May 25, 2026  
-**Module Version:** 1.0.44
+**Last Updated:** July 24, 2026  
+**Module Version:** 1.0.46
 
 ## Overview
-This PowerShell module aims to provide a comprehensive command-line interface for the AutomateNOW! automation platform. It contains 583+ functions across 104,000+ lines of code, enabling automation scripting, pipeline integration, and programmatic control of most platform resources.
+This PowerShell module aims to provide a comprehensive command-line interface for the AutomateNOW! automation platform. It exports 603 functions across 108,000+ lines of code, enabling automation scripting, pipeline integration, and programmatic control of most platform resources.
 
 ---
 
@@ -31,7 +31,7 @@ This PowerShell module aims to provide a comprehensive command-line interface fo
 ### ✅ Region Markers (#region / #endregion)
 **Status:** Standardized  
 **Format:** Lowercase `#region` and `#endregion` used consistently  
-**Reason:** Provides code organization for large function sets (583+ functions)
+**Reason:** Provides code organization for large function sets (603 functions)
 
 **API Category Labels:** Some regions include uppercase API category names in parentheses (e.g., `#region - Calendar (RESOURCE)`) to help correlate objects with their underlying API categories. For example, a Calendar is categorized as a RESOURCE within the AutomateNOW! API.
 
@@ -91,7 +91,7 @@ This PowerShell module aims to provide a comprehensive command-line interface fo
 ## File Organization
 
 ### Structure
-- **AutomateNOW.psm1:** Main module file (104,000+ lines, 583+ functions)
+- **AutomateNOW.psm1:** Main module file (108,000+ lines, 603 exported functions)
 - **Classes.psm1:** Enum definitions and class structures
 - **AutomateNOW.psd1:** Module manifest
 - **Icons.ps1:** Icon code mappings for UI elements
