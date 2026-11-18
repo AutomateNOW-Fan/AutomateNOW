@@ -4,7 +4,7 @@
 
 ## 1.0.47
 
-Prepared for release.
+Released November 17, 2026.
 
 ### Compatibility
 

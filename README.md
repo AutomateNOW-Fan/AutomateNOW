@@ -26,9 +26,9 @@ See the [release notes](CHANGELOG.md#1047) for upgrade details.
 - Know your instance hostname, exact domain name and your organization's
   sign-in method.
 
-This repository contains the **1.0.47 release candidate**. Until publication,
-the Gallery command installs the latest published release. See the
-[release notes](CHANGELOG.md#1047) for what's new.
+Version **1.0.47** is available on the
+[PowerShell Gallery](https://www.powershellgallery.com/packages/AutomateNOW/1.0.47).
+See the [release notes](CHANGELOG.md#1047) for what's new.
 
 ## Getting started
 
