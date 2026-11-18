@@ -1,2 +1,9 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Preserve the exact validated release bytes across Git transfers.
+/AutomateNOW.psd1 -text
+/AutomateNOW.psm1 -text
+/Classes.psm1 -text
+/Icons.ps1 -text
+/timezones.json -text
